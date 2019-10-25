@@ -10,7 +10,7 @@ project_folder = os.path.expanduser(BASE_DIR)
 load_dotenv(os.path.join(project_folder, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG')
+DEBUG = os.environ.get('DEBUG', False)
 
 ALLOWED_HOSTS = ['*']
 
@@ -46,7 +46,6 @@ PROJECT_APPS = [
     'marketing',
     'project',
     'jd_parser',
-    # 'reports',
     'activity',
     'ckiller',
     'notification_utils',
@@ -64,7 +63,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'qinspect.middleware.QueryInspectMiddleware',
 ]
 
 ROOT_URLCONF = 'log1.urls'
@@ -87,16 +85,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'log1.wsgi.application'
 
-
-# Database Configuration
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.environ.get('DB_NAME', ''),
+        'USER': os.environ.get('DB_USER', ''),
+        'PORT': os.environ.get('DB_PORT', '5432'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'consultadd'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
     }
 }
 
@@ -113,16 +109,15 @@ AUTH_PASSWORD_VALIDATORS = [
 CORS_ORIGIN_ALLOW_ALL = True
 
 # Send Grid Configuration
-SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', None)
 
-EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'apikey'
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
+EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', None)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', None)
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_API_KEY', None)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-DEFAULT_FROM_EMAIL = "Log1@consultadd.com"
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'consultadd.com')
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -180,12 +175,7 @@ logging.config.dictConfig({
         'file': {
             'level': 'DEBUG',
             'handlers': ['console']
-        },
-        'qinspect': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': True,
-        },
+        }
     }
 })
 
@@ -199,27 +189,3 @@ CELERY_TASK_ALWAYS_EAGER = False
 NOTIFICATIONS_CHANNELS = {
     'websocket': 'notification_utils.channels.BroadCastWebSocketChannel'
 }
-
-# Query Inspector behaviour
-
-# Whether the Query Inspector should do anything (default: False)
-QUERY_INSPECT_ENABLED = True
-# Whether to log the stats via Django logging (default: True)
-QUERY_INSPECT_LOG_STATS = True
-# Whether to add stats headers (default: True)
-QUERY_INSPECT_HEADER_STATS = True
-# Whether to log duplicate queries (default: False)
-QUERY_INSPECT_LOG_QUERIES = True
-# Whether to log queries that are above an absolute limit (default: None - disabled)
-QUERY_INSPECT_ABSOLUTE_LIMIT = 100  # in milliseconds
-# Whether to log queries that are more than X standard deviations above the mean query time (default: None - disabled)
-QUERY_INSPECT_STANDARD_DEVIATION_LIMIT = 2
-# Whether to include tracebacks in the logs (default: False)
-QUERY_INSPECT_LOG_TRACEBACKS = True
-# Project root (a list of directories, see below - default empty)
-QUERY_INSPECT_TRACEBACK_ROOTS = [BASE_DIR]
-# Minimum number of duplicates needed to log the query (default: 2)
-QUERY_INSPECT_DUPLICATE_MIN = 1  # to force logging of all queries
-# Whether to truncate SQL queries in logs to specified size, for readability purposes
-# (default: None - full SQL query is included)
-QUERY_INSPECT_SQL_LOG_LIMIT = 120  # limit to 120 chars
