@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from utils_app.admin import ExportCsvMixin
-from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, \
+from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, FeedbackDetail, \
     ConsultantPOC, ConsultantFeedback, Education, Experience, WorkAuth
 
 
@@ -40,6 +40,12 @@ class ExperienceAdmin(admin.ModelAdmin, ExportCsvMixin):
     list_display = ('id', 'title', 'consultant', 'org_name', 'exp_type', 'start_date', 'end_date', 'city')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'org_name', 'title', 'city')
     actions = ["export_as_csv"]
+
+
+@admin.register(FeedbackDetail)
+class FeedbackDetail(admin.ModelAdmin):
+    list_display = ('id', 'role', 'experience', 'programming', 'communication', 'problem_solving', 'organizational')
+    search_fields = ('id',)
 
 
 @admin.register(ConsultantMarketing)

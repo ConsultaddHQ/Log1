@@ -1,31 +1,139 @@
 import logging
-from datetime import datetime, date
-from django.db.models import Subquery, OuterRef, Q, F, Count
 from django.shortcuts import get_object_or_404
+from django.db.models import Subquery, OuterRef, Q, F, Count
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.generics import CreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
+from project.models import Project
 from consultant.serializers import *
+from activity.serializers import CommentSerializer
+from marketing.models import Submission, Interview
+from attachment.serializers import AttachmentSerializer
 
 logger = logging.getLogger(__name__)
 
 
-class ConsultantBenchViewSets(viewsets.ModelViewSet):
+class ConsultantViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
-    serializer_class = ConsultantSerializer
+    serializer_class = ConsultantBenchSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @action(methods=['get'], detail=False, url_path='map')
-    def map(self, request):
-        consultants = Consultant.objects.filter(status='in_marketing').values('current_city').annotate(
-            total=Count('current_city')).order_by('current_city')
-        return Response({"results": consultants}, status=status.HTTP_200_OK)
+    @staticmethod
+    def get_submission_data(queryset, filter_by_status, first, last):
+        try:
+            total = queryset.count()
+            submission = queryset.filter(status='sub').count()
+            project = queryset.filter(status='project').count()
+            interview = queryset.filter(status='interview').count()
+
+            if filter_by_status:
+                queryset = queryset.filter(status=filter_by_status)
+
+            data_counts = {
+                'total': total,
+                'sub': submission,
+                'project': project,
+                'interview': interview
+            }
+            data = queryset.select_related('lead', 'consultant')[first:last].annotate(
+                consultant_name=F('consultant_marketing__consultant__name'),
+                company_name=F('lead__vendor_company__name'),
+                marketer_name=F('lead__marketer__employee_name'),
+                location=F('lead__city')
+            ).values('id', 'rate', 'consultant_name', 'company_name', 'marketer_name', 'location', 'project')
+
+            return data, data_counts
+        except Exception as error:
+            logger.error(error)
+            return error, "error"
+
+    @staticmethod
+    def get_interview_data(queryset, filter_by_status, first, last):
+        try:
+            # Interview counts by status
+            queryset = queryset.order_by('-modified').distinct('modified')
+            total = queryset.count()
+            failed = queryset.filter(status='failed').count()
+            offer = queryset.filter(status='offer').count()
+            scheduled = queryset.filter(status='scheduled').count()
+            cancelled = queryset.filter(status='cancelled').count()
+            rescheduled = queryset.filter(status='rescheduled').count()
+            feedback_due = queryset.filter(status='feedback_due').count()
+
+            data_counts = {
+                'total': total,
+                'offer': offer,
+                'failed': failed,
+                'scheduled': scheduled,
+                'cancelled': cancelled,
+                'rescheduled': rescheduled,
+                'feedback_due': feedback_due,
+            }
+
+            if filter_by_status:
+                queryset = queryset.filter(status=filter_by_status)
+
+            data = queryset[first:last].annotate(
+                job_title=F('submission__lead__job_title'),
+                ctb_name=F('supervisor__employee_name'),
+                client=F('submission__client'),
+                project=F('submission__project'),
+                marketer_name=F('submission__lead__marketer__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+
+            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_type', 'submission_id',
+                     'supervisor__employee_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
+                     'project', 'job_title', 'modified', 'created')
+
+            return data, data_counts
+        except Exception as error:
+            logger.error(error)
+            return error, 'error'
+
+    @staticmethod
+    def get_project_data(queryset, filter_by_status, first, last):
+        try:
+            # count of project by status
+            total = queryset.count()
+            new = queryset.filter(status='new').count()
+            joined = queryset.filter(status='joined').count()
+            received = queryset.filter(status='received').count()
+            on_boarded = queryset.filter(status='on_boarded').count()
+            not_joined = queryset.filter(status='not_joined').count()
+
+            queryset = queryset.order_by('-modified').distinct('modified')
+            if filter_by_status:
+                queryset = queryset.filter(status=filter_by_status)
+
+            data_counts = {
+                'new': new,
+                'total': total,
+                'joined': joined,
+                'received': received,
+                'on_boarded': on_boarded,
+                'not_joined': not_joined,
+            }
+            data = queryset[first:last].annotate(
+                consultant_name=F('consultant__name'),
+                location=F('submission__lead__city'),
+                company_name=F('submission__lead__vendor_company__name'),
+                client=F('submission__client'),
+                rate=F('submission__rate'),
+                marketer_name=F('submission__lead__marketer__employee_name')
+            ).values('id', 'consultant_name', 'location', 'company_name', 'client', 'rate', 'marketer_name')
+            return data, data_counts
+        except Exception as error:
+            logger.error(error)
+            return error, 'error'
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -37,6 +145,281 @@ class ConsultantBenchViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        consultant = Consultant.objects.filter(email__iexact=data['email'])
+        if consultant:
+            return Response({"result": "Consultant Already Exist"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            consultant = Consultant.objects.create(
+                ssn=data['ssn'],
+                name=data['name'],
+                email=data['email'],
+                skype=data['skype'],
+                links=data['links'],
+                skills=data['skills'],
+                gender=data['gender'],
+                date_of_birth=data['dob'],
+                phone_no=data['phone_no'],
+                work_type=data['work_type'],
+                current_city=data['current_city'],
+            )
+
+            # Creating Marketing Cycle of Consultant
+            consultant_marketing = ConsultantMarketing.objects.create(
+                consultant=consultant,
+                in_pool=data['in_pool'],
+                start=data['marketing_start'],
+                primary_marketer_id=data['primary_marketer'],
+                preferred_location=data['preferred_location'],
+            )
+
+            teams = request.data.get('teams', None)
+            if teams:
+                for team in teams:
+                    consultant_marketing.teams.add(get_object_or_404(Team, name=team))
+
+            # Creating Recruiter of Consultant
+            ConsultantPOC.objects.create(
+                consultant=consultant,
+                poc_type='recruiter',
+                start=timezone.now(),
+                poc_id=data['recruiter']
+            )
+
+            # Creating Retention of Consultant
+            ConsultantPOC.objects.create(
+                consultant=consultant,
+                poc_type='retention',
+                start=timezone.now(),
+                poc_id=data['retention']
+            )
+
+            # Creating Work-Auth
+            WorkAuth.objects.create(
+                consultant=consultant,
+                is_current=True,
+                visa_end=data['visa_end'],
+                visa_start=data['visa_start'],
+                visa_type=data['visa_type'],
+            )
+
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        obj_id = kwargs.get('pk')
+        con_obj = request.query_params.get('type')
+        obj_status = request.query_params.get('obj_status')
+        con_classes = {
+            'work_auth': WorkAuth,
+            'consultant': Consultant,
+            'recruiter': ConsultantPOC,
+            'retention': ConsultantPOC,
+            'marketing': ConsultantMarketing,
+            'rate_revision': ConsultantRateRevisionSerializer,
+            'serializer': {
+                'work_auth': WorkAuthSerializer,
+                'retention': ConsultantPOCSerializer,
+                'recruiter': ConsultantPOCSerializer,
+                'consultant': ConsultantUpdateSerializer,
+                'marketing': ConsultantMarketingCreateSerializer,
+                'rate_revision': ConsultantRateRevisionSerializer,
+            }
+        }
+        try:
+            if obj_status == 'created':
+                serializer = con_classes['serializer']["con_obj"](data=request.data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                else:
+                    return Response({"result": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                obj = get_object_or_404(con_classes["con_obj"], id=obj_id)
+                if not obj:
+                    return Response({"result": "Consultant Object not found"}, status=status.HTTP_400_BAD_REQUEST)
+                serializer = con_classes['serializer']['con_obj'](obj, partial=True)
+                serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except KeyError as err:
+            logger.error(err)
+            return Response({"error": "%s Object type not found" % (con_obj,)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=True, url_path='edu_exp')
+    def edu_exp(self, request, *args, **kwargs):
+        data = request.data
+        consultant_id = kwargs.get('pk')
+        try:
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+
+            Education.objects.create(
+                city=data['city'],
+                title=data['title'],
+                major=data['major'],
+                remark=data['remark'],
+                consultant=consultant,
+                org_name=data['org_name'],
+                edu_type=data['edu_type'],
+                end_date=data['end_date'],
+                start_date=data['start_date'],
+            )
+            Experience.objects.create(
+                city=data['city'],
+                title=data['title'],
+                remark=data['remark'],
+                consultant=consultant,
+                company=data['company'],
+                org_name=data['org_name'],
+                exp_type=data['exp_type'],
+                end_date=data['end_date'],
+                start_date=data['start_date'],
+            )
+            return Response({"result": "created"}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, url_path='marketing')
+    def marketing(self, request, *args, **kwargs):
+        page = int(request.query_params.get("page", 1))
+        marketing_stage = request.query_params.get('stage')
+        page_size = int(request.query_params.get("page_size", 10))
+        filter_by_status = request.query_params.get("filter_by_status", None)
+        last, first = page * page_size, page * page_size - page_size
+
+        try:
+            consultant_id = kwargs.get('pk')
+            if marketing_stage == 'submission':
+                submissions = Submission.objects.filter(
+                    consultant_marketing__consultant_id=consultant_id,
+                    consultant_marketing__end=None
+                ).exclude(status='draft')
+                data, counts = self.get_submission_data(submissions, filter_by_status, first, last)
+                if counts == "error":
+                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+            elif marketing_stage == 'interview':
+                interviews = Interview.objects.filter(
+                    submission__consultant_marketing__consultant_id=consultant_id,
+                    submission__consultant_marketing__end=None
+                )
+                data, counts = self.get_interview_data(interviews, filter_by_status, first, last)
+                if counts == "error":
+                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                projects = Project.objects.filter(
+                    consultant_id=consultant_id
+                )
+                data, counts = self.get_project_data(projects, filter_by_status, first, last)
+                if counts == "error":
+                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"results": data, "data_count": counts})
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get', 'post'], detail=True, url_path='feedback')
+    def feedback(self, request, *args, **kwargs):
+        if request.method == 'GET':
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+            last, first = page * page_size, page * page_size - page_size
+
+            try:
+                consultant_id = kwargs.get('pk')
+                feedback_type = request.query_params.get("feedback_type")
+                queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id, feedback_type=feedback_type)
+                serializer = CommentSerializer(queryset, many=True)
+                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        elif request.method == 'POST':
+            try:
+                consultant_id = kwargs.get('pk')
+                data = request.data
+                feedback_details = FeedbackDetail.objects.create(
+                    role=data['role'],
+                    experience=data['experience'],
+                    programming=data['programming'],
+                    communication=data['communication'],
+                    organizational=data['organizational '],
+                    problem_solving=data['problem_solving'],
+                )
+                feedback = ConsultantFeedback.objects.create(
+                    remark=data['remark'],
+                    rating=data['rating'],
+                    created_by=request.user,
+                    feedback=feedback_details,
+                    consultant_id=consultant_id,
+                    given_by_id=data['given_by'],
+                    feedback_type=data['feedback_type'],
+                )
+                serializer = ConsultantFeedbackSerializer(feedback, many=True)
+                return Response({'result': serializer.data}, status=status.HTTP_201_CREATED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": 'Method not allowed'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, url_path='documents')
+    def documents(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+            queryset = consultant.attachments.all()
+            serializer = AttachmentSerializer(queryset, many=True)
+            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get', 'post'], detail=True, url_path='comments')
+    def comments(self, request, *args, **kwargs):
+        if request.method == 'GET':
+            try:
+                consultant_id = kwargs.get('pk')
+                consultant = get_object_or_404(Comment, id=consultant_id)
+                queryset = consultant.comments.all()
+                serializer = CommentSerializer(queryset, many=True)
+                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        elif request.method == 'POST':
+            try:
+                content_type = ContentType.objects.get(model='comment')
+                object_id = request.data['object_id']
+                comment = Comment.objects.create(
+                    user=request.user,
+                    object_id=object_id,
+                    content_type=content_type,
+                    comment_text=request.data['comment_text'],
+                    parent_comment_id=request.data['parent_comment'],
+                )
+                serializer = CommentSerializer(comment)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantBenchSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @action(methods=['get'], detail=False, url_path='map')
+    def map(self, request):
+        consultants = Consultant.objects.filter(status='in_marketing').values('current_city').annotate(
+            total=Count('current_city')).order_by('current_city')
+        return Response({"results": consultants}, status=status.HTTP_200_OK)
+
     def list(self, request, *args, **kwargs):
         team_name = request.query_params.get('team', None)
         con_status = request.query_params.get('status', 'in_marketing')
@@ -45,9 +428,7 @@ class ConsultantBenchViewSets(viewsets.ModelViewSet):
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
-        if 'query' in request.query_params:
-            if len(query.strip()) == 0:
-                query = 'empty'
+
         try:
             consultants = Consultant.objects.filter(marketing__end=None).exclude(
                 status__in=['new', 'archived', 'in_training', 'terminated'])
@@ -63,16 +444,13 @@ class ConsultantBenchViewSets(viewsets.ModelViewSet):
 
             # Consultants search based on name, email, recruiter and location
             elif query:
-                consultants = consultants.objects.filter(
-                    Q(name=query) |
-                    Q(email=query) |
-                    Q(skills=query) |
-                    Q(current_city=query) |
+                consultants = consultants.filter(
+                    Q(name=query) | Q(email=query) | Q(skills=query) | Q(current_city=query) |
                     Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
                 # Marketer's team Consultants
             else:
-                consultants = Consultant.objects.filter(
+                consultants = consultants.filter(
                     Q(marketing__teams=request.user.team, marketing__in_pool=False) |
                     Q(marketing__marketer=request.user)
                 )
@@ -90,15 +468,201 @@ class ConsultantBenchViewSets(viewsets.ModelViewSet):
             if con_status == 'in_pool':
                 consultants = consultants.filter(status='in_marketing', marketing__in_pool=True)
             else:
-                consultants = consultants.filter(status='in_marketing', marketing__in_pool=False)
+                consultants = consultants.filter(status=con_status, marketing__in_pool=False)
+
             con_marketing = ConsultantPOC.objects.filter(
                 consultant=OuterRef("pk"), end=None, poc_type='recruiter')
+
             data = consultants[first:last].annotate(
                 preferred_location=F('marketing__preferred_location'),
                 recruiter=Subquery(con_marketing.values('poc__employee_name')[:1])
             ).values('id', 'name', 'skills', 'preferred_location', 'recruiter')
+
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
 
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ConsultantMarketingViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
+    queryset = ConsultantMarketing.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ConsultantMarketingSerializer
+
+    # Marketer assignment
+    @action(methods=["put"], detail=True, url_path='marketer_assignment')
+    def marketer_assignment(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, end=None)
+            if queryset:
+                consultant_marketing = queryset.first()
+            else:
+                return Response({"result": "Consultant is not in Marketing"})
+            roles = request.user.roles
+            if 'superadmin' in roles or \
+                    ('admin' in roles and request.user.team in consultant_marketing.consultant.teams.all()):
+                marketer_ids = request.data.get('marketers', None)
+                for marketer_id in marketer_ids:
+                    marketer = get_object_or_404(User, id=marketer_id)
+                    consultant_marketing.marketer.add(marketer)
+                serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_200_OK)
+
+    # Team Assignment
+    @action(methods=['put'], detail=True, url_path='team_assignment')
+    def team_assignment(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, end=None)
+            if queryset:
+                consultant_marketing = queryset.first()
+            else:
+                return Response({"result": "Consultant is not in Marketing"})
+            if 'superadmin' in request.user.roles:
+                team_ids = request.data.get('teams')
+                for team_id in team_ids:
+                    team = get_object_or_404(Team, id=team_id)
+                    consultant_marketing.teams.add(team)
+                serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_200_OK)
+
+    # Remove assigned Marketer from Consultant
+    @action(methods=['put'], detail=True, url_path='remove_marketer')
+    def remove_marketer(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, end=None)
+            if queryset:
+                consultant_marketing = queryset.first()
+            else:
+                return Response({"result": "Consultant is not in Marketing"})
+            roles = request.user.roles
+            if 'superadmin' in roles or \
+                    ('admin' in roles and request.user.team in consultant_marketing.consultant.teams.all()):
+                marketer_ids = request.data.get('marketers', None)
+                for marketer_id in marketer_ids:
+                    marketer = get_object_or_404(User, id=marketer_id)
+                    consultant_marketing.marketer.remove(marketer)
+                serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Remove team from Consultant
+    @action(methods=['put'], detail=True, url_path='remove_team')
+    def remove_team(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, end=None)
+            if queryset:
+                consultant_marketing = queryset.first()
+            else:
+                return Response({"result": "Consultant is not in Marketing"})
+            if 'superadmin' in request.user.roles:
+                team_ids = request.data.get('teams')
+                for team_id in team_ids:
+                    team = get_object_or_404(Team, id=team_id)
+                    consultant_marketing.teams.remove(team)
+                serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_200_OK)
+
+
+class ConsultantProfileViewSets(viewsets.ModelViewSet):
+    permission_classes = (IsAuthenticated,)
+    queryset = ConsultantProfile.objects.all()
+    serializer_class = ConsultantProfileSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    # Return Consultant Profile by ID
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            profile_id = kwargs.get('pk')
+            profile = get_object_or_404(ConsultantProfile, id=profile_id)
+            serializer = self.serializer_class(profile)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Return Consultant Profiles
+    def list(self, request, *args, **kwargs):
+        try:
+            consultant_id = request.query_params.get('con_id', None)
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+            profiles = consultant.profiles.all()
+            serializer = self.serializer_class(profiles, many=True)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data
+            suffix = data['title'].strip()
+            name = request.user.full_name
+            initials = name.split()[0][0] + name.split()[1][0] if len(name.split()) > 1 else ""
+            title = "{}-{}-{}".format(initials.upper(), data['visa_type'], data["dob"][:4])
+
+            consultant_profile = ConsultantProfile.objects.create(
+                links=data['links'],
+                linkedin=data['linkedin'],
+                date_of_birth=data['dob'],
+                visa_end=data['visa_end'],
+                title=title + "-" + suffix,
+                profile_owner=request.user,
+                education=data['education'],
+                visa_type=data['visa_type'],
+                visa_start=data['visa_start'],
+                consultant_id=data['consultant'],
+                current_city=data['current_city'],
+            )
+            serializer = self.serializer_class(consultant_profile)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            consultant_profile_id = kwargs.get('pk')
+            consultant_profile = get_object_or_404(ConsultantProfile, id=consultant_profile_id)
+            serializer = self.serializer_class(consultant_profile, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            consultant_profile_id = kwargs.get('pk')
+            consultant_profile = get_object_or_404(ConsultantProfile, id=consultant_profile_id)
+            consultant_profile.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

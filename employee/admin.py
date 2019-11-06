@@ -17,9 +17,8 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
                  ('Important dates', {'fields': ('last_login', 'date_joined')}),
                  )
 
-    list_display = (
-        'id', 'employee_id', 'email', 'employee_name', 'team', 'gender', 'is_active', 'roles', 'consultant_assigned')
-    search_fields = ('email', 'employee_id', 'name', 'id', 'team__name')
+    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'roles')
+    search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
     actions = ["export_as_csv"]
 
     def roles(self, obj):
@@ -29,20 +28,13 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
 
     roles.short_description = "Roles"
 
-    def consultant_assigned(self, obj):
-        return ", ".join([
-            user.name for user in obj.marketed.all()
-        ])
-
-    consultant_assigned.short_description = "Consultant Assigned"
-
 
 class UserCreationFormExtended(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super(UserCreationFormExtended, self).__init__(*args, **kwargs)
-        self.fields['employee_id'] = forms.IntegerField(label=_("Employee-ID"))
-        self.fields['username'] = forms.IntegerField(label=_("Username"))
-        self.fields['email'] = forms.EmailField(label=_("E-mail"), max_length=75)
+        self.fields['employee_id'] = forms.IntegerField(label=_("Employee ID"))
+        self.fields['username'] = forms.IntegerField(label=_("User Name"))
+        self.fields['email'] = forms.EmailField(label=_("Email"), max_length=75)
 
 
 UserAdmin.add_form = UserCreationFormExtended
@@ -57,7 +49,7 @@ UserAdmin.add_fieldsets = (
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'email', 'address')
-    search_fields = ('employee_name', 'email')
+    search_fields = ('name', 'email')
 
 
 @admin.register(Role)

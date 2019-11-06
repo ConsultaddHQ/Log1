@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from employee.models import User, Asset
+from employee.models import User, Asset, Team
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -33,6 +33,12 @@ class UserSerializerLogin(UserSerializer):
     @staticmethod
     def get_team(self):
         return self.team.name
+
+
+class TeamSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Team
+        fields = ('id', 'name')
 
 
 class EmailSerializer(serializers.Serializer):

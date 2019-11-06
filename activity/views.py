@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 
 from activity.models import Activity
 from activity.serializers import ActivitySerializer
@@ -25,7 +26,7 @@ def create_activity(object_id, model, user, desc, activity_type):
     return serializer.data
 
 
-class ActivityViewSets(viewsets.ModelViewSet):
+class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
     queryset = Activity.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ActivitySerializer
@@ -53,11 +54,3 @@ class ActivityViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    def create(self, request, *args, **kwargs):
-        return Response({"error": "Bad request"}, status=status.HTTP_400_BAD_REQUEST)
-
-    def update(self, request, *args, **kwargs):
-        return Response({"error": "Bad request"}, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, *args, **kwargs):
-        return Response({"error": "Bad request"}, status=status.HTTP_400_BAD_REQUEST)

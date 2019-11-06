@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
+from activity.models import Comment
 from employee.models import User, Team
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
@@ -59,6 +60,7 @@ WORK_TYPE_CHOICE = (
 class Consultant(TimeStampedModel):
     email = models.EmailField(_('Email ID'), unique=True)
     name = models.CharField(_('Full Name'), max_length=100)
+    comments = GenericRelation(Comment, verbose_name="comments")
     attachments = GenericRelation(Attachment, verbose_name="Documents")
     ssn = models.CharField(_('SSN ID'), max_length=20, null=True, blank=True)
     date_of_birth = models.DateField(_('Date of birth'), blank=True, null=True)
@@ -141,8 +143,7 @@ class Experience(models.Model):
     remark = models.TextField(_('Additional Details'), null=True, blank=True)
     city = models.CharField(_('City'), max_length=100, blank=True, null=True)
     company = models.CharField(_('Company name'), max_length=100, null=True, blank=True)
-    org_name = models.CharField(_('Organization Name'), max_length=50, null=True, blank=True)
-    exp_type = models.CharField(_('Experience Type'), max_length=50, choices=EDUCATION_CHOICES, null=True, blank=True)
+    exp_type = models.CharField(_('Experience Type'), max_length=50, null=True, blank=True)
     start_date = models.DateField(
         _('Start Date'),
         null=True, blank=True,
@@ -288,13 +289,16 @@ class ConsultantPOC(TimeStampedModel):
         return f'{self.poc.employee_name} {self.poc_type} of {self.consultant.name}'
 
 
-class FeedbackDetails(models.Model):
+class FeedbackDetail(models.Model):
     role = models.TextField(_('Role Knowledge'), blank=True, null=True)
     experience = models.TextField(_('Experience'), blank=True, null=True)
     programming = models.TextField(_('Programming Skill'), blank=True, null=True)
     communication = models.TextField(_('Communication Skills'), blank=True, null=True)
     problem_solving = models.TextField(_('Problem Solving Skill'), blank=True, null=True)
     organizational = models.TextField(_('Organizational Knowledge'), blank=True, null=True)
+
+    def __str__(self):
+        return self.id
 
 
 class ConsultantFeedback(TimeStampedModel):
@@ -308,7 +312,7 @@ class ConsultantFeedback(TimeStampedModel):
         help_text=_('Rating 1 being worst and 5 being best')
     )
     feedback = models.ForeignKey(
-        FeedbackDetails, on_delete=models.CASCADE,
+        FeedbackDetail, on_delete=models.CASCADE,
         related_name='consultant',
         verbose_name='Consultant Feedback')
     consultant = models.ForeignKey(
@@ -338,4 +342,3 @@ class ConsultantFeedback(TimeStampedModel):
 
     def __str__(self):
         return f'{self.consultant.name} {self.feedback_type} of {self.rating}'
-

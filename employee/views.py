@@ -88,8 +88,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin):
         try:
             query = request.query_params.get('query', None)
             user_type = request.query_params.get('type', None)
-            if user_type == 'interview':
-                users = User.objects.filter(role__name='interviewee')
+            if user_type:
+                users = User.objects.filter(role__name=user_type)
             elif user_type == 'team':
                 if 'superadmin' in request.user.roles:
                     users = User.objects.prefetch_related('role').filter(role__name='marketer')
@@ -134,7 +134,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ResetPasswordViewSet(GenericViewSet):
+class ResetPasswordViewSets(GenericViewSet):
     queryset = User.objects.all()
     permission_classes = ()
     authentication_classes = ()
@@ -232,8 +232,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
     serializer_class = AssetSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-    field_list = ['id', 'email', 'number', 'username', 'password', 'employee_id', 'provider', 'modified', 'tech',
-                  'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'employee_name']
+    field_list = ['id', 'email', 'number', 'username', 'password', 'provider', 'modified', 'tech',
+                  'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
 
     def retrieve(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')

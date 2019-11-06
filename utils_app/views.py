@@ -52,9 +52,14 @@ def get_time_filter(queryset, filter_by):
         start_of_week = today - timedelta(today.weekday())
         queryset = queryset.filter(created__gte=start_of_week)
 
-    elif filter_by == 'month':
+    elif filter_by == 'last_month':
         last = date.today().replace(day=1) - timedelta(days=1)
-        first = date.today().replace(day=1) - timedelta(days=last.day)
+        first = last.replace(day=1)
+        queryset = queryset.filter(created__range=[first, last])
+
+    elif filter_by == 'this_month':
+        first = date.today().replace(day=1)
+        last = date.today()
         queryset = queryset.filter(created__range=[first, last])
 
     return queryset

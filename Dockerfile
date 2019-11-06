@@ -13,8 +13,8 @@ ENV PYTHONUNBUFFERED 1
 
 # install dependencies
 RUN pip install --upgrade pip
-COPY ./requirements/base.txt /usr/src/log1/requirements/prod.txt
-RUN pip install -r requirements/prod.txt
+COPY ./requirements/base.txt /usr/src/log1/requirements/base.txt
+RUN pip install -r requirements/base.txt
 
 # copy project
 COPY . /usr/src/log1/

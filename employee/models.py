@@ -189,7 +189,7 @@ class Asset(TimeStampedModel):
         return super(Asset, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.owner.name
+        return self.owner.employee_name
 
 
 class Organization(TimeStampedModel):
