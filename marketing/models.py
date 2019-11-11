@@ -7,13 +7,13 @@ from django.contrib.contenttypes.fields import GenericRelation
 
 from employee.models import User
 from attachment.models import Attachment
-from consultant.models import ConsultantMarketing
 from utils_app.models import TimeStampedModel
+from consultant.models import ConsultantMarketing
 
 
 STATUS_CHOICES = (
     ('new', 'New'),
-    ('draft', 'draft'),
+    ('draft', 'Draft'),
     ('sub', 'Submitted'),
     ('archived', 'Archived'),
 )

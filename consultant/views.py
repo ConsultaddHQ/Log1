@@ -20,10 +20,10 @@ from attachment.serializers import AttachmentSerializer
 logger = logging.getLogger(__name__)
 
 
-class ConsultantViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
+class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
-    serializer_class = ConsultantBenchSerializer
     permission_classes = (IsAuthenticated,)
+    serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
@@ -135,17 +135,39 @@ class ConsultantViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             logger.error(error)
             return error, 'error'
 
+    def list(self, request, *args, **kwargs):
+        consultants = Consultant.objects.filter(status='in_marketing')
+        roles = request.user.roles
+
+        if 'marketer' in request.user.roles:
+            consultants = consultants.filter(
+                Q(in_pool=True) |
+                Q(marketer=request.user)
+            )
+        elif 'admin' in roles:
+            consultants = consultants.filter(
+                Q(teams=request.user.team, in_pool=False) |
+                Q(in_pool=True)
+            )
+
+        consultants = consultants.order_by('id').distinct('id')
+        serializer = ConsultantListSerializer(consultants, many=True)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
     def retrieve(self, request, *args, **kwargs):
         try:
             consultant_id = kwargs.get('pk')
             consultant = get_object_or_404(Consultant, id=consultant_id)
             serializer = self.serializer_class(consultant)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles and 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
@@ -211,6 +233,9 @@ class ConsultantViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
         return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles and 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
         obj_id = kwargs.get('pk')
         con_obj = request.query_params.get('type')
         obj_status = request.query_params.get('obj_status')
@@ -249,8 +274,11 @@ class ConsultantViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             logger.error(err)
             return Response({"error": "%s Object type not found" % (con_obj,)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['post'], detail=True, url_path='edu_exp')
-    def edu_exp(self, request, *args, **kwargs):
+    @action(methods=['post'], detail=True, url_path='education')
+    def education(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles or 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
         data = request.data
         consultant_id = kwargs.get('pk')
         try:
@@ -267,13 +295,26 @@ class ConsultantViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 end_date=data['end_date'],
                 start_date=data['start_date'],
             )
+            return Response({"result": "created"}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=True, url_path='experience')
+    def experience(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles or 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+        data = request.data
+        consultant_id = kwargs.get('pk')
+        try:
+            consultant = get_object_or_404(Consultant, id=consultant_id)
             Experience.objects.create(
                 city=data['city'],
                 title=data['title'],
                 remark=data['remark'],
                 consultant=consultant,
                 company=data['company'],
-                org_name=data['org_name'],
                 exp_type=data['exp_type'],
                 end_date=data['end_date'],
                 start_date=data['start_date'],
@@ -407,11 +448,18 @@ class ConsultantViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=True, url_path='rate_revision')
+    def rate_revision(self, request, *args, **kwargs):
+        consultant_id = kwargs.get('pk')
+        rate_revision = ConsultantRateRevision.objects.filter(consultant=consultant_id)
+        data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback')
+        return Response({"results": data}, status=status.HTTP_200_OK)
+
 
 class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
-    serializer_class = ConsultantBenchSerializer
     permission_classes = (IsAuthenticated,)
+    serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
     @action(methods=['get'], detail=False, url_path='map')
@@ -470,13 +518,23 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
             else:
                 consultants = consultants.filter(status=con_status, marketing__in_pool=False)
 
-            con_marketing = ConsultantPOC.objects.filter(
+            poc = ConsultantPOC.objects.filter(
                 consultant=OuterRef("pk"), end=None, poc_type='recruiter')
 
+            rate = ConsultantRateRevision.objects.filter(
+                consultant=OuterRef("pk"), end=None)
+
+            marketing = ConsultantMarketing.objects.filter(
+                consultant=OuterRef("pk"), end=None)
+
             data = consultants[first:last].annotate(
-                preferred_location=F('marketing__preferred_location'),
-                recruiter=Subquery(con_marketing.values('poc__employee_name')[:1])
-            ).values('id', 'name', 'skills', 'preferred_location', 'recruiter')
+                rate=Subquery(rate.values('rate')[:1]),
+                rtg=Subquery(marketing.values('rtg')[:1]),
+                in_pool=Subquery(marketing.values('in_pool')[:1]),
+                marketing_start=Subquery(marketing.values('start')[:1]),
+                recruiter=Subquery(poc.values('poc__employee_name')[:1]),
+                preferred_location=Subquery(marketing.values('preferred_location')[:1]),
+            ).values('id', 'name', 'skills', 'preferred_location', 'recruiter','rtg', 'rate', 'in_pool', 'marketing_start')
 
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
 
@@ -485,9 +543,9 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConsultantMarketingViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
-    queryset = ConsultantMarketing.objects.all()
+class ConsultantMarketingViewSets(GenericViewSet):
     permission_classes = (IsAuthenticated,)
+    queryset = ConsultantMarketing.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantMarketingSerializer
 
@@ -511,7 +569,7 @@ class ConsultantMarketingViewSets(RetrieveModelMixin, ListModelMixin, GenericVie
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_200_OK)
@@ -534,7 +592,7 @@ class ConsultantMarketingViewSets(RetrieveModelMixin, ListModelMixin, GenericVie
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_200_OK)
@@ -559,7 +617,7 @@ class ConsultantMarketingViewSets(RetrieveModelMixin, ListModelMixin, GenericVie
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -582,7 +640,7 @@ class ConsultantMarketingViewSets(RetrieveModelMixin, ListModelMixin, GenericVie
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_200_OK)

@@ -23,10 +23,8 @@ from constants import ENGINEERING
 
 from utils_app.models import City
 from marketing.serializers import *
-from jd_parser.models import JDParser
 from constants import announcement_url
 from attachment.models import Attachment
-from jd_parser.extraction import extraction
 from utils_app.views import get_time_filter
 from utils_app.mailing import send_email_attachment_multiple
 from utils_app.calendar import get_inteviews, book_calendar, update_calendar, delete_calendar_booking
@@ -88,7 +86,7 @@ class VendorContactViewSets(ListModelMixin, CreateModelMixin, UpdateModelMixin, 
         if vendor:
             return Response({"error": "already exists"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            VendorContact(
+            VendorContact.objects.create(
                 name=data['name'],
                 email=data['email'],
                 number=data['number'],
@@ -129,7 +127,10 @@ class LeadViewSets(viewsets.ModelViewSet):
             archive = queryset.filter(status='archived').count()
 
             if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
+                if filter_by_status == 'archived':
+                    queryset = queryset.filter(status=filter_by_status).exclude(status='archived')
+                else:
+                    queryset = queryset.filter(status=filter_by_status)
 
             data_counts = {
                 "new": new,
@@ -139,7 +140,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 "archive": archive,
             }
 
-            data = queryset[first:last].annotate(
+            data = queryset.exclude(status='archived')[first:last].annotate(
                 company_name=F('vendor_company__name'),
                 company_id=F('vendor_company__id'),
                 project=F('submission__project')
@@ -162,15 +163,15 @@ class LeadViewSets(viewsets.ModelViewSet):
             if query:
                 leads = Lead.objects.filter(
                     Q(marketer=request.user) & (
-                            Q(location__icontains=query) |
+                            Q(city__icontains=query) |
                             Q(job_title__icontains=query) |
                             Q(vendor_company__name__icontains=query)
                     )
                 ).annotate(submission_count=Count('submission'))
 
             else:
-                leads = Lead.objects.filter(marketer=request.user).exclude(status='archived').annotate(
-                    submission_count=Count('submission')).order_by('-modified')
+                leads = Lead.objects.filter(marketer=request.user)\
+                    .annotate(submission_count=Count('submission')).order_by('-modified')
 
             leads = get_time_filter(leads, filter_by=filter_by_time)
 
@@ -183,3 +184,269 @@ class LeadViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            roles_have_access = {'superadmin', 'admin', 'marketer'}
+            res = set(roles).issubset(roles_have_access)
+            if not res:
+                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            serializer = LeadCreateSerializer(data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                queryset = Lead.objects.filter(id=serializer.data["id"])
+                lead = queryset.first()
+                lead.marketer = request.user
+                lead.save()
+                data = queryset.annotate(submission_count=Count('submission')) \
+                    .annotate(company_name=F('vendor_company__name'),
+                              company_id=F('vendor_company__id'),
+                              project=F('submission__project')
+                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills',
+                                       'company_id', 'company_name', 'status', 'created', 'modified', 'submission_count'
+                                       , 'project')
+                return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
+            logger.error(serializer.errors)
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            roles_have_access = {'superadmin', 'admin', 'marketer'}
+            res = set(roles).issubset(roles_have_access)
+            if not res:
+                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            queryset = Lead.objects.filter(id=kwargs.get('pk'))
+            if not queryset:
+                return Response({"error": "Lead not found"}, status=status.HTTP_404_NOT_FOUND)
+            lead = queryset.first()
+            serializer = LeadCreateSerializer(lead, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                data = queryset.annotate(submission_count=Count('submission')) \
+                    .annotate(company_name=F('vendor_company__name'),
+                              company_id=F('vendor_company__id'),
+                              project=F('submission__project')
+                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills',
+                                       'company_id', 'company_name', 'status', 'created', 'modified', 'submission_count'
+                                       , 'project')
+                return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
+            logger.error(serializer.errors)
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            lead = get_object_or_404(Lead, id=kwargs.get('pk'))
+            lead.status = 'archived'
+            lead.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='map')
+    def map(self, request):
+        try:
+            leads = Lead.objects.filter(marketer=request.user).values('city'). \
+                annotate(total=Count('city')).order_by('city')
+            return Response({"results": leads}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='lead_by_city')
+    def lead_by_city(self, request):
+        try:
+            city = request.query_params.get('query', None)
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+            last, first = page * page_size, page * page_size - page_size
+
+            leads = Lead.objects.annotate(submission_count=Count('submission')).filter(
+                Q(marketer=self.request.user, city__iexact=city)).order_by('-modified')
+
+            data, data_counts = self.get_lead_data(leads, '', first, last)
+
+            if data_counts == 'error':
+                return Response({"error": data}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SubmissionViewSets(viewsets.ModelViewSet):
+    queryset = Submission.objects.all()
+    serializer_class = LeadCreateSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @staticmethod
+    def get_submission_data(sub, filter_by_status, first, last):
+        try:
+            total = sub.count()
+            submission = sub.filter(status='sub').count()
+            project = sub.filter(status='project').count()
+            interview = sub.filter(status='interview').count()
+
+            if filter_by_status:
+                sub = sub.filter(status=filter_by_status)
+
+            data_counts = {
+                'total': total,
+                'sub': submission,
+                'project': project,
+                'interview': interview
+            }
+            data = sub.select_related('lead', 'consultant_marketing')[first:last].annotate(
+                consultant_name=F('consultant_marketing__consultant__name'),
+                company_name=F('lead__vendor_company__name'),
+                marketer_name=F('lead__marketer__employee_name'),
+                city=F('lead__city')
+            ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'consultant_name',
+                     'company_name', 'marketer_name', 'city', 'project', 'vendor_contact')
+
+            return data, data_counts
+        except Exception as error:
+            logger.error(error)
+            return error, "error"
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            sub_id = kwargs.get('pk')
+            sub = get_object_or_404(Submission, id=sub_id)
+            if sub.lead.marketer == request.user:
+                serializer = self.detail_serializer_class(sub)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            else:
+                serializer = self.serializer_class(sub)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def list(self, request, *args, **kwargs):
+        query = request.query_params.get('query', None)
+        filter_for = request.query_params.get('filter_for', 'all')
+        consultant_id = request.query_params.get('consultant', None)
+        filter_by_time = request.query_params.get('filter_by_time', 'all')
+        filter_by_status = request.query_params.get('filter_by_status', None)
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        last, first = page * page_size, page * page_size - page_size
+
+        try:
+            roles = request.user.roles
+            # For Recruiter Admin
+            roles_have_access = {'admin', 'recruiter'}
+            res = set(roles).issubset(roles_have_access)
+
+            sub = Submission.objects.filter(
+                consultant_marketing__consultant__status__in=['in_marketing', 'in_offer']).exclude(status='draft')
+
+            if res:
+                sub = sub.select_related('consultant').filter(
+                    Q(consultant_marketing__consultant__recruiter=request.user) |
+                    Q(consultant_marketing__consultant__recruiter__team=request.user.team)
+                )
+            # Team submissions for Scrum master
+            elif 'admin' in roles:
+                sub = sub.select_related('lead', 'consultant').filter(
+                    (Q(lead__marketer__team=request.user.team) |
+                     Q(consultant_marketing__consultant__in_pool=True) |
+                     Q(consultant_marketing__consultant__teams=request.user.team))
+                )
+
+            # Submissions of a marketer and pool consultant submissions (except those are on project)
+            elif 'marketer' in request.user.roles:
+                sub = sub.select_related('lead', 'consultant').filter(
+                    (Q(lead__marketer=request.user) |
+                     Q(consultant_marketing__consultant__marketer=request.user))
+                )
+
+            # Submissions of a Recruiters consultants (except those are on project)
+            elif 'recruiter' in request.user.roles:
+                sub = Submission.objects.select_related('consultant').filter(
+                    consultant_marketing__consultant__recruiter=request.user,
+                    consultant_marketing__consultant__status='in_marketing'
+                )
+
+            if filter_for:
+                if filter_for == 'my':
+                    sub = sub.filter(lead__marketer=request.user)
+                elif filter_for == 'team':
+                    sub = sub.filter(lead__marketer__team=request.user.team)
+
+            if consultant_id and consultant_id != 'null':
+                sub = sub.select_related('lead', 'consultant').filter(consultant_marketing__consultant_id=consultant_id)
+
+            # Search submission by client, vendor and consultant
+            if query:
+                query = query.strip()
+                sub = sub.select_related('lead', 'consultant').filter(
+                    Q(lead__marketer=request.user) &
+                    (Q(client__icontains=query) |
+                     Q(lead__job_title__icontains=query) |
+                     Q(lead__location__icontains=query) |
+                     Q(lead__vendor_company__name__icontains=query) |
+                     Q(consultant_marketing__consultant__name__icontains=query) |
+                     Q(lead__marketer__full_name__istartswith=query) |
+                     Q(vendors__company__name__icontains=query)
+                     )
+                )
+
+            # Submission filter by week, month and all
+            sub = get_time_filter(sub, filter_by_time).order_by('modified').distinct('modified')
+
+            # Submission filter by status
+            data, sub_data = self.get_submission_data(sub, filter_by_status, first, last)
+
+            if sub_data == "error":
+                return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"results": data, "counts": sub_data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data
+            sub = Submission.objects.create(
+                lead_id=data['lead'],
+                consultant_marketing_id=data['consultant'],
+                status='draft'
+            )
+
+            content_type = ContentType.objects.get(model='submission')
+            resume = request.FILES.get('file', None)
+            if resume:
+                Attachment.objects.create(
+                    object_id=sub.id,
+                    content_type=content_type,
+                    attachment_type='resume',
+                    attachment_file=resume,
+                    creator=request.user
+                )
+
+            data = {
+                "id": sub.id,
+                "status": "draft",
+                "created": sub.created,
+                "modified": sub.modified,
+                "consultant_name": sub.consultant_name,
+                "consultant_id": sub.consultant.consultant.id,
+                "attachments": AttachmentSerializer(sub.attachments.all(), many=True).data,
+            }
+            return Response({"result": data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)

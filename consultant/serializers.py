@@ -21,7 +21,7 @@ class ConsultantUpdateSerializer(serializers.ModelSerializer):
 class POCSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'employee_name', 'email')
+        fields = ('id', 'employee_name', 'email', 'phone')
 
 
 class ConsultantMarketingCreateSerializer(serializers.ModelSerializer):
@@ -31,12 +31,13 @@ class ConsultantMarketingCreateSerializer(serializers.ModelSerializer):
 
 
 class ConsultantMarketingSerializer(serializers.ModelSerializer):
+    primary_marketer = POCSerializer()
     teams = TeamSerializer(many=True)
     marketer = POCSerializer(many=True)
 
     class Meta:
         model = ConsultantMarketing
-        fields = ('id', 'teams', 'marketer', 'in_pool', 'start', 'end', 'preferred_location', 'primary_marketer')
+        fields = ('id', 'teams', 'marketer', 'in_pool', 'rtg', 'start', 'end', 'preferred_location', 'primary_marketer')
 
 
 class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
@@ -101,7 +102,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     education = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
-    rate_revision = serializers.SerializerMethodField()
+    rate = serializers.SerializerMethodField()
 
     @staticmethod
     def get_work_auth(self):
@@ -120,12 +121,15 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return EducationSerializer(self.experiences.all(), many=True).data
 
     @staticmethod
-    def get_rate_revision(self):
-        return ConsultantRateRevisionSerializer(self.rates.filter(end=None), many=True).data
+    def get_rate(self):
+        rate_revision = self.rates.filter(end=None)
+        if rate_revision:
+            return rate_revision.first().rate
+        return 0
 
     @staticmethod
     def get_marketing(self):
-        return ConsultantMarketingSerializer(self.marketing.filter(end=None), many=True).data
+        return ConsultantMarketingSerializer(self.marketing.filter(end=None), many=True).data[0]
 
     @staticmethod
     def get_recruiter(self):
@@ -155,4 +159,16 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
                   'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
-                  'profiles', 'education', 'experience', 'rate_revision', 'marketing')
+                  'profiles', 'education', 'experience', 'rate', 'marketing')
+
+
+class ConsultantListSerializer(serializers.ModelSerializer):
+    profiles = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_profiles(self):
+        return ConsultantProfileSerializer(self.profiles.all(), many=True).data
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'email', 'profiles')

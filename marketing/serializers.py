@@ -18,6 +18,12 @@ class VendorContactSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class LeadCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Lead
+        fields = '__all__'
+
+
 class LeadSerializer(serializers.ModelSerializer):
     vendor_company_name = serializers.SerializerMethodField()
     marketer = serializers.SerializerMethodField()
@@ -32,6 +38,40 @@ class LeadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lead
-        fields = (
-            'id', 'job_desc', 'job_title', 'skill', 'location', 'vendor_company_id', 'vendor_company_name', 'marketer',
-            'status', 'created', 'modified')
+        fields = ('id', 'job_desc', 'job_title', 'primary_skill', 'city', 'vendor_company_id', 'vendor_company_name',
+                  'marketer', 'status', 'created', 'modified')
+
+
+class SubmissionDetailSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+    vendor_contact = VendorContactSerializer()
+    lead = LeadSerializer(read_only=True)
+
+    class Meta:
+        model = Submission
+        fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone',
+                  'status', 'is_active', 'vendor_contact', 'attachments')
+
+    @staticmethod
+    def get_attachments(self):
+        return AttachmentSerializer(self.attachments.all(), many=True).data
+
+
+class SubmissionSerializer(serializers.ModelSerializer):
+    vendor_contact = serializers.SerializerMethodField()
+    vendor_layer = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+    lead = LeadSerializer(read_only=True)
+
+    class Meta:
+        model = Submission
+        fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone',
+                  'status', 'is_active', 'vendor_contact', 'attachments')
+
+    @staticmethod
+    def get_attachments(self):
+        return []
+
+    @staticmethod
+    def get_vendor_contact(self):
+        return None

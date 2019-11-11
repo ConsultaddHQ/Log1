@@ -56,7 +56,7 @@ class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
     screening_display.short_description = "Screening"
 
     def marketer_display(self, obj):
-        return obj.lead.marketer.name
+        return obj.lead.marketer.employee_name
 
     marketer_display.short_description = "Marketer"
 

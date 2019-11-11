@@ -196,6 +196,7 @@ class ConsultantProfile(TimeStampedModel):
 
 
 class ConsultantMarketing(TimeStampedModel):
+    rtg = models.BooleanField(_('Ready to Go'), default=False)
     cycle = models.IntegerField(_('Cycle Number'), default=1)
     in_pool = models.BooleanField(_('In Pool'), default=False)
     end = models.DateField(_('Marketing End Date'), blank=True, null=True)

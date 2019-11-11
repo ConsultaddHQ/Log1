@@ -37,8 +37,8 @@ class EducationAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(Experience)
 class ExperienceAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_display = ('id', 'title', 'consultant', 'org_name', 'exp_type', 'start_date', 'end_date', 'city')
-    search_fields = ('id', 'consultant__name', 'consultant__email', 'org_name', 'title', 'city')
+    list_display = ('id', 'title', 'consultant', 'exp_type', 'start_date', 'end_date', 'city')
+    search_fields = ('id', 'consultant__name', 'consultant__email', 'title', 'city')
     actions = ["export_as_csv"]
 
 
