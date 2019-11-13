@@ -12,6 +12,7 @@ from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, Consul
     ConsultantProfileViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets
 from utils_app.views import CityViewSets
+from report.views import DashboardViewSet
 
 schema_view = get_swagger_view(title='New Log1 Documentation')
 
@@ -33,6 +34,7 @@ router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'city', CityViewSets)
+router.register(r'report', DashboardViewSet)
 
 
 urlpatterns = [

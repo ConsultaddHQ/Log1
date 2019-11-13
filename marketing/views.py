@@ -9,9 +9,8 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin
 
-from django.db import transaction
 from django.db.models import Count, Q, F
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
@@ -170,7 +169,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 ).annotate(submission_count=Count('submission'))
 
             else:
-                leads = Lead.objects.filter(marketer=request.user)\
+                leads = Lead.objects.filter(marketer=request.user) \
                     .annotate(submission_count=Count('submission')).order_by('-modified')
 
             leads = get_time_filter(leads, filter_by=filter_by_time)
@@ -285,8 +284,8 @@ class LeadViewSets(viewsets.ModelViewSet):
 
 class SubmissionViewSets(viewsets.ModelViewSet):
     queryset = Submission.objects.all()
-    serializer_class = LeadCreateSerializer
     permission_classes = (IsAuthenticated,)
+    serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
@@ -324,7 +323,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             sub_id = kwargs.get('pk')
             sub = get_object_or_404(Submission, id=sub_id)
             if sub.lead.marketer == request.user:
-                serializer = self.detail_serializer_class(sub)
+                serializer = SubmissionDetailSerializer(sub)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
             else:
                 serializer = self.serializer_class(sub)
@@ -352,6 +351,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             sub = Submission.objects.filter(
                 consultant_marketing__consultant__status__in=['in_marketing', 'in_offer']).exclude(status='draft')
 
+            # For Recruiter Admin
             if res:
                 sub = sub.select_related('consultant').filter(
                     Q(consultant_marketing__consultant__recruiter=request.user) |
@@ -450,3 +450,211 @@ class SubmissionViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            queryset = Submission.objects.filter(id=kwargs.get('pk'), lead__marketer=request.user)
+            if not queryset:
+                return Response({"error": "Submission not found"}, status=status.HTTP_400_BAD_REQUEST)
+            submission = queryset.first()
+            serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                submission.lead.status = 'sub'
+                submission.lead.save()
+
+                if submission.vendor_contact:
+                    submission.is_active = True
+                else:
+                    submission.is_active = False
+                submission.save()
+
+                data = queryset.annotate(
+                    consultant_name=F('consultant_marketing__consultant__name'),
+                    company_name=F('lead__vendor_company__name'),
+                    marketer_name=F('lead__marketer__employee_name'),
+                    city=F('lead__city')
+                ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'company_name',
+                         'is_active',
+                         'consultant_name', 'marketer_name', 'city', 'project')
+                return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VendorLayerView(ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin, GenericViewSet):
+    queryset = VendorLayer.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = VendorLayerSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            submission_id = request.query_params.get('submission')
+            vendor_layer = VendorLayer.objects.filter(submission_id=submission_id).order_by('level')
+            serializer = self.serializer_class(vendor_layer, many=True)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            submission_id = request.data.get('submission')
+            queryset = VendorLayer.objects.filter(submission=submission_id)
+            level = 0
+            if queryset:
+                level = queryset.latest('created').level
+
+            vendor_layer = VendorLayer.objects.create(
+                level=level + 1,
+                submission_id=submission_id,
+                company_id=request.data.get('company')
+            )
+
+            serializer = self.serializer_class(vendor_layer)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            data = request.data.get('data')
+            for index in range(len(data)):
+                vendor_layer = get_object_or_404(VendorLayer, id=data[index]['id'])
+                vendor_layer.level = index + 1
+                vendor_layer.save()
+
+            return Response({"result": 'updated'}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            vendor_layer = get_object_or_404(VendorLayer, id=kwargs.get('pk'))
+            vendor_layer.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class InterviewViewSets(viewsets.ModelViewSet):
+    queryset = Interview.objects.all()
+    serializer_class = InterviewSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @staticmethod
+    def send_test_mail(test, scrum_master):
+        try:
+            to = [ENGINEERING]
+            marketer = test.submission.lead.marketer
+            resume = test.submission.attachments.filter(attachment_type='resume')
+            cc = [marketer.email]
+            if scrum_master:
+                cc.append(scrum_master)
+            attachments = test.attachments.all()
+            path = [attachment.attachment_file.path for attachment in attachments]
+            if resume:
+                path.append(resume.first().attachment_file.path)
+
+            mail_data = {
+                'cc': cc,
+                'to': to,
+                'subject': 'Test for {} :: {} :: {} :: {}'.format(test.submission.consultant_name,
+                                                                  test.submission.vendor, test.submission.client,
+                                                                  marketer.full_name),
+                'template': '../templates/test_mail.html',
+                'context': {
+                    'employer': test.submission.employer,
+                    'client_name': test.submission.client,
+                    'marketer_name': test.submission.marketer,
+                    'job_desc': test.submission.lead.job_desc,
+                    'job_title': test.submission.lead.job_title,
+                    'vendor_company': test.submission.lead.vendor_company.name,
+                    'consultant_name': test.submission.consultant.consultant.name,
+                    'consultant_email': test.submission.consultant.consultant.email,
+                    'consultant_phone': test.submission.consultant.consultant.phone_no,
+                },
+                'attachments': path,
+            }
+            res = send_email_attachment_multiple(mail_data, marketer.email)
+            return res, "ok"
+        except Exception as error:
+            logger.error(error)
+            return error, "error"
+
+    # Change status of past scheduled and rescheduled Interviews to feedback_due
+    @staticmethod
+    def change_to_feedback_due():
+        try:
+            now = datetime.now() - timedelta(hours=4)
+            previous_interviews = Interview.objects.filter(end_time__lte=now, status__in=['scheduled', 'rescheduled'])
+            for interview in previous_interviews:
+                interview.status = 'feedback_due'
+                interview.save()
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @staticmethod
+    def get_interview_data(queryset, filter_by_status, first, last):
+        try:
+            # Interview counts by status
+            queryset = queryset.order_by('-modified').distinct('modified')
+            total = queryset.count()
+            offer = queryset.filter(status='offer').count()
+            failed = queryset.filter(status='failed').count()
+            scheduled = queryset.filter(status='scheduled').count()
+            cancelled = queryset.filter(status='cancelled').count()
+            rescheduled = queryset.filter(status='rescheduled').count()
+            feedback_due = queryset.filter(status='feedback_due').count()
+
+            data_counts = {
+                'total': total,
+                'offer': offer,
+                'failed': failed,
+                'scheduled': scheduled,
+                'cancelled': cancelled,
+                'rescheduled': rescheduled,
+                'feedback_due': feedback_due,
+            }
+
+            if filter_by_status:
+                queryset = queryset.filter(status=filter_by_status)
+
+            data = queryset[first:last].annotate(
+                client=F('submission__client'),
+                project=F('submission__project'),
+                job_title=F('submission__lead__job_title'),
+                supervisor_name=F('supervisor__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__lead__marketer__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'type', 'submission_id',
+                     'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name', 'project',
+                     'job_title', 'modified')
+            return data, data_counts
+        except Exception as error:
+            logger.error(error)
+            return error, 'error'
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            self.change_to_feedback_due()
+            screening = get_object_or_404(Interview, id=kwargs.get('pk'))
+            if request.user in [screening.submission.lead.marketer, screening.ctb] + list(screening.guest.all()):
+                serializer = InterviewDetailSerializer(screening)
+            else:
+                serializer = self.serializer_class(screening)
+
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

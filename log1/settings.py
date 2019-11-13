@@ -14,7 +14,6 @@ DEBUG = os.environ.get('DEBUG', False)
 
 ALLOWED_HOSTS = ['*']
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -48,6 +47,7 @@ PROJECT_APPS = [
     'jd_parser',
     'activity',
     'ckiller',
+    'report',
     'notification_utils',
 ]
 
@@ -96,7 +96,6 @@ DATABASES = {
         'PASSWORD': os.environ.get('DB_PASSWORD', 'consultadd'),
     }
 }
-
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -147,7 +146,6 @@ MODELS_PATH = os.path.join(BASE_DIR, 'models')
 
 # Password Reset Token Expiry Time
 RESET_TOKEN_EXPIRY_TIME = 1
-
 
 # Logger Configuration
 logging.config.dictConfig({

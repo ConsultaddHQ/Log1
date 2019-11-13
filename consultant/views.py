@@ -242,13 +242,13 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         con_classes = {
             'work_auth': WorkAuth,
             'consultant': Consultant,
+            'relation': ConsultantPOC,
             'recruiter': ConsultantPOC,
-            'retention': ConsultantPOC,
             'marketing': ConsultantMarketing,
             'rate_revision': ConsultantRateRevisionSerializer,
             'serializer': {
                 'work_auth': WorkAuthSerializer,
-                'retention': ConsultantPOCSerializer,
+                'relation': ConsultantPOCSerializer,
                 'recruiter': ConsultantPOCSerializer,
                 'consultant': ConsultantUpdateSerializer,
                 'marketing': ConsultantMarketingCreateSerializer,
@@ -256,7 +256,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             }
         }
         try:
-            if obj_status == 'created':
+            if obj_status == 'create':
                 serializer = con_classes['serializer']["con_obj"](data=request.data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
@@ -534,7 +534,7 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
                 marketing_start=Subquery(marketing.values('start')[:1]),
                 recruiter=Subquery(poc.values('poc__employee_name')[:1]),
                 preferred_location=Subquery(marketing.values('preferred_location')[:1]),
-            ).values('id', 'name', 'skills', 'preferred_location', 'recruiter','rtg', 'rate', 'in_pool', 'marketing_start')
+            ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool', 'marketing_start')
 
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
 

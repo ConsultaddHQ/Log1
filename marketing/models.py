@@ -4,12 +4,10 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
-
 from employee.models import User
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 from consultant.models import ConsultantMarketing
-
 
 STATUS_CHOICES = (
     ('new', 'New'),
@@ -176,15 +174,15 @@ class Submission(TimeStampedModel):
 
 
 class VendorLayer(TimeStampedModel):
-    level = models.IntegerField(null=True, blank=True)
+    level = models.IntegerField()
     submission = models.ForeignKey(
         Submission, on_delete=models.CASCADE,
         related_name='vendors',
         verbose_name='Submission'
     )
-    company = models.ForeignKey(
+    vendor_company = models.ForeignKey(
         VendorCompany, on_delete=models.CASCADE,
-        related_name='vendor_layer',
+        related_name='vendor_layers',
         verbose_name='Company'
     )
 
@@ -198,7 +196,7 @@ class VendorLayer(TimeStampedModel):
         return super(VendorLayer, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'Level: {self.level} {self.company.name}'
+        return f'Level: {self.level} {self.vendor_company.name}'
 
 
 class Interview(TimeStampedModel):

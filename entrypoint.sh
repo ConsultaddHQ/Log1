@@ -1,12 +1,12 @@
 #!/bin/bash
 
- Collect static files
-echo "Collect static files"
-python manage.py collectstatic --noinput
+# Collect static files
+# echo "Collect static files"
+# python manage.py collectstatic --noinput
 
 # Creating migration files
-echo "Appling makemigrations"
-python manage.py makemigrations
+# echo "Appling makemigrations"
+# python manage.py makemigrations
 
 # Apply database migrations
 echo "Apply database migrations"

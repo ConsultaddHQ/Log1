@@ -3,6 +3,7 @@ from rest_framework import serializers
 from project.models import *
 from marketing.models import *
 from employee.models import User
+from employee.serializers import UserSerializer
 from attachment.serializers import AttachmentSerializer
 
 
@@ -42,6 +43,11 @@ class LeadSerializer(serializers.ModelSerializer):
                   'marketer', 'status', 'created', 'modified')
 
 
+class SubmissionCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        fields = '__all__'
+
+
 class SubmissionDetailSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer()
@@ -75,3 +81,46 @@ class SubmissionSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_vendor_contact(self):
         return None
+
+
+class VendorLayerSerializer(serializers.ModelSerializer):
+    company = VendorCompanySerializer()
+
+    class Meta:
+        model = VendorLayer
+        fields = '__all__'
+
+
+class InterviewSerializer(serializers.ModelSerializer):
+    submission = SubmissionSerializer()
+    guest = UserSerializer(many=True)
+    ctb = UserSerializer()
+
+    class Meta:
+        model = Interview
+        fields = '__all__'
+
+
+class InterviewDetailSerializer(serializers.ModelSerializer):
+    submission = SubmissionDetailSerializer()
+    guest = UserSerializer(many=True)
+    ctb = UserSerializer()
+
+    class Meta:
+        model = Interview
+        fields = '__all__'
+
+
+class InterviewCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Interview
+        fields = '__all__'
+
+
+class InterviewGetSerializer(serializers.ModelSerializer):
+    guest = UserSerializer(many=True)
+    ctb = UserSerializer()
+
+    class Meta:
+        model = Interview
+        fields = '__all__'

@@ -162,10 +162,10 @@ class Experience(models.Model):
 
 
 class ConsultantProfile(TimeStampedModel):
-    education = models.TextField(_('Academics Details'))
     title = models.CharField(max_length=200, blank=True, null=True)
     visa_end = models.DateField(_('Visa End Date'), blank=True, null=True)
     visa_start = models.DateField(_('Visa Start Date'), blank=True, null=True)
+    education = models.TextField(_('Academics Details'), blank=True, null=True)
     date_of_birth = models.DateField(_('Date of birth'), blank=True, null=True)
     links = models.CharField(_('Links'), max_length=100, blank=True, null=True)
     visa_type = models.CharField(_('Visa Type'), max_length=20, blank=True, null=True)
@@ -240,6 +240,7 @@ class ConsultantMarketing(TimeStampedModel):
 
 class ConsultantRateRevision(TimeStampedModel):
     rate = models.IntegerField(_('Rate'))
+    previous_rate = models.IntegerField(_('Previous Rate'), default=0)
     end = models.DateField(_('Rate End Date'), blank=True, null=True)
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
     feedback = models.TextField(_('Revision Feedback'), blank=True, null=True)

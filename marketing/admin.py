@@ -63,8 +63,8 @@ class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(VendorLayer)
 class VendorLayerAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_display = ('id', 'level', 'submission', 'company')
-    search_fields = ('company__name',)
+    list_display = ('id', 'level', 'submission', 'vendor_company')
+    search_fields = ('vendor_company__name',)
     actions = ["export_as_csv"]
 
 
