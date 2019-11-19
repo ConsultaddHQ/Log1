@@ -101,6 +101,20 @@ class Consultant(TimeStampedModel):
     def get_attachment(self):
         return self.attachments.all()
 
+    @property
+    def recruiter(self):
+        queryset = self.pocs.filter(poc_type='recruiter', end=None)
+        if queryset:
+            return queryset.first().poc
+        return None
+
+    @property
+    def relation(self):
+        queryset = self.pocs.filter(poc_type='relation', end=None)
+        if queryset:
+            return queryset.first().poc
+        return None
+
 
 class WorkAuth(TimeStampedModel):
     is_current = models.BooleanField(_('Is current Visa'), default=True)
@@ -112,6 +126,18 @@ class WorkAuth(TimeStampedModel):
         related_name='work_auth',
         verbose_name='Consultant'
     )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(WorkAuth, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.consultant.name} {self.visa_start}'
 
 
 class Education(models.Model):
@@ -236,6 +262,14 @@ class ConsultantMarketing(TimeStampedModel):
 
     def __str__(self):
         return f'{self.cycle} - {self.consultant.name}'
+
+    @property
+    def recruiter(self):
+        return self.consultant.recruiter
+
+    @property
+    def relation(self):
+        return self.consultant.relation
 
 
 class ConsultantRateRevision(TimeStampedModel):

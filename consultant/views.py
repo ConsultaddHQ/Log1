@@ -43,7 +43,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 'project': project,
                 'interview': interview
             }
-            data = queryset.select_related('lead', 'consultant')[first:last].annotate(
+            data = queryset[first:last].annotate(
                 consultant_name=F('consultant_marketing__consultant__name'),
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('lead__marketer__employee_name'),
@@ -148,6 +148,11 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             consultants = consultants.filter(
                 Q(teams=request.user.team, in_pool=False) |
                 Q(in_pool=True)
+            )
+
+        elif 'recruiter' in roles:
+            consultants = consultants.filter(
+                pocs__poc=request.user
             )
 
         consultants = consultants.order_by('id').distinct('id')
@@ -424,7 +429,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         if request.method == 'GET':
             try:
                 consultant_id = kwargs.get('pk')
-                consultant = get_object_or_404(Comment, id=consultant_id)
+                consultant = get_object_or_404(Consultant, id=consultant_id)
                 queryset = consultant.comments.all()
                 serializer = CommentSerializer(queryset, many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
@@ -679,7 +684,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
         try:
             data = request.data
             suffix = data['title'].strip()
-            name = request.user.full_name
+            name = request.user.employee_name
             initials = name.split()[0][0] + name.split()[1][0] if len(name.split()) > 1 else ""
             title = "{}-{}-{}".format(initials.upper(), data['visa_type'], data["dob"][:4])
 

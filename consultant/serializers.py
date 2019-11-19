@@ -1,3 +1,4 @@
+from django.db.models import F
 from rest_framework import serializers
 
 from consultant.models import *
@@ -27,13 +28,17 @@ class POCSerializer(serializers.ModelSerializer):
 class ConsultantMarketingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantMarketing
-        exclude = ('cycle', 'teams', 'marketer', 'created', 'modified')
+        exclude = ('id', 'cycle', 'teams', 'marketer', 'created', 'modified')
 
 
 class ConsultantMarketingSerializer(serializers.ModelSerializer):
     primary_marketer = POCSerializer()
     teams = TeamSerializer(many=True)
-    marketer = POCSerializer(many=True)
+    marketer = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_marketer(self):
+        return self.marketer.all().annotate(name=F('employee_name')).values('id', 'name')
 
     class Meta:
         model = ConsultantMarketing
@@ -89,8 +94,8 @@ class ConsultantProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantProfile
-        fields = ('title', 'visa_type', 'visa_start', 'visa_end', 'education', 'date_of_birth', 'links', 'linkedin',
-                  'current_city', 'profile_owner')
+        fields = ('id', 'title', 'visa_type', 'visa_start', 'visa_end', 'education', 'date_of_birth', 'links',
+                  'linkedin', 'current_city', 'profile_owner')
 
 
 class ConsultantBenchSerializer(serializers.ModelSerializer):

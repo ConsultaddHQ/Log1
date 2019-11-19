@@ -11,10 +11,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin
 
-from django.db.models import Count, Q, F
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Count, OuterRef, Subquery, Q, F, FloatField
 
 from discord_webhook import DiscordWebhook, DiscordEmbed
 
@@ -24,6 +24,7 @@ from utils_app.models import City
 from marketing.serializers import *
 from constants import announcement_url
 from attachment.models import Attachment
+from consultant.models import ConsultantPOC
 from utils_app.views import get_time_filter
 from utils_app.mailing import send_email_attachment_multiple
 from utils_app.calendar import get_inteviews, book_calendar, update_calendar, delete_calendar_booking
@@ -305,7 +306,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 'project': project,
                 'interview': interview
             }
-            data = sub.select_related('lead', 'consultant_marketing')[first:last].annotate(
+            data = sub[first:last].annotate(
                 consultant_name=F('consultant_marketing__consultant__name'),
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('lead__marketer__employee_name'),
@@ -344,54 +345,46 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
         try:
             roles = request.user.roles
-            # For Recruiter Admin
-            roles_have_access = {'admin', 'recruiter'}
-            res = set(roles).issubset(roles_have_access)
+            sub = Submission.objects.exclude(
+                Q(consultant_marketing__consultant__status='archived') |
+                Q(status='draft')
+            )
 
-            sub = Submission.objects.filter(
-                consultant_marketing__consultant__status__in=['in_marketing', 'in_offer']).exclude(status='draft')
-
-            # For Recruiter Admin
-            if res:
-                sub = sub.select_related('consultant').filter(
-                    Q(consultant_marketing__consultant__recruiter=request.user) |
-                    Q(consultant_marketing__consultant__recruiter__team=request.user.team)
-                )
             # Team submissions for Scrum master
-            elif 'admin' in roles:
-                sub = sub.select_related('lead', 'consultant').filter(
+            if 'admin' in roles:
+                sub = sub.filter(
                     (Q(lead__marketer__team=request.user.team) |
                      Q(consultant_marketing__consultant__in_pool=True) |
                      Q(consultant_marketing__consultant__teams=request.user.team))
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
-            elif 'marketer' in request.user.roles:
-                sub = sub.select_related('lead', 'consultant').filter(
+            elif 'marketer' in roles:
+                sub = sub.filter(
                     (Q(lead__marketer=request.user) |
                      Q(consultant_marketing__consultant__marketer=request.user))
                 )
 
             # Submissions of a Recruiters consultants (except those are on project)
-            elif 'recruiter' in request.user.roles:
-                sub = Submission.objects.select_related('consultant').filter(
-                    consultant_marketing__consultant__recruiter=request.user,
-                    consultant_marketing__consultant__status='in_marketing'
+            elif 'recruiter' in roles:
+                sub = Submission.objects.filter(
+                    Q(consultant_marketing__consultant__pocs__poc=request.user,
+                      consultant_marketing__consultant__pocs__poc_type='recruiter',
+                      consultant_marketing__consultant__status='in_marketing')
                 )
 
-            if filter_for:
-                if filter_for == 'my':
-                    sub = sub.filter(lead__marketer=request.user)
-                elif filter_for == 'team':
-                    sub = sub.filter(lead__marketer__team=request.user.team)
+            if filter_for == 'my':
+                sub = sub.filter(lead__marketer=request.user)
+            elif filter_for == 'team':
+                sub = sub.filter(lead__marketer__team=request.user.team)
 
             if consultant_id and consultant_id != 'null':
-                sub = sub.select_related('lead', 'consultant').filter(consultant_marketing__consultant_id=consultant_id)
+                sub = sub.filter(consultant_marketing__consultant_id=consultant_id)
 
             # Search submission by client, vendor and consultant
             if query:
                 query = query.strip()
-                sub = sub.select_related('lead', 'consultant').filter(
+                sub = sub.filter(
                     Q(lead__marketer=request.user) &
                     (Q(client__icontains=query) |
                      Q(lead__job_title__icontains=query) |
@@ -590,7 +583,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, "error"
 
-    # Change status of past scheduled and rescheduled Interviews to feedback_due
+    # Change status of scheduled and rescheduled Interviews to feedback_due
     @staticmethod
     def change_to_feedback_due():
         try:
@@ -648,13 +641,83 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             self.change_to_feedback_due()
-            screening = get_object_or_404(Interview, id=kwargs.get('pk'))
-            if request.user in [screening.submission.lead.marketer, screening.ctb] + list(screening.guest.all()):
-                serializer = InterviewDetailSerializer(screening)
+            interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+            if request.user in [interview.submission.lead.marketer, interview.ctb] + list(interview.guest.all()):
+                serializer = InterviewDetailSerializer(interview)
             else:
-                serializer = self.serializer_class(screening)
+                serializer = self.serializer_class(interview)
 
             return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def list(self, request, *args, **kwargs):
+        query = request.query_params.get('query', None)
+        filter_for = request.query_params.get('filter_for', 'all')
+        filter_by_time = request.query_params.get('filter_by_time', None)
+        filter_by_status = request.query_params.get('filter_by_status', None)
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
+        last, first = page * page_size, page * page_size - page_size
+
+        try:
+            # Change status of past Interview to feedback due
+            self.change_to_feedback_due()
+
+            # Search Interview by Client, VendorContact and Consultant
+            queryset = Interview.objects.exclude(submission__consultant_marketing__consultant__status='archived')
+            if filter_for == 'my':
+                queryset = queryset.filter(submission__lead__marketer=request.user)
+            elif filter_for == 'team':
+                queryset = queryset.filter(submission__lead__marketer__team=request.user.team)
+
+            # Interview List for admin (team interviews) and marketer
+            roles = request.user.roles
+            if 'admin' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__consultant__teams=request.user.team,
+                      submission__consultant_marketing__in_pool=False) |
+                    Q(submission__consultant_marketing__in_pool=True)
+                )
+
+            elif 'marketer' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__in_pool=True) |
+                    Q(submission__consultant_marketing__consultant__marketer=request.user) |
+                    Q(submission__lead__marketer=request.user)
+                )
+
+            elif 'recruiter' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
+                      submission__consultant_marketing__consultant__pocs__poc_type='recruiter')
+                )
+
+            elif 'retention_manager' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
+                      submission__consultant_marketing__consultant__pocs__poc_type='relation')
+                )
+
+            if query:
+                query = query.strip()
+                queryset = queryset.filter(
+                    Q(submission__client__icontains=query) |
+                    Q(submission__lead__vendor_company__name__icontains=query) |
+                    Q(submission__lead__marketer__employee_name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                    Q(submission__consultant_marketing__consultant__name__icontains=query)
+                )
+
+            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
+
+            data, screen_data = self.get_interview_data(queryset, filter_by_status, first, last)
+
+            if screen_data == 'error':
+                return Response({"error": data}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"results": data, "counts": screen_data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

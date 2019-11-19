@@ -77,6 +77,23 @@ class EmployeeAuthViewSets(GenericViewSet):
         logger.error("Incorrect Employee Id/Password")
         return Response({"error": "Incorrect Employee Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['post'], detail=False, url_path='consultant_login')
+    def consultant_login(self, request):
+        """
+            Normal Login
+            :param request, email, password
+        """
+        email = request.data.get('email')
+        if email:
+            user = get_object_or_404(User, email=email, role__name='consultant')
+        else:
+            return Response({"error": "Email id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+        user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
+        if user:
+            return Response({"result": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
+        logger.error("Incorrect Email ID/Password")
+        return Response({"error": "Incorrect Email Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class EmployeeViewSets(GenericViewSet, ListModelMixin):
     queryset = User.objects.all()
@@ -92,13 +109,13 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin):
                 users = User.objects.filter(role__name=user_type)
             elif user_type == 'team':
                 if 'superadmin' in request.user.roles:
-                    users = User.objects.prefetch_related('role').filter(role__name='marketer')
+                    users = User.objects.filter(role__name='marketer')
                 else:
-                    users = User.objects.prefetch_related('role').filter(team=request.user.team, role__name='marketer')
+                    users = User.objects.filter(team=request.user.team, role__name='marketer')
             else:
-                users = User.objects.filter(employee_name__icontains=query)
+                users = User.objects.filter(employee_name__icontains=query).exclude(role__name='consultant')
             users = users.annotate(name=Lower('employee_name')).order_by('name')
-            data = users.values('id', 'employee_id', 'email', 'employee_name')
+            data = users.values('id', 'employee_id', 'email', 'name')
             return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -376,68 +393,68 @@ class AssetsViewSets(viewsets.ModelViewSet):
         try:
             import pandas as pd
             file = request.FILES.get('file')
-            if file:
-                file_extension = file.name.split(".")[-1]
-                if file_extension == 'csv':
-                    df = pd.read_csv(file, encoding="ISO-8859-1", skip_blank_lines=False)
-                elif file_extension == 'xlsx':
-                    df = pd.read_excel(file)
-                else:
-                    return Response({"error": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
-                if 'Username' not in df.columns:
-                    return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
-                if not df.empty:
-                    created, updated, failed = 0, 0, 0
-                    for index, row in df.iterrows():
-                        if pd.isnull(row["Username"]):
-                            break
-                        try:
-                            if not pd.isnull(row['Asset Type']):
-                                asset, new_asset = Asset.objects.get_or_create(
-                                    owner=request.user,
-                                    provider=row['Provider'],
-                                    username=row['Username'],
-                                    password=row['Password'],
-                                    asset_type=row['Asset Type'].lower()
-                                )
-                            else:
-                                logger.error(row["Username"], request.user.full_name, "Asset Type not found")
-                                failed += 1
-                                continue
-                            asset.email = row['Email'] if not pd.isnull(row['Email']) else ""
-                            asset.tech = row['Technology'] if not pd.isnull(row['Technology']) else ""
-                            asset.remarks = row['Remarks'] if not pd.isnull(row['Remarks']) else ""
-                            asset.number = row['Phone Number'] if not pd.isnull(row['Phone Number']) else ""
-                            asset.asset_type = row['Asset Type'] if not pd.isnull(row['Asset Type']) else ""
-                            asset.alter_email = row['Alternate Email'] if not pd.isnull(row['Alternate Email']) else ""
-                            asset.alter_number = row['Alternate Number'] if not pd.isnull(
-                                row['Alternate Number']) else ""
-                            asset.save()
+            file_extension = file.name.split(".")[-1]
+            if file_extension == 'csv':
+                df = pd.read_csv(file, encoding="ISO-8859-1", skip_blank_lines=False)
+            elif file_extension == 'xlsx':
+                df = pd.read_excel(file)
+            else:
+                return Response({"error": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
 
-                            if new_asset:
-                                created += 1
-                            else:
-                                updated += 1
-
-                        except Exception as e:
-                            logger.error(row["Username"], request.user.full_name, e)
+            if 'Username' not in df.columns:
+                return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
+            if not df.empty:
+                created, updated, failed = 0, 0, 0
+                for index, row in df.iterrows():
+                    if pd.isnull(row["Username"]):
+                        break
+                    try:
+                        if not pd.isnull(row['Asset Type']):
+                            asset, new_asset = Asset.objects.get_or_create(
+                                owner=request.user,
+                                provider=row['Provider'],
+                                username=row['Username'],
+                                password=row['Password'],
+                                asset_type=row['Asset Type'].lower()
+                            )
+                        else:
+                            logger.error(row["Username"], request.user.full_name, "Asset Type not found")
                             failed += 1
                             continue
-                    mail_data = {
-                        'to': [request.user.email],
-                        'bcc': [],
-                        'cc': [],
-                        'subject': 'Log1 bulk upload of Asset information',
-                        'template': '../templates/asset_report.html',
-                        'context': {
-                            'user': request.user.full_name,
-                            'created': created,
-                            'updated': updated,
-                            'failed': failed,
-                        },
-                    }
-                    send_email(mail_data, "Log1")
-                    return Response({"result": "Upload Complete"}, status=status.HTTP_201_CREATED)
+                        asset.email = row['Email'] if not pd.isnull(row['Email']) else ""
+                        asset.tech = row['Technology'] if not pd.isnull(row['Technology']) else ""
+                        asset.remarks = row['Remarks'] if not pd.isnull(row['Remarks']) else ""
+                        asset.number = row['Phone Number'] if not pd.isnull(row['Phone Number']) else ""
+                        asset.asset_type = row['Asset Type'] if not pd.isnull(row['Asset Type']) else ""
+                        asset.alter_email = row['Alternate Email'] if not pd.isnull(row['Alternate Email']) else ""
+                        asset.alter_number = row['Alternate Number'] if not pd.isnull(
+                            row['Alternate Number']) else ""
+                        asset.save()
+
+                        if new_asset:
+                            created += 1
+                        else:
+                            updated += 1
+
+                    except Exception as e:
+                        logger.error(row["Username"], request.user.full_name, e)
+                        failed += 1
+                        continue
+                mail_data = {
+                    'to': [request.user.email],
+                    'bcc': [],
+                    'cc': [],
+                    'subject': 'Log1 bulk upload of Asset information',
+                    'template': '../templates/asset_report.html',
+                    'context': {
+                        'user': request.user.full_name,
+                        'created': created,
+                        'updated': updated,
+                        'failed': failed,
+                    },
+                }
+                send_email(mail_data, "Log1")
+                return Response({"result": "Upload Complete"}, status=status.HTTP_201_CREATED)
             return Response({"result": "Empty File"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as error:
             logger.error(error)

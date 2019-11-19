@@ -134,9 +134,9 @@ class Submission(TimeStampedModel):
     status = models.CharField(_('Status'), max_length=20, choices=SUB_CHOICES, default='sub')
 
     # Consultant Profile
-    education = models.TextField(_('Academics Details'))
     visa_end = models.DateField(_('Visa End Date'), blank=True, null=True)
     visa_start = models.DateField(_('Visa Start Date'), blank=True, null=True)
+    education = models.TextField(_('Academics Details'), blank=True, null=True)
     visa_type = models.CharField(_('Visa Type'), max_length=20, blank=True, null=True)
     linkedin = models.CharField(_('Linkedin URL'), max_length=300, blank=True, null=True)
     other_link = models.CharField(_('Other Links'), max_length=100, blank=True, null=True)
@@ -172,9 +172,17 @@ class Submission(TimeStampedModel):
     def __str__(self):
         return f'{self.lead.marketer.employee_name} : {self.client}'
 
+    @property
+    def consultant(self):
+        return self.consultant_marketing.consultant
+
+    @property
+    def marketer(self):
+        return self.lead.marketer
+
 
 class VendorLayer(TimeStampedModel):
-    level = models.IntegerField()
+    level = models.IntegerField(default=1)
     submission = models.ForeignKey(
         Submission, on_delete=models.CASCADE,
         related_name='vendors',
@@ -240,4 +248,13 @@ class Interview(TimeStampedModel):
         if self.start_time:
             return f'CTB:{self.supervisor} :: {self.round}R :: {self.get_interview_type_display()} :: ' \
                    f'{self.start_time.strftime("%d/%m/%Y::%I:%M %p EST")} :: {self.submission.client} :: ' \
-                   f' {self.submission.consultant.name} :: {self.submission.lead.marketer.employee_name}'
+                   f' {self.submission.consultant.name} :: ' \
+                   f'{self.submission.marketer.employee_name}'
+
+    @property
+    def marketer(self):
+        return self.submission.lead.marketer
+
+    @property
+    def consultant(self):
+        return self.submission.consultant_marketing.consultant

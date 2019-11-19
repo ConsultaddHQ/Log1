@@ -115,6 +115,15 @@ class User(AbstractUser, PermissionsMixin):
     def roles(self):
         return [role.name for role in self.role.all()]
 
+    @property
+    def consultant(self):
+        if 'consultant' in self.roles:
+            from consultant.models import Consultant
+            consultant = Consultant.objects.filter(email=self.email)
+            if consultant:
+                return consultant.first()
+        return None
+
     @staticmethod
     def send_mail(mail_data):
         try:
@@ -122,6 +131,12 @@ class User(AbstractUser, PermissionsMixin):
             return res, "ok"
         except Exception as error:
             return error, "error"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.first_name = self.employee_name.split()[0]
+            self.last_name = self.employee_name.split()[1] if len(self.employee_name.split()) > 1 else ""
+        return super(User, self).save(*args, **kwargs)
 
 
 class ResetPasswordToken(models.Model):
