@@ -5,6 +5,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
 from employee.models import User
+from activity.models import Comment
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 from consultant.models import ConsultantMarketing
@@ -38,13 +39,19 @@ SCREENING_STATUS_CHOICES = (
     ('feedback_due', 'Feedback Due'),
 )
 
-SCREENING_CHOICES = (
+INTERVIEW_MODE = (
     ('skype', 'Skype'),
     ('webex', 'Webex'),
     ('hangout', 'Hangout'),
     ('video_call', 'Video Call'),
-    ('telephonic', 'Voice Call'),
-    ('telephonic-conf', 'Voice Conference Call'),
+    ('voice_call', 'Voice Call'),
+    ('dial-in', 'Dial In'),
+)
+
+SCREENING_CHOICES = (
+    ('test', 'test'),
+    ('screening', 'Screening'),
+    ('interview', 'Interview'),
 )
 
 
@@ -127,6 +134,7 @@ class Submission(TimeStampedModel):
     attachments = GenericRelation(Attachment)
     employer = models.CharField(_('Employer'), max_length=50)
     rate = models.FloatField(_('Rate'), null=True, blank=True)
+    comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is active'), default=False)
     email = models.EmailField(_('Marketing Email'), null=True, blank=True)
     client = models.CharField(_('Client'), max_length=50, null=True, blank=True)
@@ -216,7 +224,8 @@ class Interview(TimeStampedModel):
     call_details = models.TextField(_('Call Details'), null=True, blank=True)
     attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
     calendar_id = models.CharField(_('Calendar ID'), max_length=50, null=True, blank=True)
-    interview_type = models.CharField(_('Interview Type'), max_length=20, choices=SCREENING_CHOICES)
+    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=SCREENING_CHOICES)
+    interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
     status = models.CharField(_('Status'), max_length=20, choices=SCREENING_STATUS_CHOICES, default='scheduled')
     supervisor = models.ForeignKey(
         User, on_delete=models.PROTECT,
@@ -246,10 +255,9 @@ class Interview(TimeStampedModel):
 
     def __str__(self):
         if self.start_time:
-            return f'CTB:{self.supervisor} :: {self.round}R :: {self.get_interview_type_display()} :: ' \
-                   f'{self.start_time.strftime("%d/%m/%Y::%I:%M %p EST")} :: {self.submission.client} :: ' \
-                   f' {self.submission.consultant.name} :: ' \
-                   f'{self.submission.marketer.employee_name}'
+            return f'''CTB:{self.supervisor} :: {self.round}R :: {self.get_interview_type_display()} ::
+                   {self.start_time.strftime("%d/%m/%Y::%I:%M %p EST")} :: {self.submission.client} ::
+                   {self.submission.consultant.name} :: {self.submission.marketer.employee_name}'''
 
     @property
     def marketer(self):

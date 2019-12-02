@@ -1,12 +1,13 @@
 import os
-
 from django.db import models
+from django.utils import timezone
 from django.dispatch import receiver
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 from employee.models import User
+from utils_app.models import TimeStampedModel
 
 ATTACHMENT_TYPE = (
     ('ssn', 'SSN'),
@@ -43,11 +44,10 @@ class AttachmentManager(models.Manager):
         return self.filter(content_type__pk=object_type.id, object_id=obj.pk)
 
 
-class Attachment(models.Model):
+class Attachment(TimeStampedModel):
     objects = AttachmentManager()
 
     object_id = models.PositiveIntegerField()
-    created = models.DateTimeField(_('created'), auto_now_add=True)
     attachment_file = models.FileField(_('attachment'), upload_to=attachment_upload)
     attachment_type = models.CharField(choices=ATTACHMENT_TYPE, blank=True, null=True, max_length=500)
     content_type = models.ForeignKey(
@@ -69,7 +69,16 @@ class Attachment(models.Model):
         )
 
     def __str__(self):
-        return f'{self.creator.name} attached {self.attachment_file.name}'
+        return f'{self.creator.employee_name} attached {self.attachment_file.name}'
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Attachment, self).save(*args, **kwargs)
 
     @property
     def filename(self):

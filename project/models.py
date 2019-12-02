@@ -81,6 +81,14 @@ class Project(TimeStampedModel):
     def __str__(self):
         return self.consultant.name
 
+    @property
+    def marketer_name(self):
+        return self.submission.lead.marketer.employee_name
+
+    @property
+    def consultant_name(self):
+        return self.submission.lead.marketer.employee_name
+
 
 class ProjectSupport(TimeStampedModel):
     end = models.DateField(_('Support End Date'), blank=True, null=True)

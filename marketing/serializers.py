@@ -1,8 +1,7 @@
 from rest_framework import serializers
 
-from project.models import *
 from marketing.models import *
-from employee.models import User
+from project.models import Project
 from employee.serializers import UserSerializer
 from attachment.serializers import AttachmentSerializer
 
@@ -48,31 +47,50 @@ class SubmissionCreateSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = '__all__'
+
+
 class SubmissionDetailSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
+    interviews = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
         model = Submission
-        fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone',
-                  'status', 'is_active', 'vendor_contact', 'attachments')
+        fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
+                  'attachments', 'interviews', 'project')
 
     @staticmethod
     def get_attachments(self):
         return AttachmentSerializer(self.attachments.all(), many=True).data
 
+    @staticmethod
+    def get_interviews(self):
+        return InterviewGetSerializer(self.screening.all(), many=True).data
+
+    @staticmethod
+    def get_project(self):
+        if hasattr(self, 'project'):
+            return ProjectSerializer(self.project).data
+        return None
+
 
 class SubmissionSerializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
-    vendor_layer = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
+    interviews = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
         model = Submission
-        fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone',
-                  'status', 'is_active', 'vendor_contact', 'attachments')
+        fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
+                  'attachments', 'interviews', 'project')
 
     @staticmethod
     def get_attachments(self):
@@ -80,6 +98,16 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_vendor_contact(self):
+        return None
+
+    @staticmethod
+    def get_interviews(self):
+        return InterviewGetSerializer(self.screening.all(), many=True).data
+
+    @staticmethod
+    def get_project(self):
+        if hasattr(self, 'project'):
+            return ProjectSerializer(self.project).data
         return None
 
 
@@ -104,7 +132,7 @@ class InterviewSerializer(serializers.ModelSerializer):
 class InterviewDetailSerializer(serializers.ModelSerializer):
     submission = SubmissionDetailSerializer()
     guest = UserSerializer(many=True)
-    ctb = UserSerializer()
+    supervisor = UserSerializer()
 
     class Meta:
         model = Interview
@@ -119,7 +147,7 @@ class InterviewCreateSerializer(serializers.ModelSerializer):
 
 class InterviewGetSerializer(serializers.ModelSerializer):
     guest = UserSerializer(many=True)
-    ctb = UserSerializer()
+    supervisor = UserSerializer()
 
     class Meta:
         model = Interview

@@ -1,3 +1,6 @@
+from functools import wraps
+
+import jwt
 import logging
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, F, Count
@@ -144,7 +147,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 Q(in_pool=True) |
                 Q(marketer=request.user)
             )
-        elif 'admin' in roles:
+        elif 'admin' in roles or 'proxy' in roles:
             consultants = consultants.filter(
                 Q(teams=request.user.team, in_pool=False) |
                 Q(in_pool=True)
@@ -250,9 +253,13 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             'relation': ConsultantPOC,
             'recruiter': ConsultantPOC,
             'marketing': ConsultantMarketing,
+            'education': EducationSerializer,
+            'experience': ExperienceSerializer,
             'rate_revision': ConsultantRateRevisionSerializer,
             'serializer': {
                 'work_auth': WorkAuthSerializer,
+                'education': EducationSerializer,
+                'experience': ExperienceSerializer,
                 'relation': ConsultantPOCSerializer,
                 'recruiter': ConsultantPOCSerializer,
                 'consultant': ConsultantUpdateSerializer,
@@ -373,12 +380,11 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             page = int(request.query_params.get("page", 1))
             page_size = int(request.query_params.get("page_size", 10))
             last, first = page * page_size, page * page_size - page_size
-
             try:
                 consultant_id = kwargs.get('pk')
                 feedback_type = request.query_params.get("feedback_type")
                 queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id, feedback_type=feedback_type)
-                serializer = CommentSerializer(queryset, many=True)
+                serializer = CommentSerializer(queryset[first:last], many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
             except Exception as error:
                 logger.error(error)
@@ -392,7 +398,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                     experience=data['experience'],
                     programming=data['programming'],
                     communication=data['communication'],
-                    organizational=data['organizational '],
+                    organizational=data['organizational'],
                     problem_solving=data['problem_solving'],
                 )
                 feedback = ConsultantFeedback.objects.create(
@@ -404,25 +410,13 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                     given_by_id=data['given_by'],
                     feedback_type=data['feedback_type'],
                 )
-                serializer = ConsultantFeedbackSerializer(feedback, many=True)
+                serializer = ConsultantFeedbackSerializer(feedback)
                 return Response({'result': serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": 'Method not allowed'}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(methods=['get'], detail=True, url_path='documents')
-    def documents(self, request, *args, **kwargs):
-        try:
-            consultant_id = kwargs.get('pk')
-            consultant = get_object_or_404(Consultant, id=consultant_id)
-            queryset = consultant.attachments.all()
-            serializer = AttachmentSerializer(queryset, many=True)
-            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get', 'post'], detail=True, url_path='comments')
     def comments(self, request, *args, **kwargs):
@@ -439,7 +433,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         elif request.method == 'POST':
             try:
                 content_type = ContentType.objects.get(model='comment')
-                object_id = request.data['object_id']
+                object_id = kwargs.get('pk', None)
                 comment = Comment.objects.create(
                     user=request.user,
                     object_id=object_id,
@@ -452,6 +446,18 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, url_path='documents')
+    def documents(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+            queryset = consultant.attachments.all()
+            serializer = AttachmentSerializer(queryset, many=True)
+            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, *args, **kwargs):
@@ -498,8 +504,8 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
             # Consultants search based on name, email, recruiter and location
             elif query:
                 consultants = consultants.filter(
-                    Q(name=query) | Q(email=query) | Q(skills=query) | Q(current_city=query) |
-                    Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
+                    Q(name__icontains=query) | Q(email__iexact=query) | Q(skills__icontains=query) |
+                    Q(current_city__icontains=query) | Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
                 # Marketer's team Consultants
             else:
@@ -565,8 +571,8 @@ class ConsultantMarketingViewSets(GenericViewSet):
             else:
                 return Response({"result": "Consultant is not in Marketing"})
             roles = request.user.roles
-            if 'superadmin' in roles or \
-                    ('admin' in roles and request.user.team in consultant_marketing.consultant.teams.all()):
+            if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
+                                         in consultant_marketing.consultant.teams.all()):
                 marketer_ids = request.data.get('marketers', None)
                 for marketer_id in marketer_ids:
                     marketer = get_object_or_404(User, id=marketer_id)
@@ -613,8 +619,8 @@ class ConsultantMarketingViewSets(GenericViewSet):
             else:
                 return Response({"result": "Consultant is not in Marketing"})
             roles = request.user.roles
-            if 'superadmin' in roles or \
-                    ('admin' in roles and request.user.team in consultant_marketing.consultant.teams.all()):
+            if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
+                                         in consultant_marketing.consultant.teams.all()):
                 marketer_ids = request.data.get('marketers', None)
                 for marketer_id in marketer_ids:
                     marketer = get_object_or_404(User, id=marketer_id)

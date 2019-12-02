@@ -70,13 +70,13 @@ class VendorLayerAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(Interview)
 class InterviewAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_display = ('id', 'round', 'submission', 'supervisor', 'status', 'interview_type', 'start_time', 'end_time',
-                    'feedback', 'calendar_id', 'guest_display')
-    search_fields = ('submission__consultant__name', 'ctb__employee_name', 'status', 'type', 'calendar_id')
+    list_display = ('id', 'round', 'submission', 'supervisor', 'status', 'screening_type', 'start_time', 'end_time',
+                    'interview_mode', 'feedback', 'calendar_id', 'guest_display')
+    search_fields = ('submission__consultant__name', 'supervisor__employee_name', 'status', 'type', 'calendar_id')
     actions = ["export_as_csv"]
 
     def guest_display(self, obj):
         return "".join([
-            user.name for user in obj.guest.all()
+            user.employee_name for user in obj.guest.all()
         ])
     guest_display.short_description = "Guest"

@@ -82,7 +82,7 @@ class FeedbackDetailsSerializer(serializers.ModelSerializer):
 
 
 class ConsultantFeedbackSerializer(serializers.ModelSerializer):
-    feedback = FeedbackDetailsSerializer(many=True)
+    feedback = FeedbackDetailsSerializer()
 
     class Meta:
         model = ConsultantFeedback

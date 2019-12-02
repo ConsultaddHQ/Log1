@@ -3,6 +3,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin
@@ -12,7 +13,7 @@ from attachment.serializers import *
 logger = logging.getLogger(__name__)
 
 
-class AttachmentView(RetrieveModelMixin, CreateModelMixin):
+class AttachmentView(RetrieveModelMixin, CreateModelMixin, GenericViewSet):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
     permission_classes = (IsAuthenticated,)

@@ -90,7 +90,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             return Response({"error": "Email id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
         user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
         if user:
-            return Response({"result": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": ConsultantSerializerLogin(user).data}, status=status.HTTP_202_ACCEPTED)
         logger.error("Incorrect Email ID/Password")
         return Response({"error": "Incorrect Email Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -204,7 +204,7 @@ class ResetPasswordViewSets(GenericViewSet):
                     'template': '../templates/password_reset.html',
                     'context': {
                         'employee_id': user.employee_id,
-                        'name': user.full_name,
+                        'name': user.employee_name,
                         'email': user.email,
                         'token': token,
                     },
@@ -328,7 +328,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                         final_string = num_string
                     else:
                         final_string = "Nothing"
-                desc = "{} updated {} of {} asset".format(request.user.full_name.title(), final_string,
+                desc = "{} updated {} of {} asset".format(request.user.employee_name.title(), final_string,
                                                           serializer.data['asset_type'])
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
@@ -342,7 +342,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             asset.is_deleted = True
             asset.save()
-            desc = "{} deleted {} asset".format(request.user.full_name.title(), asset.asset_type)
+            desc = "{} deleted {} asset".format(request.user.employee_name.title(), asset.asset_type)
             create_activity(asset.id, 'asset', request.user, desc, 'deleted')
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
@@ -361,11 +361,11 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     if u == request.user.id:
                         continue
                     user = User.objects.get(id=u)
-                    names.append(user.full_name)
+                    names.append(user.employee_name)
                     asset.shared_to.add(user)
                 user_list = ", ".join(names[:len(names) - 1]) + " and " + names[-1] if len(names) > 1 else "".join(
                     names)
-                desc = "{} shared {} asset to {}".format(request.user.full_name.title(), asset.asset_type, user_list)
+                desc = "{} shared {} asset to {}".format(request.user.employee_name.title(), asset.asset_type, user_list)
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": "ok"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -380,7 +380,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             user = User.objects.get(id=user_id)
             asset.shared_to.remove(user)
-            desc = "{} Unshared {} from {} asset".format(request.user.full_name, user.full_name, asset.asset_type)
+            desc = "{} Unshared {} from {} asset".format(request.user.employee_name, user.employee_name, asset.asset_type)
             create_activity(asset.id, 'asset', request.user, desc, 'updated')
             serializer = self.serializer_class(asset)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
@@ -418,7 +418,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                                 asset_type=row['Asset Type'].lower()
                             )
                         else:
-                            logger.error(row["Username"], request.user.full_name, "Asset Type not found")
+                            logger.error(row["Username"], request.user.employee_name, "Asset Type not found")
                             failed += 1
                             continue
                         asset.email = row['Email'] if not pd.isnull(row['Email']) else ""
@@ -437,7 +437,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                             updated += 1
 
                     except Exception as e:
-                        logger.error(row["Username"], request.user.full_name, e)
+                        logger.error(row["Username"], request.user.employee_name, e)
                         failed += 1
                         continue
                 mail_data = {
@@ -447,7 +447,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     'subject': 'Log1 bulk upload of Asset information',
                     'template': '../templates/asset_report.html',
                     'context': {
-                        'user': request.user.full_name,
+                        'user': request.user.employee_name,
                         'created': created,
                         'updated': updated,
                         'failed': failed,

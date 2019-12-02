@@ -1,5 +1,7 @@
+from discord_webhook import DiscordWebhook, DiscordEmbed
+
+from rest_framework import status
 from datetime import date, timedelta
-from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
@@ -50,3 +52,13 @@ def get_time_filter(queryset, filter_by):
         queryset = queryset.filter(created__range=[first, last])
 
     return queryset
+
+
+# Webhook function for Discord App
+def discord_webhook(username, content, text, url):
+    webhook = DiscordWebhook(url=url, username=username,
+                             content=content)
+    embed = DiscordEmbed(description=text, color=242424)
+
+    webhook.add_embed(embed)
+    webhook.execute()

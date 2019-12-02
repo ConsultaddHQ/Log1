@@ -19,45 +19,37 @@ def calendar_con():
 
 
 def calendar_description(data):
-    consultant = data["consultant"]
-    consultant_profile = data["consultant_profile"]
-    user = data["user"]
-    submission = data["submission"]
-    lead = data["lead"]
-    desc = data["description"]
-    call_details = data["call_details"]
-
     description = f'''
     <strong>Calling Details</strong>
-        {call_details}
+        {data["call_details"]}
 
-    <strong>Marketer Name - {user.full_name}</strong>
-    <strong>Employer - {submission.employer}</strong>
+    <strong>Marketer Name - {data["user"].employee_name}</strong>
+    <strong>Employer - {data["submission"].employer}</strong>
 
     <strong>consultant Details: </strong>
 
-        Name - {consultant.name}
-        DOB - {consultant_profile.dob}
-        SSN - {consultant.ssn}
-        VISA - {consultant_profile.visa_type}
-        Visa Start - {consultant_profile.visa_start}
-        Visa End - {consultant_profile.visa_end}
+        Name - {data["consultant"].name}
+        DOB - {data["submission"].date_of_birth}
+        SSN - {data["consultant"].ssn}
+        VISA - {data["submission"].visa_type}
+        Visa Start - {data["submission"].visa_start}
+        Visa End - {data["submission"].visa_end}
 
-        Skype id - {consultant.skype}
+        Skype id - {data["consultant"].skype}
 
-        Education - {consultant_profile.education}
+        Education - {data["submission"].education}
 
     <strong>Position Details:</strong>
 
-        Location = {lead.location}
-        Job Title - {lead.job_title}
-        Client Name - {submission.client}
+        Location = {data["lead"].city}
+        Job Title - {data["lead"].job_title}
+        Client Name - {data["submission"].client}
 
     <strong>Extra details:</strong> 
-        {desc}
+        {data["description"]}
 
     <strong>Job Description:</strong>
-        {lead.job_desc}
+        {data["lead"].job_desc}
 
     '''
     return description
@@ -86,7 +78,8 @@ def book_calendar(data):
             'RRULE:FREQ=DAILY;COUNT=1'
         ],
 
-        'attendees': data["attendees"],
+        # 'attendees': data["attendees"],
+        'attendees': [],
 
         'reminders': {
             'useDefault': False,
@@ -121,7 +114,8 @@ def update_calendar(event_id, data):
             'RRULE:FREQ=DAILY;COUNT=1'
         ],
 
-        'attendees': data["attendees"],
+        # 'attendees': data["attendees"],
+        'attendees': [],
 
         'reminders': {
             'useDefault': False,
@@ -135,7 +129,7 @@ def update_calendar(event_id, data):
     return updated_event['id']
 
 
-def get_inteviews(data):
+def get_interviews(data):
     service = calendar_con()
     page_token = None
     count = 0

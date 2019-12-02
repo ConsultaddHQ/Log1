@@ -133,7 +133,7 @@ class User(AbstractUser, PermissionsMixin):
             return error, "error"
 
     def save(self, *args, **kwargs):
-        if not self.id:
+        if not self.id and self.employee_name:
             self.first_name = self.employee_name.split()[0]
             self.last_name = self.employee_name.split()[1] if len(self.employee_name.split()) > 1 else ""
         return super(User, self).save(*args, **kwargs)
