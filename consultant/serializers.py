@@ -4,7 +4,30 @@ from rest_framework import serializers
 from consultant.models import *
 from employee.models import User
 from project.models import ProjectSupport
-from employee.serializers import TeamSerializer
+from employee.serializers import TeamSerializer, UserSerializer
+
+
+# Consultant Login
+class ConsultantLoginSerializer(UserSerializer):
+    token = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'token', 'email', 'name', 'is_active', 'project')
+
+    @staticmethod
+    def get_project(self):
+        if hasattr(self, 'project'):
+            return self.projects.exclude(end_date=None).annotate(
+                client=F('submission__client')
+            ).values('id', 'start_date', 'client')
+        return False
+
+    @staticmethod
+    def get_token(self):
+        token, created = ConsultantToken.objects.get_or_create(consultant=self)
+        return token.key
 
 
 class ConsultantSerializer(serializers.ModelSerializer):

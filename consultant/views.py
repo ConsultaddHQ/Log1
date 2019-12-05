@@ -1,6 +1,3 @@
-from functools import wraps
-
-import jwt
 import logging
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, F, Count
@@ -16,11 +13,92 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 
 from project.models import Project
 from consultant.serializers import *
-from activity.serializers import CommentSerializer
 from marketing.models import Submission, Interview
 from attachment.serializers import AttachmentSerializer
+from consultant.permissions import ConsultantIsAuthenticated
+from consultant.auth import consultant_authenticate, get_consultant
+from consultant.authentication import ConsultantTokenAuthentication
+from activity.serializers import CommentSerializer, CommentGetSerializer
 
 logger = logging.getLogger(__name__)
+
+
+class ConsultantAuthViewSets(GenericViewSet):
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantLoginSerializer
+
+    @action(methods=['post'], detail=False, url_path='register')
+    def register(self, request):
+        """
+            User Register
+            :param request, email, password, employee_id, name, phone, gender, team, role
+        """
+        try:
+            email = request.data.get('email')
+            password = request.data.get('password').strip()
+
+            queryset = Consultant.objects.filter(email__exact=email)
+            if queryset:
+                consultant = queryset.first()
+                consultant.set_password(password)
+                consultant.is_active = True
+                consultant.save()
+
+                return Response({"result": "Success"}, status=status.HTTP_201_CREATED)
+            else:
+                return Response({"error": "Consultant Does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, url_path='login')
+    def login(self, request):
+        """
+            Normal Login
+            :param request, email, password
+        """
+        email = request.data.get('email')
+        if email:
+            consultant = get_object_or_404(Consultant, email=email)
+        else:
+            return Response({"error": "Email is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+        consultant = consultant_authenticate(email=consultant.email, password=request.data.get('password').strip())
+        if consultant:
+            return Response({"result": self.serializer_class(consultant).data}, status=status.HTTP_202_ACCEPTED)
+        logger.error("Incorrect Email Id OR Password")
+        return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantLoginSerializer
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        queryset = Consultant.objects.all()
+        serializer = self.serializer_class(queryset, many=True)
+        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
+    @action(methods=['post'], detail=False, url_path='change_password')
+    def change_password(self, request):
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+        consultant = get_consultant(request)
+        if consultant.check_password(current_password):
+            consultant.set_password(new_password)
+            consultant.save()
+            return Response({"result": "password updated"}, status=status.HTTP_200_OK)
+        return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['delete'], detail=False, url_path='logout')
+    def logout(self, request):
+        """
+            Logout for authenticated user
+        """
+        token = get_object_or_404(ConsultantToken, key=request.auth)
+        token.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
@@ -424,15 +502,15 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             try:
                 consultant_id = kwargs.get('pk')
                 consultant = get_object_or_404(Consultant, id=consultant_id)
-                queryset = consultant.comments.all()
-                serializer = CommentSerializer(queryset, many=True)
+                queryset = consultant.comments.filter(parent_comment=None)
+                serializer = CommentGetSerializer(queryset, many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         elif request.method == 'POST':
             try:
-                content_type = ContentType.objects.get(model='comment')
+                content_type = ContentType.objects.get(model='consultant')
                 object_id = kwargs.get('pk', None)
                 comment = Comment.objects.create(
                     user=request.user,
@@ -441,7 +519,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                     comment_text=request.data['comment_text'],
                     parent_comment_id=request.data['parent_comment'],
                 )
-                serializer = CommentSerializer(comment)
+                serializer = CommentGetSerializer(comment)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
@@ -545,7 +623,8 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
                 marketing_start=Subquery(marketing.values('start')[:1]),
                 recruiter=Subquery(poc.values('poc__employee_name')[:1]),
                 preferred_location=Subquery(marketing.values('preferred_location')[:1]),
-            ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool', 'marketing_start')
+            ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
+                     'marketing_start')
 
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
 

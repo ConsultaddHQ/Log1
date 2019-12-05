@@ -8,8 +8,8 @@ from django.utils.translation import ugettext_lazy as _
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.mixins import ListModelMixin
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, exceptions, viewsets
 from rest_framework.authentication import TokenAuthentication
@@ -76,23 +76,6 @@ class EmployeeAuthViewSets(GenericViewSet):
             return Response({"result": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
         logger.error("Incorrect Employee Id/Password")
         return Response({"error": "Incorrect Employee Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(methods=['post'], detail=False, url_path='consultant_login')
-    def consultant_login(self, request):
-        """
-            Normal Login
-            :param request, email, password
-        """
-        email = request.data.get('email')
-        if email:
-            user = get_object_or_404(User, email=email, role__name='consultant')
-        else:
-            return Response({"error": "Email id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
-        user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
-        if user:
-            return Response({"result": ConsultantSerializerLogin(user).data}, status=status.HTTP_202_ACCEPTED)
-        logger.error("Incorrect Email ID/Password")
-        return Response({"error": "Incorrect Email Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class EmployeeViewSets(GenericViewSet, ListModelMixin):

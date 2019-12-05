@@ -1,6 +1,10 @@
+import os
+import binascii
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import BaseUserManager
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
 
 from activity.models import Comment
@@ -57,7 +61,15 @@ WORK_TYPE_CHOICE = (
 )
 
 
-class Consultant(TimeStampedModel):
+class ConsultantManager(BaseUserManager):
+    use_in_migrations = True
+
+    def get_by_natural_key(self, username):
+        return self.get(**{self.model.USERNAME_FIELD: username})
+
+
+class Consultant(AbstractBaseUser, TimeStampedModel):
+    is_active = models.BooleanField(default=False)
     email = models.EmailField(_('Email ID'), unique=True)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")
@@ -85,6 +97,10 @@ class Consultant(TimeStampedModel):
         default='full_time'
     )
 
+    objects = ConsultantManager()
+
+    USERNAME_FIELD = 'email'
+
     def save(self, *args, **kwargs):
         """
             On save timestamps
@@ -96,6 +112,9 @@ class Consultant(TimeStampedModel):
 
     def __str__(self):
         return f'{self.name} {self.email}'
+
+    def get_by_natural_key(self, username):
+        return self.get(**{self.model.USERNAME_FIELD: username})
 
     @property
     def get_attachment(self):
@@ -114,6 +133,33 @@ class Consultant(TimeStampedModel):
         if queryset:
             return queryset.first().poc
         return None
+
+
+class ConsultantToken(models.Model):
+    """
+    The default authorization token model.
+    """
+    key = models.CharField(_("Key"), max_length=40, primary_key=True)
+    consultant = models.OneToOneField(
+        Consultant, related_name='consultant_token',
+        on_delete=models.CASCADE, verbose_name=_("Consultant")
+    )
+    created = models.DateTimeField(_("Created"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Consultant Token")
+        verbose_name_plural = _("Consultant Tokens")
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super(ConsultantToken, self).save(*args, **kwargs)
+
+    def generate_key(self):
+        return binascii.hexlify(os.urandom(20)).decode()
+
+    def __str__(self):
+        return self.key
 
 
 class WorkAuth(TimeStampedModel):

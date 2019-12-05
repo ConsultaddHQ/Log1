@@ -35,27 +35,6 @@ class UserSerializerLogin(UserSerializer):
         return self.team.name
 
 
-# Consultant Login
-class ConsultantSerializerLogin(UserSerializer):
-    token = serializers.SerializerMethodField()
-    consultant = serializers.SerializerMethodField()
-
-    class Meta:
-        model = User
-        fields = ('token', 'consultant')
-
-    @staticmethod
-    def get_token(self):
-        token, created = Token.objects.get_or_create(user=self)
-        return token.key
-
-    @staticmethod
-    def get_consultant(self):
-        from consultant.models import Consultant
-        consultant = Consultant.objects.filter(email=self.email).values('id', 'name', 'email', 'ssn')
-        return consultant
-
-
 class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team

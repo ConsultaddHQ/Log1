@@ -2,15 +2,20 @@ from django.contrib import admin
 
 from utils_app.admin import ExportCsvMixin
 from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, FeedbackDetail, \
-    ConsultantPOC, ConsultantFeedback, Education, Experience, WorkAuth
+    ConsultantPOC, ConsultantFeedback, Education, Experience, WorkAuth, ConsultantToken
 
 
 @admin.register(Consultant)
 class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
     list_display = ('id', 'name', 'email', 'date_of_birth', 'phone_no', 'skills', 'status', 'current_city', 'ssn',
-                    'links', 'gender', 'work_type')
+                    'links', 'gender', 'work_type', 'password', 'is_active')
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
     actions = ["export_as_csv"]
+
+
+@admin.register(ConsultantToken)
+class ConsultantToken(admin.ModelAdmin):
+    list_display = ('consultant', 'key', 'created')
 
 
 @admin.register(ConsultantProfile)

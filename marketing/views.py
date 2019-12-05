@@ -174,7 +174,7 @@ class LeadViewSets(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            roles_have_access = {'superadmin', 'admin', 'proxy', 'marketer'}
+            roles_have_access = {'superadmin', 'admin', 'proxy', 'marketer', 'interviewee'}
             res = set(roles).issubset(roles_have_access)
             if not res:
                 return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)

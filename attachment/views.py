@@ -25,10 +25,13 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, GenericViewSet):
         attachment_type = request.query_params.get("type", None)
         try:
             obj_content_type = ContentType.objects.get(model=obj_type)
-            query = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type).order_by('-created')
             if attachment_type:
-                query = query.filter(attachment_type=attachment_type)
-            serializer = self.serializer_class(query, many=True)
+                queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type,
+                                                     attachment_type=attachment_type).order_by('-created')
+            else:
+                queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type
+                                                     ).order_by('-created')
+            serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)

@@ -10,13 +10,12 @@ from rest_framework.documentation import include_docs_urls
 
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
-    ConsultantProfileViewSets
+    ConsultantProfileViewSets, ConsultantAuthViewSets, ConsultantAppViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets
 from utils_app.views import CityViewSets
 from attachment.views import AttachmentView
 from project.views import ProjectViewSets, EngineeringProjectsViewSets
-# from report.views import DashboardViewSet
 
 schema_view = get_swagger_view(title='New Log1 Documentation')
 
@@ -34,6 +33,10 @@ router.register(r'consultant_bench', ConsultantBenchViewSets)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
 
+# Mobile Application routes
+router.register(r'consultant_app', ConsultantAppViewSets)
+router.register(r'consultant_auth', ConsultantAuthViewSets)
+
 router.register(r'lead', LeadViewSets)
 router.register(r'screening', InterviewViewSets)
 router.register(r'submission', SubmissionViewSets)
@@ -44,7 +47,6 @@ router.register(r'project', ProjectViewSets)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
-# router.register(r'report', DashboardViewSet)
 
 
 urlpatterns = [
