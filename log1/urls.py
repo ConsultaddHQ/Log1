@@ -15,7 +15,7 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
     InterviewViewSets
 from utils_app.views import CityViewSets
 from attachment.views import AttachmentView
-from project.views import ProjectViewSets, EngineeringProjectsViewSets
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, TimeSheetViewSets
 
 schema_view = get_swagger_view(title='New Log1 Documentation')
 
@@ -44,6 +44,7 @@ router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'project', ProjectViewSets)
+router.register(r'timesheet', TimeSheetViewSets)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
@@ -52,8 +53,10 @@ router.register(r'city', CityViewSets)
 urlpatterns = [
     path('api/', include(router.urls)),
     path('api/admin/', admin.site.urls),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if os.getenv('DEBUG', False):
     urlpatterns.append(path('api/swagger/', schema_view))
+    urlpatterns.append(path('api/v1/', include(router.urls)))
     urlpatterns.append(path('api/docs/', include_docs_urls(title='New Log1', public=True)))

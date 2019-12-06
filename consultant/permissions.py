@@ -8,7 +8,7 @@ from consultant.authentication import get_authorization_header
 
 class ConsultantIsAuthenticated(BasePermission):
     """
-    Allows access only to authenticated users.
+    Allows access only to authenticated Consultants.
     """
 
     def has_permission(self, request, view):

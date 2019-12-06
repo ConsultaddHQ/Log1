@@ -12,9 +12,3 @@
 **/migrations/*
 **/media/*
 models
-utils_app/credentials.json
-utils_app/token.pickle
-utils_app/application.json
-utils_app/candidates.json
-utils_app/tokens.json
-utils_app/google_auth.py

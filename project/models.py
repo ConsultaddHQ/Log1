@@ -6,7 +6,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from employee.models import User
 from marketing.models import Submission
 from consultant.models import Consultant
-from attachment.models import Attachment
+from attachment.models import Attachment, attachment_upload
 from utils_app.models import TimeStampedModel
 
 PROJECT_CHOICES = (
@@ -42,6 +42,14 @@ PROJECT_CHOICES = (
     ("terminated-fired_security_issue", "Fired - Data Security Issue"),
 )
 
+TIMESHEET_STATUS = (
+    ('draft', 'Draft'),
+    ('rejected', 'Rejected'),
+    ('pending_approval', 'Pending Approval'),
+    ('consider_for_payroll', 'Consider for Payroll'),
+    ('consider_for_invoice', 'Consider for Invoice'),
+)
+
 
 class Project(TimeStampedModel):
     attachments = GenericRelation(Attachment)
@@ -65,7 +73,7 @@ class Project(TimeStampedModel):
         related_name='project',
         verbose_name='Submission'
     )
-    consultant = models.OneToOneField(
+    consultant = models.ForeignKey(
         Consultant, on_delete=models.PROTECT,
         related_name='projects',
         verbose_name='Consultant'
@@ -116,3 +124,28 @@ class ProjectSupport(TimeStampedModel):
     def __str__(self):
         return f'{self.project.submission.consultant.name} - {self.support.employee_name}'
 
+
+class TimeSheet(TimeStampedModel):
+    attachments = GenericRelation(Attachment)
+    end = models.DateField(_('end'), null=True, blank=True)
+    start = models.DateField(_('start'), null=True, blank=True)
+    hours = models.FloatField(max_length=20, null=True, blank=True)
+    additional_hours = models.FloatField(max_length=20, null=True, blank=True, default=0)
+    status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS, default='draft')
+    project = models.ForeignKey(
+        Project, on_delete=models.PROTECT,
+        related_name='timesheets',
+        verbose_name='TimeSheet'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(TimeSheet, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.project.consultant.name} - {self.hours}'

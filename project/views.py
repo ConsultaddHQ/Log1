@@ -2,16 +2,20 @@ import os
 import logging
 from datetime import datetime
 
-from django.db.models import Q, F, Subquery, OuterRef
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.db.models import Q, F, Subquery, OuterRef
 
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin
+
+from consultant.permissions import ConsultantIsAuthenticated
+from consultant.authentication import ConsultantTokenAuthentication, get_consultant
 
 from constants import offer_url
 from project.serializers import *
@@ -47,11 +51,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': to,
                 'bcc': [],
                 'subject': 'Offer Received of {} :: {} :: {} :: {} :: {}'.format(
-                    submission.consultant_name, submission.client, str(start_date), submission.client, submission.vendor
+                    submission.consultant_name, submission.client, str(self.start_date), submission.client,
+                    submission.vendor
                 ),
                 'template': '../templates/offer.html',
                 'context': {
-                    'start': start_date,
+                    'start': self.start_date,
                     'rate': submission.rate,
                     'employer': submission.employer,
                     'client_name': submission.client,
@@ -428,8 +433,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    authentication_classes = (HasAPIKey,)
+    permission_classes = ()
 
     def list(self, request, *args, **kwargs):
         try:
@@ -460,3 +465,51 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
         except Exception as error:
             logger.error(str(error))
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# API for Mobile App
+class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset = TimeSheet.objects.all()
+    serializer_class = TimeSheetSerializer
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            consultant = get_consultant(request)
+            project = consultant.get_project()
+            if project:
+                project = project.first()
+                queryset = TimeSheet.objects.filter(project=project)
+                serializer = self.serializer_class(queryset, many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"error": "Project Not Found"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            consultant = get_consultant(request)
+            project = consultant.get_project()
+            if project:
+                project = project.first()
+                timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), project=project)
+                timesheet.project = request.data.get('project')
+                timesheet.total_hours = request.data.get('total_hours')
+                timesheet.save()
+                serializer = self.serializer_class(timesheet)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"error": "Project Not Found"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None))
+            timesheet.status = 'rejected'
+            timesheet.save()
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

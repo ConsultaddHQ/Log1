@@ -18,10 +18,11 @@ class ConsultantLoginSerializer(UserSerializer):
 
     @staticmethod
     def get_project(self):
-        if hasattr(self, 'project'):
-            return self.projects.exclude(end_date=None).annotate(
-                client=F('submission__client')
-            ).values('id', 'start_date', 'client')
+        if hasattr(self, 'projects'):
+            return self.projects.filter(end_date=None).annotate(
+                client=F('submission__client'),
+                employer=F('submission__employer')
+            ).values('id', 'start_date', 'client', 'employer')
         return False
 
     @staticmethod
@@ -121,6 +122,15 @@ class ConsultantProfileSerializer(serializers.ModelSerializer):
                   'linkedin', 'current_city', 'profile_owner')
 
 
+class ConsultantCreateProfileSerializer(serializers.ModelSerializer):
+    profile_owner = serializers.HiddenField(default=serializers.CurrentUserDefault())
+
+    class Meta:
+        model = ConsultantProfile
+        fields = ('id', 'title', 'visa_type', 'visa_start', 'visa_end', 'education', 'date_of_birth', 'links',
+                  'linkedin', 'current_city', 'profile_owner')
+
+
 class ConsultantBenchSerializer(serializers.ModelSerializer):
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
@@ -164,7 +174,14 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         queryset = self.pocs.filter(end=None, poc_type='recruiter')
         if queryset:
             poc = queryset.first().poc
-            return POCSerializer(poc).data
+            data = {
+                "id": queryset.first().id,
+                'user_id': poc.id,
+                'email': poc.email,
+                'phone': poc.phone,
+                'employee_name': poc.employee_name,
+            }
+            return data
         return None
 
     @staticmethod
@@ -172,7 +189,14 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         queryset = self.pocs.filter(end=None, poc_type='relation')
         if queryset:
             poc = queryset.first().poc
-            return POCSerializer(poc).data
+            data = {
+                "id": queryset.first().id,
+                'user_id': poc.id,
+                'email': poc.email,
+                'phone': poc.phone,
+                'employee_name': poc.employee_name,
+            }
+            return data
         return None
 
     @staticmethod
@@ -180,7 +204,14 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         queryset = ProjectSupport.objects.filter(project__consultant=self, end=None)
         if queryset:
             poc = queryset.first().engineer
-            return POCSerializer(poc).data
+            data = {
+                "id": queryset.first().id,
+                'user_id': poc.id,
+                'email': poc.email,
+                'phone': poc.phone,
+                'employee_name': poc.employee_name,
+            }
+            return data
         return None
 
     class Meta:

@@ -9,8 +9,10 @@ from django.contrib.contenttypes.fields import GenericRelation
 
 from activity.models import Comment
 from employee.models import User, Team
+from utils_app.mailing import send_email
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
+from employee.token import get_token_generator
 
 CONSULTANT_STATUS_CHOICE = (
     ('archived', 'Archived'),
@@ -59,6 +61,8 @@ WORK_TYPE_CHOICE = (
     ('c2c', 'C2C'),
     ('full_time', 'Full Time')
 )
+
+TOKEN_GENERATOR_CLASS = get_token_generator()
 
 
 class ConsultantManager(BaseUserManager):
@@ -116,6 +120,15 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     def get_by_natural_key(self, username):
         return self.get(**{self.model.USERNAME_FIELD: username})
 
+    def get_project(self):
+        from project.models import Project
+        queryset = Project.objects.filter(
+            models.Q(consultant=self) &
+            (models.Q(end_date=None, status='joined') |
+             models.Q(end_date__gte=timezone.now()))
+        )
+        return queryset
+
     @property
     def get_attachment(self):
         return self.attachments.all()
@@ -133,6 +146,42 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         if queryset:
             return queryset.first().poc
         return None
+
+    @staticmethod
+    def send_mail(mail_data):
+        try:
+            # res = send_email(mail_data, "admin@consultadd.com")
+            return "res", "ok"
+        except Exception as error:
+            return error, "error"
+
+
+class ConsultantResetPasswordToken(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    key = models.CharField(_("Key"), max_length=64, db_index=True, unique=True)
+    user_agent = models.CharField(_("HTTP User Agent"), max_length=256, default="")
+    consultant = models.ForeignKey(Consultant, related_name='password_reset_tokens', on_delete=models.CASCADE)
+    ip_address = models.GenericIPAddressField(_("The IP address of this session"), default="127.0.0.1")
+
+    class Meta:
+        verbose_name = _("Consultant Password Reset Token")
+        verbose_name_plural = _("Consultant Password Reset Tokens")
+
+    @staticmethod
+    def generate_key():
+        return TOKEN_GENERATOR_CLASS.generate_token()
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super(ConsultantResetPasswordToken, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.consultant} : {self.key}'
+
+
+def clear_expired(expiry_time):
+    ConsultantResetPasswordToken.objects.filter(created_at__lte=expiry_time).delete()
 
 
 class ConsultantToken(models.Model):

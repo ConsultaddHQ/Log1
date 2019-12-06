@@ -1,12 +1,13 @@
 import logging
+from datetime import timedelta
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, F, Count
 
-from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import status, viewsets, exceptions
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
@@ -14,15 +15,18 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 from project.models import Project
 from consultant.serializers import *
 from marketing.models import Submission, Interview
+from consultant.auth import consultant_authenticate
 from attachment.serializers import AttachmentSerializer
 from consultant.permissions import ConsultantIsAuthenticated
-from consultant.auth import consultant_authenticate, get_consultant
-from consultant.authentication import ConsultantTokenAuthentication
+from employee.models import get_password_reset_token_expiry_time
 from activity.serializers import CommentSerializer, CommentGetSerializer
+from employee.serializers import PasswordTokenSerializer, EmailSerializer
+from consultant.authentication import ConsultantTokenAuthentication, get_consultant
 
 logger = logging.getLogger(__name__)
 
 
+# API for Mobile App
 class ConsultantAuthViewSets(GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
@@ -69,6 +73,7 @@ class ConsultantAuthViewSets(GenericViewSet):
         return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
 
 
+# API for Mobile App
 class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
@@ -99,6 +104,98 @@ class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
         token = get_object_or_404(ConsultantToken, key=request.auth)
         token.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# API for Mobile App
+class ConsultantResetPasswordViewSets(GenericViewSet):
+    permission_classes = ()
+    authentication_classes = ()
+    queryset = Consultant.objects.all()
+    serializer_class = EmailSerializer
+    pass_serializer_class = PasswordTokenSerializer
+
+    @action(methods=['post'], detail=False, url_path='token_request')
+    def token_request(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+
+        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+
+        now_minus_expiry_time = timezone.now() - timedelta(hours=password_reset_token_validation_time)
+
+        clear_expired(now_minus_expiry_time)
+
+        consultants = Consultant.objects.filter(email__iexact=email)
+
+        active_user_found = False
+        for consultant in consultants:
+            if consultant.is_active and consultant.has_usable_password():
+                active_user_found = True
+
+        # No active user found, raise a validation error
+        if not active_user_found:
+            logger.info("User is not active")
+            raise exceptions.ValidationError({
+                'email': [
+                    "There is no active user associated with this e-mail address or the password can not be changed"],
+            })
+        ip = request.META['REMOTE_ADDR']
+        for consultant in consultants:
+            if consultant.is_active and consultant.has_usable_password():
+                if consultant.password_reset_tokens.all().count() > 0:
+                    token = consultant.password_reset_tokens.all()[0]
+                else:
+                    token = ConsultantResetPasswordToken.objects.create(
+                        consultant=consultant,
+                        user_agent=request.META['HTTP_USER_AGENT'],
+                        ip_address=ip if ip else '127.0.0.1'
+                    )
+                mail_data = {
+                    'to': [consultant.email],
+                    'cc': [],
+                    'bcc': [],
+                    'subject': 'Reset Log1 Password',
+                    'template': '../templates/password_reset.html',
+                    'context': {
+                        'name': consultant.name,
+                        'email': consultant.email,
+                        'token': token,
+                    },
+                }
+                res, error = consultant.send_mail(mail_data)
+                if error == 'error':
+                    logger.error(res)
+                    return Response({'error': str(res)}, status=status.HTTP_200_OK)
+        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
+
+    @action(methods=['post'], detail=False, url_path='confirm_password')
+    def confirm_password(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        password = serializer.validated_data['password']
+        token = serializer.validated_data['token']
+
+        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+
+        reset_password_token = ConsultantResetPasswordToken.objects.filter(key=token).first()
+
+        if reset_password_token is None:
+            return Response({'status': 'not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
+
+        if timezone.now() > expiry_date:
+            reset_password_token.delete()
+            return Response({'status': 'expired'}, status=status.HTTP_404_NOT_FOUND)
+
+        reset_password_token.consultant.set_password(password)
+        reset_password_token.consultant.save()
+
+        # Delete all password reset tokens for this user
+        ConsultantResetPasswordToken.objects.filter(consultant=reset_password_token.consultant).delete()
+
+        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
 
 
 class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
@@ -320,7 +417,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles and 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles):
             return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
         obj_id = kwargs.get('pk')
         con_obj = request.query_params.get('type')
@@ -347,17 +444,15 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         }
         try:
             if obj_status == 'create':
-                serializer = con_classes['serializer']["con_obj"](data=request.data, partial=True)
+                serializer = con_classes['serializer'][con_obj](data=request.data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
                     return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
                 else:
                     return Response({"result": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                obj = get_object_or_404(con_classes["con_obj"], id=obj_id)
-                if not obj:
-                    return Response({"result": "Consultant Object not found"}, status=status.HTTP_400_BAD_REQUEST)
-                serializer = con_classes['serializer']['con_obj'](obj, partial=True)
+                obj = get_object_or_404(con_classes[con_obj], id=obj_id)
+                serializer = con_classes['serializer'][con_obj](obj, data=request.data, partial=True)
                 serializer.save()
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:

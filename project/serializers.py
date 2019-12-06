@@ -11,6 +11,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class TimeSheetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TimeSheet
+        fields = '__all__'
+
+
 class ProjectGetSerializer(serializers.ModelSerializer):
     submission = SubmissionSerializer()
     interview = serializers.SerializerMethodField()

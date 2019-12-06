@@ -103,7 +103,7 @@ class Lead(TimeStampedModel):
     job_title = models.CharField(_('Job Title'), max_length=100, blank=True, null=True)
     primary_skill = models.CharField(_('Primary Skill'), max_length=50, blank=True, null=True)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='new')
-    secondary_skills = ArrayField(models.CharField(_('Secondary Skills'), max_length=30, blank=True, null=True))
+    secondary_skills = ArrayField(models.CharField(_('Secondary Skills'), max_length=30), blank=True, null=True)
     vendor_company = models.ForeignKey(
         VendorCompany, on_delete=models.PROTECT,
         null=True, blank=True,

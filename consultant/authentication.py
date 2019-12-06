@@ -3,6 +3,8 @@ from rest_framework import exceptions
 from django.utils.translation import ugettext_lazy as _
 from rest_framework.authentication import get_authorization_header
 
+from consultant.models import ConsultantToken
+
 
 class ConsultantTokenAuthentication(object):
     """
@@ -65,3 +67,14 @@ class ConsultantTokenAuthentication(object):
 
     def authenticate_header(self, request):
         return self.keyword
+
+
+def get_consultant(request):
+    auth = get_authorization_header(request).split()
+    key = auth[1].decode()
+    try:
+        consultant_token = ConsultantToken.objects.select_related('consultant').get(key=key)
+    except ConsultantToken.DoesNotExist:
+        raise exceptions.AuthenticationFailed('Invalid token.')
+    if consultant_token.consultant and consultant_token.consultant.is_authenticated:
+        return consultant_token.consultant
