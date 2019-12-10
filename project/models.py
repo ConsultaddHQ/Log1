@@ -45,7 +45,9 @@ PROJECT_CHOICES = (
 TIMESHEET_STATUS = (
     ('draft', 'Draft'),
     ('rejected', 'Rejected'),
+    ('submitted', 'Submitted'),
     ('pending_approval', 'Pending Approval'),
+    ('consultant_rejected', 'Consultant Rejected'),
     ('consider_for_payroll', 'Consider for Payroll'),
     ('consider_for_invoice', 'Consider for Invoice'),
 )
@@ -135,7 +137,7 @@ class TimeSheet(TimeStampedModel):
     project = models.ForeignKey(
         Project, on_delete=models.PROTECT,
         related_name='timesheets',
-        verbose_name='TimeSheet'
+        verbose_name='Consultant'
     )
 
     def save(self, *args, **kwargs):

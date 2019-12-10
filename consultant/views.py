@@ -156,7 +156,7 @@ class ConsultantResetPasswordViewSets(GenericViewSet):
                     'cc': [],
                     'bcc': [],
                     'subject': 'Reset Log1 Password',
-                    'template': '../templates/password_reset.html',
+                    'template': '../templates/con_password_reset.html',
                     'context': {
                         'name': consultant.name,
                         'email': consultant.email,
@@ -459,55 +459,72 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             logger.error(err)
             return Response({"error": "%s Object type not found" % (con_obj,)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['post'], detail=True, url_path='education')
+    @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
             return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
-        data = request.data
-        consultant_id = kwargs.get('pk')
-        try:
-            consultant = get_object_or_404(Consultant, id=consultant_id)
 
-            Education.objects.create(
-                city=data['city'],
-                title=data['title'],
-                major=data['major'],
-                remark=data['remark'],
-                consultant=consultant,
-                org_name=data['org_name'],
-                edu_type=data['edu_type'],
-                end_date=data['end_date'],
-                start_date=data['start_date'],
-            )
-            return Response({"result": "created"}, status=status.HTTP_201_CREATED)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        if request.method == 'POST':
+            try:
+                data = request.data
+                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+                Education.objects.create(
+                    city=data['city'],
+                    title=data['title'],
+                    major=data['major'],
+                    remark=data['remark'],
+                    consultant=consultant,
+                    org_name=data['org_name'],
+                    edu_type=data['edu_type'],
+                    end_date=data['end_date'],
+                    start_date=data['start_date'],
+                )
+                return Response({"result": "created"}, status=status.HTTP_201_CREATED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            try:
+                education = get_object_or_404(Education, id=kwargs.get('pk'))
+                serializer = self.serializer_class(education, data=request.data, partial=True)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['post'], detail=True, url_path='experience')
+    @action(methods=['post', 'put'], detail=True, url_path='experience')
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
             return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
-        data = request.data
-        consultant_id = kwargs.get('pk')
-        try:
-            consultant = get_object_or_404(Consultant, id=consultant_id)
-            Experience.objects.create(
-                city=data['city'],
-                title=data['title'],
-                remark=data['remark'],
-                consultant=consultant,
-                company=data['company'],
-                exp_type=data['exp_type'],
-                end_date=data['end_date'],
-                start_date=data['start_date'],
-            )
-            return Response({"result": "created"}, status=status.HTTP_201_CREATED)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if request.method == 'POST':
+            try:
+                data = request.data
+                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+                Experience.objects.create(
+                    city=data['city'],
+                    title=data['title'],
+                    remark=data['remark'],
+                    consultant=consultant,
+                    company=data['company'],
+                    exp_type=data['exp_type'],
+                    end_date=data['end_date'],
+                    start_date=data['start_date'],
+                )
+                return Response({"result": "created"}, status=status.HTTP_201_CREATED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            try:
+                experience = get_object_or_404(Experience, id=kwargs.get('pk'))
+                serializer = self.serializer_class(experience, data=request.data, partial=True)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=True, url_path='marketing')
     def marketing(self, request, *args, **kwargs):
@@ -634,8 +651,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
     @action(methods=['get'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, *args, **kwargs):
-        consultant_id = kwargs.get('pk')
-        rate_revision = ConsultantRateRevision.objects.filter(consultant=consultant_id)
+        rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk'))
         data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback')
         return Response({"results": data}, status=status.HTTP_200_OK)
 

@@ -2,6 +2,7 @@ import os
 import logging
 from datetime import datetime
 
+from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, F, Subquery, OuterRef
@@ -474,7 +475,8 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    def list(self, request, *args, **kwargs):
+    @action(methods=['GET'], detail=False, url_path='history')
+    def history(self, request, *args, **kwargs):
         try:
             consultant = get_consultant(request)
             project = consultant.get_project()
@@ -488,15 +490,53 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    def update(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         try:
             consultant = get_consultant(request)
             project = consultant.get_project()
             if project:
                 project = project.first()
+                queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'])
+                serializer = self.serializer_class(queryset, many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"error": "Project Not Found"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            project = request.user.get_project()
+            if project:
+                project = project.first()
                 timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), project=project)
-                timesheet.project = request.data.get('project')
-                timesheet.total_hours = request.data.get('total_hours')
+                timesheet.status = 'submitted'
+                timesheet.hours = request.data.get('hours')
+                timesheet.additional_hours = request.data.get('additional_hours')
+
+                # Uploading Timesheet Screenshots to S3
+                try:
+                    content_type = ContentType.objects.get(model='timesheet')
+                    if request.FILES.get('file1', None):
+                        Attachment.objects.create(
+                            object_id=timesheet.id,
+                            content_type=content_type,
+                            attachment_type='timesheet',
+                            attachment_file=request.FILES.get('file1'),
+                            creator=User.objects.get(id=1)
+                        )
+                    if request.FILES.get('file2', None):
+                        Attachment.objects.create(
+                            object_id=timesheet.id,
+                            content_type=content_type,
+                            attachment_type='timesheet',
+                            attachment_file=request.FILES.get('file2'),
+                            creator=User.objects.get(id=1)
+                        )
+                except Exception as error:
+                    logger.error(error)
+                    return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
                 timesheet.save()
                 serializer = self.serializer_class(timesheet)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
@@ -508,7 +548,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
     def destroy(self, request, *args, **kwargs):
         try:
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None))
-            timesheet.status = 'rejected'
+            timesheet.status = 'consultant_rejected'
             timesheet.save()
         except Exception as error:
             logger.error(error)
