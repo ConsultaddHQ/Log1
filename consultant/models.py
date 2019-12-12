@@ -150,8 +150,8 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     @staticmethod
     def send_mail(mail_data):
         try:
-            # res = send_email(mail_data, "admin@consultadd.com")
-            return "res", "ok"
+            res = send_email(mail_data, "admin@consultadd.com")
+            return res, "ok"
         except Exception as error:
             return error, "error"
 

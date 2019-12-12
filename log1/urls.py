@@ -10,7 +10,8 @@ from rest_framework.documentation import include_docs_urls
 
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
-    ConsultantProfileViewSets, ConsultantAuthViewSets, ConsultantAppViewSets
+    ConsultantProfileViewSets, ConsultantAuthViewSets, ConsultantAppViewSets, ConsultantResetPasswordViewSets, \
+    ConsultantPOCViewSets, WorkAuthViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets
 from utils_app.views import CityViewSets
@@ -29,9 +30,12 @@ router.register(r'password', ResetPasswordViewSets)
 router.register(r'attachment', AttachmentView)
 
 router.register(r'consultant', ConsultantViewSets)
+router.register(r'consultant_poc', ConsultantPOCViewSets)
+router.register(r'consultant_work_auth', WorkAuthViewSets)
 router.register(r'consultant_bench', ConsultantBenchViewSets)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
+router.register(r'consultant_password', ConsultantResetPasswordViewSets)
 
 # Mobile Application routes
 router.register(r'consultant_app', ConsultantAppViewSets)

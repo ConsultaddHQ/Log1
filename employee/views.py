@@ -200,7 +200,7 @@ class ResetPasswordViewSets(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.pass_serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         password = serializer.validated_data['password']
         token = serializer.validated_data['token']

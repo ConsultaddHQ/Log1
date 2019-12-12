@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import timedelta, date
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, F, Count
 
@@ -152,15 +152,14 @@ class ConsultantResetPasswordViewSets(GenericViewSet):
                         ip_address=ip if ip else '127.0.0.1'
                     )
                 mail_data = {
-                    'to': [consultant.email],
+                    'to': ['sarang.m@consultadd.in'],
                     'cc': [],
                     'bcc': [],
                     'subject': 'Reset Log1 Password',
                     'template': '../templates/con_password_reset.html',
                     'context': {
                         'name': consultant.name,
-                        'email': consultant.email,
-                        'token': token,
+                        'token': token.key,
                     },
                 }
                 res, error = consultant.send_mail(mail_data)
@@ -171,7 +170,7 @@ class ConsultantResetPasswordViewSets(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.pass_serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         password = serializer.validated_data['password']
         token = serializer.validated_data['token']
@@ -349,7 +348,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles and 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles):
             return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
@@ -413,51 +412,21 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
+        return Response({"result": ConsultantSerializer(consultant).data}, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
             return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
-        obj_id = kwargs.get('pk')
-        con_obj = request.query_params.get('type')
-        obj_status = request.query_params.get('obj_status')
-        con_classes = {
-            'work_auth': WorkAuth,
-            'consultant': Consultant,
-            'relation': ConsultantPOC,
-            'recruiter': ConsultantPOC,
-            'marketing': ConsultantMarketing,
-            'education': EducationSerializer,
-            'experience': ExperienceSerializer,
-            'rate_revision': ConsultantRateRevisionSerializer,
-            'serializer': {
-                'work_auth': WorkAuthSerializer,
-                'education': EducationSerializer,
-                'experience': ExperienceSerializer,
-                'relation': ConsultantPOCSerializer,
-                'recruiter': ConsultantPOCSerializer,
-                'consultant': ConsultantUpdateSerializer,
-                'marketing': ConsultantMarketingCreateSerializer,
-                'rate_revision': ConsultantRateRevisionSerializer,
-            }
-        }
         try:
-            if obj_status == 'create':
-                serializer = con_classes['serializer'][con_obj](data=request.data, partial=True)
-                if serializer.is_valid():
-                    serializer.save()
-                    return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-                else:
-                    return Response({"result": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                obj = get_object_or_404(con_classes[con_obj], id=obj_id)
-                serializer = con_classes['serializer'][con_obj](obj, data=request.data, partial=True)
-                serializer.save()
+            obj = get_object_or_404(Consultant, id=kwargs.get('pk'))
+            serializer = ConsultantUpdateSerializer(obj, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
-            return Response({"error": "%s Object type not found" % (con_obj,)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
@@ -487,7 +456,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         else:
             try:
                 education = get_object_or_404(Education, id=kwargs.get('pk'))
-                serializer = self.serializer_class(education, data=request.data, partial=True)
+                serializer = EducationSerializer(education, data=request.data, partial=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)
@@ -520,7 +489,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         else:
             try:
                 experience = get_object_or_404(Experience, id=kwargs.get('pk'))
-                serializer = self.serializer_class(experience, data=request.data, partial=True)
+                serializer = ExperienceSerializer(experience, data=request.data, partial=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)
@@ -744,11 +713,18 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConsultantMarketingViewSets(GenericViewSet):
+class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantMarketing.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantMarketingSerializer
+
+    def update(self, request, *args, **kwargs):
+        consultant_marketing = get_object_or_404(ConsultantMarketing, id=kwargs.get('pk'))
+        serializer = ConsultantMarketingCreateSerializer(consultant_marketing, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
 
     # Marketer assignment
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
@@ -925,3 +901,90 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+    queryset = ConsultantPOC.objects.all()
+    serializer_class = ConsultantPOCSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles or 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            instance = ConsultantPOC.objects.filter(poc_type=request.data['poc_type'],
+                                                    consultant=request.data['consultant'],
+                                                    end=None)
+            if instance:
+                previous_poc = instance.first()
+                previous_poc.end = date.today()
+                previous_poc.save()
+            ConsultantPOC.objects.create(
+                poc_id=request.data['poc'],
+                poc_type=request.data['poc_type'],
+                consultant_id=request.data['consultant'],
+                start=date.today()
+            )
+            return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
+        except KeyError as err:
+            logger.error(err)
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles or 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
+            serializer = self.serializer_class(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except KeyError as err:
+            logger.error(err)
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+    queryset = WorkAuth.objects.all()
+    serializer_class = WorkAuthSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles or 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
+            if instance:
+                previous_work_auth = instance.first()
+                previous_work_auth.is_current = False
+                previous_work_auth.save()
+            WorkAuth.objects.create(
+                is_current=True,
+                visa_end=request.data['visa_end'],
+                visa_type=request.data['visa_type'],
+                visa_start=request.data['visa_start'],
+                consultant_id=request.data['consultant'],
+            )
+            return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
+        except KeyError as err:
+            logger.error(err)
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles or 'recruiter' in roles):
+            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            instance = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
+            serializer = self.serializer_class(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except KeyError as err:
+            logger.error(err)
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)

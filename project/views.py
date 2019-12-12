@@ -468,7 +468,7 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# API for Mobile App
+# API for Mobile App (For Consultants)
 class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = TimeSheet.objects.all()
     serializer_class = TimeSheetSerializer
@@ -492,8 +492,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
 
     def list(self, request, *args, **kwargs):
         try:
-            consultant = get_consultant(request)
-            project = consultant.get_project()
+            project = request.user.get_project()
             if project:
                 project = project.first()
                 queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'])

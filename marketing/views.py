@@ -28,7 +28,7 @@ from utils_app.calendar import get_interviews, book_calendar, update_calendar, d
 logger = logging.getLogger(__name__)
 
 
-class VendorCompanyViewSets(ListModelMixin, GenericViewSet):
+class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     queryset = VendorCompany.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = VendorCompanySerializer
@@ -48,6 +48,17 @@ class VendorCompanyViewSets(ListModelMixin, GenericViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        queryset = VendorCompany.objects.filter(name__iexact=request.data.get('name', None))
+        if queryset:
+            return Response({"result": "Company already exist"}, status=status.HTTP_201_CREATED)
+        company = VendorCompany.objects.create(
+            name=request.data.get('name', None),
+            created_by=str(request.user.employee_id) + " - " + request.user.employee_name
+        )
+        serializer = VendorCompanySerializer(company)
+        return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
 
 
 class VendorContactViewSets(ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):

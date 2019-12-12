@@ -40,7 +40,7 @@ class ConsultantSerializer(serializers.ModelSerializer):
 class ConsultantUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
-        exclude = ('created', 'modified')
+        exclude = ('password', 'created', 'modified')
 
 
 class POCSerializer(serializers.ModelSerializer):
