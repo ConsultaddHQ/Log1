@@ -74,6 +74,7 @@ class ConsultantManager(BaseUserManager):
 
 class Consultant(AbstractBaseUser, TimeStampedModel):
     is_active = models.BooleanField(default=False)
+    first_login = models.BooleanField(default=True)
     email = models.EmailField(_('Email ID'), unique=True)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")

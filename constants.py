@@ -18,7 +18,7 @@ if os.getenv('ENV') == 'prod':
     # 45 days limit Channel
     pool_channel_url = "https://discordapp.com/api/webhooks/626001183076778004/KzKrcylbIantpPtFKLmNTGxILSTYBn4Q07MyDTLYbzB0Tj8m1JrMFBe97NJVTWKuXd_5"
 
-elif os.getenv('ENV') == 'local':
+elif os.getenv('ENV') == 'local' or os.getenv('ENV') == 'dev':
     LEGAL = "sarang.m@consultadd.in"
     FINANCE = "sarang.m@consultadd.in"
     RELATIONS = "sarang.m@consultadd.in"

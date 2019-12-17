@@ -129,8 +129,8 @@ class ProjectSupport(TimeStampedModel):
 
 class TimeSheet(TimeStampedModel):
     attachments = GenericRelation(Attachment)
-    end = models.DateField(_('end'), null=True, blank=True)
-    start = models.DateField(_('start'), null=True, blank=True)
+    end = models.DateField(_('End'), null=True, blank=True)
+    start = models.DateField(_('Start'), null=True, blank=True)
     hours = models.FloatField(max_length=20, null=True, blank=True)
     additional_hours = models.FloatField(max_length=20, null=True, blank=True, default=0)
     status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS, default='draft')
@@ -138,6 +138,13 @@ class TimeSheet(TimeStampedModel):
         Project, on_delete=models.PROTECT,
         related_name='timesheets',
         verbose_name='Consultant'
+    )
+    edited_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
+    edited_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='timesheet_edits',
+        verbose_name='Edited BY',
+        null=True, blank=True
     )
 
     def save(self, *args, **kwargs):

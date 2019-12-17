@@ -2,10 +2,10 @@ import os
 import logging
 from datetime import datetime
 
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, F, Subquery, OuterRef
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -13,7 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin
 
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication, get_consultant
@@ -336,7 +336,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 sub.consultant_marketing.consultant.status = 'in_offer'
                 sub.consultant_marketing.consultant.save()
 
-                start_date = request.data['start_date']
                 scrum_masters = []
                 queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'])
                 for user in queryset:
@@ -510,28 +509,34 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 project = project.first()
                 timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), project=project)
                 timesheet.status = 'submitted'
-                timesheet.hours = request.data.get('hours')
-                timesheet.additional_hours = request.data.get('additional_hours')
+                timesheet.hours = float(request.data.get('hours'))
+                timesheet.additional_hours = float(request.data.get('additional_hours'))
 
                 # Uploading Timesheet Screenshots to S3
                 try:
+                    admin_user = User.objects.get(employee_id=1000)
                     content_type = ContentType.objects.get(model='timesheet')
+                    screenshot = False
                     if request.FILES.get('file1', None):
                         Attachment.objects.create(
                             object_id=timesheet.id,
                             content_type=content_type,
                             attachment_type='timesheet',
                             attachment_file=request.FILES.get('file1'),
-                            creator=User.objects.get(id=1)
+                            creator=admin_user
                         )
+                        screenshot = True
                     if request.FILES.get('file2', None):
                         Attachment.objects.create(
                             object_id=timesheet.id,
                             content_type=content_type,
                             attachment_type='timesheet',
                             attachment_file=request.FILES.get('file2'),
-                            creator=User.objects.get(id=1)
+                            creator=admin_user
                         )
+                        screenshot = True
+                    if not screenshot:
+                        return Response({"error": "Attachment is required"}, status=status.HTTP_400_BAD_REQUEST)
                 except Exception as error:
                     logger.error(error)
                     return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

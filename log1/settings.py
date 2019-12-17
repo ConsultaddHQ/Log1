@@ -138,7 +138,7 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
 # Media files Storage location (Documents)
-if os.environ.get('ENV') == 'prod':
+if os.environ.get('ENV') == 'prod' or os.environ.get('ENV') == 'dev':
     AWS_DEFAULT_ACL = None
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
@@ -151,7 +151,7 @@ if os.environ.get('ENV') == 'prod':
 
     PUBLIC_MEDIA_LOCATION = 'media'
     MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
-    DEFAULT_FILE_STORAGE = 'utils_app.storage_backends.PublicMediaStorage'
+    DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 else:
     MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')

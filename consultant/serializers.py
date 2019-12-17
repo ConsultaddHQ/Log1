@@ -14,7 +14,7 @@ class ConsultantLoginSerializer(UserSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'token', 'email', 'name', 'is_active', 'project')
+        fields = ('id', 'token', 'email', 'name', 'is_active', 'project', 'first_login')
 
     @staticmethod
     def get_project(self):

@@ -87,14 +87,20 @@ class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
-        current_password = request.data.get('current_password')
+        first_password = request.query_params.get('first_password', None)
         new_password = request.data.get('new_password')
         consultant = get_consultant(request)
-        if consultant.check_password(current_password):
+        if first_password:
             consultant.set_password(new_password)
-            consultant.save()
-            return Response({"result": "password updated"}, status=status.HTTP_200_OK)
-        return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
+            consultant.first_login = False
+        else:
+            current_password = request.data.get('current_password')
+            if consultant.check_password(current_password):
+                consultant.set_password(new_password)
+            else:
+                return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
+        consultant.save()
+        return Response({"result": "password updated"}, status=status.HTTP_200_OK)
 
     @action(methods=['delete'], detail=False, url_path='logout')
     def logout(self, request):
@@ -963,14 +969,15 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 previous_work_auth = instance.first()
                 previous_work_auth.is_current = False
                 previous_work_auth.save()
-            WorkAuth.objects.create(
+            work_auth = WorkAuth.objects.create(
                 is_current=True,
                 visa_end=request.data['visa_end'],
                 visa_type=request.data['visa_type'],
                 visa_start=request.data['visa_start'],
                 consultant_id=request.data['consultant'],
             )
-            return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
+            serializer = self.serializer_class(work_auth)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except KeyError as err:
             logger.error(err)
             return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)

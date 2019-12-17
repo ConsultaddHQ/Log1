@@ -1,5 +1,6 @@
 #!/bin/bash
 
+mkdir -p media
 # Collect static files
 # echo "Collect static files"
 # python manage.py collectstatic --noinput
