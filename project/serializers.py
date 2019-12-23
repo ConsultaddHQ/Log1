@@ -12,9 +12,44 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class TimeSheetSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+
     class Meta:
         model = TimeSheet
-        fields = '__all__'
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'edited_at', 'edited_by',
+                  'modified', 'attachments', 'project')
+
+    def get_attachments(self, obj: Attachment) -> dict:
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
+
+    def get_project(self, obj):
+        return {
+            'id': obj.project.id,
+            'start_date': obj.project.start_date,
+            'client': obj.project.submission.client
+        }
+
+
+class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
+    project = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'email', 'status', 'project')
+
+    def get_project(self, obj):
+        project = Project.objects.filter(consultant=obj)
+        if project:
+            project = project.latest('id')
+            return {
+                'id': project.id,
+                'start_date': project.start_date,
+                'team': project.submission.employer,
+                'client': project.submission.client,
+                'vendor': project.submission.lead.vendor_company.name,
+            }
+        return None
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):

@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, date
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -13,7 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication, get_consultant
@@ -554,6 +554,59 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None))
             timesheet.status = 'consultant_rejected'
             timesheet.save()
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
+    queryset = TimeSheet.objects.all()
+    serializer_class = TimeSheetSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def retrieve(self, request, *args, **kwargs):
+        start = request.query_params.get('start', None)
+        end = request.query_params.get('end', date.today())
+
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        last, first = page * page_size, page * page_size - page_size
+
+        try:
+            projects = Project.objects.filter(consultant_id=kwargs.get('pk', None))
+            if projects:
+                project = projects.latest('id')
+                if start:
+                    queryset = TimeSheet.objects.filter(project=project, created__range=[start, end])
+                else:
+                    queryset = TimeSheet.objects.filter(project=project)
+                total = queryset.count()
+                serializer = self.serializer_class(queryset[first:last], many=True)
+                return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
+            return Response({"error": "No Project Found"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def list(self, request, *args, **kwargs):
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        last, first = page * page_size, page * page_size - page_size
+        try:
+            query = request.query_params.get('query', None)
+            consultant_id = request.query_params.get('consultant', None)
+            if consultant_id:
+                consultants = Consultant.objects.filter(id=consultant_id)
+            else:
+                consultants = Consultant.objects.exclude(status='archived')
+            if query:
+                consultants = Consultant.objects.filter(
+                    Q()
+                ).exclude(status='archived')
+            total = consultants.count()
+            serializer = ConsultantTimeSheetSerializer(consultants[first:last], many=True)
+            return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

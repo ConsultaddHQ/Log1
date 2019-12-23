@@ -158,7 +158,7 @@ class ConsultantResetPasswordViewSets(GenericViewSet):
                         ip_address=ip if ip else '127.0.0.1'
                     )
                 mail_data = {
-                    'to': ['sarang.m@consultadd.in'],
+                    'to': ['aditi.so@consultadd.in'],
                     'cc': [],
                     'bcc': [],
                     'subject': 'Reset Log1 Password',
