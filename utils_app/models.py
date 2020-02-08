@@ -23,3 +23,14 @@ class City(models.Model):
     class Meta:
         ordering = ('name',)
         verbose_name_plural = 'cities'
+
+
+class ScrumMeeting(TimeStampedModel):
+    previous = models.BooleanField(_('Previous'), default=True)
+    held_on = models.DateField(_('Held On'), default=timezone.now)
+
+    def __str__(self):
+        return f"{self.held_on} {self.previous}"
+
+    class Meta:
+        ordering = ('-held_on',)

@@ -1,13 +1,8 @@
->#***Log1***
+# Log1
 
-Python 3.6
-pip install -r requirements/base.txt
+Python Version - 3.6
 
-* Create Database
-* Setup env file
+Install Docker and docker-compose
 
-`python manage.py makemigrations`
+Goto docker container shell and run `python manage.py makemigrations`
 
-`python manage.py migrate`
-
-`python manage.py runserver`

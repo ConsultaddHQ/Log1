@@ -27,8 +27,8 @@ class VendorContactAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_display = ('id', 'job_title', 'city', 'primary_skill', 'status', 'marketer', 'vendor_company', 'sub_display')
-    search_fields = ('job_title', 'status', 'marketer__employee_name', 'vendor_company__name', 'primary_skill')
+    list_display = ('id', 'job_title', 'city', 'primary_skill', 'status', 'owner', 'vendor_company', 'sub_display')
+    search_fields = ('job_title', 'status', 'owner__employee_name', 'vendor_company__name', 'primary_skill')
     actions = ["export_as_csv"]
 
     def sub_display(self, obj):
@@ -41,7 +41,7 @@ class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_display = ('id', 'lead', 'consultant_marketing', 'client', 'rate', 'email', 'marketer_display',
+    list_display = ('id', 'lead', 'consultant_marketing', 'client', 'rate', 'email', 'created_by', 'lead_owner_display',
                     'status', 'is_active', 'employer', 'phone', 'screening_display', 'vendor_contact', 'visa_type',
                     'visa_start', 'visa_end', 'linkedin', 'date_of_birth', 'current_city', 'created', 'modified')
     search_fields = ('consultant_marketing__consultant__name', 'lead__marketer__employee_name',
@@ -50,15 +50,15 @@ class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
 
     def screening_display(self, obj):
         return ", ".join([
-            child.ctb.name for child in obj.screening.all() if child.ctb
+            child.supervisor.employee_name for child in obj.screening.all() if child.supervisor
         ])
 
     screening_display.short_description = "Screening"
 
-    def marketer_display(self, obj):
-        return obj.lead.marketer.employee_name
+    def lead_owner_display(self, obj):
+        return obj.lead.owner.employee_name
 
-    marketer_display.short_description = "Marketer"
+    lead_owner_display.short_description = "Lead Owner"
 
 
 @admin.register(VendorLayer)

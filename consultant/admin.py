@@ -12,6 +12,9 @@ class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
     actions = ["export_as_csv"]
 
+    class Media(object):
+        css = {'all': ('no-more-warnings.css', )}
+
 
 @admin.register(ConsultantToken)
 class ConsultantToken(admin.ModelAdmin):
@@ -49,7 +52,8 @@ class ExperienceAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(FeedbackDetail)
 class FeedbackDetail(admin.ModelAdmin):
-    list_display = ('id', 'role', 'experience', 'programming', 'communication', 'problem_solving', 'organizational')
+    list_display = ('id', 'role_knowledge', 'experience', 'programming', 'communication', 'problem_solving',
+                    'organizational')
     search_fields = ('id',)
 
 

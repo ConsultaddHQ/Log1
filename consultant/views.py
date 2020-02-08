@@ -1,13 +1,13 @@
 import logging
-from datetime import timedelta, date
+from datetime import date
 from django.shortcuts import get_object_or_404
-from django.db.models import Subquery, OuterRef, Q, F, Count
+from django.db.models import Subquery, OuterRef, Q, Count
 
-from rest_framework.decorators import action
+from rest_framework import status, viewsets
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status, viewsets, exceptions
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
@@ -15,198 +15,18 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 from project.models import Project
 from consultant.serializers import *
 from marketing.models import Submission, Interview
-from consultant.auth import consultant_authenticate
 from attachment.serializers import AttachmentSerializer
-from consultant.permissions import ConsultantIsAuthenticated
-from employee.models import get_password_reset_token_expiry_time
 from activity.serializers import CommentSerializer, CommentGetSerializer
-from employee.serializers import PasswordTokenSerializer, EmailSerializer
-from consultant.authentication import ConsultantTokenAuthentication, get_consultant
 
 logger = logging.getLogger(__name__)
-
-
-# API for Mobile App
-class ConsultantAuthViewSets(GenericViewSet):
-    queryset = Consultant.objects.all()
-    serializer_class = ConsultantLoginSerializer
-
-    @action(methods=['post'], detail=False, url_path='register')
-    def register(self, request):
-        """
-            User Register
-            :param request, email, password, employee_id, name, phone, gender, team, role
-        """
-        try:
-            email = request.data.get('email')
-            password = request.data.get('password').strip()
-
-            queryset = Consultant.objects.filter(email__exact=email)
-            if queryset:
-                consultant = queryset.first()
-                consultant.set_password(password)
-                consultant.is_active = True
-                consultant.save()
-
-                return Response({"result": "Success"}, status=status.HTTP_201_CREATED)
-            else:
-                return Response({"error": "Consultant Does not exist"}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as error:
-            logger.error(error)
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(methods=['post'], detail=False, url_path='login')
-    def login(self, request):
-        """
-            Normal Login
-            :param request, email, password
-        """
-        email = request.data.get('email')
-        if email:
-            consultant = get_object_or_404(Consultant, email=email)
-        else:
-            return Response({"error": "Email is Empty"}, status=status.HTTP_400_BAD_REQUEST)
-        consultant = consultant_authenticate(email=consultant.email, password=request.data.get('password').strip())
-        if consultant:
-            return Response({"result": self.serializer_class(consultant).data}, status=status.HTTP_202_ACCEPTED)
-        logger.error("Incorrect Email Id OR Password")
-        return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
-
-
-# API for Mobile App
-class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
-    queryset = Consultant.objects.all()
-    serializer_class = ConsultantLoginSerializer
-    permission_classes = (ConsultantIsAuthenticated,)
-    authentication_classes = (ConsultantTokenAuthentication,)
-
-    def list(self, request, *args, **kwargs):
-        queryset = Consultant.objects.all()
-        serializer = self.serializer_class(queryset, many=True)
-        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
-
-    @action(methods=['post'], detail=False, url_path='change_password')
-    def change_password(self, request):
-        first_password = request.query_params.get('first_password', None)
-        new_password = request.data.get('new_password')
-        consultant = get_consultant(request)
-        if first_password:
-            consultant.set_password(new_password)
-            consultant.first_login = False
-        else:
-            current_password = request.data.get('current_password')
-            if consultant.check_password(current_password):
-                consultant.set_password(new_password)
-            else:
-                return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
-        consultant.save()
-        return Response({"result": "password updated"}, status=status.HTTP_200_OK)
-
-    @action(methods=['delete'], detail=False, url_path='logout')
-    def logout(self, request):
-        """
-            Logout for authenticated user
-        """
-        token = get_object_or_404(ConsultantToken, key=request.auth)
-        token.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-# API for Mobile App
-class ConsultantResetPasswordViewSets(GenericViewSet):
-    permission_classes = ()
-    authentication_classes = ()
-    queryset = Consultant.objects.all()
-    serializer_class = EmailSerializer
-    pass_serializer_class = PasswordTokenSerializer
-
-    @action(methods=['post'], detail=False, url_path='token_request')
-    def token_request(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
-
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
-
-        now_minus_expiry_time = timezone.now() - timedelta(hours=password_reset_token_validation_time)
-
-        clear_expired(now_minus_expiry_time)
-
-        consultants = Consultant.objects.filter(email__iexact=email)
-
-        active_user_found = False
-        for consultant in consultants:
-            if consultant.is_active and consultant.has_usable_password():
-                active_user_found = True
-
-        # No active user found, raise a validation error
-        if not active_user_found:
-            logger.info("User is not active")
-            raise exceptions.ValidationError({
-                'email': [
-                    "There is no active user associated with this e-mail address or the password can not be changed"],
-            })
-        ip = request.META['REMOTE_ADDR']
-        for consultant in consultants:
-            if consultant.is_active and consultant.has_usable_password():
-                if consultant.password_reset_tokens.all().count() > 0:
-                    token = consultant.password_reset_tokens.all()[0]
-                else:
-                    token = ConsultantResetPasswordToken.objects.create(
-                        consultant=consultant,
-                        user_agent=request.META['HTTP_USER_AGENT'],
-                        ip_address=ip if ip else '127.0.0.1'
-                    )
-                mail_data = {
-                    'to': ['aditi.so@consultadd.in'],
-                    'cc': [],
-                    'bcc': [],
-                    'subject': 'Reset Log1 Password',
-                    'template': '../templates/con_password_reset.html',
-                    'context': {
-                        'name': consultant.name,
-                        'token': token.key,
-                    },
-                }
-                res, error = consultant.send_mail(mail_data)
-                if error == 'error':
-                    logger.error(res)
-                    return Response({'error': str(res)}, status=status.HTTP_200_OK)
-        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
-
-    @action(methods=['post'], detail=False, url_path='confirm_password')
-    def confirm_password(self, request):
-        serializer = self.pass_serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        password = serializer.validated_data['password']
-        token = serializer.validated_data['token']
-
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
-
-        reset_password_token = ConsultantResetPasswordToken.objects.filter(key=token).first()
-
-        if reset_password_token is None:
-            return Response({'status': 'not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
-
-        if timezone.now() > expiry_date:
-            reset_password_token.delete()
-            return Response({'status': 'expired'}, status=status.HTTP_404_NOT_FOUND)
-
-        reset_password_token.consultant.set_password(password)
-        reset_password_token.consultant.save()
-
-        # Delete all password reset tokens for this user
-        ConsultantResetPasswordToken.objects.filter(consultant=reset_password_token.consultant).delete()
-
-        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
+dont_have_access = 'you don\'t have access'
 
 
 class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
+    sub_serializer_class = ConsultantSubmissionSerializer
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
@@ -273,7 +93,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 company_name=F('submission__lead__vendor_company__name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
 
-            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_type', 'submission_id',
+            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_type', 'submission_id', 'status',
                      'supervisor__employee_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                      'project', 'job_title', 'modified', 'created')
 
@@ -345,8 +165,13 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     def retrieve(self, request, *args, **kwargs):
         try:
             consultant_id = kwargs.get('pk')
-            consultant = get_object_or_404(Consultant, id=consultant_id)
-            serializer = self.serializer_class(consultant)
+            submission = request.query_params.get('submission', 'false')
+            if submission.lower() == "true":
+                consultant = get_object_or_404(Consultant, id=consultant_id)
+                serializer = self.sub_serializer_class(consultant)
+            else:
+                consultant = get_object_or_404(Consultant, id=consultant_id)
+                serializer = self.serializer_class(consultant)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -355,7 +180,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
@@ -423,7 +248,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             obj = get_object_or_404(Consultant, id=kwargs.get('pk'))
             serializer = ConsultantUpdateSerializer(obj, data=request.data, partial=True)
@@ -438,7 +263,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
             try:
@@ -472,7 +297,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
             try:
@@ -680,11 +505,15 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
             consultants = consultants.order_by('id').distinct('id')
             in_pool = consultants.filter(status='in_marketing', marketing__in_pool=True).count()
             in_marketing = consultants.filter(status='in_marketing', marketing__in_pool=False).count()
+            in_offer = consultants.filter(status='in_offer').count()
+            on_project = consultants.filter(status='on_project').count()
 
             count = {
-                "total": in_pool + in_marketing,
                 "in_pool": in_pool,
-                "in_marketing": in_marketing
+                "in_offer": in_offer,
+                "on_project": on_project,
+                "in_marketing": in_marketing,
+                "total": in_pool + in_marketing + in_offer + on_project,
             }
 
             # Filter Consultant by status and In pool
@@ -752,7 +581,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_200_OK)
@@ -775,7 +604,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_200_OK)
@@ -800,7 +629,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -823,7 +652,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
-                return Response({"error": "You don't have access"}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_200_OK)
@@ -864,14 +693,14 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             suffix = data['title'].strip()
             name = request.user.employee_name
             initials = name.split()[0][0] + name.split()[1][0] if len(name.split()) > 1 else ""
-            title = "{}-{}-{}".format(initials.upper(), data['visa_type'], data["dob"][:4])
+            title = f'{initials.upper()}-{ data["visa_type"]}-{data["dob"][:4]}-{suffix}'
 
             consultant_profile = ConsultantProfile.objects.create(
+                title=title,
                 links=data['links'],
                 linkedin=data['linkedin'],
                 date_of_birth=data['dob'],
                 visa_end=data['visa_end'],
-                title=title + "-" + suffix,
                 profile_owner=request.user,
                 education=data['education'],
                 visa_type=data['visa_type'],
@@ -918,7 +747,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = ConsultantPOC.objects.filter(poc_type=request.data['poc_type'],
                                                     consultant=request.data['consultant'],
@@ -941,7 +770,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
             serializer = self.serializer_class(instance, data=request.data, partial=True)
@@ -962,7 +791,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
             if instance:
@@ -985,7 +814,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"error": "you don't have access"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
             serializer = self.serializer_class(instance, data=request.data, partial=True)

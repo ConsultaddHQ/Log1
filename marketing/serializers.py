@@ -26,20 +26,20 @@ class LeadCreateSerializer(serializers.ModelSerializer):
 
 class LeadSerializer(serializers.ModelSerializer):
     vendor_company_name = serializers.SerializerMethodField()
-    marketer = serializers.SerializerMethodField()
+    owner = serializers.SerializerMethodField()
 
     @staticmethod
     def get_vendor_company_name(self):
         return self.vendor_company.name if self.vendor_company else None
 
     @staticmethod
-    def get_marketer(self):
-        return self.marketer.employee_name
+    def get_owner(self):
+        return self.owner.employee_name
 
     class Meta:
         model = Lead
         fields = ('id', 'job_desc', 'job_title', 'primary_skill', 'city', 'vendor_company_id', 'vendor_company_name',
-                  'marketer', 'status', 'created', 'modified')
+                  'owner', 'status', 'created', 'modified')
 
 
 class SubmissionCreateSerializer(serializers.ModelSerializer):
@@ -56,6 +56,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 class SubmissionDetailSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
     interviews = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer()
     lead = LeadSerializer(read_only=True)
@@ -63,20 +64,20 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'attachments', 'interviews', 'project')
+                  'attachments', 'interviews', 'project', 'created_by')
 
-    @staticmethod
-    def get_attachments(self):
-        return AttachmentSerializer(self.attachments.all(), many=True).data
+    def get_created_by(self, obj):
+        return obj.created_by.employee_name
 
-    @staticmethod
-    def get_interviews(self):
-        return InterviewGetSerializer(self.screening.all(), many=True).data
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
 
-    @staticmethod
-    def get_project(self):
+    def get_interviews(self, obj):
+        return InterviewGetSerializer(obj.screening.all(), many=True).data
+
+    def get_project(self, obj):
         if hasattr(self, 'project'):
-            return ProjectSerializer(self.project).data
+            return ProjectSerializer(obj.project).data
         return None
 
 
@@ -84,30 +85,30 @@ class SubmissionSerializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
     interviews = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'attachments', 'interviews', 'project')
+                  'attachments', 'interviews', 'project', 'created_by')
 
-    @staticmethod
+    def get_created_by(self, obj):
+        return obj.created_by.employee_name
+
     def get_attachments(self):
         return []
 
-    @staticmethod
     def get_vendor_contact(self):
         return None
 
-    @staticmethod
-    def get_interviews(self):
-        return InterviewGetSerializer(self.screening.all(), many=True).data
+    def get_interviews(self, obj):
+        return InterviewGetSerializer(obj.screening.all(), many=True).data
 
-    @staticmethod
-    def get_project(self):
+    def get_project(self, obj):
         if hasattr(self, 'project'):
-            return ProjectSerializer(self.project).data
+            return ProjectSerializer(obj.project).data
         return None
 
 

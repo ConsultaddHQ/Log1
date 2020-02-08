@@ -6,8 +6,23 @@ from attachment.serializers import AttachmentSerializer
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = Project
+        fields = ('id', 'status', 'feedback', 'created', 'duration', 'invoicing_period', 'feedback',
+                  'client_address', 'vendor_address', 'payment_term', 'start_date', 'end_date', 'reporting_details')
+
+    def get_status(self, obj):
+        status = obj.statuses.filter(is_current=True)
+        if status:
+            return status.status
+        return None
+
+
+class PayrollScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollSchedule
         fields = '__all__'
 
 
@@ -54,6 +69,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
 
 class ProjectGetSerializer(serializers.ModelSerializer):
     submission = SubmissionSerializer()
+    status = serializers.SerializerMethodField()
     interview = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
@@ -64,50 +80,62 @@ class ProjectGetSerializer(serializers.ModelSerializer):
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
                   'start_date', 'end_date', 'reporting_details')
 
-    @staticmethod
-    def get_attachments(self):
-        return AttachmentSerializer(self.attachments.all(), many=True).data
+    def get_status(self, obj):
+        status = obj.statuses.filter(is_current=True)
+        if status:
+            return status.status
+        return None
 
-    @staticmethod
-    def get_interview(self):
-        return InterviewGetSerializer(self.submission.screening.all(), many=True).data
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
 
-    @staticmethod
-    def get_check_list(self):
+    def get_interview(self, obj):
+        return InterviewGetSerializer(obj.submission.screening.all(), many=True).data
+
+    def get_check_list(self, obj):
         msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0
 
-        start_date = 1 if self.start_date else 0
+        start_date = 1 if obj.start_date else 0
 
-        if self.attachments.filter(attachment_type='msa'):
+        if obj.attachments.filter(attachment_type='msa'):
             msa = 1
 
-        if self.attachments.filter(attachment_type='work_order'):
+        if obj.attachments.filter(attachment_type='work_order'):
             work_order = 1
 
-        if self.attachments.filter(attachment_type='work_order_msa'):
+        if obj.attachments.filter(attachment_type='work_order_msa'):
             msa, work_order = 1, 1
 
-        if self.attachments.filter(attachment_type='msa_signed'):
+        if obj.attachments.filter(attachment_type='msa_signed'):
             s_msa = 1
 
-        if self.attachments.filter(attachment_type='work_order_signed'):
+        if obj.attachments.filter(attachment_type='work_order_signed'):
             s_work_order = 1
 
-        if self.attachments.filter(attachment_type='work_order_msa_signed'):
+        if obj.attachments.filter(attachment_type='work_order_msa_signed'):
             s_msa, s_work_order = 1, 1
 
-        if self.client_address and len(self.client_address.strip()) > 0:
+        if obj.client_address and len(obj.client_address.strip()) > 0:
             client_address = 1
 
-        if self.vendor_address and len(self.vendor_address.strip()) > 0:
+        if obj.vendor_address and len(obj.vendor_address.strip()) > 0:
             vendor_address = 1
 
-        if self.reporting_details and len(self.reporting_details.strip()) > 0:
+        if obj.reporting_details and len(obj.reporting_details.strip()) > 0:
             reporting_details = 1
 
-        status = True if (s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
-                          ) / 6 >= 1 else False
+        status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                          + reporting_details) / 6 >= 1 else False
 
-        return {"status": status, "total": 6, "msa": msa, "work_order": work_order, "client_address": client_address,
-                "vendor_address": vendor_address, "start_date": start_date, "reporting_details": reporting_details,
-                "msa_signed": s_msa, "work_order_signed": s_work_order}
+        return {
+            "total": 6,
+            "msa": msa,
+            "status": status,
+            "msa_signed": s_msa,
+            "work_order": work_order,
+            "start_date": start_date,
+            "client_address": client_address,
+            "vendor_address": vendor_address,
+            "work_order_signed": s_work_order,
+            "reporting_details": reporting_details,
+        }

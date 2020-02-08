@@ -13,8 +13,10 @@ from utils_app.mailing import send_email
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
+from notification.models import FCMDevice, Notification
 
 CONSULTANT_STATUS_CHOICE = (
+    ('new', 'New'),
     ('archived', 'Archived'),
     ('in_offer', 'In Offer'),
     ('on_project', 'On Project'),
@@ -125,8 +127,8 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         from project.models import Project
         queryset = Project.objects.filter(
             models.Q(consultant=self) &
-            (models.Q(end_date=None, status='joined') |
-             models.Q(end_date__gte=timezone.now()))
+            (models.Q(end_date=None, statuses__status='joined', statuses__is_current=True) |
+             models.Q(end_date__gte=timezone.now(), statuses__status='joined', statuses__is_current=True))
         )
         return queryset
 
@@ -146,6 +148,13 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         queryset = self.pocs.filter(poc_type='relation', end=None)
         if queryset:
             return queryset.first().poc
+        return None
+
+    @property
+    def rate(self):
+        queryset = self.rates.filter(end=None)
+        if queryset:
+            return queryset.first().rate
         return None
 
     @staticmethod
@@ -189,7 +198,9 @@ class ConsultantToken(models.Model):
     """
     The default authorization token model.
     """
+    fcm_tokens = GenericRelation(FCMDevice)
     key = models.CharField(_("Key"), max_length=40, primary_key=True)
+    uuid = models.CharField(_("Universally Unique Identifier"), max_length=64, db_index=True, default='UUID')
     consultant = models.OneToOneField(
         Consultant, related_name='consultant_token',
         on_delete=models.CASCADE, verbose_name=_("Consultant")
@@ -323,6 +334,7 @@ class ConsultantMarketing(TimeStampedModel):
     in_pool = models.BooleanField(_('In Pool'), default=False)
     end = models.DateField(_('Marketing End Date'), blank=True, null=True)
     start = models.DateField(_('Marketing Start Date'), blank=True, null=True)
+    is_current = models.BooleanField(_('Current Marketing Cycle'), default=True)
     preferred_location = models.TextField(_('Preferred Location'), null=True, blank=True)
     teams = models.ManyToManyField(
         Team,
@@ -371,9 +383,9 @@ class ConsultantMarketing(TimeStampedModel):
 class ConsultantRateRevision(TimeStampedModel):
     rate = models.IntegerField(_('Rate'))
     previous_rate = models.IntegerField(_('Previous Rate'), default=0)
-    end = models.DateField(_('Rate End Date'), blank=True, null=True)
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
     feedback = models.TextField(_('Revision Feedback'), blank=True, null=True)
+    end = models.DateField(_('Rate End Date'), default=None, blank=True, null=True)
     consultant = models.ForeignKey(
         Consultant, on_delete=models.CASCADE,
         related_name='rates',
@@ -394,8 +406,8 @@ class ConsultantRateRevision(TimeStampedModel):
 
 
 class ConsultantPOC(TimeStampedModel):
-    end = models.DateField(_('Rate End Date'), blank=True, null=True)
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
+    end = models.DateField(_('Rate End Date'), default=None, blank=True, null=True)
     poc_type = models.CharField(_('Recruiter Or Retention'), max_length=20, blank=True, null=True)
     poc = models.ForeignKey(
         User, on_delete=models.PROTECT,
@@ -422,8 +434,8 @@ class ConsultantPOC(TimeStampedModel):
 
 
 class FeedbackDetail(models.Model):
-    role = models.TextField(_('Role Knowledge'), blank=True, null=True)
     experience = models.TextField(_('Experience'), blank=True, null=True)
+    role_knowledge = models.TextField(_('Role Knowledge'), blank=True, null=True)
     programming = models.TextField(_('Programming Skill'), blank=True, null=True)
     communication = models.TextField(_('Communication Skills'), blank=True, null=True)
     problem_solving = models.TextField(_('Problem Solving Skill'), blank=True, null=True)

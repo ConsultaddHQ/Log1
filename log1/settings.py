@@ -1,6 +1,7 @@
 import os
 import logging.config
 from dotenv import load_dotenv
+from collections import OrderedDict
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
@@ -31,23 +32,24 @@ THIRD_PARTY_APPS = [
 
     'storages',
     'explorer',
+    'constance',
     'corsheaders',
-    'notifications',
+    'notification',
     'rest_framework_swagger',
 
 ]
 
 PROJECT_APPS = [
-    'api_key',
-    'utils_app',
-    'employee',
-    'attachment',
-    'consultant',
-    'marketing',
-    'project',
-    'jd_parser',
-    'activity',
-    'ckiller',
+    'api_key.apps.ApiKeyConfig',
+    'utils_app.apps.UtilsAppConfig',
+    'employee.apps.EmployeeConfig',
+    'attachment.apps.AttachmentConfig',
+    'consultant.apps.ConsultantConfig',
+    'marketing.apps.MarketingConfig',
+    'project.apps.ProjectConfig',
+    'jd_parser.apps.JdParserConfig',
+    'activity.apps.ActivityConfig',
+    'ckiller.apps.CkillerConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -104,6 +106,8 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
+REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'}
+
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
 
@@ -127,7 +131,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 # Django Explorer Setup
 EXPLORER_CONNECTIONS = {'Default': 'default'}
@@ -201,4 +205,26 @@ CELERY_TASK_ALWAYS_EAGER = False
 # Notifications settings
 NOTIFICATIONS_CHANNELS = {
     'websocket': 'notification_utils.channels.BroadCastWebSocketChannel'
+}
+
+# Constance Config
+
+CONSTANCE_CONFIG = OrderedDict([
+    ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
+    ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
+    ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
+    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
+    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
+    ('SUPERADMIN', ('sudeep.b@consultadd.com', "Sudeep's email id")),
+    ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "MatterMost")),
+    ('offer_failure', ('https://mm.consultadd.com/hooks/n1j5juob5ffnfj93kehbzapeih', "MatterMost")),
+    ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "MatterMost")),
+    ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "MatterMost")),
+    ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "MatterMost")),
+    ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "MatterMost")),
+])
+
+CONSTANCE_CONFIG_FIELDSETS = {
+    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN'),
+    'Web Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url'),
 }

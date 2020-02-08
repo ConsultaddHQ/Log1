@@ -131,6 +131,24 @@ class ConsultantCreateProfileSerializer(serializers.ModelSerializer):
                   'linkedin', 'current_city', 'profile_owner')
 
 
+class ConsultantSubmissionSerializer(serializers.ModelSerializer):
+    profiles = serializers.SerializerMethodField()
+    marketing_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'email', 'status', 'profiles', 'marketing_id')
+
+    def get_profiles(self, obj):
+        return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
+
+    def get_marketing_id(self, obj):
+        queryset = obj.marketing.filter(end=None)
+        if queryset:
+            return queryset.first().id
+        return None
+
+
 class ConsultantBenchSerializer(serializers.ModelSerializer):
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
@@ -141,6 +159,12 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
     rate = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
+                  'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
+                  'profiles', 'education', 'experience', 'rate', 'marketing')
 
     @staticmethod
     def get_work_auth(self):
@@ -213,12 +237,6 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             }
             return data
         return None
-
-    class Meta:
-        model = Consultant
-        fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
-                  'profiles', 'education', 'experience', 'rate', 'marketing')
 
 
 class ConsultantListSerializer(serializers.ModelSerializer):

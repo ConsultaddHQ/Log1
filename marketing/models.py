@@ -110,11 +110,17 @@ class Lead(TimeStampedModel):
         related_name='leads',
         verbose_name='Vendor Company'
     )
-    marketer = models.ForeignKey(
+    owner = models.ForeignKey(
         User, on_delete=models.PROTECT,
         null=True, blank=True,
         related_name='leads',
-        verbose_name='Marketer'
+        verbose_name='Lead Owner'
+    )
+    shared_to = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='shared_leads',
+        verbose_name='Lead Shared to',
     )
 
     def save(self, *args, **kwargs):
@@ -127,7 +133,7 @@ class Lead(TimeStampedModel):
         return super(Lead, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.vendor_company} : {self.city} : {self.marketer.employee_name}'
+        return f'{self.vendor_company.name} : {self.owner.employee_name} : {self.city} '
 
 
 class Submission(TimeStampedModel):
@@ -167,6 +173,12 @@ class Submission(TimeStampedModel):
         related_name='submissions',
         verbose_name='Vendor Contact'
     )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='submissions',
+        verbose_name='Submission done by'
+    )
 
     def save(self, *args, **kwargs):
         """
@@ -178,15 +190,19 @@ class Submission(TimeStampedModel):
         return super(Submission, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.lead.marketer.employee_name} : {self.client}'
+        return f'{self.created_by.employee_name} : {self.client}'
 
     @property
     def consultant(self):
         return self.consultant_marketing.consultant
 
     @property
-    def marketer(self):
-        return self.lead.marketer
+    def lead_owner(self):
+        return self.lead.owner
+
+    @property
+    def vendor(self):
+        return self.lead.vendor_company
 
 
 class VendorLayer(TimeStampedModel):
@@ -255,14 +271,14 @@ class Interview(TimeStampedModel):
 
     def __str__(self):
         if self.start_time:
-            return f'''CTB:{self.supervisor} :: {self.round}R :: {self.get_interview_type_display()} ::
+            return f'''CTB:{self.supervisor} :: {self.round}R :: {self.get_screening_type_display()} ::
                    {self.start_time.strftime("%d/%m/%Y::%I:%M %p EST")} :: {self.submission.client} ::
-                   {self.submission.consultant.name} :: {self.submission.marketer.employee_name}'''
+                   {self.submission.consultant.name} :: {self.submission.created_by.employee_name}'''
 
     @property
     def marketer(self):
-        return self.submission.lead.marketer
+        return self.submission.created_by
 
     @property
     def consultant(self):
-        return self.submission.consultant_marketing.consultant
+        return self.submission.consultant

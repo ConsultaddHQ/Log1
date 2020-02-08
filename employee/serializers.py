@@ -25,8 +25,7 @@ class UserSerializerLogin(UserSerializer):
         model = User
         fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'last_login')
 
-    @staticmethod
-    def get_token(user):
+    def get_token(self, user):
         token, created = Token.objects.get_or_create(user=user)
         return token.key
 
