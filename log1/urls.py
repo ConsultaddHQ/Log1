@@ -9,15 +9,24 @@ from rest_framework_swagger.views import get_swagger_view
 from rest_framework.documentation import include_docs_urls
 
 from utils_app.views import CityViewSets
+
 from attachment.views import AttachmentView
+
+from report.views import ScrumMeetingReport
+
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets
+
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
+
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
+
+from consultant.mobile_api import ConsultantAuthViewSets, ConsultantAppViewSets, ConsultantResetPasswordViewSets
+
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets
+
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
     ConsultantProfileViewSets, ConsultantPOCViewSets, WorkAuthViewSets
-from consultant.mobile_api import ConsultantAuthViewSets, ConsultantAppViewSets, ConsultantResetPasswordViewSets
 
 
 schema_view = get_swagger_view(title="New Log1 Documentation")
@@ -57,10 +66,12 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
 
+router.register(r'scrum_report', ScrumMeetingReport)
+
 
 urlpatterns = [
     path('api/v2/', include(router.urls)),
-    path('api/admin/', admin.site.urls),
+    path('api/v2/admin/', admin.site.urls),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if os.getenv('DEBUG', False):

@@ -144,13 +144,13 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
         if 'marketer' in request.user.roles:
             consultants = consultants.filter(
-                Q(in_pool=True) |
-                Q(marketer=request.user)
+                Q(marketing__in_pool=True, marketing__is_current=True) |
+                Q(marketing__marketer=request.user, marketing__is_current=True)
             )
         elif 'admin' in roles or 'proxy' in roles:
             consultants = consultants.filter(
-                Q(teams=request.user.team, in_pool=False) |
-                Q(in_pool=True)
+                Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__is_current=True) |
+                Q(marketing__in_pool=True, marketing__is_current=True)
             )
 
         elif 'recruiter' in roles:

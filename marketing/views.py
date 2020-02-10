@@ -8,7 +8,8 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin
+from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, \
+    DestroyModelMixin
 
 from constance import config
 from django.db import transaction
@@ -236,25 +237,23 @@ class LeadViewSets(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         try:
-            roles = request.user.roles
-            roles_have_access = {'superadmin', 'admin', 'proxy', 'marketer'}
-            res = set(roles).issubset(roles_have_access)
-            if not res:
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
-            queryset = Lead.objects.filter(id=kwargs.get('pk'))
+            queryset = Lead.objects.filter(id=kwargs.get('pk'), owner=request.user)
             if not queryset:
-                return Response({"error": "Lead not found"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "object not found"}, status=status.HTTP_404_NOT_FOUND)
+            else:
+                if queryset.first().owner != request.user:
+                    return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             lead = queryset.first()
             serializer = LeadCreateSerializer(lead, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                data = queryset.annotate(submission_count=Count('submission')) \
-                    .annotate(company_name=F('vendor_company__name'),
-                              company_id=F('vendor_company__id'),
-                              project=F('submission__project')
-                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills',
-                                       'company_id', 'company_name', 'status', 'created', 'modified', 'submission_count'
-                                       , 'project')
+                data = queryset.annotate(
+                    submission_count=Count('submission')
+                ).annotate(company_name=F('vendor_company__name'),
+                           company_id=F('vendor_company__id'),
+                           project=F('submission__project')
+                           ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'project'
+                                    , 'company_id', 'company_name', 'status', 'created', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -447,6 +446,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
         consultant_id = request.query_params.get('consultant', None)
         filter_by_time = request.query_params.get('filter_by_time', 'all')
         filter_by_status = request.query_params.get('filter_by_status', None)
+
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
@@ -469,8 +469,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
                 sub = sub.filter(
-                    (Q(created_by=request.user) |
-                     Q(consultant_marketing__consultant__marketer=request.user))
+                    Q(created_by=request.user) |
+                    Q(consultant_marketing__marketer=request.user)
                 )
 
             # Submissions of a Recruiters consultants (except those are on project)
@@ -526,9 +526,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if not res:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             lead_id = request.data.get('lead', None)
+            lead = get_object_or_404(Lead, id=lead_id)
             if not lead_id:
                 lead = Lead.objects.create(
-                    status='new',
                     owner=request.user,
                     city=request.data['city'],
                     job_desc=request.data['job_desc'],
@@ -539,6 +539,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 lead_id = lead.id
             data = create_submission(request, lead_id)
             if data:
+                lead.status = 'sub'
+                lead.save()
                 return Response({"result": data}, status=status.HTTP_201_CREATED)
             return Response({"error": data}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
@@ -547,12 +549,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'), lead__marketer=request.user)
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by=request.user)
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                submission.lead.status = 'sub'
-                submission.lead.save()
 
                 if submission.vendor_contact:
                     submission.is_active = True
@@ -1048,7 +1048,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 "username": "Log1 Updates",
                                 "text": text,
                             }
-                            post_msg_using_webhook(announcement_url, data)
+                            post_msg_using_webhook(config.announcement_url, data)
 
                     ctb = interview.supervisor.email
                     attendees = [

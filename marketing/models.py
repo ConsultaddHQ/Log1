@@ -190,7 +190,9 @@ class Submission(TimeStampedModel):
         return super(Submission, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.created_by.employee_name} : {self.client}'
+        if self.created_by:
+            return f'{self.created_by.employee_name} : {self.client}'
+        return f'{self.client}'
 
     @property
     def consultant(self):

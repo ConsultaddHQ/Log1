@@ -64,7 +64,8 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'attachments', 'interviews', 'project', 'created_by')
+                  'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
+                  'current_city', 'attachments', 'interviews', 'project', 'created_by')
 
     def get_created_by(self, obj):
         return obj.created_by.employee_name
@@ -92,7 +93,8 @@ class SubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'attachments', 'interviews', 'project', 'created_by')
+                  'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
+                  'current_city', 'attachments', 'interviews', 'project', 'created_by')
 
     def get_created_by(self, obj):
         return obj.created_by.employee_name

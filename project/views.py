@@ -444,7 +444,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    authentication_classes = (HasAPIKey,)
+    authentication_classes = ()
     permission_classes = ()
 
     def list(self, request, *args, **kwargs):
@@ -461,11 +461,12 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
 
             data = projects.annotate(
                 client=F('submission__client'),
+                status=F('statuses__status'),
                 location=F('submission__lead__city'),
                 job_title=F('submission__lead__job_title'),
                 vendor=F('submission__lead__vendor_company__name'),
-                marketer_email=F('submission__lead__marketer__email'),
-                marketer_name=F('submission__lead__marketer__employee_name'),
+                marketer_email=F('submission__created_by__email'),
+                marketer_name=F('submission__created_by__employee_name'),
                 recruiter=Subquery(poc.values('poc__employee_name')[:1]),
             ).values(
                 'id', 'client', 'consultant__name', 'consultant__email', 'status', 'feedback', 'client', 'start_date',
