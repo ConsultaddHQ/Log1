@@ -4,6 +4,7 @@ from marketing.models import *
 from project.models import Project
 from employee.serializers import UserSerializer
 from attachment.serializers import AttachmentSerializer
+from consultant.serializers import ConsultantSerializer
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -42,6 +43,7 @@ class LeadSerializer(serializers.ModelSerializer):
 
 class SubmissionCreateSerializer(serializers.ModelSerializer):
     class Meta:
+        model = Submission
         fields = '__all__'
 
 
@@ -55,6 +57,7 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
     interviews = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer()
     lead = LeadSerializer(read_only=True)
@@ -63,13 +66,16 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'interviews', 'project', 'created_by')
+                  'current_city', 'attachments', 'interviews', 'project', 'created_by', 'consultant')
 
     def get_created_by(self, obj):
         return obj.created_by.employee_name
 
     def get_attachments(self, obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data
+
+    def get_consultant(self, obj):
+        return ConsultantSerializer(obj.consultant).data
 
     def get_interviews(self, obj):
         return InterviewGetSerializer(obj.screening.all(), many=True).data
@@ -85,6 +91,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
     interviews = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
 
@@ -92,10 +99,13 @@ class SubmissionSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'interviews', 'project', 'created_by')
+                  'current_city', 'attachments', 'interviews', 'project', 'created_by', 'consultant')
 
     def get_created_by(self, obj):
         return obj.created_by.employee_name
+
+    def get_consultant(self, obj):
+        return ConsultantSerializer(obj.consultant).data
 
     def get_attachments(self, obj):
         return []
@@ -113,7 +123,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
 
 class VendorLayerSerializer(serializers.ModelSerializer):
-    company = VendorCompanySerializer()
+    vendor_company = VendorCompanySerializer()
 
     class Meta:
         model = VendorLayer
@@ -121,9 +131,9 @@ class VendorLayerSerializer(serializers.ModelSerializer):
 
 
 class InterviewSerializer(serializers.ModelSerializer):
-    submission = SubmissionSerializer()
+    submission = SubmissionCreateSerializer()
     guest = UserSerializer(many=True)
-    ctb = UserSerializer()
+    supervisor = UserSerializer()
 
     class Meta:
         model = Interview
@@ -131,7 +141,7 @@ class InterviewSerializer(serializers.ModelSerializer):
 
 
 class InterviewDetailSerializer(serializers.ModelSerializer):
-    submission = SubmissionDetailSerializer()
+    submission = SubmissionCreateSerializer()
     guest = UserSerializer(many=True)
     supervisor = UserSerializer()
 

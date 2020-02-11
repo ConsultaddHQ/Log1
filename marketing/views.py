@@ -252,8 +252,8 @@ class LeadViewSets(viewsets.ModelViewSet):
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
                            project=F('submission__project')
-                           ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'project'
-                                    , 'company_id', 'company_name', 'status', 'created', 'modified', 'submission_count')
+                           ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'status'
+                                    , 'company_id', 'company_name', 'project', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -586,21 +586,23 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
         try:
             if request.query_params.get('lead_id') == 0:
+                vendor_company = get_object_or_404(VendorCompany, id=request.query_params.get('company_id'))
                 if client_name:
                     queryset = Submission.objects.filter(
                         Q(consultant_marketing__consultant_id=consultant_id) &
-                        Q(client__icontains=client_name)
+                        (Q(client__icontains=client_name) | Q(lead__vendor_company=vendor_company))
                     )
                 else:
                     queryset = Submission.objects.filter(
-                        Q(consultant_marketing__consultant_id=consultant_id)
+                        Q(consultant_marketing__consultant_id=consultant_id) &
+                        Q(lead__vendor_company=vendor_company)
                     )
             else:
                 lead = get_object_or_404(Lead, id=request.query_params.get('lead_id'))
                 if client_name and client_name != 'null':
                     queryset = Submission.objects.filter(
                         Q(consultant_marketing__consultant_id=consultant_id) &
-                        Q(client__icontains=client_name)
+                        (Q(client__icontains=client_name) | Q(lead__vendor_company=lead.vendor_company))
                     )
                 else:
                     queryset = Submission.objects.filter(
@@ -637,15 +639,15 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class VendorLayerView(ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin, GenericViewSet):
+class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin, GenericViewSet):
     queryset = VendorLayer.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = VendorLayerSerializer
     authentication_classes = (TokenAuthentication,)
 
-    def list(self, request, *args, **kwargs):
+    def retrieve(self, request, *args, **kwargs):
         try:
-            submission_id = request.query_params.get('submission')
+            submission_id = kwargs.get('pk', None)
             vendor_layer = VendorLayer.objects.filter(submission_id=submission_id).order_by('level')
             serializer = self.serializer_class(vendor_layer, many=True)
             return Response({"results": serializer.data}, status=status.HTTP_200_OK)
@@ -659,12 +661,12 @@ class VendorLayerView(ListModelMixin, CreateModelMixin, UpdateModelMixin, Destro
             queryset = VendorLayer.objects.filter(submission=submission_id)
             level = 0
             if queryset:
-                level = queryset.latest('created').level
+                level = queryset.aggregate(Max('level'))['level__max']
 
             vendor_layer = VendorLayer.objects.create(
                 level=level + 1,
                 submission_id=submission_id,
-                company_id=request.data.get('company')
+                vendor_company_id=request.data.get('company')
             )
 
             serializer = self.serializer_class(vendor_layer)
@@ -736,7 +738,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'screening_type',
+            ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode',
                      'submission_id', 'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                      'project', 'job_title', 'modified')
             return data, data_counts
@@ -843,7 +845,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             elif 'marketer' in roles:
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__in_pool=True) |
-                    Q(submission__consultant_marketing__consultant__marketer=request.user) |
+                    Q(submission__consultant_marketing__marketer=request.user) |
                     Q(submission__created_by=request.user)
                 )
 
@@ -894,10 +896,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             # calculating Interview round
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(
-                status='cancelled').aggregate(Max('round'))
+                status='cancelled')
             round_count = 0
             if prev_interview:
-                round_count = prev_interview['round__max']
+                round_count = prev_interview.aggregate(Max('round'))['round__max']
 
             # Saving Interview
             serializer = InterviewCreateSerializer(data=request.data, partial=True)
@@ -982,7 +984,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         "username": "Log1 Updates",
                         "text": text,
                     }
-                    post_msg_using_webhook(config.announcement_url, data)
+                    # post_msg_using_webhook(config.announcement_url, data)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1029,7 +1031,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 if status_change == 'false':
                     interview.status = 'rescheduled'
                     interview.save()
-                    # Message to discord for interview timing updating
+                    # Message to mattermost for interview timing updating
                     if date.today() == interview.start_time.date() and interview.interview_mode == 'interview':
                         text = f"""#### :stopwatch: Interview Rescheduled \n **CTB: 
                                 {interview.supervisor.employee_name} :: Round:{interview.round} :: 

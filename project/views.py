@@ -33,7 +33,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
     create_serializer_class = ProjectGetSerializer
     authentication_classes = (TokenAuthentication,)
 
-    # Done
     @staticmethod
     def send_offer_received_mail(self, submission, scrum_master, marketer):
         try:
@@ -72,7 +71,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, "error"
 
-    # Done
     @staticmethod
     def support_mail(start_date, submission, scrum_master, marketer):
         try:
@@ -123,7 +121,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error("Support mail exception error for {}".format(marketer.email), error)
             return error, "error"
 
-    # Done
     @staticmethod
     def po_mail(self, path, scrum_master_email, po_type):
         marketer = self.submission.created_by
@@ -254,7 +251,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Done
     def retrieve(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
@@ -264,7 +260,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Done
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', None)
@@ -320,7 +315,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Done
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         sub_id = request.data.get('submission')
