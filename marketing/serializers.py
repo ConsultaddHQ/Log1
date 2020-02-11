@@ -28,13 +28,11 @@ class LeadSerializer(serializers.ModelSerializer):
     vendor_company_name = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
 
-    @staticmethod
-    def get_vendor_company_name(self):
-        return self.vendor_company.name if self.vendor_company else None
+    def get_vendor_company_name(self, obj):
+        return obj.vendor_company.name if obj.vendor_company else None
 
-    @staticmethod
-    def get_owner(self):
-        return self.owner.employee_name
+    def get_owner(self, obj):
+        return obj.owner.employee_name
 
     class Meta:
         model = Lead
@@ -99,10 +97,10 @@ class SubmissionSerializer(serializers.ModelSerializer):
     def get_created_by(self, obj):
         return obj.created_by.employee_name
 
-    def get_attachments(self):
+    def get_attachments(self, obj):
         return []
 
-    def get_vendor_contact(self):
+    def get_vendor_contact(self, obj):
         return None
 
     def get_interviews(self, obj):

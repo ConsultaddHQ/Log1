@@ -50,6 +50,7 @@ PROJECT_APPS = [
     'jd_parser.apps.JdParserConfig',
     'activity.apps.ActivityConfig',
     'ckiller.apps.CkillerConfig',
+    'report.apps.ReportConfig'
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS

@@ -13,7 +13,7 @@ from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateMode
 
 from constance import config
 from django.db import transaction
-from django.db.models import Count, Q, F
+from django.db.models import Count, Q, F, Max
 from django.db.models.functions import Lower
 from django.shortcuts import get_object_or_404
 
@@ -888,16 +888,16 @@ class InterviewViewSets(viewsets.ModelViewSet):
             # Change status of past Interview to feedback due
             self.change_to_feedback_due()
 
-            submissions = Submission.objects.filter(id=request.data.get('submission'))
+            submissions = Submission.objects.filter(id=request.data.get('submission'), created_by=request.user)
             if not submissions:
                 return Response({"error": 'This is not your submission'}, status=status.HTTP_400_BAD_REQUEST)
 
             # calculating Interview round
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(
-                status='cancelled').order_by('-created')
+                status='cancelled').aggregate(Max('round'))
             round_count = 0
             if prev_interview:
-                round_count = prev_interview.first().round
+                round_count = prev_interview['round__max']
 
             # Saving Interview
             serializer = InterviewCreateSerializer(data=request.data, partial=True)
@@ -953,16 +953,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 cal_res = {
                     'id': 'error'
                 }
-                try:
-                    cal_res = book_calendar(event)
-                    interview.calendar_id = cal_res['id']
-                    interview.save()
-                except Exception as error:
-                    logger.error("Calendar booking failed")
-                    logger.error(error)
-                    logger.error(cal_res)
-                    return Response({"result": "Calendar event creation failed", "error": str(error)},
-                                    status=status.HTTP_400_BAD_REQUEST)
+
+                # try:
+                #     cal_res = book_calendar(event)
+                #     interview.calendar_id = cal_res['id']
+                #     interview.save()
+                # except Exception as error:
+                #     logger.error("Calendar booking failed")
+                #     logger.error(error)
+                #     logger.error(cal_res)
+                #     return Response({"result": "Calendar event creation failed", "error": str(error)},
+                #                     status=status.HTTP_400_BAD_REQUEST)
 
                 # Discord message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
@@ -976,17 +977,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         :: {interview.marketer.employee_name} **
                     '''
 
-                text = "#### :spiral_calendar: New Interview Scheduled \n **CTB : {0} :: Round : {1} :: {2} :: {3} " \
-                       ":: {4} :: {5} :: {6}**".format(
-                    interview.supervisor.employee_name, interview.round, interview.get_type_display(),
-                    interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'), interview.consultant,
-                    interview.submission.client, interview.marketer)
-                data = {
-                    "response_type": "in_channel",
-                    "username": "Log1 Updates",
-                    "text": text,
-                }
-                post_msg_using_webhook(config.announcement_url, data)
+                    data = {
+                        "response_type": "in_channel",
+                        "username": "Log1 Updates",
+                        "text": text,
+                    }
+                    post_msg_using_webhook(config.announcement_url, data)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1010,7 +1006,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             # Change status of past Screening to feedback due
             self.change_to_feedback_due()
             interview_id = kwargs.get('pk')
-            reschedule = request.query_params.get('re', 'no')
             status_change = request.query_params.get('status_change', 'true')
             queryset = Interview.objects.filter(id=interview_id, submission__created_by=request.user)
             if not queryset:
@@ -1032,23 +1027,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'id': 'error'
                 }
                 if status_change == 'false':
-                    if reschedule.lower() == 'yes':
-                        interview.status = 'rescheduled'
-                        interview.save()
-                        # Message to discord for interview timing updating
-                        if date.today() == interview.start_time.date() and interview.interview_mode == 'interview':
-                            text = f"""#### :stopwatch: Interview Rescheduled \n **CTB: 
-                                    {interview.supervisor.employee_name} :: Round:{interview.round} :: 
-                                    {interview.get_screening_type_display()} :: 
-                                    {interview.start_time.strftime('%m/%d/%Y :: %I:%M EST')} :: 
-                                    {interview.consultant.name} :: {interview.submission.client} :: 
-                                    {interview.marketer.employee_name}**"""
-                            data = {
-                                "response_type": "in_channel",
-                                "username": "Log1 Updates",
-                                "text": text,
-                            }
-                            post_msg_using_webhook(config.announcement_url, data)
+                    interview.status = 'rescheduled'
+                    interview.save()
+                    # Message to discord for interview timing updating
+                    if date.today() == interview.start_time.date() and interview.interview_mode == 'interview':
+                        text = f"""#### :stopwatch: Interview Rescheduled \n **CTB: 
+                                {interview.supervisor.employee_name} :: Round:{interview.round} :: 
+                                {interview.get_screening_type_display()} :: 
+                                {interview.start_time.strftime('%m/%d/%Y :: %I:%M EST')} :: 
+                                {interview.consultant.name} :: {interview.submission.client} :: 
+                                {interview.marketer.employee_name}**"""
+                        data = {
+                            "response_type": "in_channel",
+                            "username": "Log1 Updates",
+                            "text": text,
+                        }
+                        post_msg_using_webhook(config.announcement_url, data)
 
                     ctb = interview.supervisor.email
                     attendees = [
@@ -1067,7 +1061,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                             {interview.get_screening_type_display} :: 
                             {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
-                            {interview.submission.client} :: {interview.consultant} :: {interview.marketer}"""
+                            {interview.submission.client} :: {interview.consultant.name} :: 
+                            {interview.marketer.employee_name}"""
 
                     sub = interview.submission
 
@@ -1089,14 +1084,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         }
 
                         # Update interview on Google Calendar
-                        event_id = interview.calendar_id
-                        try:
-                            cal_res['id'] = update_calendar(event_id, event)
-                        except Exception as error:
-                            logger.error(error)
-                            logger.error(cal_res)
-                            return Response({"result": "Calendar event update failed", "error": str(error)},
-                                            status=status.HTTP_400_BAD_REQUEST)
+                        # event_id = interview.calendar_id
+                        # try:
+                        #     cal_res['id'] = update_calendar(event_id, event)
+                        # except Exception as error:
+                        #     logger.error(error)
+                        #     logger.error(cal_res)
+                        #     return Response({"result": "Calendar event update failed", "error": str(error)},
+                        #                     status=status.HTTP_400_BAD_REQUEST)
 
                 data = queryset.annotate(
                     client=F('submission__client'),

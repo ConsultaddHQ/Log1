@@ -442,10 +442,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
 
 class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
+    authentication_classes = ()
+    permission_classes = (HasAPIKey,)
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    authentication_classes = ()
-    permission_classes = ()
 
     def list(self, request, *args, **kwargs):
         try:

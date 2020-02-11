@@ -56,7 +56,9 @@ class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
     screening_display.short_description = "Screening"
 
     def lead_owner_display(self, obj):
-        return obj.lead.owner.employee_name
+        if obj.lead.owner:
+            return obj.lead.owner.employee_name
+        return None
 
     lead_owner_display.short_description = "Lead Owner"
 
