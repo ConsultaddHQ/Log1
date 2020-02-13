@@ -3,6 +3,7 @@ from typing import Tuple
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.utils.translation import ugettext_lazy as _
 
 from .crypto import concatenate, KeyGenerator, split
 
@@ -61,10 +62,11 @@ class APIKeyManager(BaseAPIKeyManager):
 class AbstractAPIKey(models.Model):
     objects = APIKeyManager()
 
-    id = models.CharField(max_length=100, unique=True, primary_key=True, editable=False)
-    prefix = models.CharField(max_length=8, unique=True, editable=False)
-    hashed_key = models.CharField(max_length=100, editable=False)
-    created = models.DateTimeField(auto_now_add=True, db_index=True)
+    hashed_key = models.CharField(_('Hashed Key'), max_length=100, editable=False)
+    created = models.DateTimeField(_('Created'), auto_now_add=True, db_index=True)
+    api_key = models.CharField(_('Api-Key'), max_length=100, blank=True, null=True)
+    prefix = models.CharField(_('Prefix'), max_length=8, unique=True, editable=False)
+    id = models.CharField(_('ID'), max_length=100, unique=True, primary_key=True, editable=False)
     name = models.CharField(
         max_length=50,
         blank=False,

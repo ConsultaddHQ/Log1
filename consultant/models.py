@@ -36,7 +36,7 @@ VISA_CHOICES = (
     ('opt-ext', 'OPT Extension'),
     ('us_citizen', 'US CITIZEN'),
     ('not_auth', 'Not Authorized'),
-    ('gc-ead', 'Green Card Holder EAD'),
+    ('gc:ead', 'Green Card Holder EAD'),
 )
 
 EDUCATION_CHOICES = (
@@ -118,7 +118,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         return super(Consultant, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.name} {self.email}'
+        return f'{self.id}:{self.name} {self.email}'
 
     def get_by_natural_key(self, username):
         return self.get(**{self.model.USERNAME_FIELD: username})
@@ -187,7 +187,7 @@ class ConsultantResetPasswordToken(models.Model):
         return super(ConsultantResetPasswordToken, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.consultant} : {self.key}'
+        return f'{self.id}:{self.consultant}-{self.key}'
 
 
 def clear_expired(expiry_time):
@@ -244,7 +244,7 @@ class WorkAuth(TimeStampedModel):
         return super(WorkAuth, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.consultant.name} {self.visa_start}'
+        return f'{self.id}:{self.consultant.name} {self.visa_start}'
 
 
 class Education(models.Model):
@@ -325,7 +325,7 @@ class ConsultantProfile(TimeStampedModel):
         return super(ConsultantProfile, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.title} - {self.consultant.name}'
+        return f'{self.id}:{self.title}-{self.consultant.name}'
 
 
 class ConsultantMarketing(TimeStampedModel):
@@ -369,7 +369,7 @@ class ConsultantMarketing(TimeStampedModel):
         return super(ConsultantMarketing, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.cycle} - {self.consultant.name}'
+        return f'{self.id}:{self.cycle}-{self.consultant.name}'
 
     @property
     def recruiter(self):
@@ -402,7 +402,7 @@ class ConsultantRateRevision(TimeStampedModel):
         return super(ConsultantRateRevision, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.consultant.name} - {self.rate} - {self.start}'
+        return f'{self.id}:{self.consultant.name}-{self.rate}-{self.start}'
 
 
 class ConsultantPOC(TimeStampedModel):
@@ -430,7 +430,7 @@ class ConsultantPOC(TimeStampedModel):
         return super(ConsultantPOC, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.poc.employee_name} {self.poc_type} of {self.consultant.name}'
+        return f'{self.id}-{self.poc.employee_name} {self.poc_type} of {self.consultant.name}'
 
 
 class FeedbackDetail(models.Model):
@@ -485,4 +485,4 @@ class ConsultantFeedback(TimeStampedModel):
         return super(ConsultantFeedback, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.consultant.name} {self.feedback_type} of {self.rating}'
+        return f'{self.id}:{self.consultant.name} {self.feedback_type} of {self.rating}'

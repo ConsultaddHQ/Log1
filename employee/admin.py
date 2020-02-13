@@ -5,8 +5,9 @@ from django.contrib.auth.forms import UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 
 from utils_app.admin import ExportCsvMixin
-from api_key.admin import APIKeyModelAdmin
-from .models import User, Role, Team, ResetPasswordToken, Asset, Organization, OrganizationAPIKey
+from .models import User, Role, Team, ResetPasswordToken, Asset
+
+admin.site.site_header = "Log1"
 
 
 @admin.register(User)
@@ -17,9 +18,12 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
                  ('Important dates', {'fields': ('last_login', 'date_joined')}),
                  )
 
-    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'roles')
-    search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
     actions = ["export_as_csv"]
+    date_hierarchy = 'last_login'
+    empty_value_display = '-------'
+    list_filter = ('employee_name', 'team', 'role')
+    search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
+    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'roles')
 
     def roles(self, obj):
         return ", ".join([
@@ -48,36 +52,29 @@ UserAdmin.add_fieldsets = (
 
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'email', 'address')
+    empty_value_display = '-------'
     search_fields = ('name', 'email')
+    list_display = ('id', 'name', 'email', 'address')
 
 
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
     search_fields = ('name',)
+    list_display = ('id', 'name')
+    empty_value_display = '-------'
 
 
 @admin.register(ResetPasswordToken)
 class ResetPasswordTokenAdmin(admin.ModelAdmin):
+    empty_value_display = '-------'
+    list_filter = ('user__employee_name',)
     list_display = ('user', 'key', 'ip_address', 'user_agent')
     search_fields = ('user__employee_name', 'user__email', 'key')
 
 
 @admin.register(Asset)
 class AssetAdmin(admin.ModelAdmin):
+    empty_value_display = '-------'
+    list_filter = ('owner__employee_name', 'asset_type')
     list_display = ('id', 'owner', 'email', 'asset_type')
     search_fields = ('id', 'owner__employee_name', 'email', 'asset_type')
-
-
-@admin.register(Organization)
-class OrganizationModelAdmin(admin.ModelAdmin):
-    list_display = ['name', 'active']
-    search_fields = ['name']
-
-
-@admin.register(OrganizationAPIKey)
-class OrganizationAPIKeyModelAdmin(APIKeyModelAdmin):
-    list_display = [*APIKeyModelAdmin.list_display, "organization"]
-    search_fields = [*APIKeyModelAdmin.search_fields, "organization__name"]
-

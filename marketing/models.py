@@ -60,7 +60,7 @@ class VendorCompany(models.Model):
     created_by = models.CharField(_('Created By'), max_length=50, null=True, blank=True)
 
     def __str__(self):
-        return self.name
+        return f'{self.id}:{self.name}'
 
     class Meta:
         verbose_name = _("Vendor Company")
@@ -94,7 +94,7 @@ class VendorContact(TimeStampedModel):
         return super(VendorContact, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.name} from {self.company}'
+        return f'{self.id}:{self.name} from {self.company}'
 
 
 class Lead(TimeStampedModel):
@@ -134,8 +134,8 @@ class Lead(TimeStampedModel):
 
     def __str__(self):
         if self.owner:
-            return f'{self.vendor_company.name} : {self.owner.employee_name} : {self.city}'
-        return f'{self.vendor_company.name} : {self.city}'
+            return f'{self.id}:{self.vendor_company.name} - {self.owner.employee_name} - {self.city}'
+        return f'{self.id}:{self.vendor_company.name} - {self.city}'
 
 
 class Submission(TimeStampedModel):
@@ -193,8 +193,8 @@ class Submission(TimeStampedModel):
 
     def __str__(self):
         if self.created_by:
-            return f'{self.created_by.employee_name} : {self.client}'
-        return f'{self.client}'
+            return f'{self.id}:{self.created_by.employee_name} - {self.client}'
+        return f'{self.id}:{self.client}'
 
     @property
     def consultant(self):
@@ -232,7 +232,7 @@ class VendorLayer(TimeStampedModel):
         return super(VendorLayer, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'Level: {self.level} {self.vendor_company.name}'
+        return f'{self.id}:L{self.level} {self.vendor_company.name}'
 
 
 class Interview(TimeStampedModel):

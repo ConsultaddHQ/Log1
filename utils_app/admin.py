@@ -25,6 +25,7 @@ class ExportCsvMixin:
 
 @admin.register(City)
 class CityAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_display = ('id', 'name', 'state')
-    search_fields = ('name', 'state')
+    list_filter = ('state',)
     actions = ["export_as_csv"]
+    search_fields = ('name', 'state')
+    list_display = ('id', 'name', 'state')

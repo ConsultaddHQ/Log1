@@ -132,7 +132,6 @@ def update_calendar(event_id, data):
 def get_interviews(data):
     service = calendar_con()
     page_token = None
-    count = 0
     calendar_data = []
     time_min = data["start"] + '06:00:00-04:00'
     time_max = data["end"] + '23:59:00-04:00'
@@ -167,7 +166,6 @@ def get_interviews(data):
                     "attachments": [{"fileUrl": i["fileUrl"], "title": i["title"]} for i in
                                     event["attachments"]] if "attachments" in event else []
                 }
-            count += 1
             calendar_data.append(data)
         page_token = events.get('nextPageToken')
         if not page_token:

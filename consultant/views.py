@@ -49,9 +49,9 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             data = queryset[first:last].annotate(
                 consultant_name=F('consultant_marketing__consultant__name'),
                 company_name=F('lead__vendor_company__name'),
-                marketer_name=F('lead__marketer__employee_name'),
-                location=F('lead__city')
-            ).values('id', 'rate', 'consultant_name', 'company_name', 'marketer_name', 'location', 'project')
+                marketer_name=F('created_by__employee_name'),
+                city=F('lead__city')
+            ).values('id', 'rate', 'consultant_name', 'company_name', 'marketer_name', 'city', 'project', 'client')
 
             return data, data_counts
         except Exception as error:
@@ -89,11 +89,11 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 ctb_name=F('supervisor__employee_name'),
                 client=F('submission__client'),
                 project=F('submission__project'),
-                marketer_name=F('submission__lead__marketer__employee_name'),
+                marketer_name=F('submission__created_by__employee_name'),
                 company_name=F('submission__lead__vendor_company__name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
 
-            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_type', 'submission_id', 'status',
+            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'submission_id', 'status',
                      'supervisor__employee_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                      'project', 'job_title', 'modified', 'created')
 
@@ -107,15 +107,15 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         try:
             # count of project by status
             total = queryset.count()
-            new = queryset.filter(status='new').count()
-            joined = queryset.filter(status='joined').count()
-            received = queryset.filter(status='received').count()
-            on_boarded = queryset.filter(status='on_boarded').count()
-            not_joined = queryset.filter(status='not_joined').count()
+            joined = queryset.filter(statuses__status='joined', statuses__is_current=True).count()
+            new = queryset.filter(statuses__status='new', statuses__is_current=True).count()
+            received = queryset.filter(statuses__status='received', statuses__is_current=True).count()
+            on_boarded = queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count()
+            not_joined = queryset.filter(statuses__status='not_joined', statuses__is_current=True).count()
 
             queryset = queryset.order_by('-modified').distinct('modified')
             if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
+                queryset = queryset.filter(statuses__status=filter_by_status, statuses__is_current=True)
 
             data_counts = {
                 'new': new,
@@ -126,13 +126,12 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 'not_joined': not_joined,
             }
             data = queryset[first:last].annotate(
-                consultant_name=F('consultant__name'),
-                location=F('submission__lead__city'),
-                company_name=F('submission__lead__vendor_company__name'),
-                client=F('submission__client'),
                 rate=F('submission__rate'),
-                marketer_name=F('submission__lead__marketer__employee_name')
-            ).values('id', 'consultant_name', 'location', 'company_name', 'client', 'rate', 'marketer_name')
+                client=F('submission__client'),
+                consultant_name=F('consultant__name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name')
+            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created')
             return data, data_counts
         except Exception as error:
             logger.error(error)

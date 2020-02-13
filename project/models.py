@@ -84,7 +84,7 @@ class Project(TimeStampedModel):
         return super(Project, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.consultant.name
+        return f'{self.id}:{self.consultant.name}'
 
     @property
     def marketer_name(self):
@@ -134,7 +134,7 @@ class ProjectSupport(TimeStampedModel):
         return super(ProjectSupport, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.project.submission.consultant.name} - {self.support.employee_name}'
+        return f'{self.id}:{self.project.submission.consultant.name} - {self.support.employee_name}'
 
 
 class TimeSheet(TimeStampedModel):
@@ -169,7 +169,7 @@ class TimeSheet(TimeStampedModel):
         return super(TimeSheet, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.project.consultant.name} - {self.hours}'
+        return f'{self.id}:{self.project.consultant.name} - {self.hours}'
 
 
 class PayrollSchedule(models.Model):

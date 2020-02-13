@@ -163,9 +163,8 @@ class LeadViewSets(viewsets.ModelViewSet):
             data = queryset.exclude(status='archived')[first:last].annotate(
                 company_name=F('vendor_company__name'),
                 company_id=F('vendor_company__id'),
-                project=F('submission__project')
             ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                     'company_name', 'status', 'created', 'modified', 'submission_count', 'project')
+                     'company_name', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
         except Exception as error:
@@ -224,10 +223,8 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset.annotate(submission_count=Count('submission')) \
                     .annotate(company_name=F('vendor_company__name'),
                               company_id=F('vendor_company__id'),
-                              project=F('submission__project')
-                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills',
-                                       'company_id', 'company_name', 'status', 'created', 'modified', 'submission_count'
-                                       , 'project')
+                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+                                       'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -251,10 +248,9 @@ class LeadViewSets(viewsets.ModelViewSet):
                     submission_count=Count('submission')
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
-                           project=F('submission__project')
                            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'status'
-                                    , 'company_id', 'company_name', 'project', 'modified', 'submission_count')
-                return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
+                                    , 'company_id', 'company_name', 'modified', 'submission_count')
+                return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
@@ -375,16 +371,7 @@ def create_submission(request, lead_id):
         if other:
             create_attachment(other_file_data)
 
-        data = {
-            "id": sub.id,
-            "status": sub.status,
-            "created": sub.created,
-            "modified": sub.modified,
-            "consultant_id": sub.consultant.id,
-            "consultant_name": sub.consultant.name,
-            "attachments": AttachmentSerializer(sub.attachments.all(), many=True).data,
-        }
-        return data
+        return sub
     except Exception as error:
         logger.error(error)
         return False
@@ -418,7 +405,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('created_by__employee_name'),
                 city=F('lead__city')
-            ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'consultant_name',
+            ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'consultant_name', 'is_active',
                      'company_name', 'marketer_name', 'city', 'project', 'vendor_contact')
 
             return data, data_counts
@@ -443,7 +430,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', 'all')
-        consultant_id = request.query_params.get('consultant', None)
+        consultant_id = request.query_params.get('consultant_id', None)
         filter_by_time = request.query_params.get('filter_by_time', 'all')
         filter_by_status = request.query_params.get('filter_by_status', None)
 
@@ -518,6 +505,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
@@ -537,8 +525,22 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     vendor_company_id=request.data['vendor_company'],
                 )
                 lead_id = lead.id
-            data = create_submission(request, lead_id)
-            if data:
+            sub = create_submission(request, lead_id)
+            data = {
+                "id": sub.id,
+                "status": sub.status,
+                "created": sub.created,
+                "modified": sub.modified,
+                "consultant_id": sub.consultant.id,
+                "consultant_name": sub.consultant.name,
+                "attachments": AttachmentSerializer(sub.attachments.all(), many=True).data,
+            }
+            if sub.vendor_contact:
+                sub.is_active = True
+            else:
+                sub.is_active = False
+            sub.save()
+            if sub:
                 lead.status = 'sub'
                 lead.save()
                 return Response({"result": data}, status=status.HTTP_201_CREATED)
@@ -585,7 +587,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            if request.query_params.get('lead_id') == 0:
+            if request.query_params.get('lead_id') == "0":
                 vendor_company = get_object_or_404(VendorCompany, id=request.query_params.get('company_id'))
                 if client_name:
                     queryset = Submission.objects.filter(
@@ -917,11 +919,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 submission.save()
 
                 # Calendar title
-                title = "CTB:{} :: {}R :: {} :: {} :: {} :: {} :: {} :: {}".format(
-                    interview.supervisor.employee_name, interview.round, interview.get_screening_type_display(),
-                    interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST'), interview.submission.client,
-                    interview.consultant, interview.marketer, interview.submission.employer
-                )
+                title = f"CTB:{interview.supervisor.employee_name} " \
+                        f":: {interview.round}R " \
+                        f":: {interview.get_interview_mode_display()} " \
+                        f":: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} " \
+                        f":: {interview.submission.client} " \
+                        f":: {interview.consultant.name} " \
+                        f":: {interview.marketer.employee_name} " \
+                        f":: {interview.submission.employer}"
 
                 # Calendar attendees
                 supervisor = interview.supervisor.email
@@ -1044,7 +1049,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             "username": "Log1 Updates",
                             "text": text,
                         }
-                        post_msg_using_webhook(config.announcement_url, data)
+                        # post_msg_using_webhook(config.announcement_url, data)
 
                     ctb = interview.supervisor.email
                     attendees = [
@@ -1141,7 +1146,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get'], detail=False, url_path='cal_interviews')
+    @action(methods=['get'], detail=False, url_path='calendar_interviews')
     def calendar_interviews(self, request):
         end = request.query_params.get('end', None)
         start = request.query_params.get('start', None)
