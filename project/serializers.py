@@ -10,13 +10,13 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'feedback', 'created', 'duration', 'invoicing_period', 'feedback',
-                  'client_address', 'vendor_address', 'payment_term', 'start_date', 'end_date', 'reporting_details')
+        fields = ('id', 'status', 'feedback', 'created', 'duration', 'invoicing_period', 'feedback', 'submission', 'city',
+                  'client_address', 'vendor_address', 'payment_term', 'start_date', 'end_date', 'reporting_details', 'consultant')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
         if status:
-            return status.status
+            return status.first().status
         return None
 
 
@@ -70,27 +70,23 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
 class ProjectGetSerializer(serializers.ModelSerializer):
     submission = SubmissionSerializer()
     status = serializers.SerializerMethodField()
-    interview = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'interview', 'created',
+        fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
                   'start_date', 'end_date', 'reporting_details')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
         if status:
-            return status.status
+            return status.first().status
         return None
 
     def get_attachments(self, obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data
-
-    def get_interview(self, obj):
-        return InterviewGetSerializer(obj.submission.screening.all(), many=True).data
 
     def get_check_list(self, obj):
         msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0

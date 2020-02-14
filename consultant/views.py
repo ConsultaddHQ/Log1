@@ -86,7 +86,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
             data = queryset[first:last].annotate(
                 job_title=F('submission__lead__job_title'),
-                ctb_name=F('supervisor__employee_name'),
+                ctb=F('supervisor__employee_name'),
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_name=F('submission__created_by__employee_name'),
@@ -94,7 +94,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
 
             ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'submission_id', 'status',
-                     'supervisor__employee_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
+                     'ctb', 'marketer_name', 'consultant_name', 'client', 'company_name',
                      'project', 'job_title', 'modified', 'created')
 
             return data, data_counts
@@ -107,8 +107,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         try:
             # count of project by status
             total = queryset.count()
-            joined = queryset.filter(statuses__status='joined', statuses__is_current=True).count()
             new = queryset.filter(statuses__status='new', statuses__is_current=True).count()
+            joined = queryset.filter(statuses__status='joined', statuses__is_current=True).count()
             received = queryset.filter(statuses__status='received', statuses__is_current=True).count()
             on_boarded = queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count()
             not_joined = queryset.filter(statuses__status='not_joined', statuses__is_current=True).count()

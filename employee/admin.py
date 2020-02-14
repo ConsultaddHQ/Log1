@@ -54,7 +54,7 @@ UserAdmin.add_fieldsets = (
 class TeamAdmin(admin.ModelAdmin):
     empty_value_display = '-------'
     search_fields = ('name', 'email')
-    list_display = ('id', 'name', 'email', 'address')
+    list_display = ('id', 'name', 'email', 'dept')
 
 
 @admin.register(Role)

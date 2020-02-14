@@ -35,6 +35,10 @@ def get_time_filter(queryset, filter_by):
 
 
 def post_msg_using_webhook(url, data):
-    headers = {'Content-Type': 'application/json'}
-    resp = requests.post(url, headers=headers, data=json.dumps(data))
-    return resp.json()
+    try:
+        headers = {'Content-Type': 'application/json'}
+        resp = requests.post(url, headers=headers, data=json.dumps(data))
+        return resp
+    except Exception as error:
+        print(error)
+        return None

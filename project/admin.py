@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from utils_app.admin import ExportCsvMixin
-from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule
+from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, ProjectStatus
 
 
 @admin.register(Project)
@@ -22,6 +22,15 @@ class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
     list_filter = ('project__consultant__name', 'project__submission__client', 'support__employee_name')
     search_fields = ('project__consultant__name', 'status', 'project__submission__client', 'support__employee_name',
                      'project__submission__created_by__employee_name')
+
+
+@admin.register(ProjectStatus)
+class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
+    actions = ["export_as_csv"]
+    empty_value_display = '-------'
+    list_display = ('id', 'project', 'status', 'created', 'is_current')
+    list_filter = ('project__consultant__name', 'status', 'is_current')
+    search_fields = ('project__consultant__name', 'status', 'project__submission__client', 'is_current')
 
 
 @admin.register(TimeSheet)

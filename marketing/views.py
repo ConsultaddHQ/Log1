@@ -405,8 +405,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('created_by__employee_name'),
                 city=F('lead__city')
-            ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'consultant_name', 'is_active',
-                     'company_name', 'marketer_name', 'city', 'project', 'vendor_contact')
+            ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
+                     'company_name', 'marketer_name', 'consultant_name', 'project', 'vendor_contact')
 
             return data, data_counts
         except Exception as error:
@@ -535,7 +535,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 "consultant_name": sub.consultant.name,
                 "attachments": AttachmentSerializer(sub.attachments.all(), many=True).data,
             }
-            if sub.vendor_contact:
+            if sub.vendor_contact and sub.client:
                 sub.is_active = True
             else:
                 sub.is_active = False
@@ -556,7 +556,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if serializer.is_valid():
                 serializer.save()
 
-                if submission.vendor_contact:
+                if submission.vendor_contact and submission.client:
                     submission.is_active = True
                 else:
                     submission.is_active = False
@@ -900,6 +900,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(
                 status='cancelled')
             round_count = 0
+            if prev_interview and prev_interview.first().status not in ['cancelled', 'next_round']:
+                return Response({"error": "change status of previous interview"}, status=status.HTTP_400_BAD_REQUEST)
+
             if prev_interview:
                 round_count = prev_interview.aggregate(Max('round'))['round__max']
 
@@ -933,9 +936,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 scrum_master = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
                 guest = [{"email": user.email} for user in interview.guest.all()]
                 attendees = [
-                                {'email': request.user.email},
                                 {'email': supervisor},
-                                {"email": "bbookingg@gmail.com"}
+                                {'email': request.user.email},
+                                {"email": "bbookingg@gmail.com"},
                             ] + guest
                 for user in scrum_master:
                     attendees.append({"email": user.email})
@@ -972,24 +975,20 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 #     return Response({"result": "Calendar event creation failed", "error": str(error)},
                 #                     status=status.HTTP_400_BAD_REQUEST)
 
-                # Discord message for Interview
+                # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                    text = f'''#### :spiral_calendar: New Interview Scheduled \n
-                        **CTB:{interview.supervisor.employee_name} 
-                        :: Round:{interview.round} 
-                        :: {interview.get_screening_type_display()} 
-                        :: {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} 
-                        :: {interview.consultant.name} 
-                        :: {interview.submission.client} 
-                        :: {interview.marketer.employee_name} **
-                    '''
-
+                    text = '#### :spiral_calendar: New Interview Scheduled \n **CTB:{} :: Round:{} :: {} :: {} :: {} ' \
+                           ':: {} :: {} **'.format(
+                        interview.supervisor.employee_name, interview.round, interview.get_screening_type_display(),
+                        interview.start_time.strftime('%m/%d/%Y::%I:%M EST'), interview.consultant.name,
+                        interview.submission.client, interview.marketer.employee_name
+                    )
                     data = {
                         "response_type": "in_channel",
                         "username": "Log1 Updates",
                         "text": text,
                     }
-                    # post_msg_using_webhook(config.announcement_url, data)
+                    post_msg_using_webhook(config.announcement_url, data)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1029,7 +1028,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 if interview.status in ['offer']:
                     interview.submission.is_active = False
                 interview.submission.save()
-
                 cal_res = {
                     'id': 'error'
                 }
@@ -1037,36 +1035,34 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     interview.status = 'rescheduled'
                     interview.save()
                     # Message to mattermost for interview timing updating
-                    if date.today() == interview.start_time.date() and interview.interview_mode == 'interview':
-                        text = f"""#### :stopwatch: Interview Rescheduled \n **CTB: 
-                                {interview.supervisor.employee_name} :: Round:{interview.round} :: 
-                                {interview.get_screening_type_display()} :: 
-                                {interview.start_time.strftime('%m/%d/%Y :: %I:%M EST')} :: 
-                                {interview.consultant.name} :: {interview.submission.client} :: 
-                                {interview.marketer.employee_name}**"""
+                    if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
+                        text = "#### :stopwatch: Interview Rescheduled \n **CTB: {} :: Round:{} :: {} :: {} :: {} :: " \
+                               "{} :: {}**".format(
+                            interview.supervisor.employee_name, interview.round, interview.get_screening_type_display(),
+                            interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
+                            interview.submission.consultant.name,
+                            interview.submission.client, interview.marketer.employee_name)
                         data = {
                             "response_type": "in_channel",
                             "username": "Log1 Updates",
                             "text": text,
                         }
-                        # post_msg_using_webhook(config.announcement_url, data)
-
-                    ctb = interview.supervisor.email
+                        post_msg_using_webhook(config.announcement_url, data)
+                    supervisor_email = interview.supervisor.email
                     attendees = [
-                        {'email': ctb},
+                        {'email': supervisor_email},
                         {'email': request.user.email},
-                        {"email": "bbookingg@gmail.com"}
+                        {'email': 'bbookingg@gmail.com'},
                     ]
                     scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
                     for user in scrum_masters:
                         attendees.append({'email': user.email})
-
                     guest = [{"email": user.email} for user in interview.guest.all()]
                     if len(guest) > 0:
                         attendees = attendees + guest
 
                     title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
-                            {interview.get_screening_type_display} :: 
+                            {interview.get_screening_type_display()} :: 
                             {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
                             {interview.submission.client} :: {interview.consultant.name} :: 
                             {interview.marketer.employee_name}"""
@@ -1084,8 +1080,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             "submission": sub,
                             "user": request.user,
                             "attendees": attendees,
-                            "consultant_profile": sub.consultant,
-                            "consultant": sub.consultant.consultant,
+                            "consultant": sub.consultant,
                             "description": request.data["description"],
                             "call_details": request.data["call_details"]
                         }

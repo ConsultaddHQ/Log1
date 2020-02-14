@@ -285,4 +285,4 @@ class Interview(TimeStampedModel):
 
     @property
     def consultant(self):
-        return self.submission.consultant
+        return self.submission.consultant_marketing.consultant

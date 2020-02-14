@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import date
+from datetime import datetime, date
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -330,19 +330,23 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project = Project.objects.get(id=serializer.data['id'])
                 ProjectStatus.objects.create(
                     status='new',
-                    project=project
+                    project=project,
+                    is_current=True
                 )
 
                 sub.status = 'project'
                 sub.save()
+                project.consultant = sub.consultant
+                project.save()
                 project.consultant.status = 'in_offer'
                 project.consultant.save()
 
                 queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'])
                 scrum_masters = [{"email": user.email} for user in queryset]
 
-                support_mail_res, support_mail_error = self.support_mail(sub, scrum_masters, request.user)
-                offer_mail_res, offer_mail_error = self.send_offer_received_mail(sub, scrum_masters, request.user)
+                support_mail_res, offer_mail_res, support_mail_error, offer_mail_error = 0, 0, 0, 0
+                # support_mail_res, support_mail_error = self.support_mail(sub, scrum_masters, request.user)
+                # offer_mail_res, offer_mail_error = self.send_offer_received_mail(sub, scrum_masters, request.user)
                 if support_mail_error == 'error' or offer_mail_error == 'error':
                     logger.error(support_mail_res)
                     logger.error(offer_mail_res)
@@ -395,10 +399,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 #                     queryset = User.objects.filter(team=request.user.team, role__name='admin')
 #                     if queryset:
 #                         scrum_master = queryset.first().email
-#                     if prev_status not in termination_status and new_status in termination_status:
-#                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
-#                     elif prev_status not in cancellation_status and new_status in cancellation_status:
-#                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
+#                     # if prev_status not in termination_status and new_status in termination_status:
+#                     #     resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
+#                     # elif prev_status not in cancellation_status and new_status in cancellation_status:
+#                     #     resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
 #
 #                     # Discord message for PO
 #                     if prev_status == 'new' and project.status == 'received':

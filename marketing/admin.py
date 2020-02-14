@@ -97,11 +97,11 @@ class InterviewAdmin(admin.ModelAdmin, ExportCsvMixin):
     guest_display.short_description = "Guest"
 
     def make_status_feedback_due(self, request, queryset):
-        rows_updated = queryset.update(status='feedback_due')
+        rows_updated = queryset.update(status='cancelled')
         if rows_updated == 1:
             message_bit = "1 Interview was"
         else:
             message_bit = "%s Interviews were" % rows_updated
-        self.message_user(request, "%s successfully marked as feedback due." % message_bit)
+        self.message_user(request, "%s successfully marked as Cancelled." % message_bit)
 
-    make_status_feedback_due.short_description = "Mark selected Interview's status as Feedback due"
+    make_status_feedback_due.short_description = "Mark selected Interview's status as Cancelled"

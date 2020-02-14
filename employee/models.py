@@ -68,9 +68,9 @@ class UserManager(BaseUserManager):
 
 
 class Team(models.Model):
-    email = models.EmailField(_('Company Email'))
-    name = models.CharField(_('Company Name'), max_length=50)
-    address = models.CharField(_('Company Address'), max_length=300, blank=True)
+    name = models.CharField(_('Name'), max_length=50)
+    email = models.EmailField(_('Email'), null=True, blank=True)
+    dept = models.CharField(_('Department'), max_length=20, null=True, blank=True)
 
     def __str__(self):
         return self.name

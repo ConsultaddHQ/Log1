@@ -55,6 +55,7 @@ TIMESHEET_STATUS = (
 
 class Project(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    is_msg_sent = models.BooleanField(_('Is Message Sent'), default=False)
     end_date = models.DateField(_('End Date'), null=True, blank=True)
     start_date = models.DateField(_('Start Date'), null=True, blank=True)
     feedback = models.TextField(_('Reason of Failure'), null=True, blank=True)
@@ -72,8 +73,9 @@ class Project(TimeStampedModel):
     )
     consultant = models.ForeignKey(
         Consultant, on_delete=models.PROTECT,
+        null=True, blank=True,
         related_name='projects',
-        verbose_name='Consultant'
+        verbose_name='Consultant',
     )
 
     def save(self, *args, **kwargs):
@@ -84,15 +86,13 @@ class Project(TimeStampedModel):
         return super(Project, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.id}:{self.consultant.name}'
+        if self.consultant:
+            return f'{self.id}: {self.consultant.name}'
+        return f'{self.id}'
 
     @property
     def marketer_name(self):
         return self.submission.created_by.employee_name
-
-    @property
-    def consultant_name(self):
-        return self.submission.consultant.name
 
 
 class ProjectStatus(models.Model):
@@ -108,6 +108,10 @@ class ProjectStatus(models.Model):
         related_name='statuses',
         verbose_name='Project'
     )
+
+    class Meta:
+        ordering = ('project',)
+        verbose_name_plural = 'Project Statuses'
 
 
 class ProjectSupport(TimeStampedModel):
