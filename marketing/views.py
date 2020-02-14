@@ -1013,6 +1013,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             self.change_to_feedback_due()
             interview_id = kwargs.get('pk')
             status_change = request.query_params.get('status_change', 'true')
+            reschedule = request.query_params.get('reschedule', None)
             queryset = Interview.objects.filter(id=interview_id, submission__created_by=request.user)
             if not queryset:
                 return Response({"error": "Interview not found"}, status=status.HTTP_400_BAD_REQUEST)
@@ -1032,22 +1033,25 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'id': 'error'
                 }
                 if status_change == 'false':
-                    interview.status = 'rescheduled'
-                    interview.save()
-                    # Message to mattermost for interview timing updating
-                    if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                        text = "#### :stopwatch: Interview Rescheduled \n **CTB: {} :: Round:{} :: {} :: {} :: {} :: " \
-                               "{} :: {}**".format(
-                            interview.supervisor.employee_name, interview.round, interview.get_screening_type_display(),
-                            interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
-                            interview.submission.consultant.name,
-                            interview.submission.client, interview.marketer.employee_name)
-                        data = {
-                            "response_type": "in_channel",
-                            "username": "Log1 Updates",
-                            "text": text,
-                        }
-                        post_msg_using_webhook(config.announcement_url, data)
+                    if reschedule == 'true':
+                        interview.status = 'rescheduled'
+                        interview.save()
+
+                        # Message to mattermost for interview timing updating
+                        if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
+                            text = "#### :stopwatch: Interview Rescheduled \n **CTB: {} :: Round:{} :: {} :: {} :: " \
+                                   "{} :: {} :: {}**".format(
+                                interview.supervisor.employee_name, interview.round,
+                                interview.get_screening_type_display(),
+                                interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
+                                interview.submission.consultant.name,
+                                interview.submission.client, interview.marketer.employee_name)
+                            data = {
+                                "response_type": "in_channel",
+                                "username": "Log1 Updates",
+                                "text": text,
+                            }
+                            post_msg_using_webhook(config.announcement_url, data)
                     supervisor_email = interview.supervisor.email
                     attendees = [
                         {'email': supervisor_email},
@@ -1141,28 +1145,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get'], detail=False, url_path='calendar_interviews')
-    def calendar_interviews(self, request):
-        end = request.query_params.get('end', None)
-        start = request.query_params.get('start', None)
-        email = request.query_params.get('email', None)
-        start_time = datetime.strptime(start, "%Y-%m-%d")
-        end_time = datetime.strptime(end, "%Y-%m-%d")
-        start_time = start_time.strftime("%Y-%m-%dT")
-        end_time = end_time.strftime("%Y-%m-%dT")
-        event = {
-            "email": email,
-            "start": start_time,
-            "end": end_time
-        }
-        # Get interviews from Google Calendar for specific Email ID
-        try:
-            data, visibility = get_interviews(event)
-            return Response({"result": data, "visibility": visibility}, status=status.HTTP_200_OK)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
     # Suggestions for Interview
     @action(methods=['get'], detail=False, url_path='suggestions')
     def interview_suggestions(self, request):
@@ -1204,6 +1186,28 @@ class InterviewViewSets(viewsets.ModelViewSet):
                      'consultant_name', 'start_time', 'end_time', 'company_name', 'client', 'interview_mode')
 
             return Response({"result": data, "total": total}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='calendar_interviews')
+    def calendar_interviews(self, request):
+        end = request.query_params.get('end', None)
+        start = request.query_params.get('start', None)
+        email = request.query_params.get('email', None)
+        start_time = datetime.strptime(start, "%Y-%m-%d")
+        end_time = datetime.strptime(end, "%Y-%m-%d")
+        start_time = start_time.strftime("%Y-%m-%dT")
+        end_time = end_time.strftime("%Y-%m-%dT")
+        event = {
+            "email": email,
+            "start": start_time,
+            "end": end_time
+        }
+        # Get interviews from Google Calendar for specific Email ID
+        try:
+            data, visibility = get_interviews(event)
+            return Response({"result": data, "visibility": visibility}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

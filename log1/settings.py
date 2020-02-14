@@ -36,7 +36,7 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'notification',
     'rest_framework_swagger',
-
+    'constance.backends.database',
 ]
 
 PROJECT_APPS = [
@@ -209,6 +209,8 @@ NOTIFICATIONS_CHANNELS = {
 }
 
 # Constance Config
+
+CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
