@@ -21,7 +21,7 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     date_hierarchy = 'last_login'
     empty_value_display = '-------'
-    list_filter = ('employee_name', 'team', 'role')
+    list_filter = ('team', 'role', 'is_active')
     search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
     list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'roles')
 
@@ -52,6 +52,7 @@ UserAdmin.add_fieldsets = (
 
 @admin.register(Team)
 class TeamAdmin(admin.ModelAdmin):
+    list_filter = ('dept',)
     empty_value_display = '-------'
     search_fields = ('name', 'email')
     list_display = ('id', 'name', 'email', 'dept')

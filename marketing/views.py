@@ -2,14 +2,12 @@ import difflib
 import logging
 from datetime import date, datetime, timedelta
 
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, \
-    DestroyModelMixin
+from rest_framework.mixins import *
 
 from constance import config
 from django.db import transaction
@@ -404,9 +402,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 consultant_name=F('consultant_marketing__consultant__name'),
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('created_by__employee_name'),
+                marketer_id=F('created_by'),
                 city=F('lead__city')
             ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
-                     'company_name', 'marketer_name', 'consultant_name', 'project', 'vendor_contact')
+                     'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact')
 
             return data, data_counts
         except Exception as error:
@@ -735,58 +734,19 @@ class InterviewViewSets(viewsets.ModelViewSet):
             data = queryset[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
+                marketer_id=F('submission__created_by'),
                 job_title=F('submission__lead__job_title'),
                 supervisor_name=F('supervisor__employee_name'),
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode',
-                     'submission_id', 'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
+                     'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client', 'company_name',
                      'project', 'job_title', 'modified')
             return data, data_counts
         except Exception as error:
             logger.error(error)
             return error, 'error'
-
-    @staticmethod
-    def send_test_mail(test, scrum_master):
-        try:
-            to = [config.ENGINEERING]
-            marketer = test.submission.lead.marketer
-            resume = test.submission.attachments.filter(attachment_type='resume')
-            cc = [marketer.email]
-            if scrum_master:
-                cc.append(scrum_master)
-            attachments = test.attachments.all()
-            path = [attachment.attachment_file.path for attachment in attachments]
-            if resume:
-                path.append(resume.first().attachment_file.path)
-
-            mail_data = {
-                'cc': cc,
-                'to': to,
-                'subject': 'Test for {} :: {} :: {} :: {}'.format(test.submission.consultant_name,
-                                                                  test.submission.vendor, test.submission.client,
-                                                                  marketer.employee_name),
-                'template': '../templates/test_mail.html',
-                'context': {
-                    'employer': test.submission.employer,
-                    'client_name': test.submission.client,
-                    'marketer_name': test.submission.marketer,
-                    'job_desc': test.submission.lead.job_desc,
-                    'job_title': test.submission.lead.job_title,
-                    'vendor_company': test.submission.lead.vendor_company.name,
-                    'consultant_name': test.submission.consultant.consultant.name,
-                    'consultant_email': test.submission.consultant.consultant.email,
-                    'consultant_phone': test.submission.consultant.consultant.phone_no,
-                },
-                'attachments': path,
-            }
-            res = send_email_attachment_multiple(mail_data, marketer.email)
-            return res, "ok"
-        except Exception as error:
-            logger.error(error)
-            return error, "error"
 
     # Change status of scheduled and rescheduled Interviews to feedback_due
     @staticmethod
@@ -1028,6 +988,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     interview.submission.is_active = True
                 if interview.status in ['offer']:
                     interview.submission.is_active = False
+                    interview.submission.status = 'in_offer'
                 interview.submission.save()
                 cal_res = {
                     'id': 'error'
@@ -1127,7 +1088,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
             # Delete from google calendar
             try:
-                delete_calendar_booking(interview.calendar_id)
+                if interview.calendar_id:
+                    delete_calendar_booking(interview.calendar_id)
+                else:
+                    return Response({"result": "calendar id not found"}, status=status.HTTP_404_NOT_FOUND)
             except Exception as error:
                 logger.error(error)
                 logger.error("Calendar event deletion failed")

@@ -37,7 +37,7 @@ class UserSerializerLogin(UserSerializer):
 class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'dept')
 
 
 class EmailSerializer(serializers.Serializer):

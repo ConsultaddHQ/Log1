@@ -55,7 +55,6 @@ TIMESHEET_STATUS = (
 
 class Project(TimeStampedModel):
     attachments = GenericRelation(Attachment)
-    is_msg_sent = models.BooleanField(_('Is Message Sent'), default=False)
     end_date = models.DateField(_('End Date'), null=True, blank=True)
     start_date = models.DateField(_('Start Date'), null=True, blank=True)
     feedback = models.TextField(_('Reason of Failure'), null=True, blank=True)
@@ -66,6 +65,10 @@ class Project(TimeStampedModel):
     duration = models.CharField(_('Duration'), max_length=50, null=True, blank=True)
     reporting_details = models.TextField(_('Reporting Details'), null=True, blank=True)
     invoicing_period = models.IntegerField(_('Invoicing Period'), null=True, blank=True)
+    is_msg_sent = models.BooleanField(
+        _('Is Message Sent'),
+        help_text='Message sent on Offer-announcement channel ?',
+        default=False)
     submission = models.OneToOneField(
         Submission, on_delete=models.PROTECT,
         related_name='project',

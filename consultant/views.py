@@ -371,8 +371,12 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             last, first = page * page_size, page * page_size - page_size
             try:
                 consultant_id = kwargs.get('pk')
-                feedback_type = request.query_params.get("feedback_type")
-                queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id, feedback_type=feedback_type)
+                feedback_type = request.query_params.get("feedback_type", None)
+                if feedback_type:
+                    queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id,
+                                                                 feedback_type=feedback_type)
+                else:
+                    queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id)
                 serializer = CommentSerializer(queryset[first:last], many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
             except Exception as error:
@@ -480,9 +484,8 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
             consultants = Consultant.objects.filter(marketing__end=None).exclude(
                 status__in=['new', 'archived', 'in_training', 'terminated'])
             # Team wise Filter
-            if team_name:
-                team = get_object_or_404(Team, name=team_name)
-                consultants = consultants.filter(marketing__teams=team)
+            if team_name and team_name != 'all':
+                consultants = consultants.filter(marketing__teams__name=team_name)
 
             # Location wise Filter
             if location:
@@ -692,7 +695,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             suffix = data['title'].strip()
             name = request.user.employee_name
             initials = name.split()[0][0] + name.split()[1][0] if len(name.split()) > 1 else ""
-            title = f'{initials.upper()}-{ data["visa_type"]}-{data["dob"][:4]}-{suffix}'
+            title = f'{initials.upper()}-{data["visa_type"]}-{data["dob"][:4]}-{suffix}'
 
             consultant_profile = ConsultantProfile.objects.create(
                 title=title,

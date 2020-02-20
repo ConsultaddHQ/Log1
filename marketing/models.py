@@ -21,6 +21,7 @@ SUB_CHOICES = (
     ('draft', 'Draft'),
     ('sub', 'Submitted'),
     ('project', 'Project'),
+    ('in_offer', 'In Offer'),
     ('interview', 'Interview'),
 )
 

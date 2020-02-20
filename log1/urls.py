@@ -10,9 +10,9 @@ from rest_framework.documentation import include_docs_urls
 
 from utils_app.views import CityViewSets
 
-from attachment.views import AttachmentView
-
 from report.views import ScrumMeetingReport
+
+from attachment.views import AttachmentView, AttachmentGetView
 
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets
 
@@ -39,6 +39,7 @@ router.register(r'employee', EmployeeViewSets)
 router.register(r'password', ResetPasswordViewSets)
 
 router.register(r'attachment', AttachmentView)
+router.register(r'get_attachment', AttachmentGetView)
 
 router.register(r'consultant', ConsultantViewSets)
 router.register(r'consultant_poc', ConsultantPOCViewSets)

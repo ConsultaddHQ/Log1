@@ -48,15 +48,70 @@ class SubmissionCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    check_list = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = Project
-        fields = '__all__'
+        fields = ('id', 'status', 'created', 'duration', 'start_date', 'end_date', 'city', 'feedback', 'consultant',
+                  'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list')
+
+    def get_status(self, obj):
+        status = obj.statuses.filter(is_current=True)
+        if status:
+            return status.first().status
+        return None
+
+    def get_check_list(self, obj):
+        msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0
+
+        start_date = 1 if obj.start_date else 0
+
+        if obj.attachments.filter(attachment_type='msa'):
+            msa = 1
+
+        if obj.attachments.filter(attachment_type='work_order'):
+            work_order = 1
+
+        if obj.attachments.filter(attachment_type='work_order_msa'):
+            msa, work_order = 1, 1
+
+        if obj.attachments.filter(attachment_type='msa_signed'):
+            s_msa = 1
+
+        if obj.attachments.filter(attachment_type='work_order_signed'):
+            s_work_order = 1
+
+        if obj.attachments.filter(attachment_type='work_order_msa_signed'):
+            s_msa, s_work_order = 1, 1
+
+        if obj.client_address and len(obj.client_address.strip()) > 0:
+            client_address = 1
+
+        if obj.vendor_address and len(obj.vendor_address.strip()) > 0:
+            vendor_address = 1
+
+        if obj.reporting_details and len(obj.reporting_details.strip()) > 0:
+            reporting_details = 1
+
+        return {
+            "total": 6,
+            "msa": msa,
+            "msa_signed": s_msa,
+            "work_order": work_order,
+            "start_date": start_date,
+            "client_address": client_address,
+            "vendor_address": vendor_address,
+            "work_order_signed": s_work_order,
+            "reporting_details": reporting_details,
+        }
 
 
 class SubmissionDetailSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
     interviews = serializers.SerializerMethodField()
-    created_by = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
+    marketer_id = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer()
@@ -66,10 +121,13 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'interviews', 'project', 'created_by', 'consultant')
+                  'current_city', 'attachments', 'interviews', 'project', 'marketer_name', 'marketer_id', 'consultant')
 
-    def get_created_by(self, obj):
+    def get_marketer_name(self, obj):
         return obj.created_by.employee_name
+
+    def get_marketer_id(self, obj):
+        return obj.created_by.id
 
     def get_attachments(self, obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data
@@ -78,10 +136,10 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         return ConsultantSerializer(obj.consultant).data
 
     def get_interviews(self, obj):
-        return InterviewGetSerializer(obj.screening.all(), many=True).data
+        return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
 
     def get_project(self, obj):
-        if hasattr(self, 'project'):
+        if hasattr(obj, 'project'):
             return ProjectSerializer(obj.project).data
         return None
 
@@ -90,7 +148,8 @@ class SubmissionSerializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
     interviews = serializers.SerializerMethodField()
-    created_by = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
+    marketer_id = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
@@ -99,27 +158,30 @@ class SubmissionSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'interviews', 'project', 'created_by', 'consultant')
+                  'current_city', 'attachments', 'interviews', 'project', 'marketer_name', 'marketer_id', 'consultant')
 
-    def get_created_by(self, obj):
+    def get_marketer_name(self, obj):
         return obj.created_by.employee_name
+
+    def get_marketer_id(self, obj):
+        return obj.created_by.id
 
     def get_consultant(self, obj):
         return ConsultantSerializer(obj.consultant).data
 
-    def get_attachments(self, obj):
+    def get_attachments(self):
         return []
 
-    def get_vendor_contact(self, obj):
+    def get_vendor_contact(self):
+        return None
+
+    def get_project(self, obj):
+        if hasattr(obj, 'project'):
+            return ProjectSerializer(obj.project).data
         return None
 
     def get_interviews(self, obj):
-        return InterviewGetSerializer(obj.screening.all(), many=True).data
-
-    def get_project(self, obj):
-        if hasattr(self, 'project'):
-            return ProjectSerializer(obj.project).data
-        return None
+        return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
 
 
 class VendorLayerSerializer(serializers.ModelSerializer):

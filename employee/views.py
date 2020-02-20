@@ -97,7 +97,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', None)
+            query = request.query_params.get('query', '')
             user_type = request.query_params.get('type', None)
             if user_type:
                 users = User.objects.filter(role__name=user_type)
@@ -122,7 +122,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
-        teams = Team.objects.all().values('id', 'name', 'address')
+        teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
         return Response({"results": teams}, status=status.HTTP_200_OK)
 
     @action(methods=['post'], detail=False, url_path='change_password')
