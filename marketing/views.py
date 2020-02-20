@@ -399,11 +399,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 'interview': interview
             }
             data = sub[first:last].annotate(
-                consultant_name=F('consultant_marketing__consultant__name'),
+                city=F('lead__city'),
+                marketer_id=F('created_by'),
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('created_by__employee_name'),
-                marketer_id=F('created_by'),
-                city=F('lead__city')
+                consultant_name=F('consultant_marketing__consultant__name'),
             ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
                      'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact')
 
@@ -740,8 +740,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode',
-                     'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client', 'company_name',
+            ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
+                     'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
                      'project', 'job_title', 'modified')
             return data, data_counts
         except Exception as error:

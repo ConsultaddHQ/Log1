@@ -16,6 +16,8 @@ from attachment.views import AttachmentView, AttachmentGetView
 
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets
 
+from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
+
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
 
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
@@ -69,6 +71,9 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'city', CityViewSets)
 
 router.register(r'scrum_report', ScrumMeetingReport)
+
+router.register(r'emp_notify', ScrumMeetingReport)
+router.register(r'con_notify', ScrumMeetingReport)
 
 
 urlpatterns = [

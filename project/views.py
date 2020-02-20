@@ -12,7 +12,7 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 
 from constance import config
 from project.serializers import *
@@ -523,7 +523,7 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
+class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = TimeSheet.objects.all()
     serializer_class = TimeSheetSerializer
     permission_classes = (IsAuthenticated,)
@@ -538,11 +538,11 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSe
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            projects = Project.objects.filter(consultant_id=kwargs.get('pk', None))
+            projects = Project.objects.filter(consultant_id=kwargs.get('pk', None), statuses__status='joined')
             if projects:
                 project = projects.latest('id')
                 if start:
-                    queryset = TimeSheet.objects.filter(project=project, created__range=[start, end])
+                    queryset = TimeSheet.objects.filter(project=project, start__range=[start, end])
                 else:
                     queryset = TimeSheet.objects.filter(project=project)
                 total = queryset.count()
@@ -557,19 +557,61 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSe
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
+
+        query = request.query_params.get('query', None)
+        consultant_id = request.query_params.get('consultant', None)
+        consultant_name = request.query_params.get('consultant_name', None)
+
         try:
-            query = request.query_params.get('query', None)
-            consultant_id = request.query_params.get('consultant', None)
+            project_status = ['joined', 'terminated-resigned', 'terminated', 'terminated-resigned_location_issue',
+                              'terminated-resigned_location_issue', 'terminated-resigned_full_time_offer',
+                              'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
+                              'terminated-fired_performance_issue', 'terminated-fired_security_issue']
+
             if consultant_id:
-                consultants = Consultant.objects.filter(id=consultant_id)
+                consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
+            elif consultant_name:
+                consultants = Consultant.objects.filter(name__icontains=consultant_name)
             else:
-                consultants = Consultant.objects.exclude(status='archived')
+                consultant_ids = Project.objects.filter(status__in=project_status).values_list('consultant', flat=True)
+                consultants = Consultant.objects.filter(id__in=list(consultant_ids)).exclude(status='archived')
+
             if query:
-                consultants = Consultant.objects.filter(
-                ).exclude(status='archived')
+                consultants = consultants.objects.filter(
+                    Q(name__istartswith=query) |
+                    Q(projects__submission__client__icontains=query) |
+                    Q(projects__submission__lead__vendor_company__name__icontains=query)
+                )
             total = consultants.count()
             serializer = ConsultantTimeSheetSerializer(consultants[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            if 'finance' in request.user.roles:
+                timesheet_id = kwargs.get('pk')
+                timesheet = get_object_or_404(TimeSheet, id=timesheet_id)
+                timesheet.remark = request.data.get('remark', None)
+                timesheet.status = request.data.get('status')
+                timesheet.status_updated_at = datetime.now()
+                timesheet.status_updated_by = request.user
+                timesheet.save()
+                serializer = self.serializer_class(timesheet)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["get"], detail=True, url_name="from_notification")
+    def from_notification(self, request, *args, **kwargs):
+        try:
+            queryset = TimeSheet.objects.filter(id=kwargs.get('pk'))
+            serializer = self.serializer_class(queryset, many=True)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

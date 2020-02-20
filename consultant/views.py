@@ -387,7 +387,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 consultant_id = kwargs.get('pk')
                 data = request.data
                 feedback_details = FeedbackDetail.objects.create(
-                    role=data['role'],
+                    role_knowledge=data['role'],
                     experience=data['experience'],
                     programming=data['programming'],
                     communication=data['communication'],
@@ -481,10 +481,13 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.filter(marketing__end=None).exclude(
+            consultants = Consultant.objects.filter(
+                Q(marketing__end=None) |
+                Q(marketing__marketer=request.user)
+            ).exclude(
                 status__in=['new', 'archived', 'in_training', 'terminated'])
             # Team wise Filter
-            if team_name and team_name != 'all':
+            if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name)
 
             # Location wise Filter
@@ -498,12 +501,7 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
                     Q(name__icontains=query) | Q(email__iexact=query) | Q(skills__icontains=query) |
                     Q(current_city__icontains=query) | Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
-                # Marketer's team Consultants
-            else:
-                consultants = consultants.filter(
-                    Q(marketing__teams=request.user.team, marketing__in_pool=False) |
-                    Q(marketing__marketer=request.user)
-                )
+
             consultants = consultants.order_by('id').distinct('id')
             in_pool = consultants.filter(status='in_marketing', marketing__in_pool=True).count()
             in_marketing = consultants.filter(status='in_marketing', marketing__in_pool=False).count()
@@ -523,7 +521,6 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
                 consultants = consultants.filter(status='in_marketing', marketing__in_pool=True)
             else:
                 consultants = consultants.filter(status=con_status, marketing__in_pool=False)
-
             poc = ConsultantPOC.objects.filter(
                 consultant=OuterRef("pk"), end=None, poc_type='recruiter')
 
