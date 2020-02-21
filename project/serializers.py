@@ -121,7 +121,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'status', 'project')
+        fields = ('id', 'name', 'email', 'ts_status', 'project')
 
     def get_project(self, obj):
         project = Project.objects.filter(consultant=obj)
@@ -145,7 +145,6 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
             'submitted': sub_ts,
         }
         return data
-
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):

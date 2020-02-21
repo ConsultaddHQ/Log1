@@ -573,11 +573,13 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             elif consultant_name:
                 consultants = Consultant.objects.filter(name__icontains=consultant_name)
             else:
-                consultant_ids = Project.objects.filter(status__in=project_status).values_list('consultant', flat=True)
+                consultant_ids = Project.objects.filter(
+                    statuses__status__in=project_status, statuses__is_current=True
+                ).values_list('consultant', flat=True)
                 consultants = Consultant.objects.filter(id__in=list(consultant_ids)).exclude(status='archived')
 
             if query:
-                consultants = consultants.objects.filter(
+                consultants = consultants.filter(
                     Q(name__istartswith=query) |
                     Q(projects__submission__client__icontains=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)

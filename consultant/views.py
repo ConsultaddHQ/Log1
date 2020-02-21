@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, datetime
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, Count
 
@@ -377,7 +377,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                                                                  feedback_type=feedback_type)
                 else:
                     queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id)
-                serializer = CommentSerializer(queryset[first:last], many=True)
+                serializer = ConsultantFeedbackSerializer(queryset[first:last], many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
             except Exception as error:
                 logger.error(error)
@@ -452,11 +452,38 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get'], detail=True, url_path='rate_revision')
+    @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, *args, **kwargs):
-        rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk'))
-        data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback')
-        return Response({"results": data}, status=status.HTTP_200_OK)
+        if request.method == 'GET':
+            try:
+                rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk'))
+                data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback', 'consultant')
+                return Response({"results": data}, status=status.HTTP_200_OK)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            try:
+                prev_rate_obj = ConsultantRateRevision.objects.filter(consultant_id=request.data['consultant'],
+                                                                      end=None)
+                prev_rate = 0
+                if prev_rate_obj:
+                    prev_rate_obj = prev_rate_obj.first()
+                    prev_rate_obj.end = datetime.today()
+                    prev_rate_obj.save()
+                    prev_rate = prev_rate_obj.rate
+                rate_obj = ConsultantRateRevision.objects.create(
+                    previous_rate=prev_rate,
+                    rate=request.data['rate'],
+                    start=request.data['start'],
+                    feedback=request.data['feedback'],
+                    consultant_id=request.data['consultant']
+                )
+                serializer = ConsultantRateRevisionSerializer(rate_obj)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
@@ -554,11 +581,41 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
     serializer_class = ConsultantMarketingSerializer
 
     def update(self, request, *args, **kwargs):
-        consultant_marketing = get_object_or_404(ConsultantMarketing, id=kwargs.get('pk'))
-        serializer = ConsultantMarketingCreateSerializer(consultant_marketing, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        try:
+            consultant_marketing = get_object_or_404(ConsultantMarketing, id=kwargs.get('pk'))
+            serializer = ConsultantMarketingCreateSerializer(consultant_marketing, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=["post"], detail=False, url_path='re_marketing')
+    def remarketing(self, request, *args, **kwargs):
+        try:
+            prev_marketing_obj = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'], end=None)
+            cycle = 1
+            if prev_marketing_obj:
+                prev_marketing_obj = prev_marketing_obj.first()
+                cycle = prev_marketing_obj.cycle + 1
+            consultant_marketing = ConsultantMarketing.objects.create(
+                cycle=cycle,
+                rtg=request.data['rtg'],
+                in_pool=request.data['in_pool'],
+                start=request.data['marketing_start'],
+                consultant_id=request.data['consultant'],
+                primary_marketer_id=request.data['primary_marketer'],
+                preferred_location=request.data['preferred_location'],
+            )
+
+            teams = request.data.get('teams', None)
+            for team in teams:
+                consultant_marketing.teams.add(get_object_or_404(Team, name=team))
+
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Marketer assignment
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
@@ -583,7 +640,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_200_OK)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Team Assignment
     @action(methods=['put'], detail=True, url_path='team_assignment')
@@ -606,7 +663,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_200_OK)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Remove assigned Marketer from Consultant
     @action(methods=['put'], detail=True, url_path='remove_marketer')
@@ -654,7 +711,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_200_OK)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConsultantProfileViewSets(viewsets.ModelViewSet):

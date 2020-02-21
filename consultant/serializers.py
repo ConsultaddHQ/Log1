@@ -52,7 +52,7 @@ class POCSerializer(serializers.ModelSerializer):
 class ConsultantMarketingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantMarketing
-        exclude = ('id', 'cycle', 'teams', 'marketer', 'created', 'modified')
+        exclude = ('teams', 'marketer', 'created', 'modified')
 
 
 class ConsultantMarketingSerializer(serializers.ModelSerializer):
