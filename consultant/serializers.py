@@ -108,6 +108,8 @@ class FeedbackDetailsSerializer(serializers.ModelSerializer):
 
 class ConsultantFeedbackSerializer(serializers.ModelSerializer):
     feedback = FeedbackDetailsSerializer()
+    given_by = POCSerializer()
+    created_by = POCSerializer()
 
     class Meta:
         model = ConsultantFeedback

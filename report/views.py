@@ -36,11 +36,11 @@ class ScrumMeetingReport(GenericViewSet):
             for team in teams:
                 team_name = team.name
                 pool = ConsultantMarketing.objects.filter(
-                    teams__name=team_name, in_pool=True, is_current=True,
-                    consultant__status='open').distinct('consultant').order_by().count()
+                    teams__name=team_name, in_pool=True,
+                    status='open').distinct('consultant').order_by().count()
                 bench = ConsultantMarketing.objects.filter(
-                    teams__name=team_name, in_pool=False, is_current=True,
-                    consultant__status='open').distinct('consultant').order_by().count()
+                    teams__name=team_name, in_pool=False,
+                    status='open').distinct('consultant').order_by().count()
                 interviews = Interview.objects.filter(
                     submission__created_by__team__name=team_name,
                     created__gte=previous_meeting_date

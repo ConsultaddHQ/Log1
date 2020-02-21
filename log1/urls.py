@@ -70,7 +70,7 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
 
-router.register(r'scrum_report', ScrumMeetingReport)
+router.register(r'report', ScrumMeetingReport)
 
 router.register(r'emp_notify', ScrumMeetingReport)
 router.register(r'con_notify', ScrumMeetingReport)

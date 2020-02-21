@@ -75,7 +75,7 @@ class ConsultantMarketingAdmin(admin.ModelAdmin, ExportCsvMixin):
     list_filter = ('consultant__name',)
     search_fields = ('id', 'consultant__name', 'consultant__email')
     list_display = ('id', 'cycle', 'consultant', 'start', 'end', 'in_pool', 'preferred_location', 'team_display',
-                    'primary_marketer', 'marketer_display')
+                    'status', 'primary_marketer', 'marketer_display')
 
     def team_display(self, obj):
         return ", ".join([

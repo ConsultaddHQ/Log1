@@ -16,6 +16,7 @@ class Command(BaseCommand):
         lower_limit = timezone.now().date() - timedelta(days=46)
 
         queryset = ConsultantMarketing.objects.filter(
+            Q(status='open') &
             Q(start__lte=upper_limit) &
             Q(start__gte=lower_limit)
         )

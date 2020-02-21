@@ -143,13 +143,13 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
         if 'marketer' in request.user.roles:
             consultants = consultants.filter(
-                Q(marketing__in_pool=True, marketing__is_current=True) |
-                Q(marketing__marketer=request.user, marketing__is_current=True)
+                Q(marketing__in_pool=True, marketing__status='open') |
+                Q(marketing__marketer=request.user, marketing__status='open')
             )
         elif 'admin' in roles or 'proxy' in roles:
             consultants = consultants.filter(
-                Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__is_current=True) |
-                Q(marketing__in_pool=True, marketing__is_current=True)
+                Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
+                Q(marketing__in_pool=True, marketing__status='open')
             )
 
         elif 'recruiter' in roles:
@@ -201,7 +201,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             )
 
             # Creating Consultant Original Profile Consultant
-            profile = ConsultantProfile.objects.create(
+            ConsultantProfile.objects.create(
                 title="Original",
                 links=data['links'],
                 consultant=consultant,
@@ -267,17 +267,16 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         if request.method == 'POST':
             try:
                 data = request.data
-                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
                 Education.objects.create(
                     city=data['city'],
                     title=data['title'],
                     major=data['major'],
                     remark=data['remark'],
-                    consultant=consultant,
                     org_name=data['org_name'],
                     edu_type=data['edu_type'],
                     end_date=data['end_date'],
                     start_date=data['start_date'],
+                    consultant_id=kwargs.get('pk'),
                 )
                 return Response({"result": "created"}, status=status.HTTP_201_CREATED)
             except Exception as error:
@@ -301,16 +300,15 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         if request.method == 'POST':
             try:
                 data = request.data
-                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
                 Experience.objects.create(
                     city=data['city'],
                     title=data['title'],
                     remark=data['remark'],
-                    consultant=consultant,
                     company=data['company'],
                     exp_type=data['exp_type'],
                     end_date=data['end_date'],
                     start_date=data['start_date'],
+                    consultant_id=kwargs.get('pk'),
                 )
                 return Response({"result": "created"}, status=status.HTTP_201_CREATED)
             except Exception as error:
@@ -346,7 +344,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             elif marketing_stage == 'interview':
                 interviews = Interview.objects.filter(
                     submission__consultant_marketing__consultant_id=consultant_id,
-                    submission__consultant_marketing__end=None
+                    submission__consultant_marketing__status='open',
+                    submission__consultant_marketing__end=None,
                 )
                 data, counts = self.get_interview_data(interviews, filter_by_status, first, last)
                 if counts == "error":
@@ -373,8 +372,9 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 consultant_id = kwargs.get('pk')
                 feedback_type = request.query_params.get("feedback_type", None)
                 if feedback_type:
-                    queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id,
-                                                                 feedback_type=feedback_type)
+                    queryset = ConsultantFeedback.objects.filter(
+                        consultant_id=consultant_id, feedback_type=feedback_type
+                    )
                 else:
                     queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id)
                 serializer = ConsultantFeedbackSerializer(queryset[first:last], many=True)
@@ -413,9 +413,9 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
     @action(methods=['get', 'post'], detail=True, url_path='comments')
     def comments(self, request, *args, **kwargs):
+        consultant_id = kwargs.get('pk')
         if request.method == 'GET':
             try:
-                consultant_id = kwargs.get('pk')
                 consultant = get_object_or_404(Consultant, id=consultant_id)
                 queryset = consultant.comments.filter(parent_comment=None)
                 serializer = CommentGetSerializer(queryset, many=True)
@@ -426,10 +426,9 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         elif request.method == 'POST':
             try:
                 content_type = ContentType.objects.get(model='consultant')
-                object_id = kwargs.get('pk', None)
                 comment = Comment.objects.create(
                     user=request.user,
-                    object_id=object_id,
+                    object_id=consultant_id,
                     content_type=content_type,
                     comment_text=request.data['comment_text'],
                     parent_comment_id=request.data['parent_comment'],
@@ -443,8 +442,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            consultant = get_object_or_404(Consultant, id=consultant_id)
+            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
             serializer = AttachmentSerializer(queryset, many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
@@ -497,8 +495,7 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
     def map(self, request):
         consultants = Consultant.objects.filter(
             marketing__status='open', marketing__is_current=True
-        ).values('current_city').annotate(
-            total=Count('current_city')).order_by('current_city')
+        ).values('current_city').annotate(total=Count('current_city')).order_by('current_city')
         return Response({"results": consultants}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
@@ -512,7 +509,7 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
 
         try:
             consultants = Consultant.objects.filter(
-                Q(marketing__end=None) |
+                Q(marketing__status='open') |
                 Q(marketing__marketer=request.user)
             )
             # Team wise Filter
@@ -521,11 +518,10 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
 
             # Location wise Filter
             if location:
-                con_status = 'open'
+                con_status = 'on_bench'
                 consultants = consultants.filter(
                     current_city=location,
                     marketing__status='open',
-                    marketing__is_current=True
                 )
 
             # Consultants search based on name, email, recruiter and location
@@ -538,15 +534,14 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
             consultants = consultants.order_by('id').distinct('id')
             in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True).count()
             on_bench = consultants.filter(marketing__status='open', marketing__in_pool=False).count()
-            in_offer = consultants.filter(marketing__status='in_offer').count()
             on_project = consultants.filter(status='on_project').count()
 
             count = {
+                "in_offer": 0,
                 "in_pool": in_pool,
-                "in_offer": in_offer,
                 "on_project": on_project,
                 "in_marketing": on_bench,
-                "total": in_pool + on_bench + in_offer + on_project,
+                "total": in_pool + on_bench + on_project,
             }
 
             # Filter Consultant by status and In pool
@@ -561,7 +556,7 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
                 consultant=OuterRef("pk"), end=None)
 
             marketing = ConsultantMarketing.objects.filter(
-                consultant=OuterRef("pk"), end=None, is_current=True)
+                consultant=OuterRef("pk"), status='open')
 
             data = consultants[first:last].annotate(
                 rate=Subquery(rate.values('rate')[:1]),
@@ -572,9 +567,7 @@ class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet
                 preferred_location=Subquery(marketing.values('preferred_location')[:1]),
             ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
                      'marketing_start')
-
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
-
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -615,11 +608,11 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 preferred_location=request.data['preferred_location'],
             )
 
-            teams = request.data.get('teams', None)
+            teams = request.data.get('teams', [])
             for team in teams:
                 consultant_marketing.teams.add(get_object_or_404(Team, name=team))
 
-            marketer_ids = request.data.get('marketers', None)
+            marketer_ids = request.data.get('marketers', [])
             for marketer_id in marketer_ids:
                 marketer = get_object_or_404(User, id=marketer_id)
                 consultant_marketing.marketer.add(marketer)
@@ -633,7 +626,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
     def marketer_assignment(self, request, *args, **kwargs):
         try:
             consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open', end=None)
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -658,7 +651,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
     def team_assignment(self, request, *args, **kwargs):
         try:
             consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open', end=None)
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -681,7 +674,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
     def remove_marketer(self, request, *args, **kwargs):
         try:
             consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open', end=None)
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -706,7 +699,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
     def remove_team(self, request, *args, **kwargs):
         try:
             consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open', end=None)
+            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
             if queryset:
                 consultant_marketing = queryset.first()
             else:
