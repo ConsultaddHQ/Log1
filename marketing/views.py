@@ -464,7 +464,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = Submission.objects.filter(
                     Q(consultant_marketing__consultant__pocs__poc=request.user,
                       consultant_marketing__consultant__pocs__poc_type='recruiter',
-                      consultant_marketing__consultant__status='in_marketing')
+                      consultant_marketing__consultant___marketing__status='open')
                 )
 
             if filter_for == 'my':

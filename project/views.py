@@ -369,8 +369,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = sub.consultant
                 project.city = sub.lead.city
                 project.save()
-                project.consultant.status = 'in_offer'
-                project.consultant.save()
+
                 queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'], is_active=True)
                 scrum_masters = [{"email": user.email} for user in queryset]
 

@@ -16,14 +16,14 @@ from employee.token import get_token_generator
 from notification.models import FCMDevice, Notification
 
 CONSULTANT_STATUS_CHOICE = (
-    ('new', 'New'),
+    ('on_bench', 'On Bench'),
     ('archived', 'Archived'),
-    ('in_offer', 'In Offer'),
     ('on_project', 'On Project'),
-    ('terminated', 'Terminated'),
-    ('in_training', 'In Training'),
-    ('in_marketing', 'In Marketing'),
-    ('marketing_candidate', 'Marketing Candidate'),
+)
+
+MARKETING_STATUS_CHOICE = (
+    ('open', 'Open'),
+    ('close', 'Close'),
 )
 
 VISA_CHOICES = (
@@ -56,12 +56,12 @@ FEEDBACK_CHOICES = (
 
 GENDER_CHOICE = (
     ('male', 'Male'),
-    ('female', 'Female')
+    ('female', 'Female'),
 )
 
 WORK_TYPE_CHOICE = (
     ('c2c', 'C2C'),
-    ('full_time', 'Full Time')
+    ('full_time', 'Full Time'),
 )
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
@@ -96,7 +96,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     status = models.CharField(
         _('status'), max_length=15,
         choices=CONSULTANT_STATUS_CHOICE,
-        default='in_marketing'
+        default='on_bench'
     )
     work_type = models.CharField(
         _('Work Type'), max_length=10,
@@ -336,6 +336,11 @@ class ConsultantMarketing(TimeStampedModel):
     start = models.DateField(_('Marketing Start Date'), blank=True, null=True)
     is_current = models.BooleanField(_('Current Marketing Cycle'), default=True)
     preferred_location = models.TextField(_('Preferred Location'), null=True, blank=True)
+    status = models.CharField(
+        _('status'), max_length=10,
+        choices=MARKETING_STATUS_CHOICE,
+        default='open'
+    )
     teams = models.ManyToManyField(
         Team,
         related_name='consultants',

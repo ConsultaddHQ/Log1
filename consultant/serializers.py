@@ -66,7 +66,8 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantMarketing
-        fields = ('id', 'teams', 'marketer', 'in_pool', 'rtg', 'start', 'end', 'preferred_location', 'primary_marketer')
+        fields = ('id', 'teams', 'marketer', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
+                  'primary_marketer')
 
 
 class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
