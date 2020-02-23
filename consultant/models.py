@@ -126,9 +126,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     def get_project(self):
         from project.models import Project
         queryset = Project.objects.filter(
-            models.Q(consultant=self) &
-            (models.Q(end_date=None, statuses__status='joined', statuses__is_current=True) |
-             models.Q(end_date__gte=timezone.now(), statuses__status='joined', statuses__is_current=True))
+            models.Q(consultant=self)
         )
         return queryset
 
