@@ -30,6 +30,7 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
     ConsultantProfileViewSets, ConsultantPOCViewSets, WorkAuthViewSets
 
+from impersonate.views import ImpersonateView,ImperEnv
 
 schema_view = get_swagger_view(title="New Log1 Documentation")
 
@@ -79,6 +80,9 @@ router.register(r'con_notify', ScrumMeetingReport)
 urlpatterns = [
     path('api/v2/', include(router.urls)),
     path('api/v2/admin/', admin.site.urls),
+    path('impersonate-start/', ImpersonateView.as_view()),
+    path('impersonate-user/', ImperEnv.as_view()),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if os.getenv('DEBUG', False):

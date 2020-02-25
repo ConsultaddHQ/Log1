@@ -13,7 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_team(self):
-        return self.team.name
+            return self.team.name
 
 
 # Login
