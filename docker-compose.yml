@@ -7,17 +7,24 @@ services:
     ports:
       - 80:80
     volumes:
-      - ./src:/src
-      - ./config:/etc/nginx/conf.d
+      - ./config/nginx/conf.d:/etc/nginx/conf.d
     depends_on:
       - web
+    networks:
+      - nginx_network
 
-  web:
-    container_name: log1
+  djangoapp:
+    container_name: log1_v2
     build: .
     volumes:
       - ./:/usr/src/log1/
     ports:
-      - 8000:8000
+      - 8001:8001
     env_file:
       - ./.env
+    networks:
+      - nginx_network
+
+networks:
+  nginx_network:
+    driver: bridge

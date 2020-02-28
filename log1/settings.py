@@ -1,6 +1,5 @@
 import os
 import logging.config
-from dotenv import load_dotenv
 from environs import Env
 from collections import OrderedDict
 
@@ -10,10 +9,9 @@ SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
 # Reading env file
 project_folder = os.path.expanduser(BASE_DIR)
-load_dotenv(os.path.join(project_folder, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', False)
+DEBUG = env('DEBUG', False)
 
 ALLOWED_HOSTS = ['*']
 
