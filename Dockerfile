@@ -18,3 +18,7 @@ RUN pip install -r requirements/base.txt
 
 # copy project
 COPY . /usr/src/log1/
+
+# Docker entry point
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/usr/src/log1/entrypoint.sh"]
