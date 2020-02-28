@@ -68,9 +68,9 @@ class UserManager(BaseUserManager):
 
 
 class Team(models.Model):
-    email = models.EmailField(_('Company Email'))
-    name = models.CharField(_('Company Name'), max_length=50)
-    address = models.CharField(_('Company Address'), max_length=300, blank=True)
+    name = models.CharField(_('Name'), max_length=50)
+    email = models.EmailField(_('Email'), null=True, blank=True)
+    dept = models.CharField(_('Department'), max_length=20, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -109,7 +109,7 @@ class User(AbstractUser, PermissionsMixin):
         app_label = 'employee'
 
     def __str__(self):
-        return self.email
+        return f'{self.id}:{self.email}'
 
     @property
     def roles(self):
@@ -160,7 +160,7 @@ class ResetPasswordToken(models.Model):
         return super(ResetPasswordToken, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.user} : {self.key}'
+        return f'{self.user}-{self.key}'
 
 
 def get_password_reset_token_expiry_time():
@@ -205,32 +205,3 @@ class Asset(TimeStampedModel):
 
     def __str__(self):
         return self.owner.employee_name
-
-
-class Organization(TimeStampedModel):
-    active = models.BooleanField(_('Active'), default=True)
-    name = models.CharField(_('organization Name'), max_length=30)
-
-    def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
-        if not self.id:
-            self.created = timezone.now()
-        self.modified = timezone.now()
-        return super(Organization, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return self.name
-
-
-class OrganizationAPIKey(APIKey):
-    organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,
-        related_name="api_keys",
-    )
-
-    class Meta(APIKey.Meta):
-        verbose_name = "Organization API key"
-        verbose_name_plural = "Organization API keys"

@@ -9,6 +9,7 @@ class APIKeyModelAdmin(admin.ModelAdmin):
     list_display = (
         "prefix",
         "name",
+        "api_key",
         "hashed_key",
         "created",
         "expiry_date",
@@ -31,11 +32,11 @@ class APIKeyModelAdmin(admin.ModelAdmin):
 
         if created:
             key = self.model.objects.assign_key(obj)
+            obj.api_key = key
             obj.save()
             message = (
                     "The API key for {} is: {}. ".format(obj.name, key)
-                    + "Please store it somewhere safe: "
-                    + "you will not be able to see it again."
+                    + "Please store it somewhere safe"
             )
             messages.add_message(request, messages.WARNING, message)
         else:
@@ -43,5 +44,3 @@ class APIKeyModelAdmin(admin.ModelAdmin):
 
 
 admin.site.register(APIKey, APIKeyModelAdmin)
-
-APIKeyAdmin = APIKeyModelAdmin

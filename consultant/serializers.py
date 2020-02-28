@@ -34,7 +34,7 @@ class ConsultantLoginSerializer(UserSerializer):
 class ConsultantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
-        fields = '__all__'
+        exclude = ('password',)
 
 
 class ConsultantUpdateSerializer(serializers.ModelSerializer):
@@ -52,7 +52,7 @@ class POCSerializer(serializers.ModelSerializer):
 class ConsultantMarketingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantMarketing
-        exclude = ('id', 'cycle', 'teams', 'marketer', 'created', 'modified')
+        exclude = ('teams', 'marketer', 'created', 'modified')
 
 
 class ConsultantMarketingSerializer(serializers.ModelSerializer):
@@ -66,7 +66,8 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantMarketing
-        fields = ('id', 'teams', 'marketer', 'in_pool', 'rtg', 'start', 'end', 'preferred_location', 'primary_marketer')
+        fields = ('id', 'teams', 'marketer', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
+                  'primary_marketer')
 
 
 class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
@@ -107,6 +108,8 @@ class FeedbackDetailsSerializer(serializers.ModelSerializer):
 
 class ConsultantFeedbackSerializer(serializers.ModelSerializer):
     feedback = FeedbackDetailsSerializer()
+    given_by = POCSerializer()
+    created_by = POCSerializer()
 
     class Meta:
         model = ConsultantFeedback
@@ -131,6 +134,24 @@ class ConsultantCreateProfileSerializer(serializers.ModelSerializer):
                   'linkedin', 'current_city', 'profile_owner')
 
 
+class ConsultantSubmissionSerializer(serializers.ModelSerializer):
+    profiles = serializers.SerializerMethodField()
+    marketing_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'email', 'status', 'profiles', 'marketing_id')
+
+    def get_profiles(self, obj):
+        return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
+
+    def get_marketing_id(self, obj):
+        queryset = obj.marketing.filter(status='open')
+        if queryset:
+            return queryset.first().id
+        return None
+
+
 class ConsultantBenchSerializer(serializers.ModelSerializer):
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
@@ -141,6 +162,12 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
     rate = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
+                  'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
+                  'profiles', 'education', 'experience', 'rate', 'marketing')
 
     @staticmethod
     def get_work_auth(self):
@@ -167,7 +194,11 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_marketing(self):
-        return ConsultantMarketingSerializer(self.marketing.filter(end=None), many=True).data[0]
+        marketing = self.marketing.filter(status='open')
+        if marketing:
+            return ConsultantMarketingSerializer(marketing, many=True).data[0]
+        else:
+            return None
 
     @staticmethod
     def get_recruiter(self):
@@ -213,12 +244,6 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             }
             return data
         return None
-
-    class Meta:
-        model = Consultant
-        fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
-                  'profiles', 'education', 'experience', 'rate', 'marketing')
 
 
 class ConsultantListSerializer(serializers.ModelSerializer):

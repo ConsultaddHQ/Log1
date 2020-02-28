@@ -13,10 +13,14 @@ class ConsultantIsAuthenticated(BasePermission):
 
     def has_permission(self, request, view):
         auth = get_authorization_header(request).split()
-        key = auth[1].decode()
-        try:
-            consultant_token = ConsultantToken.objects.select_related('consultant').get(key=key)
-        except ConsultantToken.DoesNotExist:
-            raise exceptions.AuthenticationFailed('Invalid token.')
-        if consultant_token.consultant and consultant_token.consultant.is_authenticated:
-            return consultant_token.consultant
+        if len(auth) > 0:
+            key = auth[1].decode()
+            try:
+                consultant_token = ConsultantToken.objects.select_related('consultant').get(key=key)
+            except ConsultantToken.DoesNotExist:
+                raise exceptions.AuthenticationFailed('Invalid token.')
+            if consultant_token.consultant and consultant_token.consultant.is_authenticated:
+                return consultant_token.consultant
+        else:
+            None
+

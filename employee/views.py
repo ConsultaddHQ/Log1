@@ -1,6 +1,6 @@
 import logging
-from datetime import timedelta
 from django.utils import timezone
+from datetime import timedelta, datetime
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
@@ -8,11 +8,11 @@ from django.utils.translation import ugettext_lazy as _
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, exceptions, viewsets
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
 from employee.serializers import *
 from employee.models import Role, Team
@@ -73,20 +73,31 @@ class EmployeeAuthViewSets(GenericViewSet):
             return Response({"error": "Employee Id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
         user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
         if user:
+            user.last_login = datetime.now()
+            user.save()
             return Response({"result": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
         logger.error("Incorrect Employee Id/Password")
         return Response({"error": "Incorrect Employee Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class EmployeeViewSets(GenericViewSet, ListModelMixin):
+class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            user = get_object_or_404(User, id=kwargs.get('pk'))
+            serializer = self.serializer_class(user)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', None)
+            query = request.query_params.get('query', '')
             user_type = request.query_params.get('type', None)
             if user_type:
                 users = User.objects.filter(role__name=user_type)
@@ -111,7 +122,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin):
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
-        teams = Team.objects.all().values('id', 'name', 'address')
+        teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
         return Response({"results": teams}, status=status.HTTP_200_OK)
 
     @action(methods=['post'], detail=False, url_path='change_password')
@@ -170,7 +181,6 @@ class ResetPasswordViewSets(GenericViewSet):
         ip = request.META['REMOTE_ADDR']
         for user in users:
             if user.is_active and user.has_usable_password():
-                token = None
                 if user.password_reset_tokens.all().count() > 0:
                     token = user.password_reset_tokens.all()[0]
                 else:

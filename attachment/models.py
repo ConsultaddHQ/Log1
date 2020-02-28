@@ -1,4 +1,5 @@
 import os
+import logging
 from django.db import models
 from django.utils import timezone
 from django.dispatch import receiver
@@ -8,6 +9,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 
 from employee.models import User
 from utils_app.models import TimeStampedModel
+
+logger = logging.getLogger(__name__)
 
 ATTACHMENT_TYPE = (
     ('ssn', 'SSN'),
@@ -36,6 +39,22 @@ def attachment_upload(instance, filename):
         pk=instance.content_object.pk,
         filename=filename,
     )
+
+
+def create_attachment(data):
+    try:
+        content_type = ContentType.objects.get(model=data['model'])
+        Attachment.objects.create(
+            creator=data['creator'],
+            content_type=content_type,
+            object_id=data['object_id'],
+            attachment_file=data['file'],
+            attachment_type=data['type'],
+        )
+        return True
+    except Exception as error:
+        logger.error(error)
+        return False
 
 
 class AttachmentManager(models.Manager):

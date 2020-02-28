@@ -9,7 +9,7 @@ from consultant.models import Consultant
 from attachment.models import Attachment, attachment_upload
 from utils_app.models import TimeStampedModel
 
-PROJECT_CHOICES = (
+PROJECT_STATUS_CHOICES = (
     ("new", "New"),
     ("other", "Other"),
     ("joined", "Joined"),
@@ -65,11 +65,10 @@ class Project(TimeStampedModel):
     duration = models.CharField(_('Duration'), max_length=50, null=True, blank=True)
     reporting_details = models.TextField(_('Reporting Details'), null=True, blank=True)
     invoicing_period = models.IntegerField(_('Invoicing Period'), null=True, blank=True)
-    status = models.CharField(
-        _('Status'), max_length=50,
-        choices=PROJECT_CHOICES,
-        default='new', null=True, blank=True
-    )
+    is_msg_sent = models.BooleanField(
+        _('Is Message Sent'),
+        help_text='Message sent on Offer-announcement channel ?',
+        default=False)
     submission = models.OneToOneField(
         Submission, on_delete=models.PROTECT,
         related_name='project',
@@ -77,8 +76,9 @@ class Project(TimeStampedModel):
     )
     consultant = models.ForeignKey(
         Consultant, on_delete=models.PROTECT,
+        null=True, blank=True,
         related_name='projects',
-        verbose_name='Consultant'
+        verbose_name='Consultant',
     )
 
     def save(self, *args, **kwargs):
@@ -89,15 +89,32 @@ class Project(TimeStampedModel):
         return super(Project, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.consultant.name
+        if self.consultant:
+            return f'{self.id}: {self.consultant.name}'
+        return f'{self.id}'
 
     @property
     def marketer_name(self):
-        return self.submission.lead.marketer.employee_name
+        return self.submission.created_by.employee_name
 
-    @property
-    def consultant_name(self):
-        return self.submission.lead.marketer.employee_name
+
+class ProjectStatus(models.Model):
+    is_current = models.BooleanField(_('Is Current'), default=True)
+    created = models.DateTimeField(_('Created'), default=timezone.now)
+    status = models.CharField(
+        _('Status'),
+        default='new', max_length=50,
+        choices=PROJECT_STATUS_CHOICES,
+    )
+    project = models.ForeignKey(
+        Project, on_delete=models.PROTECT,
+        related_name='statuses',
+        verbose_name='Project'
+    )
+
+    class Meta:
+        ordering = ('project',)
+        verbose_name_plural = 'Project Statuses'
 
 
 class ProjectSupport(TimeStampedModel):
@@ -124,27 +141,29 @@ class ProjectSupport(TimeStampedModel):
         return super(ProjectSupport, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.project.submission.consultant.name} - {self.support.employee_name}'
+        return f'{self.id}:{self.project.submission.consultant.name} - {self.support.employee_name}'
 
 
 class TimeSheet(TimeStampedModel):
     attachments = GenericRelation(Attachment)
     end = models.DateField(_('End'), null=True, blank=True)
     start = models.DateField(_('Start'), null=True, blank=True)
+    is_active = models.BooleanField(_('Is Active'), default=True)
+    remark = models.TextField(_("Remark"), null=True, blank=True)
     hours = models.FloatField(max_length=20, null=True, blank=True)
     additional_hours = models.FloatField(max_length=20, null=True, blank=True, default=0)
     status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS, default='draft')
-    project = models.ForeignKey(
-        Project, on_delete=models.PROTECT,
-        related_name='timesheets',
-        verbose_name='Consultant'
-    )
-    edited_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
-    edited_by = models.ForeignKey(
+    status_updated_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
+    status_updated_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='timesheet_edits',
         verbose_name='Edited BY',
         null=True, blank=True
+    )
+    project = models.ForeignKey(
+        Project, on_delete=models.PROTECT,
+        related_name='timesheets',
+        verbose_name='Project'
     )
 
     def save(self, *args, **kwargs):
@@ -157,4 +176,15 @@ class TimeSheet(TimeStampedModel):
         return super(TimeSheet, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.project.consultant.name} - {self.hours}'
+        return f'{self.id}:{self.project.consultant.name} - {self.hours}'
+
+
+class PayrollSchedule(models.Model):
+    pay_date = models.DateField(_('Pay Date'))
+    pay_day = models.CharField(_('Pay day'), max_length=20)
+    processing_date = models.DateField(_('Processing Date'))
+    pay_period_end = models.DateField(_('Pay Period End Date'))
+    pay_period_start = models.DateField(_('Pay Period Start Date'))
+
+    def __str__(self):
+        return f'{self.processing_date} :: {self.pay_period_start} - {self.pay_period_end} :: {self.pay_date}'

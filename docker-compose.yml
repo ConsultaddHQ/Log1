@@ -1,27 +1,30 @@
 version: '3.7'
 
 services:
-  db:
-    container_name: db
-    image: postgres:12.0-alpine
+  nginx:
+    image: nginx:latest
+    container_name: ng01
+    ports:
+      - 80:80
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_USER=projectx
-      - POSTGRES_PASSWORD=consultadd
-      - POSTGRES_DB=log1_db
+      - ./config/nginx/conf.d:/etc/nginx/conf.d
+    depends_on:
+      - web
+    networks:
+      - nginx_network
 
-  web:
-    container_name: log1
+  djangoapp:
+    container_name: log1_v2
     build: .
     volumes:
       - ./:/usr/src/log1/
     ports:
-      - 8000:8000
-    depends_on:
-      - db
+      - 8001:8001
     env_file:
       - ./.env
+    networks:
+      - nginx_network
 
-volumes:
-  postgres_data:
+networks:
+  nginx_network:
+    driver: bridge

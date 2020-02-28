@@ -16,8 +16,8 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         projects = Project.objects.filter(
-            Q(end_date=None, status='joined') |
-            Q(end_date__gte=timezone.now())
+            Q(end_date=None, statuses__status='joined', statuses__is_current=True) |
+            Q(end_date__gte=timezone.now(), statuses__is_current=True)
         )
         end_date = datetime.today().date()
         for project in projects:

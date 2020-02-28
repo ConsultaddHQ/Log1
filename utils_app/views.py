@@ -1,14 +1,32 @@
-from discord_webhook import DiscordWebhook, DiscordEmbed
+import json
+import logging
+import requests
+from datetime import datetime, date, timedelta
 
-from rest_framework import status
-from datetime import date, timedelta
+from django.db import transaction
+from rest_framework import status, viewsets
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
+from constance import config
 from utils_app.models import City
+from employee.models import User, Team
+from utils_app.models import City, ScrumMeeting
+from employee.serializers import UserSerializer
+from marketing.models import Submission, Interview
+from project.models import Project, PROJECT_STATUS_CHOICES
+from consultant.models import Consultant, ConsultantMarketing
+
+logger = logging.getLogger(__name__)
+
+
+def mattermost_webhook(url, data):
+    headers = {'Content-Type': 'application/json'}
+    requests.post(url, headers=headers, data=json.dumps(data))
 
 
 class CityViewSets(ListModelMixin, GenericViewSet):
@@ -23,42 +41,12 @@ class CityViewSets(ListModelMixin, GenericViewSet):
         return Response({"results": data}, status=status.HTTP_200_OK)
 
 
-def get_time_filter(queryset, filter_by):
-    if filter_by == 'today':
-        queryset = queryset.filter(created__gte=date.today())
+class UtilsViewSets(GenericViewSet):
+    queryset = City.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
-    elif filter_by == 'last_day':
-        today = date.today()
-        day = date.today().weekday()
-        if day == 0:
-            last_day = today - timedelta(days=3)
-        else:
-            last_day = today - timedelta(days=1)
-        queryset = queryset.filter(created__gte=last_day)
-
-    elif filter_by == 'week':
-        today = date.today()
-        start_of_week = today - timedelta(today.weekday())
-        queryset = queryset.filter(created__gte=start_of_week)
-
-    elif filter_by == 'last_month':
-        last = date.today().replace(day=1) - timedelta(days=1)
-        first = last.replace(day=1)
-        queryset = queryset.filter(created__range=[first, last])
-
-    elif filter_by == 'this_month':
-        first = date.today().replace(day=1)
-        last = date.today()
-        queryset = queryset.filter(created__range=[first, last])
-
-    return queryset
-
-
-# Webhook function for Discord App
-def discord_webhook(username, content, text, url):
-    webhook = DiscordWebhook(url=url, username=username,
-                             content=content)
-    embed = DiscordEmbed(description=text, color=242424)
-
-    webhook.add_embed(embed)
-    webhook.execute()
+    @action(methods=['get'], detail=False, url_path='project/statuses')
+    def project_statuses(self, request):
+        data = [{"name": x} for x, y in PROJECT_STATUS_CHOICES if x not in ['offer', 'paper_work', 'cancelled']]
+        return Response({"results": data}, status=status.HTTP_200_OK)

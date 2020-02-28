@@ -23,10 +23,9 @@ class UserSerializerLogin(UserSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'last_login')
+        fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'is_superuser')
 
-    @staticmethod
-    def get_token(user):
+    def get_token(self, user):
         token, created = Token.objects.get_or_create(user=user)
         return token.key
 
@@ -38,7 +37,7 @@ class UserSerializerLogin(UserSerializer):
 class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
-        fields = ('id', 'name')
+        fields = ('id', 'name', 'dept')
 
 
 class EmailSerializer(serializers.Serializer):

@@ -1,16 +1,17 @@
 import os
 import logging.config
-from dotenv import load_dotenv
+from environs import Env
+from collections import OrderedDict
 
+env = Env()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
 # Reading env file
 project_folder = os.path.expanduser(BASE_DIR)
-load_dotenv(os.path.join(project_folder, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', False)
+DEBUG = env('DEBUG', False)
 
 ALLOWED_HOSTS = ['*']
 
@@ -31,23 +32,25 @@ THIRD_PARTY_APPS = [
 
     'storages',
     'explorer',
+    'constance',
     'corsheaders',
-    'notifications',
+    'notification',
     'rest_framework_swagger',
-
+    'constance.backends.database',
 ]
 
 PROJECT_APPS = [
-    'api_key',
-    'utils_app',
-    'employee',
-    'attachment',
-    'consultant',
-    'marketing',
-    'project',
-    'jd_parser',
-    'activity',
-    'ckiller',
+    'api_key.apps.ApiKeyConfig',
+    'utils_app.apps.UtilsAppConfig',
+    'employee.apps.EmployeeConfig',
+    'attachment.apps.AttachmentConfig',
+    'consultant.apps.ConsultantConfig',
+    'marketing.apps.MarketingConfig',
+    'project.apps.ProjectConfig',
+    'jd_parser.apps.JdParserConfig',
+    'activity.apps.ActivityConfig',
+    'ckiller.apps.CkillerConfig',
+    'report.apps.ReportConfig'
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -88,11 +91,11 @@ WSGI_APPLICATION = 'log1.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.environ.get('DB_NAME', ''),
-        'USER': os.environ.get('DB_USER', ''),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'consultadd'),
+        'NAME': env('DB_NAME', ''),
+        'USER': env('DB_USER', ''),
+        'PORT': env('DB_PORT', '5432'),
+        'HOST': env('DB_HOST', 'localhost'),
+        'PASSWORD': env('DB_PASSWORD', 'consultadd'),
     }
 }
 
@@ -104,19 +107,21 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
+REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'}
+
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
 
 # Send Grid Configuration
 
 EMAIL_USE_TLS = True
-EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)
-EMAIL_HOST = os.environ.get('EMAIL_HOST', None)
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', None)
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_API_KEY', None)
+EMAIL_PORT = env('EMAIL_PORT', 587)
+EMAIL_HOST = env('EMAIL_HOST', None)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', None)
+EMAIL_HOST_PASSWORD = env('EMAIL_API_KEY', None)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'consultadd.com')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', 'consultadd.com')
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -138,11 +143,11 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
 # Media files Storage location (Documents)
-if os.environ.get('ENV') == 'prod' or os.environ.get('ENV') == 'dev':
+if env('ENV') == 'prod' or env('ENV') == 'dev':
     AWS_DEFAULT_ACL = None
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
@@ -201,4 +206,28 @@ CELERY_TASK_ALWAYS_EAGER = False
 # Notifications settings
 NOTIFICATIONS_CHANNELS = {
     'websocket': 'notification_utils.channels.BroadCastWebSocketChannel'
+}
+
+# Constance Config
+
+CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
+
+CONSTANCE_CONFIG = OrderedDict([
+    ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
+    ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
+    ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
+    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
+    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
+    ('SUPERADMIN', ('sudeep.b@consultadd.com', "Sudeep's email id")),
+    ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "MatterMost")),
+    ('offer_failure', ('https://mm.consultadd.com/hooks/n1j5juob5ffnfj93kehbzapeih', "MatterMost")),
+    ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "MatterMost")),
+    ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "MatterMost")),
+    ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "MatterMost")),
+    ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "MatterMost")),
+])
+
+CONSTANCE_CONFIG_FIELDSETS = {
+    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN'),
+    'Web Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url'),
 }
