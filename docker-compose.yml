@@ -1,6 +1,17 @@
 version: '3.7'
 
 services:
+  nginx:
+    image: nginx:latest
+    container_name: ng01
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/src
+      - ./config:/etc/nginx/conf.d
+    depends_on:
+      - web
+
   db:
     container_name: db
     image: postgres:12.0-alpine
@@ -14,6 +25,7 @@ services:
   web:
     container_name: log1
     build: .
+    command: bash -c "mkdir -p media && python manage.py collectstatic --noinput && python manage.py makemigrations && python manage.py migrate && gunicorn log1.wsgi -b 0.0.0.0:8000 --workers 4"
     volumes:
       - ./:/usr/src/log1/
     ports:
@@ -22,6 +34,3 @@ services:
       - db
     env_file:
       - ./.env
-
-volumes:
-  postgres_data:

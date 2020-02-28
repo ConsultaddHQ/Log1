@@ -19,6 +19,7 @@ from marketing.serializers import *
 from utils_app.utils import get_time_filter
 from consultant.models import ConsultantProfile
 from utils_app.utils import post_msg_using_webhook
+from notification.views import create_notification
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
@@ -50,7 +51,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
-        if not ('admin' in request.user.roles and 'superadmin' in request.user.roles):
+        if not ('admin' in request.user.roles or 'superadmin' in request.user.roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         queryset = VendorCompany.objects.filter(name__iexact=request.data.get('name', None))
         if queryset:
@@ -514,6 +515,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             lead_id = request.data.get('lead', None)
             lead = get_object_or_404(Lead, id=lead_id)
+
             if not lead_id:
                 lead = Lead.objects.create(
                     owner=request.user,
@@ -525,6 +527,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 )
                 lead_id = lead.id
             sub = create_submission(request, lead_id)
+
             data = {
                 "id": sub.id,
                 "status": sub.status,
@@ -845,7 +848,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @transaction.atomic
     def create(self, request, *args, **kwargs):
         submission_id = request.data['submission']
         try:
@@ -895,12 +897,16 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 supervisor = interview.supervisor.email
                 scrum_master = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
                 guest = [{"email": user.email} for user in interview.guest.all()]
+                user_list = [user for user in interview.guest.all()]
                 attendees = [
                                 {'email': supervisor},
                                 {'email': request.user.email},
                                 {"email": "bbookingg@gmail.com"},
                             ] + guest
+                user_list.append(interview.supervisor)
+
                 for user in scrum_master:
+                    user_list.append(user)
                     attendees.append({"email": user.email})
 
                 # Calendar booking start and end time
@@ -960,6 +966,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'screening_type',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name', 'job_title',
                          'submission_id', 'interview_mode')
+                # Creating Notification
+                notification_data = {
+                    'category': 'info',
+                    'description': title,
+                    'target_id': interview.id,
+                    'target_type': 'interview',
+                    'sender_user_type': 'user',
+                    'sender_id': request.user.id,
+                    'recipient_user_type': 'user',
+                    'title': 'New Interview Created',
+                }
+                create_notification(user_list, notification_data)
                 return Response({"result": data[0], 'event_id': cal_res['id']}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -993,6 +1011,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 cal_res = {
                     'id': 'error'
                 }
+                scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+                user_list = [user for user in interview.guest.all()]
+                user_list.append(interview.supervisor)
+                for user in scrum_masters:
+                    user_list.append(user)
+                title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
+                        {interview.get_screening_type_display()} :: 
+                        {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
+                        {interview.submission.client} :: {interview.consultant.name} :: 
+                        {interview.marketer.employee_name}"""
+
                 if status_change == 'false':
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
@@ -1019,18 +1048,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         {'email': request.user.email},
                         {'email': 'bbookingg@gmail.com'},
                     ]
-                    scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+
                     for user in scrum_masters:
                         attendees.append({'email': user.email})
                     guest = [{"email": user.email} for user in interview.guest.all()]
                     if len(guest) > 0:
                         attendees = attendees + guest
-
-                    title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
-                            {interview.get_screening_type_display()} :: 
-                            {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
-                            {interview.submission.client} :: {interview.consultant.name} :: 
-                            {interview.marketer.employee_name}"""
 
                     sub = interview.submission
 
@@ -1071,7 +1094,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'job_title', 'submission_id',
                          'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
-
+                notification_data = {
+                    'category': 'info',
+                    'description': title,
+                    'target_id': interview.id,
+                    'target_type': 'interview',
+                    'sender_user_type': 'user',
+                    'title': 'Interview Updated',
+                    'sender_id': request.user.id,
+                    'recipient_user_type': 'user',
+                }
+                create_notification(user_list, notification_data)
                 return Response({"result": data[0], "event_id": cal_res['id']}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -1104,6 +1137,28 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.submission.status = 'sub'
             interview.submission.is_active = True
             interview.submission.save()
+            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+            user_list = [user for user in interview.guest.all()]
+            user_list.append(interview.supervisor)
+            for user in scrum_masters:
+                user_list.append(user)
+            title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
+                                    {interview.get_screening_type_display()} :: 
+                                    {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
+                                    {interview.submission.client} :: {interview.consultant.name} :: 
+                                    {interview.marketer.employee_name}"""
+
+            notification_data = {
+                'category': 'info',
+                'description': title,
+                'target_id': interview.id,
+                'target_type': 'interview',
+                'sender_user_type': 'user',
+                'title': 'Interview Cancelled',
+                'sender_id': request.user.id,
+                'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             logger.error(error)

@@ -146,7 +146,7 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
         return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
     def get_marketing_id(self, obj):
-        queryset = obj.marketing.filter(end=None)
+        queryset = obj.marketing.filter(status='open')
         if queryset:
             return queryset.first().id
         return None
@@ -194,7 +194,11 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_marketing(self):
-        return ConsultantMarketingSerializer(self.marketing.filter(end=None), many=True).data[0]
+        marketing = self.marketing.filter(status='open')
+        if marketing:
+            return ConsultantMarketingSerializer(marketing, many=True).data[0]
+        else:
+            return None
 
     @staticmethod
     def get_recruiter(self):
