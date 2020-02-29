@@ -1,8 +1,6 @@
-image: python:3.7
-
 stages:
   - build
-  - test
+  - deploy
 
 cache:
   paths:
@@ -10,15 +8,25 @@ cache:
 
 
 build:
+  image: python:3.7
   stage: build
-
-  variables:
-    GIT_STRATEGY: none
   script:
-  - apt-get update
-  - mkdir -p media
-  - pip install --upgrade pip
-  - pip install -r requirements.txt
-  - python manage.py collectstatic --noinput
+    - echo "Building Project"
+    - sudo apt-get update
+    - mkdir -p media
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+    - python manage.py collectstatic --noinput
 
+
+production:
+  stage: deploy
+  only:
+    - dev
+  script:
+    - echo "Deploying"
+    - python manage.py runserver 0.0.0.0:8000
+  artifacts:
+    paths:
+        - log1/
 
