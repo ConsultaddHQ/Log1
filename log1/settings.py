@@ -1,5 +1,6 @@
 import os
 import logging.config
+from dotenv import load_dotenv
 from environs import Env
 from collections import OrderedDict
 
@@ -9,9 +10,10 @@ SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
 # Reading env file
 project_folder = os.path.expanduser(BASE_DIR)
+load_dotenv(os.path.join(project_folder, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG', False)
+DEBUG = os.environ.get('DEBUG', False)
 
 ALLOWED_HOSTS = ['*']
 
@@ -91,11 +93,11 @@ WSGI_APPLICATION = 'log1.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': env('DB_NAME', ''),
-        'USER': env('DB_USER', ''),
-        'PORT': env('DB_PORT', '5432'),
-        'HOST': env('DB_HOST', 'localhost'),
-        'PASSWORD': env('DB_PASSWORD', 'consultadd'),
+        'NAME': os.environ.get('DB_NAME', ''),
+        'USER': os.environ.get('DB_USER', ''),
+        'PORT': os.environ.get('DB_PORT', '5432'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'consultadd'),
     }
 }
 
@@ -115,13 +117,13 @@ CORS_ORIGIN_ALLOW_ALL = True
 # Send Grid Configuration
 
 EMAIL_USE_TLS = True
-EMAIL_PORT = env('EMAIL_PORT', 587)
-EMAIL_HOST = env('EMAIL_HOST', None)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', None)
-EMAIL_HOST_PASSWORD = env('EMAIL_API_KEY', None)
+EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', None)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', None)
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_API_KEY', None)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', 'consultadd.com')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'consultadd.com')
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
@@ -143,11 +145,11 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
 # Media files Storage location (Documents)
-if env('ENV') == 'prod' or env('ENV') == 'dev':
+if os.environ.get('ENV') == 'prod' or os.environ.get('ENV') == 'dev':
     AWS_DEFAULT_ACL = None
-    AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
     AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',

@@ -1,0 +1,25 @@
+image: ubuntu:18.04
+
+stages:
+  - build
+  - test
+
+cache:
+  paths:
+  - ~/.cache/pip/
+
+
+build:
+  stage: build
+
+  variables:
+    GIT_STRATEGY: none
+  script:
+  - apt-get update
+  - apt-get install -y python3-pip
+  - mkdir -p media
+  - pip install --upgrade pip
+  - pip install -r requirements/base.txt
+  - python manage.py collectstatic --noinput
+
+
