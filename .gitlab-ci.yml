@@ -1,4 +1,4 @@
-image: ubuntu:18.04
+image: python:3.7
 
 stages:
   - build
@@ -16,7 +16,6 @@ build:
     GIT_STRATEGY: none
   script:
   - apt-get update
-  - apt-get install -y python3-pip
   - mkdir -p media
   - pip install --upgrade pip
   - pip install -r requirements/base.txt
