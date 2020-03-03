@@ -481,13 +481,13 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 query = query.strip()
                 sub = sub.filter(
                     Q(created_by=request.user) &
-                    (Q(client__icontains=query) |
-                     Q(lead__location__icontains=query) |
-                     Q(lead__job_title__icontains=query) |
-                     Q(vendors__company__name__icontains=query) |
+                    (Q(client__istartswith=query) |
+                     Q(lead__city__istartswith=query) |
+                     Q(lead__job_title__istartswith=query) |
+                     Q(vendors__company__name__istartswith=query) |
                      Q(created_by__employee_name__istartswith=query) |
-                     Q(lead__vendor_company__name__icontains=query) |
-                     Q(consultant_marketing__consultant__name__icontains=query)
+                     Q(lead__vendor_company__name__istartswith=query) |
+                     Q(consultant_marketing__consultant__name__istartswith=query)
                      )
                 )
 
@@ -829,11 +829,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if query:
                 query = query.strip()
                 queryset = queryset.filter(
-                    Q(submission__client__icontains=query) |
-                    Q(submission__lead__vendor_company__name__icontains=query) |
+                    Q(submission__client__istartswith=query) |
+                    Q(submission__lead__job_title__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__created_by__employee_name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                    Q(submission__consultant_marketing__consultant__name__icontains=query)
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
             queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')

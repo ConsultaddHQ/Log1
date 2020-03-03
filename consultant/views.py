@@ -532,15 +532,14 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 )
 
             consultants = consultants.order_by('id').distinct('id')
-            in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True).count()
-            on_bench = consultants.filter(marketing__status='open', marketing__in_pool=False).count()
+            in_pool = consultants.filter(marketing__status='open', status='on_bench', marketing__in_pool=True).count()
+            on_bench = consultants.filter(marketing__status='open', status='on_bench', marketing__in_pool=False).count()
             on_project = consultants.filter(status='on_project').count()
 
             count = {
-                "in_offer": 0,
                 "in_pool": in_pool,
+                "on_bench": on_bench,
                 "on_project": on_project,
-                "in_marketing": on_bench,
                 "total": in_pool + on_bench + on_project,
             }
 
@@ -548,7 +547,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             if con_status == 'in_pool':
                 consultants = consultants.filter(marketing__status='open', marketing__in_pool=True)
             else:
-                consultants = consultants.filter(status=con_status, marketing__in_pool=False)
+                consultants = consultants.filter(status=con_status, marketing__status='open', marketing__in_pool=False)
             poc = ConsultantPOC.objects.filter(
                 consultant=OuterRef("pk"), end=None, poc_type='recruiter')
 

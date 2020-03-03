@@ -311,8 +311,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             if query:
                 projects = projects.filter(
+                    Q(city__istartswith=query) |
                     Q(consultant__name__istartswith=query) |
                     Q(submission__client__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__created_by__employee_name__istartswith=query)
                 )
 
