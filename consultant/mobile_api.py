@@ -77,7 +77,7 @@ class ConsultantAuthViewSets(GenericViewSet):
                 fcm_device.save()
                 project_data = Project.objects.filter(
                     consultant=consultant,
-                    status='joined'
+                    statuses_status='joined'
                 ).annotate(
                     client=F('submission__client'),
                     employer=F('submission__employer')

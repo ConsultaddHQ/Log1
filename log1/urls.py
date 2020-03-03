@@ -12,6 +12,8 @@ from utils_app.views import CityViewSets
 
 from report.views import ScrumMeetingReport
 
+from ckiller.views import CkillerSubmissionViewSet
+
 from attachment.views import AttachmentView, AttachmentGetView
 
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets
@@ -71,6 +73,8 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'city', CityViewSets)
 
 router.register(r'report', ScrumMeetingReport)
+
+router.register(r'ckiller_data', CkillerSubmissionViewSet)
 
 router.register(r'emp_notify', ScrumMeetingReport)
 router.register(r'con_notify', ScrumMeetingReport)

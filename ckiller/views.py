@@ -43,7 +43,7 @@ class CkillerSubmissionSerializer(serializers.ModelSerializer):
                   'marketer', 'consultant', 'created', 'vendor', 'client', 'rate', 'marketing_email', 'marketing_phone')
 
 
-class CkillerSubmissionView(viewsets.ModelViewSet):
+class CkillerSubmissionViewSet(viewsets.ModelViewSet):
     queryset = CkillerSubmission.objects.all()
     serializer_class = CkillerSubmissionSerializer
     authentication_classes = (TokenAuthentication,)

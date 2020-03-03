@@ -514,7 +514,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if not res:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             lead_id = request.data.get('lead', None)
-            lead = get_object_or_404(Lead, id=lead_id)
 
             if not lead_id:
                 lead = Lead.objects.create(
@@ -526,6 +525,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     vendor_company_id=request.data['vendor_company'],
                 )
                 lead_id = lead.id
+            else:
+                lead = get_object_or_404(Lead, id=lead_id)
+
             sub = create_submission(request, lead_id)
 
             data = {

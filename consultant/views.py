@@ -15,8 +15,8 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 from project.models import Project
 from consultant.serializers import *
 from marketing.models import Submission, Interview
-from attachment.serializers import AttachmentSerializer
-from activity.serializers import CommentSerializer, CommentGetSerializer
+from attachment.serializers import AttachmentURLSerializer
+from activity.serializers import CommentGetSerializer
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -444,7 +444,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
-            serializer = AttachmentSerializer(queryset, many=True)
+            serializer = AttachmentURLSerializer(queryset, many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -454,7 +454,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     def rate_revision(self, request, *args, **kwargs):
         if request.method == 'GET':
             try:
-                rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk'))
+                rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk')).order_by('-id')
                 data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback', 'consultant')
                 return Response({"results": data}, status=status.HTTP_200_OK)
             except Exception as error:
@@ -509,8 +509,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
         try:
             consultants = Consultant.objects.filter(
-                Q(marketing__status='open') |
-                Q(marketing__marketer=request.user)
+                Q(marketing__status='open')
             )
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
