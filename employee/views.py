@@ -98,9 +98,13 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def list(self, request, *args, **kwargs):
         try:
             query = request.query_params.get('query', '')
+            teams = request.query_params.get('teams', None)
             user_type = request.query_params.get('type', None)
             if user_type:
                 users = User.objects.filter(role__name=user_type)
+            elif teams:
+                teams = teams.split(",")
+                users = User.objects.filter(team__name__in=teams)
             elif user_type == 'team':
                 if 'superadmin' in request.user.roles:
                     users = User.objects.filter(role__name='marketer')
