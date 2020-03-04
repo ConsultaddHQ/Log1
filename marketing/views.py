@@ -415,8 +415,13 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            sub_id = kwargs.get('pk')
-            sub = get_object_or_404(Submission, id=sub_id)
+            if request.query_param.get('calendar', False):
+                calendar_id = kwargs.get('pk')
+                interview = get_object_or_404(Interview, calendar_id=calendar_id)
+                sub = interview.submission
+            else:
+                sub_id = kwargs.get('pk')
+                sub = get_object_or_404(Submission, id=sub_id)
             if sub.created_by == request.user:
                 serializer = SubmissionDetailSerializer(sub)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)

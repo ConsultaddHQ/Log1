@@ -149,19 +149,21 @@ def get_interviews(data):
                 visibility = False
                 data = {
                     "id": event["id"],
+                    "visibility": False,
                     "updated": event["updated"],
-                    "start": event["start"]["dateTime"],
                     "end": event["end"]["dateTime"],
+                    "start": event["start"]["dateTime"],
                 }
             else:
                 data = {
                     "id": event["id"],
-                    "title": event["summary"] if "summary" in event else "",
-                    "description": event["description"] if "description" in event else "",
+                    "visibility": True,
                     "created": event["created"],
                     "updated": event["updated"],
-                    "start": event["start"]["dateTime"],
                     "end": event["end"]["dateTime"],
+                    "start": event["start"]["dateTime"],
+                    "title": event["summary"] if "summary" in event else "",
+                    "description": event["description"] if "description" in event else "",
                     "attendees": [i["email"] for i in event["attendees"]] if "attendees" in event else [],
                     "attachments": [{"fileUrl": i["fileUrl"], "title": i["title"]} for i in
                                     event["attachments"]] if "attachments" in event else []

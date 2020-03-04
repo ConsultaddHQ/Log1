@@ -15,8 +15,8 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 from project.models import Project
 from consultant.serializers import *
 from marketing.models import Submission, Interview
-from attachment.serializers import AttachmentSerializer
-from activity.serializers import CommentSerializer, CommentGetSerializer
+from activity.serializers import CommentGetSerializer
+from attachment.serializers import AttachmentURLSerializer
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -267,7 +267,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         if request.method == 'POST':
             try:
                 data = request.data
-                Education.objects.create(
+                education = Education.objects.create(
                     city=data['city'],
                     title=data['title'],
                     major=data['major'],
@@ -278,7 +278,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                     start_date=data['start_date'],
                     consultant_id=kwargs.get('pk'),
                 )
-                return Response({"result": "created"}, status=status.HTTP_201_CREATED)
+                serializer = EducationSerializer(education)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -300,7 +301,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         if request.method == 'POST':
             try:
                 data = request.data
-                Experience.objects.create(
+                experience = Experience.objects.create(
                     city=data['city'],
                     title=data['title'],
                     remark=data['remark'],
@@ -310,7 +311,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                     start_date=data['start_date'],
                     consultant_id=kwargs.get('pk'),
                 )
-                return Response({"result": "created"}, status=status.HTTP_201_CREATED)
+                serializer = ExperienceSerializer(experience)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -333,15 +335,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
 
         try:
             consultant_id = kwargs.get('pk')
-            if marketing_stage == 'submission':
-                submissions = Submission.objects.filter(
-                    consultant_marketing__consultant_id=consultant_id,
-                    consultant_marketing__end=None
-                ).exclude(status='draft')
-                data, counts = self.get_submission_data(submissions, filter_by_status, first, last)
-                if counts == "error":
-                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
-            elif marketing_stage == 'interview':
+            if marketing_stage == 'interview':
                 interviews = Interview.objects.filter(
                     submission__consultant_marketing__consultant_id=consultant_id,
                     submission__consultant_marketing__status='open',
@@ -357,7 +351,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 data, counts = self.get_project_data(projects, filter_by_status, first, last)
                 if counts == "error":
                     return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({"results": data, "data_count": counts})
+            return Response({"results": data, "total": counts})
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -444,7 +438,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
-            serializer = AttachmentSerializer(queryset, many=True)
+            serializer = AttachmentURLSerializer(queryset, many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -454,7 +448,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
     def rate_revision(self, request, *args, **kwargs):
         if request.method == 'GET':
             try:
-                rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk'))
+                rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk')).order_by('-id')
                 data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback', 'consultant')
                 return Response({"results": data}, status=status.HTTP_200_OK)
             except Exception as error:
@@ -508,10 +502,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.filter(
-                Q(marketing__status='open') |
-                Q(marketing__marketer=request.user)
-            )
+            consultants = Consultant.objects.all()
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name)
@@ -521,7 +512,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 con_status = 'in_marketing'
                 consultants = consultants.filter(
                     current_city=location,
-                    marketing__status='open',
                 )
 
             # Consultants search based on name, email, recruiter and location
@@ -532,23 +522,28 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 )
 
             consultants = consultants.order_by('id').distinct('id')
-            in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True).count()
-            on_bench = consultants.filter(marketing__status='open', marketing__in_pool=False).count()
-            on_project = consultants.filter(status='on_project').count()
+            in_pool = consultants.filter(status='on_bench', marketing__in_pool=True)
+            in_marketing = consultants.filter(status='on_bench', marketing__status='open', marketing__in_pool=False)
+            candidate = consultants.filter(status='on_bench').exclude(marketing__status='open')
+            on_project = consultants.filter(status='on_project')
 
             count = {
-                "in_offer": 0,
-                "in_pool": in_pool,
-                "on_project": on_project,
-                "in_marketing": on_bench,
-                "total": in_pool + on_bench + on_project,
+                "in_pool": in_pool.count(),
+                "on_project": on_project.count(),
+                "in_marketing": in_marketing.count(),
+                "candidate": candidate.count() if candidate.count() > 0 else 0
             }
 
             # Filter Consultant by status and In pool
-            if con_status == 'in_pool':
-                consultants = consultants.filter(marketing__status='open', marketing__in_pool=True)
-            else:
-                consultants = consultants.filter(status=con_status, marketing__in_pool=False)
+            if con_status == 'in_marketing':
+                consultants = in_marketing
+            elif con_status == 'in_pool':
+                consultants = in_pool
+            elif con_status == 'candidate':
+                consultants = candidate
+            elif con_status == 'on_project':
+                consultants = on_project
+
             poc = ConsultantPOC.objects.filter(
                 consultant=OuterRef("pk"), end=None, poc_type='recruiter')
 
