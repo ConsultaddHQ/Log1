@@ -81,7 +81,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def support_mail(start_date, submission, scrum_master):
+    def support_mail(self, start_date, submission, scrum_master):
         try:
             path, recordings = [], []
             resume = submission.attachments.filter(attachment_type='resume')
@@ -373,17 +373,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'], is_active=True)
                 scrum_masters = [{"email": user.email} for user in queryset]
 
-                support_mail_res, support_mail_error = self.support_mail(sub, scrum_masters)
-                offer_mail_res, offer_mail_error = self.send_offer_received_mail(sub, scrum_masters)
-                if support_mail_error == 'error' or offer_mail_error == 'error':
-                    logger.error(support_mail_res)
-                    logger.error(offer_mail_res)
-                    return Response({"error": "error", "support_mail_error": str(offer_mail_error),
-                                     "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
+                # support_mail_res, support_mail_error = self.support_mail(sub, scrum_masters)
+                # offer_mail_res, offer_mail_error = self.send_offer_received_mail(sub, scrum_masters)
+                # if support_mail_error == 'error' or offer_mail_error == 'error':
+                #     logger.error(support_mail_res)
+                #     logger.error(offer_mail_res)
+                #     return Response({"error": "error", "support_mail_error": str(offer_mail_error),
+                #                      "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
                 return Response({
                     "result": serializer.data,
-                    "support_mail": support_mail_res,
-                    "offer_mail": offer_mail_res
+                    "support_mail": "support_mail_res",
+                    "offer_mail": "offer_mail_res"
                 }, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -454,7 +454,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if new_status == 'received' and not project.is_msg_sent:
                 interviews = project.submission.screening.exclude(status='cancelled')
                 supervisors = "\n".join(
-                    [f"    - **Round {interview.round}**  {interview.supervisor.employee_name}\n" for interview in
+                    [f"     - Round {interview.round}  {interview.supervisor.employee_name}\n" for interview in
                      interviews if interview.supervisor])
 
                 # Sending message on Mattermost

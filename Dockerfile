@@ -12,9 +12,9 @@ ENV PYTHONUNBUFFERED 1
 # RUN apt update && apt add postgresql-dev gcc python3-dev musl-dev
 
 # install dependencies
+COPY ./requirements.txt /usr/src/log1/requirements.txt
 RUN pip install --upgrade pip
-COPY ./requirements/base.txt /usr/src/log1/requirements/base.txt
-RUN pip install -r requirements/base.txt
+RUN pip install -r requirements.txt
 
 # copy project
 COPY . /usr/src/log1/

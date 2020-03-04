@@ -138,7 +138,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             return error, 'error'
 
     def list(self, request, *args, **kwargs):
-        consultants = Consultant.objects.filter(marketing__status='open', marketing__is_current=True)
+        consultants = Consultant.objects.filter(marketing__status='open')
         roles = request.user.roles
 
         if 'marketer' in request.user.roles:
@@ -485,7 +485,7 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConsultantBenchViewSets(RetrieveModelMixin, ListModelMixin, GenericViewSet):
+class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer

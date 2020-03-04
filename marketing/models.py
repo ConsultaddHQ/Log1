@@ -43,10 +43,10 @@ SCREENING_STATUS_CHOICES = (
 INTERVIEW_MODE = (
     ('skype', 'Skype'),
     ('webex', 'Webex'),
-    ('hangout', 'Hangout'),
+    ('hangouts', 'Hangout'),
     ('video_call', 'Video Call'),
     ('voice_call', 'Voice Call'),
-    ('dial-in', 'Dial In'),
+    ('dial_in', 'Dial In'),
 )
 
 SCREENING_CHOICES = (

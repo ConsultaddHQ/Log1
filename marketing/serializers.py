@@ -169,10 +169,10 @@ class SubmissionSerializer(serializers.ModelSerializer):
     def get_consultant(self, obj):
         return ConsultantSerializer(obj.consultant).data
 
-    def get_attachments(self):
+    def get_attachments(self, obj):
         return []
 
-    def get_vendor_contact(self):
+    def get_vendor_contact(self, obj):
         return None
 
     def get_project(self, obj):

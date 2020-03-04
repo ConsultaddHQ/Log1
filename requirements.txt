@@ -26,3 +26,4 @@ gevent==1.4.0
 django-storages==1.8
 pyfcm==1.4.7
 django-constance[database]
+environs==7.2.0
