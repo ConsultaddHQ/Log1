@@ -33,13 +33,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
     create_serializer_class = ProjectGetSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @staticmethod
-    def send_offer_received_mail(self, submission, scrum_master):
+    def send_offer_received_mail(self, project, submission, scrum_master):
         try:
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.email,
                   submission.created_by.team.email]
 
-            cc = config.SUPERADMIN
+            cc = [config.SUPERADMIN]
 
             recruiter = submission.consultant.recruiter
             retention = submission.consultant.relation
@@ -57,21 +56,21 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'cc': cc,
                 'bcc': [],
                 'subject': 'Offer Received of {} :: {} :: {} :: {} :: {}'.format(
-                    submission.consultant.name, submission.client, str(self.start_date), submission.client,
+                    submission.consultant.name, submission.client, str(project.start_date), submission.client,
                     submission.vendor.name
                 ),
                 'template': '../templates/offer.html',
                 'context': {
-                    'start': self.start_date,
+                    'start': project.start_date,
                     'rate': int(submission.rate),
                     'employer': submission.employer,
                     'client_name': submission.client,
-                    'marketer_name': submission.marketer,
                     'job_title': submission.lead.job_title,
                     'con_rate': submission.consultant.rate,
                     'vendor_company': submission.vendor.name,
                     'consultant_name': submission.consultant.name,
                     'consultant_email': submission.consultant.email,
+                    'marketer_name': submission.created_by.employee_name,
                 },
             }
             res = send_email(mail_data, submission.created_by.email)
@@ -80,8 +79,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, "error"
 
-    @staticmethod
-    def support_mail(self, start_date, submission, scrum_master):
+    def support_mail(self, project, submission, scrum_master):
         try:
             path, recordings = [], []
             resume = submission.attachments.filter(attachment_type='resume')
@@ -95,7 +93,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             recruiter = submission.consultant.recruiter
             retention = submission.consultant.relation
-            cc = [config.RECRUITER, config.RELATIONS, submission.created_by.email, submission.created_by.team.email]
+            cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.email, submission.created_by.team.email]
 
             if recruiter:
                 cc.append(recruiter.email)
@@ -115,7 +113,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 ),
                 'template': '../templates/support.html',
                 'context': {
-                    'start': start_date,
+                    'start': project.start_date,
                     'recordings': recordings,
                     'employer': submission.employer,
                     'client_name': submission.client,
@@ -136,16 +134,16 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error("Support mail exception error for {}".format(submission.created_by.email), error)
             return error, "error"
 
-    @staticmethod
-    def po_mail(self, path, scrum_master_email, po_type):
-        marketer = self.submission.created_by
+    def po_mail(self, project, path, scrum_master_email, po_type):
+        submission = project.submission
+        marketer = submission.created_by
         try:
-            vendor_contact = self.submission.vendor_contact
+            vendor_contact = submission.vendor_contact
             if not vendor_contact:
                 return "Vendor is empty", 'error'
 
-            recruiter = self.submission.consultant.recruiter
-            retention = self.submission.consultant.relation
+            recruiter = submission.consultant.recruiter
+            retention = submission.consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
 
             if recruiter:
@@ -153,38 +151,38 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 to.append(retention.email)
 
-            cc = [marketer.email] + config.SUPERADMIN
+            cc = [marketer.email, config.SUPERADMIN]
             if scrum_master_email:
                 cc.append(scrum_master_email)
 
-            consultant_name = self.submission.consultant.name
+            consultant_name = submission.consultant.name
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'On Boarding of {consultant_name} :: {self.submission.employer} :: '
-                           f'{str(self.start_date)} :: {self.submission.client} :: {self.submission.vendor.name}',
+                'subject': f'On Boarding of {consultant_name} :: {submission.employer} :: '
+                           f'{str(project.start_date)} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
                 'context': {
                     'type': po_type,
-                    'start': self.start_date,
-                    'rate': self.submission.rate,
-                    'payment_term': self.payment_term,
+                    'rate': submission.rate,
+                    'start': project.start_date,
+                    'client_name': submission.client,
                     'vendor_name': vendor_contact.name,
                     'consultant_name': consultant_name,
                     'vendor_email': vendor_contact.email,
-                    'client_address': self.client_address,
-                    'client_name': self.submission.client,
-                    'vendor_address': self.vendor_address,
+                    'payment_term': project.payment_term,
+                    'job_title': submission.lead.job_title,
                     'vendor_number': vendor_contact.number,
-                    'invoicing_period': self.invoicing_period,
-                    'job_title': self.submission.lead.job_title,
-                    'reporting_details': self.reporting_details,
-                    'employer': self.submission.employer.title(),
-                    'con_rate': int(self.submission.consultant.rate),
-                    'consultant_email': self.submission.consultant.email,
-                    'marketer_name': self.submission.created_by.employee_name,
-                    'vendor_company': self.submission.lead.vendor_company.name,
+                    'employer': submission.employer.title(),
+                    'client_address': project.client_address,
+                    'vendor_address': project.vendor_address,
+                    'con_rate': int(submission.consultant.rate),
+                    'invoicing_period': project.invoicing_period,
+                    'reporting_details': project.reporting_details,
+                    'consultant_email': submission.consultant.email,
+                    'marketer_name': submission.created_by.employee_name,
+                    'vendor_company': submission.lead.vendor_company.name,
                 },
                 'attachments': path
             }
@@ -194,13 +192,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error("Offer mail error for {}".format(marketer.email), error)
             return error, "error"
 
-    @staticmethod
-    def po_termination_or_cancellation_mail(self, scrum_master_email, po_type):
-        marketer = self.submission.created_by
+    def po_termination_or_cancellation_mail(self, project, scrum_master_email, po_type):
+        submission = project.submission
+        marketer = submission.created_by
         try:
-            vendor = self.submission.vendor_contact
-            recruiter = self.submission.consultant.recruiter
-            retention = self.submission.consultant.relation
+            vendor = submission.vendor_contact
+            recruiter = submission.consultant.recruiter
+            retention = submission.consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
 
             if recruiter:
@@ -208,38 +206,38 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 to.append(retention.email)
 
-            cc = [marketer.email] + config.SUPERADMIN
+            cc = [marketer.email, config.SUPERADMIN]
 
             if scrum_master_email:
                 cc.append(scrum_master_email)
-            consultant_name = self.submission.consultant_name
+            consultant_name = submission.consultant_name
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
                 'subject': '{} of {} :: {} :: {} :: {} :: {}'.format(
-                    po_type, consultant_name, self.submission.employer, str(self.start_date), self.submission.client,
-                    self.vendor),
+                    po_type, consultant_name, submission.employer, str(project.start_date), submission.client,
+                    submission.vendor.name),
                 'template': '../templates/po_termination.html',
                 'context': {
-                    'end': self.end_date,
-                    'remark': self.feedback,
-                    'start': self.start_date,
+                    'end': project.end_date,
+                    'rate': submission.rate,
                     'vendor_name': vendor.name,
-                    'rate': self.submission.rate,
+                    'remark': project.feedback,
+                    'start': project.start_date,
                     'vendor_email': vendor.email,
                     'vendor_number': vendor.number,
-                    'vendor_address': self.vendor_address,
-                    'client_address': self.client_address,
-                    'client_name': self.submission.client,
+                    'client_name': submission.client,
+                    'job_title': submission.lead.job_title,
+                    'employer': submission.employer.title(),
                     'marketer_name': marketer.employee_name,
-                    'job_title': self.submission.lead.job_title,
-                    'reporting_details': self.reporting_details,
-                    'employer': self.submission.employer.title(),
-                    'consultant_name': self.submission.consultant.name,
-                    'consultant_email': self.submission.consultant.email,
-                    'vendor_company': self.submission.lead.vendor_company.name,
-                    'reason': self.statuses.get(is_current=True).get_status_display(),
+                    'vendor_address': project.vendor_address,
+                    'client_address': project.client_address,
+                    'consultant_name': submission.consultant.name,
+                    'reporting_details': project.reporting_details,
+                    'consultant_email': submission.consultant.email,
+                    'vendor_company': submission.lead.vendor_company.name,
+                    'reason': project.statuses.get(is_current=True).get_status_display(),
                 }
             }
             res = send_email(mail_data, marketer.email)
@@ -255,7 +253,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if project_id:
                 project = get_object_or_404(Project, id=project_id)
                 po_type = 'created'
-                if project.status == 'on_boarded':
+                if project.statuses.filter(is_current=True).first().status == 'on_boarded':
                     po_type = 'updated'
                 path = []
                 scrum_master_email = None
@@ -263,12 +261,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if scrum_master:
                     scrum_master_email = scrum_master.first().email
 
-                for i in project.attachments:
+                for i in project.attachments.all():
                     path.append(i.attachment_file.path)
-                res = "Development server"
-                error = "error"
-                if os.getenv('ENV') == 'prod':
-                    res, error = self.po_mail(project, path, scrum_master_email, po_type)
+
+                res, error = self.po_mail(project, path, scrum_master_email, po_type)
                 if error == 'error':
                     return Response({"result": str(res)}, status=status.HTTP_400_BAD_REQUEST)
                 project.status = 'on_boarded'
@@ -349,21 +345,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         sub_id = request.data.get('submission')
         try:
-            sub = get_object_or_404(Submission, id=sub_id)
+            sub = get_object_or_404(Submission, id=sub_id, created_by=request.user)
             if hasattr(sub, 'project'):
                 return Response({"error": "Project already exist"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
             serializer = self.serializer_class(data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-
                 project = Project.objects.get(id=serializer.data['id'])
                 ProjectStatus.objects.create(
                     status='new',
                     project=project,
                     is_current=True
                 )
-
                 sub.status = 'project'
                 sub.save()
                 project.consultant = sub.consultant
@@ -372,18 +366,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'], is_active=True)
                 scrum_masters = [{"email": user.email} for user in queryset]
+                support_mail_res, support_mail_error = self.support_mail(project, sub, scrum_masters)
+                offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, sub, scrum_masters)
+                if support_mail_error == 'error' or offer_mail_error == 'error':
+                    logger.error(support_mail_res)
+                    logger.error(offer_mail_res)
+                    return Response({"error": "error", "support_mail_error": str(offer_mail_error),
+                                     "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
 
-                # support_mail_res, support_mail_error = self.support_mail(sub, scrum_masters)
-                # offer_mail_res, offer_mail_error = self.send_offer_received_mail(sub, scrum_masters)
-                # if support_mail_error == 'error' or offer_mail_error == 'error':
-                #     logger.error(support_mail_res)
-                #     logger.error(offer_mail_res)
-                #     return Response({"error": "error", "support_mail_error": str(offer_mail_error),
-                #                      "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
                 return Response({
                     "result": serializer.data,
-                    "support_mail": "support_mail_res",
-                    "offer_mail": "offer_mail_res"
+                    "support_mail": str(support_mail_res),
+                    "offer_mail": str(offer_mail_res)
                 }, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -445,16 +439,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
             queryset = User.objects.filter(team=request.user.team, role__name='admin')
             if queryset:
                 scrum_master = queryset.first().email
+
             if prev_status_obj.status not in termination_status and new_status in termination_status:
-                resp, err = self.po_termination_or_cancellation_mail(scrum_master, 'PO Termination')
+                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
             elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                resp, err = self.po_termination_or_cancellation_mail(scrum_master, 'PO Cancellation')
+                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
 
             # Discord message for PO
             if new_status == 'received' and not project.is_msg_sent:
                 interviews = project.submission.screening.exclude(status='cancelled')
                 supervisors = "\n".join(
-                    [f"     - Round {interview.round}  {interview.supervisor.employee_name}\n" for interview in
+                    [f"- Round {interview.round}  {interview.supervisor.employee_name}\n" for interview in
                      interviews if interview.supervisor])
 
                 # Sending message on Mattermost
@@ -467,8 +462,8 @@ Employer :   {project.submission.employer.title()}
 Marketer :   {project.marketer_name}
 Consultant :   {project.consultant.name}
 Recruiter :   {project.submission.consultant.recruiter.employee_name}
-CTB : 
-{supervisors}
+CTB :
+    {supervisors}
 Location: {project.city}
 Client :  {project.submission.client}
 Role :  {project.submission.lead.job_title}

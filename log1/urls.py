@@ -8,9 +8,11 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_swagger.views import get_swagger_view
 from rest_framework.documentation import include_docs_urls
 
-from utils_app.views import CityViewSets
-
 from report.views import ScrumMeetingReport
+
+from impersonate.views import ImpersonateViewSets
+
+from utils_app.views import CityViewSets, SlashCommandViewSets
 
 from attachment.views import AttachmentView, AttachmentGetView
 
@@ -30,7 +32,6 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
     ConsultantProfileViewSets, ConsultantPOCViewSets, WorkAuthViewSets
 
-from impersonate.views import ImpersonateViewSets
 
 schema_view = get_swagger_view(title="New Log1 Documentation")
 
@@ -72,6 +73,8 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'city', CityViewSets)
 
 router.register(r'report', ScrumMeetingReport)
+
+router.register(r'slash', SlashCommandViewSets)
 
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)

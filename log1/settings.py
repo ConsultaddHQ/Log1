@@ -35,7 +35,6 @@ THIRD_PARTY_APPS = [
     'explorer',
     'constance',
     'corsheaders',
-    'notification',
     'rest_framework_swagger',
     'constance.backends.database',
 ]
@@ -52,6 +51,7 @@ PROJECT_APPS = [
     'activity.apps.ActivityConfig',
     'ckiller.apps.CkillerConfig',
     'report.apps.ReportConfig',
+    'notification.apps.NotificationConfig',
     'impersonate.apps.ImpersonateConfig'
 ]
 
@@ -216,11 +216,12 @@ CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
+    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
     ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
+    ('SUPERADMIN', ('sudeep.b@consultadd.com', "Sudeep's email id")),
     ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
-    ('SUPERADMIN', ('sudeep.b@consultadd.com', "Sudeep's email id")),
     ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "MatterMost")),
     ('offer_failure', ('https://mm.consultadd.com/hooks/n1j5juob5ffnfj93kehbzapeih', "MatterMost")),
     ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "MatterMost")),
@@ -230,6 +231,6 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN'),
+    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
     'Web Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url'),
 }

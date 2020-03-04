@@ -31,7 +31,7 @@ class Command(BaseCommand):
                 submissions.append(
                     {
                         "no": count,
-                        "location": submission.lead.location,
+                        "location": submission.lead.city,
                         "job_title": submission.lead.job_title,
                         "skill": submission.lead.primary_skill,
                         "job_desc": submission.lead.job_desc.replace("\n", " ;newline; "),
@@ -51,6 +51,6 @@ class Command(BaseCommand):
                     'days': days,
                 },
             }
-            reply_to = ['relations@consultadd.com']
+            reply_to = [config.RELATIONS]
             send_email(mail_data, "log1@consultadd.com", reply_to)
 

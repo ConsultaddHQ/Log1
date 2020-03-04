@@ -18,7 +18,7 @@ class Command(BaseCommand):
         interviews = Interview.objects.filter(
             start_time__date=today_date,
             status__in=['scheduled', 'rescheduled', 'feedback_due'],
-            screening_type__in=['telephonic', 'video_call', 'skype', 'webex'],
+            screening_type='interview',
         ).order_by('start_time')
 
         text = f""" #### Interviews Scheduled for today :clipboard:\n
@@ -26,7 +26,7 @@ class Command(BaseCommand):
 |:----|:------|:-------|:-----------|:-----------|:-------|:---------|
 """
         for interview in interviews:
-            text += f"""| {interview.supervisor.employee_name} | {interview.round} | {interview.get_screening_type_display()} | {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} | {interview.consultant} | {interview.submission.client} | {interview.marketer} |\n"""
+            text += f"""| {interview.supervisor.employee_name} | {interview.round} | {interview.get_interview_mode_display()} | {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} | {interview.consultant} | {interview.submission.client} | {interview.marketer} |\n"""
 
         data = {
             "response_type": "in_channel",

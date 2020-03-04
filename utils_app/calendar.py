@@ -78,8 +78,7 @@ def book_calendar(data):
             'RRULE:FREQ=DAILY;COUNT=1'
         ],
 
-        # 'attendees': data["attendees"],
-        'attendees': [],
+        'attendees': data["attendees"],
 
         'reminders': {
             'useDefault': False,
@@ -114,8 +113,7 @@ def update_calendar(event_id, data):
             'RRULE:FREQ=DAILY;COUNT=1'
         ],
 
-        # 'attendees': data["attendees"],
-        'attendees': [],
+        'attendees': data["attendees"],
 
         'reminders': {
             'useDefault': False,

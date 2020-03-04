@@ -107,7 +107,7 @@ class ProjectStatus(models.Model):
         choices=PROJECT_STATUS_CHOICES,
     )
     project = models.ForeignKey(
-        Project, on_delete=models.PROTECT,
+        Project, on_delete=models.CASCADE,
         related_name='statuses',
         verbose_name='Project'
     )

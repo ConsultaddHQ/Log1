@@ -11,11 +11,10 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        queryset = Consultant.objects.filter(marketing__end=None)
-        in_offer_con = queryset.filter(status='in_offer').count()
+        queryset = Consultant.objects.filter(marketing__status='open')
         on_project_con = queryset.filter(status='on_project').count()
-        in_pool_con = queryset.filter(status='in_marketing', marketing__in_pool=True, marketing__status='open').count()
-        on_bench_con = queryset.filter(status='in_marketing', marketing__in_pool=False, marketing__status='open').count()
+        in_pool_con = queryset.filter(status='on_bench', marketing__in_pool=True).count()
+        on_bench_con = queryset.filter(status='on_bench', marketing__in_pool=False).count()
 
         data = {
             "response_type": "in_channel",
@@ -26,7 +25,6 @@ class Command(BaseCommand):
 |:------------------|:-------------------|
 | In Marketing      | {on_bench_con} |
 | In Pool           | {in_pool_con}      | 
-| In Offer          | {in_offer_con}     | 
 | On Project        | {on_project_con}   | 
 """
         }

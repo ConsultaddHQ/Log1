@@ -7,7 +7,7 @@ from django.core.management import BaseCommand
 
 from project.models import Project
 from employee.models import User, Team
-from marketing.models import Screening
+from marketing.models import Interview
 from utils_app.mailing import send_email_attachment_multiple
 
 import pandas as pd
@@ -51,11 +51,11 @@ class Command(BaseCommand):
         for team in teams:
             today = date.today()
             this_week = today - timedelta(days=7)
-            queryset = list(Screening.objects.filter(
+            queryset = list(Interview.objects.filter(
                 start_time__gte=this_week,
-                submission__lead__marketer__team=team
-            ).values_list('submission__lead__marketer__full_name', 'ctb__full_name', 'start_time', 'round', 'type',
-                          'status', 'feedback'))
+                submission__created_by__team=team
+            ).values_list('submission__created_by__employee_name', 'supervisor__employee_name', 'start_time', 'round',
+                          'interview_mode', 'status', 'feedback'))
             df = pd.DataFrame.from_records(queryset, columns=['Marketer', 'CTB', 'Start Time', 'Round', 'Type',
                                                               'Status', 'Feedback'])
             path = "{}/media/Scrum Report {} {}.xlsx".format(settings.BASE_DIR, team.name, str(today))
@@ -64,8 +64,8 @@ class Command(BaseCommand):
 
             df.to_excel(writer, sheet_name='Sheet1')
             writer.save()
-            scrum_masters = User.objects.filter(team=team, role__name='admin')
-            offers = Project.objects.filter(created__gte=today.replace(day=1), submission__lead__marketer__team=team)
+            scrum_masters = User.objects.filter(team=team, role__name__in=['admin', 'proxy'])
+            offers = Project.objects.filter(created__gte=today.replace(day=1), submission__created_by__team=team)
             for user in scrum_masters:
                 yesterday = today - timedelta(days=1)
                 response, res = mail_to_scrum(yesterday, this_week, user, path, offers)

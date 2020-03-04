@@ -134,9 +134,9 @@ class Lead(TimeStampedModel):
         return super(Lead, self).save(*args, **kwargs)
 
     def __str__(self):
-        if self.owner:
+        if self.owner and self.vendor_company:
             return f'{self.id}:{self.vendor_company.name} - {self.owner.employee_name} - {self.city}'
-        return f'{self.id}:{self.vendor_company.name} - {self.city}'
+        return f'{self.id}- {self.city}'
 
 
 class Submission(TimeStampedModel):

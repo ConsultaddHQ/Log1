@@ -523,7 +523,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if not res:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             lead_id = request.data.get('lead', None)
-            lead = get_object_or_404(Lead, id=lead_id)
 
             if not lead_id:
                 lead = Lead.objects.create(
@@ -535,8 +534,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     vendor_company_id=request.data['vendor_company'],
                 )
                 lead_id = lead.id
-            sub = create_submission(request, lead_id)
+            else:
+                lead = get_object_or_404(Lead, id=lead_id)
 
+            sub = create_submission(request, lead_id)
             data = {
                 "id": sub.id,
                 "status": sub.status,
@@ -910,7 +911,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 attendees = [
                                 {'email': supervisor},
                                 {'email': request.user.email},
-                                {"email": "bbookingg@gmail.com"},
+                                {"email": config.BOOKING_ADMIN},
                             ] + guest
                 user_list.append(interview.supervisor)
 
@@ -939,16 +940,16 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'id': 'error'
                 }
 
-                # try:
-                #     cal_res = book_calendar(event)
-                #     interview.calendar_id = cal_res['id']
-                #     interview.save()
-                # except Exception as error:
-                #     logger.error("Calendar booking failed")
-                #     logger.error(error)
-                #     logger.error(cal_res)
-                #     return Response({"result": "Calendar event creation failed", "error": str(error)},
-                #                     status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    cal_res = book_calendar(event)
+                    interview.calendar_id = cal_res['id']
+                    interview.save()
+                except Exception as error:
+                    logger.error("Calendar booking failed")
+                    logger.error(error)
+                    logger.error(cal_res)
+                    return Response({"result": "Calendar event creation failed", "error": str(error)},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
@@ -1055,7 +1056,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     attendees = [
                         {'email': supervisor_email},
                         {'email': request.user.email},
-                        {'email': 'bbookingg@gmail.com'},
+                        {'email': config.BOOKING_ADMIN},
                     ]
 
                     for user in scrum_masters:
@@ -1065,7 +1066,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         attendees = attendees + guest
 
                     sub = interview.submission
-
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         start = serializer.data["start_time"].replace("Z", "")
                         end = serializer.data["end_time"].replace("Z", "")
@@ -1083,14 +1083,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         }
 
                         # Update interview on Google Calendar
-                        # event_id = interview.calendar_id
-                        # try:
-                        #     cal_res['id'] = update_calendar(event_id, event)
-                        # except Exception as error:
-                        #     logger.error(error)
-                        #     logger.error(cal_res)
-                        #     return Response({"result": "Calendar event update failed", "error": str(error)},
-                        #                     status=status.HTTP_400_BAD_REQUEST)
+                        event_id = interview.calendar_id
+                        try:
+                            cal_res['id'] = update_calendar(event_id, event)
+                        except Exception as error:
+                            logger.error(error)
+                            logger.error(cal_res)
+                            return Response({"result": "Calendar event update failed", "error": str(error)},
+                                            status=status.HTTP_400_BAD_REQUEST)
 
                 data = queryset.annotate(
                     client=F('submission__client'),

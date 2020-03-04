@@ -49,7 +49,7 @@ class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
 class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant_marketing__consultant__name', 'created_by__employee_name', 'status')
+    list_filter = ('status',)
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
                      'consultant_marketing__consultant__email')
     list_display = ('id', 'lead', 'consultant_marketing', 'client', 'rate', 'email', 'created_by', 'lead_owner_display',

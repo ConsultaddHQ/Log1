@@ -1,8 +1,8 @@
 from datetime import date
 from django.core.management import BaseCommand
 
-from constants import pool_channel_url
-from consultant.models import Consultant, ConsultantMarketing
+from constance import config
+from consultant.models import ConsultantMarketing
 from utils_app.utils import post_msg_using_webhook
 
 
@@ -14,8 +14,8 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         in_pool_con = ConsultantMarketing.objects.filter(
             in_pool=True,
-            end=None
-        ).order_by('-marketing_start')
+            status='open'
+        ).order_by('-start')
 
         count = 1
         text = f"""
@@ -31,7 +31,7 @@ class Command(BaseCommand):
             if con.primary_marketer:
                 marketer = con.primary_marketer.employee_name
             if con.recruiter:
-                recruiter = con.recruiter.employee_name
+                recruiter = con.consultant.recruiter.employee_name
             count += 1
 
             text += \
@@ -43,4 +43,4 @@ f"""| {count} | {con.consultant.name} | {team} | {days} | {con.consultant.skills
             "text": text
         }
 
-        post_msg_using_webhook(pool_channel_url, data)
+        post_msg_using_webhook(config.pool_channel_url, data)
