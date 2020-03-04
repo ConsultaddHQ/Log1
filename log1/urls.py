@@ -73,8 +73,8 @@ router.register(r'city', CityViewSets)
 
 router.register(r'report', ScrumMeetingReport)
 
-router.register(r'emp_notify', ScrumMeetingReport)
-router.register(r'con_notify', ScrumMeetingReport)
+router.register(r'emp_notify', EmployeeNotificationViewSet)
+router.register(r'con_notify', ConsultantNotificationViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
 

@@ -488,7 +488,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
     @action(methods=['get'], detail=False, url_path='map')
     def map(self, request):
         consultants = Consultant.objects.filter(
-            marketing__status='open', marketing__is_current=True
+            marketing__status='open'
         ).values('current_city').annotate(total=Count('current_city')).order_by('current_city')
         return Response({"results": consultants}, status=status.HTTP_200_OK)
 

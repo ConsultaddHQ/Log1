@@ -269,7 +269,10 @@ class LeadViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='map')
     def map(self, request):
         try:
-            leads = Lead.objects.filter(marketer=request.user).values('city'). \
+            leads = Lead.objects.filter(
+                Q(owner=request.user) |
+                Q(shared_to=request.user)
+            ).values('city'). \
                 annotate(total=Count('city')).order_by('city')
             return Response({"results": leads}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -415,13 +418,14 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            if request.query_param.get('calendar', False):
-                calendar_id = kwargs.get('pk')
-                interview = get_object_or_404(Interview, calendar_id=calendar_id)
+            calendar_id = request.query_params.get('calendar', 'false')
+            if calendar_id == 'true':
+                interview = get_object_or_404(Interview, calendar_id=kwargs.get('pk'))
                 sub = interview.submission
             else:
                 sub_id = kwargs.get('pk')
                 sub = get_object_or_404(Submission, id=sub_id)
+
             if sub.created_by == request.user:
                 serializer = SubmissionDetailSerializer(sub)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
