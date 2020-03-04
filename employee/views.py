@@ -103,7 +103,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             if user_type:
                 users = User.objects.filter(role__name=user_type)
             elif teams:
-                teams = teams.split(",")
+                teams = teams.lower().split(",")
                 users = User.objects.filter(team__name__in=teams)
             elif user_type == 'team':
                 if 'superadmin' in request.user.roles:

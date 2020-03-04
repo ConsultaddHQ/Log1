@@ -178,7 +178,7 @@ class Asset(TimeStampedModel):
     email = models.EmailField(_('Email'), null=True, blank=True)
     is_deleted = models.BooleanField(_('Is Deleted'), default=False)
     alter_email = models.EmailField(_('Alternate Email'), null=True, blank=True)
-    number = models.CharField(_('Number'), max_length=20, null=True, blank=True)
+    number = models.CharField(_('Number'), max_length=40, null=True, blank=True)
     tech = models.CharField(_('Technology'), max_length=40, null=True, blank=True)
     remarks = models.CharField(_('Remarks'), max_length=300, null=True, blank=True)
     alter_number = models.CharField(_('Alternate Number'), max_length=20, null=True, blank=True)

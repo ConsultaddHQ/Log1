@@ -77,7 +77,7 @@ command - {command}\n
 
         teams = Team.objects.filter(dept='Marketing')
         for team in teams:
-            bench_consultant = Consultant.objects.filter(status='on_bench', teams__name__iexact=team.name).count()
+            bench_consultant = Consultant.objects.filter(status='on_bench', marketing__teams__name__iexact=team.name, marketing__status='open').count()
             submission_count = Submission.objects.filter(
                 created__gte=start, created_by__team__name__iexact=team.name).exclude(status='draft').count()
             interview_count = Interview.objects.filter(
@@ -95,7 +95,6 @@ command - {command}\n
         return text
 
     def team_data_by_month(self, month, year, command):
-
         text = f"""#### Team Status :memo: \n
 Date - {self.months[month]}/{year}
 command - {command}\n
@@ -116,9 +115,9 @@ command - {command}\n
 
         teams = Team.objects.filter(dept='Marketing')
         for team in teams:
-            bench_consultant = Consultant.objects.filter(status='on_bench', teams__name__iexact=team.name).count()
+            bench_consultant = Consultant.objects.filter(status='on_bench', marketing__teams__name__iexact=team.name, marketing__status='open').count()
             submission_count = Submission.objects.filter(
-                created__month=month, created__year=year, lead__marketer__team__name__iexact=team.name
+                created__month=month, created__year=year, created_by__team__name__iexact=team.name
             ).exclude(status='draft').count()
             interview_count = Interview.objects.filter(
                 created__month=month, created__year=year, submission__created_by__team__name__iexact=team.name
@@ -158,20 +157,22 @@ command - {command} {query}\n
                 for consultant in consultants:
                     retention = consultant.relation.employee_name if consultant.relation else None
                     recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                    primary_marketer = consultant.marketing.filter(status='open').first().primary_marketer.employee_name if consultant.primary_marketer else None
-                    text += f"| {consultant.name} | {consultant.email} |  {consultant.status} | {primary_marketer.team.name} | {primary_marketer} |  {recruiter} |  {retention} |\n"
+                    marketing = consultant.marketing.filter(status='open')
+                    primary_marketer_name = marketing.first().primary_marketer.employee_name if marketing else None
+                    primary_marketer_team = marketing.first().primary_marketer.team.name if marketing else None
+                    text += f"| {consultant.name} | {consultant.email} |  {consultant.status} | {primary_marketer_name} | {primary_marketer_team} |  {recruiter} |  {retention} |\n"
 
             elif data_type == 'info':
                 text = f"""#### Consultant INFO :memo: \n
 command - {command} {query}\n
-| Name | Email | DOB | Status | Visa | Phone No | Skill | Preferred Location | Education |
-|:-----|:------|:----|:-------|:-----|:---------|:------|:-------------------|:----------|
+| Name | Email | DOB | Status | Visa | Phone No | Skill | Preferred Location |
+|:-----|:------|:----|:-------|:-----|:---------|:------|:-------------------|
 """
                 for consultant in consultants:
-                    education = consultant.academics.latest('id').title
                     visa_type = consultant.work_auth.filter(is_current=True).first().visa_type
-                    marketing = ConsultantMarketing.objects.filter(consultant=consultant, status='open').first()
-                    text += f"""| {consultant.name} | {consultant.email} | {consultant.date_of_birth} | {consultant.status} | {visa_type} | {consultant.phone_no} | {consultant.skills} | {marketing.preferred_location.replace("/n", "")} | {education} |\n"""
+                    marketing = consultant.marketing.filter(status='open')
+                    preferred_location = marketing.first().preferred_location.replace('\r\n', ', ') if marketing else None
+                    text += f"""| {consultant.name} | {consultant.email} | {consultant.date_of_birth} | {consultant.status} | {visa_type} | {consultant.phone_no} | {consultant.skills} | {preferred_location} |\n"""
 
             elif data_type == 'status':
                 text = f"""#### Consultant STATUS :memo: \n
@@ -280,7 +281,7 @@ command - {slash_command}\n
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        teams = ", ".join(list(marketing.teams.all().values_list('consultant_name', flat=True)))
+                        teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {recruiter} | {preferred_location} |\n"
 
                 else:
@@ -290,7 +291,7 @@ command - {slash_command}\n
 | Name | Email | Phone No | Status | In Pool | RTG | Marketing Start | Recruiter | Preferred Location |
 |:-----|:------|:---------|:-------|:--------|:----|:----------------|:----------|:-------------------|
 """
-                    bench_consultant = Consultant.objects.filter(status='on_bench', teams__name__iexact=arg2)
+                    bench_consultant = Consultant.objects.filter(status='on_bench', marketing__teams__name__iexact=arg2, marketing__status='open')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')

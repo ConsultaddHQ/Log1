@@ -458,8 +458,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if 'admin' in roles or 'proxy' in roles:
                 sub = sub.filter(
                     (Q(created_by__team=request.user.team) |
-                     Q(consultant_marketing__consultant__in_pool=True) |
-                     Q(consultant_marketing__consultant__teams=request.user.team))
+                     Q(consultant_marketing__in_pool=True) |
+                     Q(consultant_marketing__teams=request.user.team))
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
@@ -474,7 +474,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = Submission.objects.filter(
                     Q(consultant_marketing__consultant__pocs__poc=request.user,
                       consultant_marketing__consultant__pocs__poc_type='recruiter',
-                      consultant_marketing__consultant___marketing__status='open')
+                      consultant_marketing__status='open')
                 )
 
             if filter_for == 'my':
@@ -489,15 +489,13 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if query:
                 query = query.strip()
                 sub = sub.filter(
-                    Q(created_by=request.user) &
-                    (Q(client__icontains=query) |
-                     Q(lead__location__icontains=query) |
-                     Q(lead__job_title__icontains=query) |
-                     Q(vendors__company__name__icontains=query) |
-                     Q(created_by__employee_name__istartswith=query) |
-                     Q(lead__vendor_company__name__icontains=query) |
-                     Q(consultant_marketing__consultant__name__icontains=query)
-                     )
+                    Q(client__icontains=query) |
+                    Q(lead__city__icontains=query) |
+                    Q(lead__job_title__icontains=query) |
+                    Q(vendors__company__name__icontains=query) |
+                    Q(created_by__employee_name__istartswith=query) |
+                    Q(lead__vendor_company__name__icontains=query) |
+                    Q(consultant_marketing__consultant__name__icontains=query)
                 )
 
             # Submission filter by week, month and all
@@ -802,7 +800,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             self.change_to_feedback_due()
 
             # Search Interview by Client, VendorContact and Consultant
-            queryset = Interview.objects.exclude(submission__consultant_marketing__consultant__status='archived')
+            queryset = Interview.objects.exclude(submission__consultant_marketing__status='open')
             if filter_for == 'my':
                 queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
@@ -812,7 +810,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             roles = request.user.roles
             if 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
-                    Q(submission__consultant_marketing__consultant__teams=request.user.team,
+                    Q(submission__consultant_marketing__teams=request.user.team,
                       submission__consultant_marketing__in_pool=False) |
                     Q(submission__consultant_marketing__in_pool=True)
                 )
@@ -839,11 +837,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if query:
                 query = query.strip()
                 queryset = queryset.filter(
-                    Q(submission__client__icontains=query) |
+                    Q(submission__client__istartswith=query) |
                     Q(submission__lead__vendor_company__name__icontains=query) |
                     Q(submission__created_by__employee_name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                    Q(submission__consultant_marketing__consultant__name__icontains=query)
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
             queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
