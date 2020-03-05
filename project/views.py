@@ -316,7 +316,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = get_time_filter(projects, filter_by_time)
 
             # count of project by status
-            project = projects.order_by('-modified').distinct('modified')
+            project = projects.order_by('-modified').distinct('-modified')
             total = projects.count()
             new = projects.filter(statuses__status='new', statuses__is_current=True).count()
             joined = projects.filter(statuses__status='joined', statuses__is_current=True).count()
@@ -335,7 +335,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'on_boarded': on_boarded,
                 'not_joined': not_joined,
             }
-            serializer = self.serializer_class(project[first:last], many=True)
+            serializer = self.serializer_class(project.order_by('modified')[first:last], many=True)
             return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -494,22 +494,26 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
             else:
                 projects = Project.objects.select_related('submission').all()
 
-            poc = ConsultantPOC.objects.filter(
+            recruiter = ConsultantPOC.objects.filter(
                 consultant=OuterRef("consultant_id"), end=None, poc_type='recruiter')
 
+            relation = ConsultantPOC.objects.filter(
+                consultant=OuterRef("consultant_id"), end=None, poc_type='relation')
+
             data = projects.annotate(
-                client=F('submission__client'),
                 status=F('statuses__status'),
+                client=F('submission__client'),
                 location=F('submission__lead__city'),
                 job_title=F('submission__lead__job_title'),
-                vendor=F('submission__lead__vendor_company__name'),
                 marketer_email=F('submission__created_by__email'),
+                vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-                recruiter=Subquery(poc.values('poc__employee_name')[:1]),
+                recruiter=Subquery(recruiter.values('poc__employee_name')[:1]),
+                relation=Subquery(relation.values('poc__employee_name')[:1]),
             ).values(
                 'id', 'client', 'consultant__name', 'consultant__email', 'status', 'feedback', 'client', 'start_date',
-                'consultant__phone_no', 'created', 'modified', 'recruiter', 'marketer_name', 'marketer_email', 'vendor',
-                'location', 'end_date')
+                'consultant__phone_no', 'created', 'modified', 'recruiter', 'relation', 'marketer_name',
+                'marketer_email', 'vendor', 'location', 'end_date')
 
             return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as error:

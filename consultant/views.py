@@ -589,8 +589,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
     def remarketing(self, request, *args, **kwargs):
         if request.method == 'GET':
             try:
-                marketing = ConsultantMarketing.objects.filter(consultant_id=request.query_params.get('consultant'),
-                                                               status='open')
+                marketing = ConsultantMarketing.objects.filter(consultant_id=request.query_params.get('consultant'))
                 data = marketing.values('id', 'start', 'end', 'rtg', 'in_pool', 'cycle', 'preferred_location',
                                         'status', 'primary_marketer__employee_name', 'primary_marketer__team__name')
                 return Response({"result": data}, status=status.HTTP_202_ACCEPTED)

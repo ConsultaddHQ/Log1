@@ -70,10 +70,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
 
             attachment = Attachment.objects.create(
                 object_id=object_id,
+                creator=request.user,
                 content_type=content_type,
                 attachment_type=request.data['attachment_type'],
-                attachment_file=request.FILES.get('file'),
-                creator=request.user
+                attachment_file=request.FILES.get('file')
             )
             serializer = self.serializer_class(attachment)
 

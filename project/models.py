@@ -31,25 +31,23 @@ PROJECT_STATUS_CHOICES = (
     ("cancelled-candidate_denied_location", "Candidate Denied Joining - Location"),
 
     # PO terminated
+    ("terminated-fired", "Fired"),
     ("terminated-resigned", "Resigned"),
     ("terminated", "Project Terminated"),
+    ("terminated-fired_budget_issue", "Fired - Budget Issue"),
     ("terminated-resigned_rate_issue", "Resigned - Rate Issue"),
+    ("terminated-fired_security_issue", "Fired - Data Security Issue"),
     ("terminated-resigned_location_issue", "Resigned - Location Issue"),
+    ("terminated-fired_performance_issue", "Fired - Performance Issue"),
     ("terminated-resigned_full_time_offer", "Resigned - Full Time Offer"),
     ("terminated-resigned_technology_issue", "Resigned - Technology Issue"),
-    ("terminated-fired_budget_issue", "Fired - Budget Issue"),
-    ("terminated-fired_performance_issue", "Fired - Performance Issue"),
-    ("terminated-fired_security_issue", "Fired - Data Security Issue"),
 )
 
 TIMESHEET_STATUS = (
     ('draft', 'Draft'),
     ('rejected', 'Rejected'),
+    ('approved', 'Approved'),
     ('submitted', 'Submitted'),
-    ('pending_approval', 'Pending Approval'),
-    ('consultant_rejected', 'Consultant Rejected'),
-    ('consider_for_payroll', 'Consider for Payroll'),
-    ('consider_for_invoice', 'Consider for Invoice'),
 )
 
 

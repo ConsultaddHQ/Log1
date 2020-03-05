@@ -16,18 +16,16 @@ class ConsultantLoginSerializer(UserSerializer):
         model = Consultant
         fields = ('id', 'token', 'email', 'name', 'is_active', 'project', 'first_login')
 
-    @staticmethod
-    def get_project(self):
-        if hasattr(self, 'projects'):
-            return self.projects.filter(end_date=None).annotate(
+    def get_project(self, obj):
+        if hasattr(obj, 'projects'):
+            return obj.projects.filter(end_date=None).annotate(
                 client=F('submission__client'),
                 employer=F('submission__employer')
             ).values('id', 'start_date', 'client', 'employer')
         return False
 
-    @staticmethod
-    def get_token(self):
-        token, created = ConsultantToken.objects.get_or_create(consultant=self)
+    def get_token(self, obj):
+        token, created = ConsultantToken.objects.get_or_create(consultant=obj)
         return token.key
 
 
@@ -60,9 +58,8 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
     teams = TeamSerializer(many=True)
     marketer = serializers.SerializerMethodField()
 
-    @staticmethod
-    def get_marketer(self):
-        return self.marketer.all().annotate(name=F('employee_name')).values('id', 'name')
+    def get_marketer(self, obj):
+        return obj.marketer.all().annotate(name=F('employee_name')).values('id', 'name')
 
     class Meta:
         model = ConsultantMarketing
@@ -169,40 +166,33 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
                   'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
                   'profiles', 'education', 'experience', 'rate', 'marketing')
 
-    @staticmethod
-    def get_work_auth(self):
-        return WorkAuthSerializer(self.work_auth.filter(is_current=True), many=True).data
+    def get_work_auth(self, obj):
+        return WorkAuthSerializer(obj.work_auth.filter(is_current=True), many=True).data
 
-    @staticmethod
-    def get_profiles(self):
-        return ConsultantProfileSerializer(self.profiles.all(), many=True).data
+    def get_profiles(self, obj):
+        return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
-    @staticmethod
-    def get_education(self):
-        return EducationSerializer(self.academics.all(), many=True).data
+    def get_education(self, obj):
+        return EducationSerializer(obj.academics.all(), many=True).data
 
-    @staticmethod
-    def get_experience(self):
-        return EducationSerializer(self.experiences.all(), many=True).data
+    def get_experience(self, obj):
+        return EducationSerializer(obj.experiences.all(), many=True).data
 
-    @staticmethod
-    def get_rate(self):
-        rate_revision = self.rates.filter(end=None)
+    def get_rate(self, obj):
+        rate_revision = obj.rates.filter(end=None)
         if rate_revision:
             return rate_revision.first().rate
         return 0
 
-    @staticmethod
-    def get_marketing(self):
-        marketing = self.marketing.filter(status='open')
+    def get_marketing(self, obj):
+        marketing = obj.marketing.filter(status='open')
         if marketing:
             return ConsultantMarketingSerializer(marketing, many=True).data[0]
         else:
             return None
 
-    @staticmethod
-    def get_recruiter(self):
-        queryset = self.pocs.filter(end=None, poc_type='recruiter')
+    def get_recruiter(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='recruiter')
         if queryset:
             poc = queryset.first().poc
             data = {
@@ -215,9 +205,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return data
         return None
 
-    @staticmethod
-    def get_relation(self):
-        queryset = self.pocs.filter(end=None, poc_type='relation')
+    def get_relation(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='relation')
         if queryset:
             poc = queryset.first().poc
             data = {
@@ -230,9 +219,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return data
         return None
 
-    @staticmethod
-    def get_support(self):
-        queryset = ProjectSupport.objects.filter(project__consultant=self, end=None)
+    def get_support(self, obj):
+        queryset = ProjectSupport.objects.filter(project__consultant=obj, end=None)
         if queryset:
             poc = queryset.first().engineer
             data = {
@@ -249,9 +237,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 class ConsultantListSerializer(serializers.ModelSerializer):
     profiles = serializers.SerializerMethodField()
 
-    @staticmethod
-    def get_profiles(self):
-        return ConsultantProfileSerializer(self.profiles.all(), many=True).data
+    def get_profiles(self, obj):
+        return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
     class Meta:
         model = Consultant
