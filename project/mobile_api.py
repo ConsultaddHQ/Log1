@@ -39,8 +39,8 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
 
             project_ids = request.user.get_project().filter(
                 statuses__status__in=project_status, statuses__is_current=True
-            ).values_list('id', flat=True)
-            queryset = TimeSheet.objects.filter(project_id__in=project_ids).order_by('project')
+            ).order_by('-id').values_list('id', flat=True)
+            queryset = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True).order_by('project')
             serializer = self.serializer_class(queryset[first:last], many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -56,7 +56,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 Q(statuses__status='joined', statuses__is_current=True) |
                 Q(end_date__gte=timezone.now()) |
                 Q(end_date=None)
-            )
+            ).order_by('-id')
 
             if projects:
                 project = projects.first()

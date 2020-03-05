@@ -102,16 +102,18 @@ class TimeSheetSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeSheet
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'status_updated_at', 'status_updated_by',
-                  'modified', 'attachments', 'project')
+                  'modified', 'attachments', 'remark', 'project')
 
-    def get_attachments(self, obj: Attachment) -> dict:
+    def get_attachments(self, obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data
 
     def get_project(self, obj):
         return {
             'id': obj.project.id,
             'start_date': obj.project.start_date,
-            'client': obj.project.submission.client
+            'client': obj.project.submission.client,
+            'employer': obj.project.submission.employer.title(),
+            'vendor': obj.project.submission.lead.vendor_company.name,
         }
 
 

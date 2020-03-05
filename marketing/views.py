@@ -1,3 +1,4 @@
+import os
 import difflib
 import logging
 from datetime import date, datetime, timedelta
@@ -402,7 +403,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 'project': project,
                 'interview': interview
             }
-            data = sub[first:last].annotate(
+            data = sub.order_by('-modified')[first:last].annotate(
                 city=F('lead__city'),
                 marketer_id=F('created_by'),
                 company_name=F('lead__vendor_company__name'),
@@ -449,10 +450,22 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
         try:
             roles = request.user.roles
-            sub = Submission.objects.exclude(
-                Q(consultant_marketing__consultant__status='archived') |
-                Q(status='draft')
-            )
+            if query:
+                query = query.strip()
+                sub = Submission.objects.filter(
+                    Q(client__icontains=query) |
+                    Q(lead__city__icontains=query) |
+                    Q(lead__job_title__icontains=query) |
+                    Q(vendors__vendor_company__name__icontains=query) |
+                    Q(created_by__employee_name__istartswith=query) |
+                    Q(lead__vendor_company__name__icontains=query) |
+                    Q(consultant_marketing__consultant__name__icontains=query)
+                ).exclude(status='draft')
+            else:
+                sub = Submission.objects.exclude(
+                    Q(consultant_marketing__consultant__status='archived') |
+                    Q(status='draft')
+                )
 
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:
@@ -485,21 +498,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if consultant_id and consultant_id != 'null':
                 sub = sub.filter(consultant_marketing__consultant_id=consultant_id)
 
-            # Search submission by client, vendor and consultant
-            if query:
-                query = query.strip()
-                sub = sub.filter(
-                    Q(client__icontains=query) |
-                    Q(lead__city__icontains=query) |
-                    Q(lead__job_title__icontains=query) |
-                    Q(vendors__company__name__icontains=query) |
-                    Q(created_by__employee_name__istartswith=query) |
-                    Q(lead__vendor_company__name__icontains=query) |
-                    Q(consultant_marketing__consultant__name__icontains=query)
-                )
-
             # Submission filter by week, month and all
-            sub = get_time_filter(sub, filter_by_time).order_by('modified').distinct('modified')
+            sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct('modified')
 
             # Submission filter by status
             data, sub_data = self.get_submission_data(sub, filter_by_status, first, last)
@@ -742,7 +742,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
 
-            data = queryset[first:last].annotate(
+            data = queryset.order_by('-modified')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
@@ -800,7 +800,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
             self.change_to_feedback_due()
 
             # Search Interview by Client, VendorContact and Consultant
-            queryset = Interview.objects.exclude(submission__consultant_marketing__status='open')
+
+            if query:
+                query = query.strip()
+                queryset = Interview.objects.filter(
+                    Q(submission__client__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__icontains=query) |
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                )
+            else:
+                queryset = Interview.objects.exclude(submission__consultant_marketing__status='open')
             if filter_for == 'my':
                 queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
@@ -832,16 +843,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
                       submission__consultant_marketing__consultant__pocs__poc_type='relation')
-                )
-
-            if query:
-                query = query.strip()
-                queryset = queryset.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__icontains=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
             queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
@@ -938,16 +939,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'id': 'error'
                 }
 
-                try:
-                    cal_res = book_calendar(event)
-                    interview.calendar_id = cal_res['id']
-                    interview.save()
-                except Exception as error:
-                    logger.error("Calendar booking failed")
-                    logger.error(error)
-                    logger.error(cal_res)
-                    return Response({"result": "Calendar event creation failed", "error": str(error)},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                if os.environ.get('ENV', 'local') == 'prod':
+                    try:
+                        cal_res = book_calendar(event)
+                        interview.calendar_id = cal_res['id']
+                        interview.save()
+                    except Exception as error:
+                        logger.error("Calendar booking failed")
+                        logger.error(error)
+                        logger.error(cal_res)
+                        return Response({"result": "Calendar event creation failed", "error": str(error)},
+                                        status=status.HTTP_400_BAD_REQUEST)
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
@@ -1082,13 +1084,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                         # Update interview on Google Calendar
                         event_id = interview.calendar_id
-                        try:
-                            cal_res['id'] = update_calendar(event_id, event)
-                        except Exception as error:
-                            logger.error(error)
-                            logger.error(cal_res)
-                            return Response({"result": "Calendar event update failed", "error": str(error)},
-                                            status=status.HTTP_400_BAD_REQUEST)
+                        if os.environ.get('ENV', 'local') == 'prod':
+                            try:
+                                cal_res['id'] = update_calendar(event_id, event)
+                            except Exception as error:
+                                logger.error(error)
+                                logger.error(cal_res)
+                                return Response({"result": "Calendar event update failed", "error": str(error)},
+                                                status=status.HTTP_400_BAD_REQUEST)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1127,16 +1130,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
             # Delete from google calendar
-            try:
-                if interview.calendar_id:
-                    delete_calendar_booking(interview.calendar_id)
-                else:
-                    return Response({"result": "calendar id not found"}, status=status.HTTP_404_NOT_FOUND)
-            except Exception as error:
-                logger.error(error)
-                logger.error("Calendar event deletion failed")
-                return Response({"result": "Calendar event deletion failed", "error": str(error)},
-                                status=status.HTTP_400_BAD_REQUEST)
+            if os.environ.get('ENV', 'local') == 'prod':
+                try:
+                    if interview.calendar_id:
+                        delete_calendar_booking(interview.calendar_id)
+                    else:
+                        return Response({"result": "calendar id not found"}, status=status.HTTP_404_NOT_FOUND)
+                except Exception as error:
+                    logger.error(error)
+                    logger.error("Calendar event deletion failed")
+                    return Response({"result": "Calendar event deletion failed", "error": str(error)},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
             interview.status = 'cancelled'
             interview.save()

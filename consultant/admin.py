@@ -9,7 +9,7 @@ from .models import Consultant, ConsultantProfile, ConsultantMarketing, Consulta
 class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('name',)
+    list_filter = ('status',)
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
     list_display = ('id', 'name', 'email', 'date_of_birth', 'phone_no', 'skills', 'status', 'current_city', 'ssn',
                     'links', 'gender', 'work_type', 'password', 'is_active')
@@ -20,7 +20,6 @@ class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(ConsultantToken)
 class ConsultantToken(admin.ModelAdmin):
-    list_filter = ('consultant',)
     list_display = ('consultant', 'key', 'created')
 
 
@@ -28,7 +27,6 @@ class ConsultantToken(admin.ModelAdmin):
 class ConsultantProfileAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name', 'profile_owner__employee_name')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'profile_owner__employee_name')
     list_display = ('id', 'title', 'consultant', 'profile_owner', 'date_of_birth', 'linkedin', 'current_city',
                     'profile_owner', 'visa_type', 'visa_start', 'visa_end', 'links', 'education')
@@ -38,7 +36,7 @@ class ConsultantProfileAdmin(admin.ModelAdmin, ExportCsvMixin):
 class WorkAuthAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name', 'is_current', 'visa_type')
+    list_filter = ('is_current', 'visa_type')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'visa_type')
     list_display = ('id', 'consultant', 'visa_type', 'visa_start', 'visa_end', 'is_current')
 
@@ -47,7 +45,6 @@ class WorkAuthAdmin(admin.ModelAdmin, ExportCsvMixin):
 class EducationAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name',)
     search_fields = ('id', 'consultant__name', 'consultant__email', 'org_name', 'title', 'major', 'city')
     list_display = ('id', 'title', 'consultant', 'org_name', 'edu_type', 'major', 'start_date', 'end_date', 'city')
 
@@ -56,7 +53,6 @@ class EducationAdmin(admin.ModelAdmin, ExportCsvMixin):
 class ExperienceAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name',)
     search_fields = ('id', 'consultant__name', 'consultant__email', 'title', 'city')
     list_display = ('id', 'title', 'consultant', 'exp_type', 'start_date', 'end_date', 'city')
 
@@ -72,7 +68,7 @@ class FeedbackDetail(admin.ModelAdmin):
 class ConsultantMarketingAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name',)
+    list_filter = ('status',)
     search_fields = ('id', 'consultant__name', 'consultant__email')
     list_display = ('id', 'cycle', 'consultant', 'start', 'end', 'in_pool', 'preferred_location', 'team_display',
                     'status', 'primary_marketer', 'marketer_display')
@@ -96,7 +92,6 @@ class ConsultantMarketingAdmin(admin.ModelAdmin, ExportCsvMixin):
 class ConsultantRateRevisionAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name',)
     search_fields = ('id', 'consultant__name', 'consultant__email')
     list_display = ('id', 'consultant', 'rate', 'start', 'end', 'feedback')
 
@@ -105,7 +100,6 @@ class ConsultantRateRevisionAdmin(admin.ModelAdmin, ExportCsvMixin):
 class ConsultantPOCAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name', 'poc__employee_name')
     list_display = ('id', 'consultant', 'poc_type', 'poc', 'start', 'end')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'poc__employee_name')
 
@@ -114,7 +108,6 @@ class ConsultantPOCAdmin(admin.ModelAdmin, ExportCsvMixin):
 class ConsultantFeedbackAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name',)
     search_fields = ('id', 'consultant__name', 'feedback_type')
     list_display = ('id', 'consultant', 'rating', 'feedback_type', 'role', 'experience', 'programming', 'communication',
                     'problem_solving', 'organizational')

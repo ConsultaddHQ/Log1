@@ -21,11 +21,11 @@ class Command(BaseCommand):
             "username": "Log1 Updates",
             "text": f"""
 #### Bench Status :memo: \n
-| Consultant Status | Count              |
-|:------------------|:-------------------|
-| In Marketing      | {on_bench_con} |
-| In Pool           | {in_pool_con}      | 
-| On Project        | {on_project_con}   | 
+| Consultant Status | Count            |
+|:------------------|:-----------------|
+| In Marketing      | {on_bench_con}   |
+| In Pool           | {in_pool_con}    | 
+| On Project        | {on_project_con} | 
 """
         }
 

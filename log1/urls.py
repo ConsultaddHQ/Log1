@@ -51,11 +51,6 @@ router.register(r'consultant_work_auth', WorkAuthViewSets)
 router.register(r'consultant_bench', ConsultantBenchViewSets)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
-router.register(r'consultant_password', ConsultantResetPasswordViewSets)
-
-# Mobile Application routes
-router.register(r'consultant_app', ConsultantAppViewSets)
-router.register(r'consultant_auth', ConsultantAuthViewSets)
 
 router.register(r'lead', LeadViewSets)
 router.register(r'interview', InterviewViewSets)
@@ -65,8 +60,6 @@ router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'project', ProjectViewSets)
-router.register(r'timesheet', TimeSheetViewSets)
-router.register(r'payroll', PayrollScheduleViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 
@@ -81,12 +74,21 @@ router.register(r'con_notify', ConsultantNotificationViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
 
+# Mobile Application routes
+router.register(r'consultant_app', ConsultantAppViewSets)
+router.register(r'consultant_auth', ConsultantAuthViewSets)
+router.register(r'consultant_password', ConsultantResetPasswordViewSets)
+
+router.register(r'timesheet', TimeSheetViewSets)
+router.register(r'payroll', PayrollScheduleViewSets)
+
 urlpatterns = [
-    path('api/v2/', include(router.urls)),
-    path('api/v2/admin/', admin.site.urls),
+    path('api/', include(router.urls)),
+    path('api/admin/', admin.site.urls),
+    path('api/explorer/', include('explorer.urls')),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if os.getenv('DEBUG', False):
-    urlpatterns.append(path('api/v2/swagger/', schema_view))
-    urlpatterns.append(path('api/v2/docs/', include_docs_urls(title='New Log1', public=True)))
+    urlpatterns.append(path('api/swagger/', schema_view))
+    urlpatterns.append(path('api/docs/', include_docs_urls(title='New Log1', public=True)))

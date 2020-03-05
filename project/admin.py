@@ -8,9 +8,8 @@ from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, 
 class ProjectAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('consultant__name', 'submission__client', 'submission__created_by__employee_name')
-    search_fields = ('consultant__name', 'submission__client', 'submission_created_by__employee_name')
-    list_display = ('id', 'submission', 'start_date', 'end_date', 'payment_term', 'invoicing_period', 'client_address',
+    search_fields = ('consultant__name', 'submission__client', 'submission__created_by__employee_name')
+    list_display = ('id', 'submission', 'start_date', 'end_date', 'consultant', 'client_address',
                     'city', 'vendor_address')
 
 
@@ -19,7 +18,6 @@ class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
     list_display = ('id', 'project', 'support', 'start', 'end')
-    list_filter = ('project__consultant__name', 'project__submission__client', 'support__employee_name')
     search_fields = ('project__consultant__name', 'status', 'project__submission__client', 'support__employee_name',
                      'project__submission__created_by__employee_name')
 
@@ -28,8 +26,8 @@ class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
 class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
+    list_filter = ('status', 'is_current')
     list_display = ('id', 'project', 'status', 'created', 'is_current')
-    list_filter = ('project__consultant__name', 'status', 'is_current')
     search_fields = ('project__consultant__name', 'status', 'project__submission__client', 'is_current')
 
 
@@ -37,7 +35,7 @@ class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
 class TimeSheetAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    list_filter = ('project__consultant__name', 'project__submission__client')
+    list_filter = ('status',)
     search_fields = ('id', 'project__id', 'project__consultant__name', 'project__consultant__email')
     list_display = ('id', 'project', 'is_active', 'status', 'hours', 'additional_hours', 'start', 'end', 'created')
 
