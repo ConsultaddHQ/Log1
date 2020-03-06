@@ -316,7 +316,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = get_time_filter(projects, filter_by_time)
 
             # count of project by status
-            project = projects.order_by('-modified').distinct('-modified')
+            projects = projects.order_by('-modified').distinct('-modified')
             total = projects.count()
             new = projects.filter(statuses__status='new', statuses__is_current=True).count()
             joined = projects.filter(statuses__status='joined', statuses__is_current=True).count()
@@ -325,7 +325,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             not_joined = projects.filter(statuses__status='not_joined', statuses__is_current=True).count()
 
             if filter_by_status:
-                project = projects.filter(statuses__status=filter_by_status, statuses__is_current=True)
+                projects = projects.filter(statuses__status=filter_by_status, statuses__is_current=True)
 
             data_count = {
                 'new': new,
@@ -335,7 +335,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'on_boarded': on_boarded,
                 'not_joined': not_joined,
             }
-            serializer = self.serializer_class(project.order_by('modified')[first:last], many=True)
+            serializer = self.serializer_class(projects[first:last], many=True)
             return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -463,7 +463,7 @@ Marketer :   {project.marketer_name}
 Consultant :   {project.consultant.name}
 Recruiter :   {project.submission.consultant.recruiter.employee_name}
 CTB :
-    {supervisors}
+{supervisors}
 Location: {project.city}
 Client :  {project.submission.client}
 Role :  {project.submission.lead.job_title}

@@ -34,9 +34,9 @@ ATTACHMENT_TYPE = (
 def attachment_upload(instance, filename):
     """Stores the attachment in a "per module/appname/primary key" folder"""
     return 'attachments/{app}_{model}/{pk}/{filename}'.format(
-        app=instance.content_object._meta.app_label,
-        model=instance.content_object._meta.object_name.lower(),
-        pk=instance.content_object.pk,
+        app=instance.content_type.app_label,
+        model=instance.content_type.model.lower(),
+        pk=instance.id,
         filename=filename,
     )
 

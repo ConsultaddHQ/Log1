@@ -68,7 +68,6 @@ class RoleAdmin(admin.ModelAdmin):
 @admin.register(ResetPasswordToken)
 class ResetPasswordTokenAdmin(admin.ModelAdmin):
     empty_value_display = '-------'
-    list_filter = ('user__employee_name',)
     list_display = ('user', 'key', 'ip_address', 'user_agent')
     search_fields = ('user__employee_name', 'user__email', 'key')
 
@@ -76,6 +75,6 @@ class ResetPasswordTokenAdmin(admin.ModelAdmin):
 @admin.register(Asset)
 class AssetAdmin(admin.ModelAdmin):
     empty_value_display = '-------'
-    list_filter = ('owner__employee_name', 'asset_type')
+    list_filter = ('asset_type',)
     list_display = ('id', 'owner', 'email', 'asset_type')
     search_fields = ('id', 'owner__employee_name', 'email', 'asset_type')

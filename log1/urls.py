@@ -10,6 +10,8 @@ from rest_framework.documentation import include_docs_urls
 
 from report.views import ScrumMeetingReport
 
+from ckiller.views import CkillerSubmissionView
+
 from impersonate.views import ImpersonateViewSets
 
 from utils_app.views import CityViewSets, SlashCommandViewSets
@@ -65,22 +67,25 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
 
-router.register(r'report', ScrumMeetingReport)
+router.register(r'timesheet', TimeSheetViewSets)
+router.register(r'payroll', PayrollScheduleViewSets)
 
 router.register(r'cmd', SlashCommandViewSets)
 
-router.register(r'emp_notify', EmployeeNotificationViewSet)
-router.register(r'con_notify', ConsultantNotificationViewSet)
+router.register(r'report', ScrumMeetingReport)
 
 router.register(r'impersonate', ImpersonateViewSets)
+
+router.register(r'ckiller_data', CkillerSubmissionView)
+
+router.register(r'emp_notify', EmployeeNotificationViewSet)
+router.register(r'con_notify', ConsultantNotificationViewSet)
 
 # Mobile Application routes
 router.register(r'consultant_app', ConsultantAppViewSets)
 router.register(r'consultant_auth', ConsultantAuthViewSets)
 router.register(r'consultant_password', ConsultantResetPasswordViewSets)
 
-router.register(r'timesheet', TimeSheetViewSets)
-router.register(r'payroll', PayrollScheduleViewSets)
 
 urlpatterns = [
     path('api/', include(router.urls)),
