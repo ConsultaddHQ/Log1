@@ -57,7 +57,6 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 Q(end_date__gte=timezone.now()) |
                 Q(end_date=None)
             ).order_by('-id')
-
             if projects:
                 project = projects.first()
                 queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True)

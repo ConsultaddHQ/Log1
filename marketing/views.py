@@ -22,7 +22,6 @@ from consultant.models import ConsultantProfile
 from utils_app.utils import post_msg_using_webhook
 from notification.views import create_notification
 from attachment.models import Attachment, create_attachment
-from utils_app.mailing import send_email_attachment_multiple
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
 
 logger = logging.getLogger(__name__)
@@ -309,7 +308,7 @@ def create_submission(request, lead_id):
         profile = get_object_or_404(ConsultantProfile, id=request.data['profile_id'])
         vendor_contact = request.data.get('vendor_contact', None)
         if vendor_contact:
-            sub = Submission.objects.create(
+            sub, created = Submission.objects.get_or_create(
                 status='sub',
                 lead_id=lead_id,
                 created_by=request.user,
@@ -331,7 +330,7 @@ def create_submission(request, lead_id):
                 date_of_birth=profile.date_of_birth,
             )
         else:
-            sub = Submission.objects.create(
+            sub, created = Submission.objects.get_or_create(
                 status='sub',
                 lead_id=lead_id,
                 created_by=request.user,
@@ -479,6 +478,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             elif 'marketer' in roles:
                 sub = sub.filter(
                     Q(created_by=request.user) |
+                    Q(consultant_marketing__in_pool=True) |
                     Q(consultant_marketing__marketer=request.user)
                 )
 
@@ -499,8 +499,12 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = sub.filter(consultant_marketing__consultant_id=consultant_id)
 
             # Submission filter by week, month and all
-            sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct('modified')
-
+            sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct(
+                'status', 'lead', 'created_by', 'rate', 'email', 'phone', 'client', 'employer',
+                'vendor_contact', 'consultant_marketing', 'other_link', 'visa_type', 'visa_start', 'visa_end',
+                'education', 'current_city', 'date_of_birth', 'linkedin'
+            )
+            sub = sub.order_by('-modified').distinct('modified')
             # Submission filter by status
             data, sub_data = self.get_submission_data(sub, filter_by_status, first, last)
 
@@ -811,7 +815,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
             else:
-                queryset = Interview.objects.exclude(submission__consultant_marketing__status='open')
+                queryset = Interview.objects.exclude(submission__consultant_marketing__status='close')
             if filter_for == 'my':
                 queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
@@ -955,7 +959,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
                     text = '#### :spiral_calendar: New Interview Scheduled \n **CTB:{} :: Round:{} :: {} :: {} :: {} ' \
                            ':: {} :: {} **'.format(
-                        interview.supervisor.employee_name, interview.round, interview.get_screening_type_display(),
+                        interview.supervisor.employee_name, interview.round, interview.get_interview_mode_display(),
                         interview.start_time.strftime('%m/%d/%Y::%I:%M EST'), interview.consultant.name,
                         interview.submission.client, interview.marketer.employee_name
                     )
@@ -1027,7 +1031,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 for user in scrum_masters:
                     user_list.append(user)
                 title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
-                        {interview.get_screening_type_display()} :: 
+                        {interview.get_interview_mode_display()} :: 
                         {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
                         {interview.submission.client} :: {interview.consultant.name} :: 
                         {interview.marketer.employee_name}"""
@@ -1042,7 +1046,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             text = "#### :stopwatch: Interview Rescheduled \n **CTB: {} :: Round:{} :: {} :: {} :: " \
                                    "{} :: {} :: {}**".format(
                                 interview.supervisor.employee_name, interview.round,
-                                interview.get_screening_type_display(),
+                                interview.get_interview_mode_display(),
                                 interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
                                 interview.submission.consultant.name,
                                 interview.submission.client, interview.marketer.employee_name)

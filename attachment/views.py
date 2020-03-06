@@ -1,4 +1,3 @@
-import os
 import boto3
 import logging
 from django.contrib.contenttypes.models import ContentType
@@ -72,8 +71,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 object_id=object_id,
                 creator=request.user,
                 content_type=content_type,
+                attachment_file=request.FILES.get('file'),
                 attachment_type=request.data['attachment_type'],
-                attachment_file=request.FILES.get('file')
             )
             serializer = self.serializer_class(attachment)
 

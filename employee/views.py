@@ -100,18 +100,18 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.query_params.get('query', '')
             teams = request.query_params.get('teams', None)
             user_type = request.query_params.get('type', None)
+            users = User.objects.exclude(role__name='consultant')
             if user_type:
-                users = User.objects.filter(role__name=user_type)
+                users = users.filter(role__name=user_type)
             elif teams:
-                teams = teams.lower().split(",")
-                users = User.objects.filter(team__name__in=teams)
+                teams = teams.split(",")
+                users = users.filter(team__name__in=teams)
             elif user_type == 'team':
                 if 'superadmin' in request.user.roles:
-                    users = User.objects.filter(role__name='marketer')
+                    users = users.filter(role__name='marketer')
                 else:
-                    users = User.objects.filter(team=request.user.team, role__name='marketer')
-            else:
-                users = User.objects.filter(employee_name__icontains=query).exclude(role__name='consultant')
+                    users = users.filter(team=request.user.team, role__name='marketer')
+            users = users.filter(employee_name__istartswith=query)
             users = users.annotate(name=Lower('employee_name')).order_by('name')
             data = users.values('id', 'employee_id', 'email', 'name')
             return Response({"results": data}, status=status.HTTP_200_OK)
@@ -398,10 +398,13 @@ class AssetsViewSets(viewsets.ModelViewSet):
             else:
                 return Response({"error": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
 
-            if 'Username' not in df.columns:
-                return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
             if not df.empty:
                 created, updated, failed = 0, 0, 0
+                if not {'Username', 'Provider', 'Username', 'Password', 'Asset Type', 'Email', 'Technology',
+                        'Remarks', 'Phone Number', 'Alternate Email', 'Alternate Number'
+                        }.issubset(df.columns):
+                    return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
+
                 for index, row in df.iterrows():
                     if pd.isnull(row["Username"]):
                         break

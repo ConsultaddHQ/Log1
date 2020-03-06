@@ -109,7 +109,7 @@ class User(AbstractUser, PermissionsMixin):
         app_label = 'employee'
 
     def __str__(self):
-        return f'{self.id}:{self.email}'
+        return f'{self.employee_name}-{self.email}'
 
     @property
     def roles(self):

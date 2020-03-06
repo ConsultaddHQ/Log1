@@ -118,7 +118,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         return super(Consultant, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.id}:{self.name} {self.email}'
+        return f'{self.name}-{self.email}'
 
     def get_by_natural_key(self, username):
         return self.get(**{self.model.USERNAME_FIELD: username})
