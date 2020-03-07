@@ -51,10 +51,10 @@ class EmployeeAuthViewSets(GenericViewSet):
                     "result": "User already exist",
                     "data": self.serializer_class(user, many=True).data[0]},
                     status=status.HTTP_406_NOT_ACCEPTABLE)
-            user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
-            for i in role:
-                r = Role.objects.get(name=i)
-                user.role.add(r)
+            # user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
+            # for i in role:
+            #     r = Role.objects.get(name=i)
+            #     user.role.add(r)
             return Response({"result": "success", "data": self.serializer_class(user).data}, status=201)
         except Exception as error:
             logger.error(error)
@@ -139,7 +139,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"result": "password updated"}, status=status.HTTP_200_OK)
         return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['delete'], detail=False, url_path='logout')
+    @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request, *args, **kwargs):
         """
             Logout for authenticated user
@@ -397,12 +397,11 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 df = pd.read_excel(file)
             else:
                 return Response({"error": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
-
             if not df.empty:
                 created, updated, failed = 0, 0, 0
-                if not {'Username', 'Provider', 'Username', 'Password', 'Asset Type', 'Email', 'Technology',
+                if not {'Username', 'Provider', 'Password', 'Asset Type', 'Email', 'Technology',
                         'Remarks', 'Phone Number', 'Alternate Email', 'Alternate Number'
-                        }.issubset(df.columns):
+                        }.issubset(set(df.columns)):
                     return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
 
                 for index, row in df.iterrows():
@@ -454,7 +453,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     },
                 }
                 send_email(mail_data, "Log1")
-                return Response({"result": "Upload Complete"}, status=status.HTTP_201_CREATED)
+                return Response({"result": "Upload Complete", "count": mail_data['context']}, status=status.HTTP_201_CREATED)
             return Response({"result": "Empty File"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as error:
             logger.error(error)

@@ -12,7 +12,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         queryset = Consultant.objects.filter(marketing__status='open')
-        on_project_con = queryset.filter(status='on_project').count()
+        on_project_con = Consultant.objects.filter(status='on_project').count()
         in_pool_con = queryset.filter(status='on_bench', marketing__in_pool=True).count()
         on_bench_con = queryset.filter(status='on_bench', marketing__in_pool=False).count()
 

@@ -39,7 +39,7 @@ schema_view = get_swagger_view(title="New Log1 Documentation")
 
 router = DefaultRouter()
 
-router.register(r'asset', AssetsViewSets)
+router.register(r'assets', AssetsViewSets)
 router.register(r'auth', EmployeeAuthViewSets)
 router.register(r'employee', EmployeeViewSets)
 router.register(r'password', ResetPasswordViewSets)
