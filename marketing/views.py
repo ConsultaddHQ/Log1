@@ -499,12 +499,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = sub.filter(consultant_marketing__consultant_id=consultant_id)
 
             # Submission filter by week, month and all
-            sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct(
-                'status', 'lead', 'created_by', 'rate', 'email', 'phone', 'client', 'employer',
-                'vendor_contact', 'consultant_marketing', 'other_link', 'visa_type', 'visa_start', 'visa_end',
-                'education', 'current_city', 'date_of_birth', 'linkedin'
-            )
-            sub = sub.order_by('-modified').distinct('modified')
+            sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct('modified')
+
             # Submission filter by status
             data, sub_data = self.get_submission_data(sub, filter_by_status, first, last)
 

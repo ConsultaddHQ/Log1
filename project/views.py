@@ -33,6 +33,46 @@ class ProjectViewSets(viewsets.ModelViewSet):
     create_serializer_class = ProjectGetSerializer
     authentication_classes = (TokenAuthentication,)
 
+    def consultant_mail_on_joining(self, project):
+        try:
+            cc = []
+            submission = project.submission
+            recruiter = submission.consultant.recruiter
+            retention = submission.consultant.relation
+
+            if recruiter:
+                cc.append(recruiter.email)
+
+            if retention:
+                cc.append(retention.email)
+
+            mail_data = {
+                'to': [project.consultant.email],
+                'cc': cc,
+                'bcc': [],
+                'subject': '{} Consultadd Timesheet tracking app account created'.format(
+                    project.consultant.name
+                ),
+                'template': '../templates/offer.html',
+                'context': {
+                    'start': project.start_date,
+                    'rate': int(submission.rate),
+                    'employer': submission.employer,
+                    'client_name': submission.client,
+                    'job_title': submission.lead.job_title,
+                    'con_rate': submission.consultant.rate,
+                    'vendor_company': submission.vendor.name,
+                    'consultant_name': submission.consultant.name,
+                    'consultant_email': submission.consultant.email,
+                    'marketer_name': submission.created_by.employee_name,
+                },
+            }
+            res = send_email(mail_data, submission.created_by.email)
+            return res, "ok"
+        except Exception as error:
+            logger.error(error)
+            return error, "error"
+
     def send_offer_received_mail(self, project, submission, scrum_master):
         try:
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.email,
@@ -415,10 +455,42 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.consultant.status = 'on_project'
                     project.consultant.save()
 
+                    day_one = datetime.today().replace(day=1, hour=0, minute=0)
+                    total_joined_count = Project.objects.filter(
+                        statuses__created__gte=day_one, statuses__status='joined'
+                    ).count()
+
+                    team_joined_count = Project.objects.filter(
+                        statuses__created__gte=day_one, statuses__status='joined',
+                        submission__created_by__team=request.user.team
+                    ).count()
+
+                    # Sending message on Mattermost on joined status
+                    data = {
+                        "response_type": "in_channel",
+                        "username": "Log1 Updates",
+                        "text": f"""
+#### Project Joined :metal: :smile: :metal:\n
+Employer :   {project.submission.employer.title()}
+Marketer :   {project.marketer_name}
+Consultant :   {project.consultant.name}
+Recruiter :   {project.submission.consultant.recruiter.employee_name}
+Location: {project.city}
+Client :  {project.submission.client}
+Role :  {project.submission.lead.job_title}
+Joining Date :   {str(project.start_date)}\n\n
+`Project Joined count of {project.submission.employer} for this month - {total_joined_count} `
+`Total Project Joined count of this month - {team_joined_count}`
+"""
+                    }
+                    post_msg_using_webhook(config.offer_url, data)
+
+                    # resp, err = self.consultant_mail_on_joining(project)
+
             serializer = self.serializer_class(project)
 
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_offer = Project.objects.filter(
+            total_offer_count = Project.objects.filter(
                 statuses__created__gte=day_one, statuses__status='new'
             ).count()
 
@@ -439,11 +511,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             queryset = User.objects.filter(team=request.user.team, role__name='admin')
             if queryset:
                 scrum_master = queryset.first().email
-
-            if prev_status_obj.status not in termination_status and new_status in termination_status:
-                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
-            elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
 
             # Discord message for PO
             if new_status == 'received' and not project.is_msg_sent:
@@ -469,10 +536,16 @@ Client :  {project.submission.client}
 Role :  {project.submission.lead.job_title}
 Start Date :   {str(project.start_date)}\n\n
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
-`Total offer count of this month - {total_offer}`
+`Total offer count of this month - {total_offer_count}`
 """
                 }
                 post_msg_using_webhook(config.offer_url, data)
+
+            if prev_status_obj.status not in termination_status and new_status in termination_status:
+                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
+            elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
+                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
+
             return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)

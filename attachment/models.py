@@ -33,12 +33,14 @@ ATTACHMENT_TYPE = (
 
 def attachment_upload(instance, filename):
     """Stores the attachment in a "per module/appname/primary key" folder"""
-    return 'attachments/{app}_{model}/{pk}/{filename}'.format(
-        app=instance.content_type.app_label,
-        model=instance.content_type.model.lower(),
-        pk=instance.id,
-        filename=filename,
-    )
+    if instance.content_object:
+        return 'attachments/{app}_{model}/{pk}/{filename}'.format(
+            app=instance.content_object._meta.app_label,
+            model=instance.content_object._meta.object_name.lower(),
+            pk=instance.content_object.pk,
+            filename=filename,
+        )
+    return None
 
 
 def create_attachment(data):
@@ -111,5 +113,4 @@ def auto_delete_file_on_delete(sender, instance, **kwargs):
     when corresponding `MediaFile` object is deleted.
     """
     if instance.attachment_file:
-        if os.path.isfile(instance.attachment_file.path):
-            os.remove(instance.attachment_file.path)
+        instance.attachment_file.storage.delete(instance.attachment_file.name)

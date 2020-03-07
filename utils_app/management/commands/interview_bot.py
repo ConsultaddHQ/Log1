@@ -26,7 +26,7 @@ class Command(BaseCommand):
 |:----|:------|:-------|:-----------|:-----------|:-------|:---------|
 """
         for interview in interviews:
-            text += f"""| {interview.supervisor.employee_name} | {interview.round} | {interview.get_interview_mode_display()} | {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} | {interview.consultant} | {interview.submission.client} | {interview.marketer} |\n"""
+            text += f"""| {interview.supervisor.employee_name} | {interview.round} | {interview.get_interview_mode_display()} | {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} | {interview.consultant.name} | {interview.submission.client} | {interview.marketer.employee_name} |\n"""
 
         data = {
             "response_type": "in_channel",

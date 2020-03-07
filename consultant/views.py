@@ -517,8 +517,11 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             # Consultants search based on name, email, recruiter and location
             elif query:
                 consultants = consultants.filter(
-                    Q(name__icontains=query) | Q(email__iexact=query) | Q(skills__icontains=query) |
-                    Q(current_city__icontains=query) | Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
+                    Q(email__iexact=query) |
+                    Q(name__istartswith=query) |
+                    Q(skills__istartswith=query) |
+                    Q(current_city__istartswith=query) |
+                    Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
 
             consultants = consultants.order_by('id').distinct('id')
@@ -639,7 +642,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 return Response({"result": "Consultant is not in Marketing"})
             roles = request.user.roles
             if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
-                                         in consultant_marketing.consultant.teams.all()):
+                                         in consultant_marketing.teams.all()):
                 marketer_ids = request.data.get('marketers', None)
                 for marketer_id in marketer_ids:
                     marketer = get_object_or_404(User, id=marketer_id)
@@ -687,7 +690,7 @@ class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
                 return Response({"result": "Consultant is not in Marketing"})
             roles = request.user.roles
             if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
-                                         in consultant_marketing.consultant.teams.all()):
+                                         in consultant_marketing.teams.all()):
                 marketer_ids = request.data.get('marketers', None)
                 for marketer_id in marketer_ids:
                     marketer = get_object_or_404(User, id=marketer_id)
