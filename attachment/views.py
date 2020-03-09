@@ -113,10 +113,14 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 if project.reporting_details and len(project.reporting_details.strip()) > 0:
                     reporting_details = 1
 
+                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                                  + reporting_details) / 6 >= 1 else False
+
                 check_list = {
                     "total": 6,
                     "msa": msa,
                     "msa_signed": s_msa,
+                    "status": list_status,
                     "work_order": work_order,
                     "start_date": start_date,
                     "client_address": client_address,
@@ -144,6 +148,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 attachment.delete()
 
                 msa, client_address, vendor_address, work_order, reporting_details = 0, 0, 0, 0, 0
+                s_msa, s_work_order = 0, 0
 
                 start_date = 1 if project.start_date else 0
 
@@ -156,6 +161,15 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 if project.attachments.filter(attachment_type='work_order_msa'):
                     msa, work_order = 1, 1
 
+                if project.attachments.filter(attachment_type='msa_signed'):
+                    s_msa = 1
+
+                if project.attachments.filter(attachment_type='work_order_signed'):
+                    s_work_order = 1
+
+                if project.attachments.filter(attachment_type='work_order_msa_signed'):
+                    s_msa, s_work_order = 1, 1
+
                 if project.client_address and len(project.client_address.strip()) > 0:
                     client_address = 1
 
@@ -165,9 +179,13 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 if project.reporting_details and len(project.reporting_details.strip()) > 0:
                     reporting_details = 1
 
+                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                                       + reporting_details) / 6 >= 1 else False
+
                 check_list = {
                     "total": 6,
                     "msa": msa,
+                    "status": list_status,
                     "start_date": start_date,
                     "work_order": work_order,
                     "client_address": client_address,

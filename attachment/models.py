@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 ATTACHMENT_TYPE = (
     ('ssn', 'SSN'),
+    ('other', 'Other'),
     ('resume', 'Resume'),
     ('visa', 'Visa Docs'),
     ('msa', 'MSA/Agreement'),

@@ -186,3 +186,20 @@ class PayrollSchedule(models.Model):
 
     def __str__(self):
         return f'{self.processing_date} :: {self.pay_period_start} - {self.pay_period_end} :: {self.pay_date}'
+
+
+class IphoneAppLink(models.Model):
+    link = models.CharField(_('Link'), max_length=300)
+    is_sent = models.BooleanField(_('Link sent'), default=False)
+    sent_on = models.DateTimeField(_('link sent on'), null=True, blank=True)
+    consultant = models.ForeignKey(
+        Consultant, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='app_links',
+        verbose_name='Consultant',
+    )
+
+    def __str__(self):
+        if self.consultant:
+            return f'{self.consultant.name} :: {self.link} :: {str(self.is_sent)}'
+        return f'{self.link} :: {str(self.is_sent)}'

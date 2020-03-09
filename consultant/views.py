@@ -571,11 +571,42 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConsultantMarketingViewSets(UpdateModelMixin, GenericViewSet):
+class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantMarketing.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantMarketingSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            prev_marketing_obj = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'],
+                                                                    status='open')
+            cycle = 1
+            if prev_marketing_obj:
+                cycle = prev_marketing_obj.first().cycle + 1
+
+            consultant_marketing = ConsultantMarketing.objects.create(
+                cycle=cycle,
+                rtg=request.data['rtg'],
+                in_pool=request.data['in_pool'],
+                start=request.data['marketing_start'],
+                consultant_id=request.data['consultant'],
+                primary_marketer_id=request.data['primary_marketer'],
+                preferred_location=request.data['preferred_location'],
+            )
+
+            teams = request.data.get('teams', [])
+            for team in teams:
+                consultant_marketing.teams.add(get_object_or_404(Team, name=team))
+
+            marketer_ids = request.data.get('marketers', [])
+            for marketer_id in marketer_ids:
+                marketer = get_object_or_404(User, id=marketer_id)
+                consultant_marketing.marketer.add(marketer)
+
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         try:

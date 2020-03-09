@@ -99,10 +99,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         if obj.reporting_details and len(obj.reporting_details.strip()) > 0:
             reporting_details = 1
 
+        list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                               + reporting_details) / 6 >= 1 else False
+
         return {
             "total": 6,
             "msa": msa,
             "msa_signed": s_msa,
+            "status": list_status,
             "work_order": work_order,
             "start_date": start_date,
             "client_address": client_address,

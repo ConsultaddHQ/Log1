@@ -40,8 +40,8 @@ class Command(BaseCommand):
                 count += 1
             mail_data = {
                 'bcc': [],
-                # 'to': [consultant.email],
-                'to': ['sarang.m@consultadd.in'],
+                'to': [consultant.email],
+                # 'to': ['sarang.m@consultadd.in'],
                 'cc': [config.RELATIONS, config.RECRUITMENT],
                 'subject': '{} - Submissions - {}'.format(consultant.name, str(date.today())),
                 'template': '../templates/consultants_submissions.html',
