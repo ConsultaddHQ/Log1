@@ -3,17 +3,17 @@ import difflib
 import logging
 from datetime import date, datetime, timedelta
 
+from rest_framework.mixins import *
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import *
 
 from constance import config
 from django.db import transaction
-from django.db.models import Count, Q, F, Max
 from django.db.models.functions import Lower
+from django.db.models import Count, Q, F, Max
 from django.shortcuts import get_object_or_404
 
 from marketing.serializers import *
@@ -388,19 +388,21 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     @staticmethod
     def get_submission_data(sub, filter_by_status, first, last):
         try:
-            total = sub.count()
-            submission = sub.filter(status='sub').count()
-            project = sub.filter(status='project').count()
-            interview = sub.filter(status='interview').count()
+            data = {
+                "total": sub,
+                "submission": sub.filter(status='sub'),
+                "project": sub.filter(status='project'),
+                "interview": sub.filter(status='interview'),
+            }
 
             if filter_by_status:
-                sub = sub.filter(status=filter_by_status)
+                sub = data[filter_by_status]
 
             data_counts = {
-                'total': total,
-                'sub': submission,
-                'project': project,
-                'interview': interview
+                'total': data["total"].count(),
+                'sub': data["submission"].count(),
+                'project': data["project"].count(),
+                'interview': data["interview"].count()
             }
             data = sub.order_by('-modified')[first:last].annotate(
                 city=F('lead__city'),
@@ -455,9 +457,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     Q(client__icontains=query) |
                     Q(lead__city__icontains=query) |
                     Q(lead__job_title__icontains=query) |
-                    Q(vendors__vendor_company__name__icontains=query) |
-                    Q(created_by__employee_name__istartswith=query) |
                     Q(lead__vendor_company__name__icontains=query) |
+                    Q(created_by__employee_name__istartswith=query) |
+                    Q(vendors__vendor_company__name__icontains=query) |
                     Q(consultant_marketing__consultant__name__icontains=query)
                 ).exclude(status='draft')
             else:
@@ -485,9 +487,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             # Submissions of a Recruiters consultants (except those are on project)
             elif 'recruiter' in roles:
                 sub = Submission.objects.filter(
-                    Q(consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter',
-                      consultant_marketing__status='open')
+                    Q(consultant_marketing__status='open',
+                      consultant_marketing__consultant__pocs__poc=request.user,
+                      consultant_marketing__consultant__pocs__poc_type='recruiter'
+                    )
                 )
 
             if filter_for == 'my':
@@ -953,8 +956,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                    text = '#### :spiral_calendar: New Interview Scheduled \n **CTB:{} :: Round:{} :: {} :: {} :: {} ' \
-                           ':: {} :: {} **'.format(
+                    text = "#### :spiral_calendar: New Interview Scheduled \n **CTB:{} :: Round:{} :: {} :: {} :: {} " \
+                           ":: {} :: {} **".format(
                         interview.supervisor.employee_name, interview.round, interview.get_interview_mode_display(),
                         interview.start_time.strftime('%m/%d/%Y::%I:%M EST'), interview.consultant.name,
                         interview.submission.client, interview.marketer.employee_name
@@ -1187,10 +1190,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
         try:
             if ctb:
                 queryset = Interview.objects.filter(
-                    Q(submission__consultant_marketing__consultant=sub.consultant_marketing.consultant,
-                      submission__client__contains=sub.client) |
-                    Q(submission__consultant_marketing__consultant=sub.consultant_marketing.consultant,
-                      submission__lead__vendor_company=sub.vendor) |
+                    Q(submission__client__contains=sub.client,
+                      submission__consultant_marketing__consultant=sub.consultant_marketing.consultant) |
+                    Q(submission__lead__vendor_company=sub.vendor,
+                      submission__consultant_marketing__consultant=sub.consultant_marketing.consultant) |
                     Q(submission__client__contains=sub.client) |
                     Q(submission__client__contains=sub.client, supervisor=ctb)
                 )

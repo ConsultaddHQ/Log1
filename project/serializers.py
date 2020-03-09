@@ -17,7 +17,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
-                  'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name')
+                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -157,7 +157,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created',
+        fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
                   'start_date', 'end_date', 'reporting_details')
 

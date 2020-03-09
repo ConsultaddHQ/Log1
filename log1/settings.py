@@ -215,6 +215,7 @@ NOTIFICATIONS_CHANNELS = {
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
+    ('CONSULTANT_PASSWORD', ('Consultadd@123', 'Consultant login password')),
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
     ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
     ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
@@ -231,6 +232,7 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
+    'constants': ('CONSULTANT_PASSWORD',),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
     'Web Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url'),
 }

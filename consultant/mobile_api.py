@@ -189,8 +189,12 @@ class ConsultantResetPasswordViewSets(GenericViewSet):
                         user_agent=request.META['HTTP_USER_AGENT'],
                         ip_address=ip if ip else '127.0.0.1'
                     )
+                if os.environ.get('ENV', 'local') == 'prod':
+                    to = [consultant.email]
+                else:
+                    to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.in', 'anikesh.consultadd@gmail.com']
                 mail_data = {
-                    'to': ['aditi.so@consultadd.in'],
+                    'to': to,
                     'cc': [],
                     'bcc': [],
                     'subject': 'Reset Log1 Password',

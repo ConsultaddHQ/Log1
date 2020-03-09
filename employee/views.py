@@ -287,11 +287,11 @@ class AssetsViewSets(viewsets.ModelViewSet):
         try:
             data = request.data
             asset = Asset.objects.create(
+                owner=request.user,
+                email=data['email'],
                 username=data['username'],
                 password=data['password'],
-                email=data['email'],
                 provider=data['username'],
-                owner=request.user,
             )
             serializer = self.serializer_class(asset, data=request.data, partial=True)
             if serializer.is_valid():
@@ -313,9 +313,9 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 serializer.save()
                 pass_string, num_string = '', ''
                 if asset.password != password:
-                    pass_string = 'changed password from \"{}\" to \"{}\"'.format(password, asset.password)
+                    pass_string = f'changed password from \"{password}\" to \"{asset.password}\"'
                 if asset.alter_number != alter_num:
-                    num_string = 'changed Alternate number from \"{}\" to \"{}\"'.format(alter_num, asset.alter_number)
+                    num_string = f'changed Alternate number from \"{alter_num}\" to \"{asset.alter_number}\"'
                 if pass_string and num_string:
                     final_string = pass_string + " and " + num_string
                 else:
@@ -325,8 +325,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                         final_string = num_string
                     else:
                         final_string = "Nothing"
-                desc = "{} updated {} of {} asset".format(request.user.employee_name.title(), final_string,
-                                                          serializer.data['asset_type'])
+                desc = f"{request.user.employee_name.title()} updated {final_string} of {serializer.data['asset_type']} asset"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -348,8 +347,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
 
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
-        assets = request.data.get('assets')
         users = request.data.get('users')
+        assets = request.data.get('assets')
         try:
             for asset_id in assets:
                 asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
@@ -362,7 +361,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     asset.shared_to.add(user)
                 user_list = ", ".join(names[:len(names) - 1]) + " and " + names[-1] if len(names) > 1 else "".join(
                     names)
-                desc = "{} shared {} asset to {}".format(request.user.employee_name.title(), asset.asset_type, user_list)
+                desc = f"{request.user.employee_name.title()} shared {asset.asset_type} asset to {user_list}"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": "ok"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -377,7 +376,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             user = User.objects.get(id=user_id)
             asset.shared_to.remove(user)
-            desc = "{} Unshared {} from {} asset".format(request.user.employee_name, user.employee_name, asset.asset_type)
+            desc = f"{request.user.employee_name} Unshared {user.employee_name} from {asset.asset_type} asset"
             create_activity(asset.id, 'asset', request.user, desc, 'updated')
             serializer = self.serializer_class(asset)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
@@ -453,7 +452,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     },
                 }
                 send_email(mail_data, "Log1")
-                return Response({"result": "Upload Complete", "count": mail_data['context']}, status=status.HTTP_201_CREATED)
+                return Response({"result": "Upload Complete", "count": mail_data['context']},
+                                status=status.HTTP_201_CREATED)
             return Response({"result": "Empty File"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as error:
             logger.error(error)

@@ -81,7 +81,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             else:
                 project = get_object_or_404(Project, id=object_id)
 
-                msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0
+                msa, work_order, s_msa, s_work_order,  = 0, 0, 0, 0
+                client_address, vendor_address, reporting_details = 0, 0, 0
 
                 start_date = 1 if project.start_date else 0
 
