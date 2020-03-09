@@ -48,13 +48,18 @@ class SubmissionCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ('id', 'status', 'created', 'duration', 'start_date', 'end_date', 'city', 'feedback', 'consultant',
-                  'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list')
+                  'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list',
+                  'attachments')
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)

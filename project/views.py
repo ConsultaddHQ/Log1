@@ -1,6 +1,6 @@
 import os
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -33,12 +33,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
     create_serializer_class = ProjectGetSerializer
     authentication_classes = (TokenAuthentication,)
 
-    def consultant_mail_on_joining(self, project):
+    def consultant_mail_on_joining(self, project, password):
         try:
             cc = []
             submission = project.submission
-            recruiter = submission.consultant.recruiter
-            retention = submission.consultant.relation
+            recruiter = project.consultant.recruiter
+            retention = project.consultant.relation
 
             if recruiter:
                 cc.append(recruiter.email)
@@ -50,24 +50,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': [project.consultant.email],
                 'cc': cc,
                 'bcc': [],
-                'subject': '{} Consultadd Timesheet tracking app account created'.format(
-                    project.consultant.name
-                ),
-                'template': '../templates/offer.html',
+                'subject': f'{project.consultant.name} Consultadd Timesheet tracking app account created',
+                'template': '../templates/consultant_account_creation.html',
                 'context': {
-                    'start': project.start_date,
-                    'rate': int(submission.rate),
-                    'employer': submission.employer,
-                    'client_name': submission.client,
-                    'job_title': submission.lead.job_title,
-                    'con_rate': submission.consultant.rate,
-                    'vendor_company': submission.vendor.name,
-                    'consultant_name': submission.consultant.name,
-                    'consultant_email': submission.consultant.email,
-                    'marketer_name': submission.created_by.employee_name,
+                    'consultant_name': project.consultant.name,
+                    'consultant_email': project.consultant.email,
+                    'password': password,
                 },
             }
-            res = send_email(mail_data, submission.created_by.email)
+            res = send_email(mail_data, config.RELATIONS)
             return res, "ok"
         except Exception as error:
             logger.error(error)
@@ -80,8 +71,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             cc = [config.SUPERADMIN]
 
-            recruiter = submission.consultant.recruiter
-            retention = submission.consultant.relation
+            recruiter = project.consultant.recruiter
+            retention = project.consultant.relation
             if recruiter:
                 cc.append(recruiter.email)
 
@@ -95,21 +86,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': 'Offer Received of {} :: {} :: {} :: {} :: {}'.format(
-                    submission.consultant.name, submission.client, str(project.start_date), submission.client,
-                    submission.vendor.name
-                ),
+                'subject': f'Offer Received of {project.consultant.name} :: {submission.client} :: '
+                           f'{str(project.start_date)} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/offer.html',
                 'context': {
                     'start': project.start_date,
                     'rate': int(submission.rate),
                     'employer': submission.employer,
                     'client_name': submission.client,
+                    'con_rate': project.consultant.rate,
                     'job_title': submission.lead.job_title,
-                    'con_rate': submission.consultant.rate,
                     'vendor_company': submission.vendor.name,
-                    'consultant_name': submission.consultant.name,
-                    'consultant_email': submission.consultant.email,
+                    'consultant_name': project.consultant.name,
+                    'consultant_email': project.consultant.email,
                     'marketer_name': submission.created_by.employee_name,
                 },
             }
@@ -131,8 +120,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if resume:
                 path.append(resume.first().attachment_file.path)
 
-            recruiter = submission.consultant.recruiter
-            retention = submission.consultant.relation
+            recruiter = project.consultant.recruiter
+            retention = project.consultant.relation
             cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.email, submission.created_by.team.email]
 
             if recruiter:
@@ -143,26 +132,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if scrum_master:
                 cc.append(scrum_master)
 
-            consultant_name = submission.consultant.name
+            consultant_name = project.consultant.name
             mail_data = {
                 'to': [config.ENGINEERING],
                 'cc': cc,
                 'bcc': [],
-                'subject': 'Support Initiation for {} {} {}'.format(
-                    consultant_name, submission.client, submission.lead.city
-                ),
+                'subject': f'Support Initiation for {consultant_name} {submission.client} {submission.lead.city}',
                 'template': '../templates/support.html',
                 'context': {
-                    'start': project.start_date,
                     'recordings': recordings,
+                    'start': project.start_date,
                     'employer': submission.employer,
                     'client_name': submission.client,
                     'location': submission.lead.city,
                     'consultant_name': consultant_name,
                     'job_title': submission.lead.job_title,
-                    'consultant_email': submission.consultant.email,
+                    'consultant_email': project.consultant.email,
+                    'consultant_phone_no': project.consultant.phone_no,
                     'marketer_name': submission.created_by.employee_name,
-                    'consultant_phone_no': submission.consultant.phone_no,
                     'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
                 },
                 'attachments': path
@@ -182,8 +169,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if not vendor_contact:
                 return "Vendor is empty", 'error'
 
-            recruiter = submission.consultant.recruiter
-            retention = submission.consultant.relation
+            recruiter = project.consultant.recruiter
+            retention = project.consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
 
             if recruiter:
@@ -195,7 +182,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if scrum_master_email:
                 cc.append(scrum_master_email)
 
-            consultant_name = submission.consultant.name
+            consultant_name = project.consultant.name
             mail_data = {
                 'to': to,
                 'cc': cc,
@@ -217,10 +204,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'employer': submission.employer.title(),
                     'client_address': project.client_address,
                     'vendor_address': project.vendor_address,
-                    'con_rate': int(submission.consultant.rate),
+                    'con_rate': int(project.consultant.rate),
+                    'consultant_email': project.consultant.email,
                     'invoicing_period': project.invoicing_period,
                     'reporting_details': project.reporting_details,
-                    'consultant_email': submission.consultant.email,
                     'marketer_name': submission.created_by.employee_name,
                     'vendor_company': submission.lead.vendor_company.name,
                 },
@@ -237,8 +224,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
         marketer = submission.created_by
         try:
             vendor = submission.vendor_contact
-            recruiter = submission.consultant.recruiter
-            retention = submission.consultant.relation
+            recruiter = project.consultant.recruiter
+            retention = project.consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
 
             if recruiter:
@@ -250,14 +237,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             if scrum_master_email:
                 cc.append(scrum_master_email)
-            consultant_name = submission.consultant_name
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': '{} of {} :: {} :: {} :: {} :: {}'.format(
-                    po_type, consultant_name, submission.employer, str(project.start_date), submission.client,
-                    submission.vendor.name),
+                'subject': f'{po_type} of {project.consultant.name} :: {submission.employer} ::'
+                           f' {str(project.start_date)} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination.html',
                 'context': {
                     'end': project.end_date,
@@ -273,9 +258,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'marketer_name': marketer.employee_name,
                     'vendor_address': project.vendor_address,
                     'client_address': project.client_address,
-                    'consultant_name': submission.consultant.name,
+                    'consultant_name': project.consultant.name,
+                    'consultant_email': project.consultant.email,
                     'reporting_details': project.reporting_details,
-                    'consultant_email': submission.consultant.email,
                     'vendor_company': submission.lead.vendor_company.name,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                 }
@@ -349,31 +334,35 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = projects.filter(
                     Q(consultant__name__istartswith=query) |
                     Q(submission__client__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query)
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
             if filter_by_time:
                 projects = get_time_filter(projects, filter_by_time)
 
             # count of project by status
-            projects = projects.order_by('-modified').distinct('-modified')
-            total = projects.count()
-            new = projects.filter(statuses__status='new', statuses__is_current=True).count()
-            joined = projects.filter(statuses__status='joined', statuses__is_current=True).count()
-            received = projects.filter(statuses__status='received', statuses__is_current=True).count()
-            on_boarded = projects.filter(statuses__status='on_boarded', statuses__is_current=True).count()
-            not_joined = projects.filter(statuses__status='not_joined', statuses__is_current=True).count()
+            projects = projects.order_by('-modified').distinct('modified')
+            data = {
+                "total": projects,
+                "new": projects.filter(statuses__status='new', statuses__is_current=True),
+                "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
+                "received": projects.filter(statuses__status='received', statuses__is_current=True),
+                "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
+                "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
+                                              start_date__lt=date.today())
+            }
 
             if filter_by_status:
-                projects = projects.filter(statuses__status=filter_by_status, statuses__is_current=True)
+                projects = data[filter_by_status]
 
             data_count = {
-                'new': new,
-                'total': total,
-                'joined': joined,
-                'received': received,
-                'on_boarded': on_boarded,
-                'not_joined': not_joined,
+                'new': data["new"].count(),
+                'total': data["total"].count(),
+                'joined': data["joined"].count(),
+                'received': data["received"].count(),
+                'on_boarded': data["on_boarded"].count(),
+                'not_joined': data["not_joined"].count(),
             }
             serializer = self.serializer_class(projects[first:last], many=True)
             return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
@@ -398,21 +387,28 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project=project,
                     is_current=True
                 )
+
                 sub.status = 'project'
                 sub.save()
-                project.consultant = sub.consultant
+
                 project.city = sub.lead.city
+                project.consultant = sub.consultant
                 project.save()
 
                 queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'], is_active=True)
                 scrum_masters = [{"email": user.email} for user in queryset]
-                support_mail_res, support_mail_error = self.support_mail(project, sub, scrum_masters)
-                offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, sub, scrum_masters)
-                if support_mail_error == 'error' or offer_mail_error == 'error':
-                    logger.error(support_mail_res)
-                    logger.error(offer_mail_res)
-                    return Response({"error": "error", "support_mail_error": str(offer_mail_error),
-                                     "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
+
+                support_mail_res = "Development Server"
+                offer_mail_res = "Development Server"
+
+                if os.environ.get('ENV', 'local') == 'prod':
+                    support_mail_res, support_mail_error = self.support_mail(project, sub, scrum_masters)
+                    offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, sub, scrum_masters)
+                    if support_mail_error == 'error' or offer_mail_error == 'error':
+                        logger.error(support_mail_res)
+                        logger.error(offer_mail_res)
+                        return Response({"error": "error", "support_mail_error": str(offer_mail_error),
+                                         "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
 
                 return Response({
                     "result": serializer.data,
@@ -427,9 +423,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         project_id = kwargs.get('pk')
         try:
+            err = None
+            new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
             prev_status_obj = project.statuses.get(is_current=True)
-            new_status = request.data.get('status', None)
 
             project.city = request.data.get('city', None)
             project.duration = request.data.get('duration', None)
@@ -442,27 +439,56 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project.reporting_details = request.data.get('reporting_details', None)
             project.save()
 
-            if prev_status_obj.status != new_status:
-                ProjectStatus.objects.create(
+            prev_statuses = list(project.statuses.all().values_list('status', flat=True))
+            if prev_status_obj.status != new_status and new_status not in prev_statuses:
+                p_status, p_s_created = ProjectStatus.objects.get_or_create(
                     status=new_status,
                     is_current=True,
                     project=project
                 )
-                prev_status_obj.is_current = False
-                prev_status_obj.save()
+                if p_s_created:
+                    prev_status_obj.is_current = False
+                    prev_status_obj.save()
 
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
 
+                    password = config.CONSULTANT_PASSWORD
+
+                    queryset = Consultant.objects.filter(email__exact=project.consultant.email)
+                    if queryset:
+                        consultant = queryset.first()
+                        consultant.set_password(password)
+                        consultant.is_active = True
+                        consultant.save()
+
+                    # Creating first week Timesheet on project status change to joined
+                    start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
+                    week_day = start_date.weekday()
+                    if week_day == 6:
+                        end_date = start_date + timedelta(days=6)
+                    else:
+                        end_date = start_date + timedelta(days=5 - week_day)
+
+                    TimeSheet.objects.get_or_create(
+                        hours=0,
+                        end=end_date,
+                        status='draft',
+                        project=project,
+                        start=start_date,
+                    )
+
                     day_one = datetime.today().replace(day=1, hour=0, minute=0)
                     total_joined_count = Project.objects.filter(
-                        statuses__created__gte=day_one, statuses__status='joined'
+                        statuses__status='joined',
+                        statuses__created__gte=day_one,
                     ).count()
 
                     team_joined_count = Project.objects.filter(
-                        statuses__created__gte=day_one, statuses__status='joined',
-                        submission__created_by__team=request.user.team
+                        statuses__status='joined',
+                        statuses__created__gte=day_one,
+                        submission__created_by__team=request.user.team,
                     ).count()
 
                     # Sending message on Mattermost on joined status
@@ -474,7 +500,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 Employer :   {project.submission.employer.title()}
 Marketer :   {project.marketer_name}
 Consultant :   {project.consultant.name}
-Recruiter :   {project.submission.consultant.recruiter.employee_name}
+Recruiter :   {project.consultant.recruiter.employee_name}
 Location: {project.city}
 Client :  {project.submission.client}
 Role :  {project.submission.lead.job_title}
@@ -485,21 +511,24 @@ Joining Date :   {str(project.start_date)}\n\n
                     }
                     post_msg_using_webhook(config.offer_url, data)
 
-                    # resp, err = self.consultant_mail_on_joining(project)
+                    if os.environ.get('ENV', 'local') == 'prod':
+                        # resp, err = self.consultant_mail_on_joining(project, password)
+                        logger.info(f"Email sent to Consultant - {project.consultant.email}")
 
             serializer = self.serializer_class(project)
 
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
             total_offer_count = Project.objects.filter(
-                statuses__created__gte=day_one, statuses__status='new'
+                statuses__status='new',
+                statuses__created__gte=day_one,
             ).count()
 
             team_offer_count = Project.objects.filter(
-                statuses__created__gte=day_one, statuses__status='new',
-                submission__created_by__team=request.user.team
+                statuses__status='new',
+                statuses__created__gte=day_one,
+                submission__created_by__team=request.user.team,
             ).count()
 
-            err = None
             # Cancellation or Termination Mail
             cancellation_status = ['dual-offer', 'client-cancelled', 'contract-conflicts',
                                    'candidate-absconded', 'candidate-denied-jd', 'candidate-denied-rate',
@@ -516,7 +545,7 @@ Joining Date :   {str(project.start_date)}\n\n
             if new_status == 'received' and not project.is_msg_sent:
                 interviews = project.submission.screening.exclude(status='cancelled')
                 supervisors = "\n".join(
-                    [f"- Round {interview.round}  {interview.supervisor.employee_name}\n" for interview in
+                    [f"-    Round {interview.round}  {interview.supervisor.employee_name}\n" for interview in
                      interviews if interview.supervisor])
 
                 # Sending message on Mattermost
@@ -528,7 +557,7 @@ Joining Date :   {str(project.start_date)}\n\n
 Employer :   {project.submission.employer.title()}
 Marketer :   {project.marketer_name}
 Consultant :   {project.consultant.name}
-Recruiter :   {project.submission.consultant.recruiter.employee_name}
+Recruiter :   {project.consultant.recruiter.employee_name}
 CTB :
 {supervisors}
 Location: {project.city}
@@ -541,10 +570,11 @@ Start Date :   {str(project.start_date)}\n\n
                 }
                 post_msg_using_webhook(config.offer_url, data)
 
-            if prev_status_obj.status not in termination_status and new_status in termination_status:
-                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
-            elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
+            if os.environ.get('ENV', 'local') == 'prod':
+                if prev_status_obj.status not in termination_status and new_status in termination_status:
+                    resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
+                elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
+                    resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
 
             return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:

@@ -8,9 +8,18 @@ from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, 
 class ProjectAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
-    search_fields = ('consultant__name', 'submission__client', 'submission__created_by__employee_name')
-    list_display = ('id', 'submission', 'start_date', 'end_date', 'consultant', 'client_address',
-                    'city', 'vendor_address')
+    list_filter = ('statuses__status',)
+    search_fields = ('id', 'consultant__name', 'submission__client', 'submission__created_by__employee_name')
+    list_display = ('id', 'submission', 'start_date', 'end_date', 'consultant', 'project_status_display',
+                    'client_address', 'city', 'vendor_address')
+
+    def project_status_display(self, obj):
+        statuses = obj.statuses.filter(is_current=True)
+        if statuses:
+            return statuses.first().status
+        return None
+
+    project_status_display.short_description = "Status"
 
 
 @admin.register(ProjectSupport)
@@ -18,7 +27,7 @@ class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
     list_display = ('id', 'project', 'support', 'start', 'end')
-    search_fields = ('project__consultant__name', 'status', 'project__submission__client', 'support__employee_name',
+    search_fields = ('id', 'project__consultant__name', 'status', 'project__submission__client', 'support__employee_name',
                      'project__submission__created_by__employee_name')
 
 
