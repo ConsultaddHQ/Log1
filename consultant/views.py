@@ -525,7 +525,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 )
 
             consultants = consultants.order_by('id').distinct('id')
-            in_pool = consultants.filter(status='on_bench', marketing__in_pool=True)
+            in_pool = consultants.filter(status='on_bench', marketing__in_pool=True, )
             in_marketing = consultants.filter(status='on_bench', marketing__status='open', marketing__in_pool=False)
             candidate = consultants.filter(status='on_bench').exclude(marketing__status='open')
             on_project = consultants.filter(status='on_project')

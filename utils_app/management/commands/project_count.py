@@ -22,7 +22,7 @@ class Command(BaseCommand):
         received_projects = Project.objects.filter(statuses__status='received', statuses__is_current=True).count()
         on_boarded_projects = Project.objects.filter(statuses__status='on_boarded', statuses__is_current=True).count()
         joined_projects = Project.objects.filter(statuses__status='joined', statuses__is_current=True,
-                                                 created__month=month).count()
+                                                 statuses__created=month).count()
         cancelled_projects = Project.objects.filter(statuses__status__in=cancelled, statuses__is_current=True,
                                                     created__month=month).count()
         terminated_projects = Project.objects.filter(statuses__status__in=terminated, statuses__is_current=True,

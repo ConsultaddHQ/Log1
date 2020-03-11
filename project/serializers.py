@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
 from project.models import *
-from marketing.serializers import InterviewGetSerializer, SubmissionSerializer
-from attachment.serializers import AttachmentSerializer
+from marketing.serializers import SubmissionSerializer
+from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -105,7 +105,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
                   'modified', 'attachments', 'remark', 'project')
 
     def get_attachments(self, obj):
-        return AttachmentSerializer(obj.attachments.all(), many=True).data
+        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
 
     def get_project(self, obj):
         return {

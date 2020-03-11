@@ -119,7 +119,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recordings = ", ".join(recordings) if len(recordings) != 0 else "NA"
 
             if resume:
-                path.append(resume.first().attachment_file.path)
+                serializer = AttachmentURLSerializer(resume.first())
+                path.append(serializer.data["attachment_file"])
 
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
@@ -288,7 +289,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     scrum_master_email = scrum_master.first().email
 
                 for i in project.attachments.all():
-                    path.append(i.attachment_file.path)
+                    serializer = AttachmentURLSerializer(i)
+                    path.append(serializer.data["attachment_file"])
 
                 res, error = self.po_mail(project, path, scrum_master_email, po_type)
                 if error == 'error':
@@ -696,7 +698,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
             total = consultants.count()
-            serializer = ConsultantTimeSheetSerializer(consultants[first:last], many=True)
+            serializer = ConsultantTimeSheetSerializer(consultants.order_by('-id', '-projects__timesheets__modified').distinct('id')[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)

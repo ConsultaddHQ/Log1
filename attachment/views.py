@@ -1,7 +1,7 @@
 import boto3
 import logging
-from django.contrib.contenttypes.models import ContentType
 from django.shortcuts import get_object_or_404
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status
 from rest_framework.response import Response
