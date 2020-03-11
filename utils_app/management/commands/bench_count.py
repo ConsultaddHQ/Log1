@@ -12,9 +12,13 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         queryset = Consultant.objects.filter(marketing__status='open')
-        on_project_con = Consultant.objects.filter(status='on_project').count()
+        on_bench_con = queryset.filter(status='on_bench').count()
         in_pool_con = queryset.filter(status='on_bench', marketing__in_pool=True).count()
-        on_bench_con = queryset.filter(status='on_bench', marketing__in_pool=False).count()
+        on_boarded = Consultant.objects.filter(
+            status='on_bench',
+            projects__statuses__status='on_boarded',
+            projects__statuses__is_current=True
+        ).count()
 
         data = {
             "response_type": "in_channel",
@@ -23,9 +27,9 @@ class Command(BaseCommand):
 #### Bench Status :memo: \n
 | Consultant Status | Count            |
 |:------------------|:-----------------|
-| In Marketing      | {on_bench_con}   |
+| Bench             | {on_bench_con}   |
 | In Pool           | {in_pool_con}    | 
-| On Project        | {on_project_con} | 
+| On boarded        | {on_boarded}     | 
 """
         }
 

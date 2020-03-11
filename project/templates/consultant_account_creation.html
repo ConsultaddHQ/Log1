@@ -79,16 +79,18 @@ th.footer img {
                               <tr style="padding:0;vertical-align:top">
                                 <th style="margin:0;color:#3c4043;font-family:Roboto,Helvetica,Arial,sans-serif;font-size:14px;font-weight:400;line-height:inherit;margin:0;padding:0 0 24px;text-align:left">
 
-                                  <p>Hello {{ consultant_name }},</p>
+                                  <p style="margin-left:-20px;" >Hello {{ consultant_name }},</p>
                                   <h2 style="margin:0;margin-bottom:8px;color:#3c4043;font-family:Google Sans,Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:30px!important;margin:0;margin-bottom:24px;margin-top:20px;padding:0;word-wrap:normal"> Your account is created on Consultadd Timesheet App</h2>
 
                                   <ul style="color:#3c4043;font-size:14px;line-height:24px;padding-left:0px;">
-                                    <li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none;"><strong>your login info:</strong> </li>
+									<li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none; margin-top: 10px;"> <strong> Download the app from below link</strong> </li>
+									<li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none; margin-top: 10px; "><strong>Android:</strong> <span style="cursor: pointer;">{{ android_link }}</span> </li>
+                                      <li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none;"><strong>Iphone: </strong>  <span style="cursor: pointer;">{{ iphone_link }} </span> (You can use this link only once)</li>
+
+                                      <li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none; margin-top: 10px; margin-bottom: 10px; "><strong>your login info</strong> </li>
                                       <li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none;"><strong>Email:</strong> {{ consultant_email }} </li>
                                       <li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none;"><strong>Password:</strong> {{ password }} </li>
-
-                                      <li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none; margin-top: 10px;">Download the app from Apple store </li>
-                                      <li style="color:#3c4043;font-size:14px;line-height:24px;list-style: none; margin-top: 10px;"><strong>App Name: Consultadd Time Track</strong> </li>
+                                      
 
                                   <p>If you need help, contact <a href="#" style="margin:0;color:#1a73e8;font-family:Roboto,Helvetica,Arial,sans-serif;font-weight:400;line-height:24px;margin:0;padding:0;text-decoration:none">relations@consultadd.com</a>.</p>
                                   <p style="margin-top:8px;color:#3c4043;font-family:Google Sans,Helvetica,Arial,sans-serif;font-size:14px;font-weight:700;line-height:24px;margin:0;margin-bottom:0px;padding:0">Regards,</p>

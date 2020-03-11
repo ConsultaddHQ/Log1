@@ -41,7 +41,6 @@ SCREENING_STATUS_CHOICES = (
 )
 
 INTERVIEW_MODE = (
-    ('', 'Voice Call'),
     ('skype', 'Skype'),
     ('webex', 'Webex'),
     ('dial_in', 'Dial In'),

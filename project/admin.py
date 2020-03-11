@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from utils_app.admin import ExportCsvMixin
-from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, ProjectStatus
+from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, ProjectStatus, IphoneAppLink
 
 
 @admin.register(Project)
@@ -27,8 +27,8 @@ class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     empty_value_display = '-------'
     list_display = ('id', 'project', 'support', 'start', 'end')
-    search_fields = ('id', 'project__consultant__name', 'status', 'project__submission__client', 'support__employee_name',
-                     'project__submission__created_by__employee_name')
+    search_fields = ('id', 'project__consultant__name', 'status', 'project__submission__client',
+                     'support__employee_name', 'project__submission__created_by__employee_name')
 
 
 @admin.register(ProjectStatus)
@@ -53,4 +53,11 @@ class TimeSheetAdmin(admin.ModelAdmin, ExportCsvMixin):
 class PayrollScheduleAdmin(admin.ModelAdmin, ExportCsvMixin):
     list_display = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
     search_fields = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
+    actions = ["export_as_csv"]
+
+
+@admin.register(IphoneAppLink)
+class PayrollScheduleAdmin(admin.ModelAdmin, ExportCsvMixin):
+    list_display = ('id', 'code', 'sent_on', 'consultant', 'link', 'is_sent')
+    search_fields = ('id', 'code', 'link', 'consultant')
     actions = ["export_as_csv"]

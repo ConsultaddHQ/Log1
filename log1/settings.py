@@ -145,23 +145,20 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
 # Media files Storage location (Documents)
-if os.environ.get('ENV') == 'prod' or os.environ.get('ENV') == 'dev':
-    AWS_DEFAULT_ACL = None
-    AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
-    AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
-    }
-    AWS_LOCATION = 'media'
+AWS_DEFAULT_ACL = None
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',
+}
+AWS_LOCATION = 'media'
 
-    PUBLIC_MEDIA_LOCATION = 'media'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
-    DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
-else:
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+PUBLIC_MEDIA_LOCATION = 'media'
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
+DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
+
 
 MODELS_PATH = os.path.join(BASE_DIR, 'models')
 
@@ -216,6 +213,7 @@ CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
     ('CONSULTANT_PASSWORD', ('Consultadd@123', 'Consultant login password')),
+    ('ANDROID_APP_LINK', ('http://bit.ly/2TBgKRc', 'Andoird App Download Link')),
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
     ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
     ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
@@ -223,16 +221,18 @@ CONSTANCE_CONFIG = OrderedDict([
     ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
-    ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "MatterMost")),
-    ('offer_failure', ('https://mm.consultadd.com/hooks/n1j5juob5ffnfj93kehbzapeih', "MatterMost")),
-    ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "MatterMost")),
-    ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "MatterMost")),
-    ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "MatterMost")),
-    ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "MatterMost")),
+    ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "Recruitment Channel")),
+    ('offer_failure', ('https://mm.consultadd.com/hooks/n1j5juob5ffnfj93kehbzapeih', "Offer Failure Channel")),
+    ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "45dayslimit Channel")),
+    ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "Offer Announcement Channel")),
+    ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "Loudspeaker Channel")),
+    ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "Announcement Channel")),
+    ('joined_url', ('https://mm.consultadd.com/hooks/ixfc4oeeofb53d149dc3cq5ddy', "Joining Announcement Channel")),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'constants': ('CONSULTANT_PASSWORD',),
+    'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
-    'Web Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url'),
+    'Web-Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url',
+                  'loud_speakers_url', 'joined_url'),
 }

@@ -33,10 +33,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
     create_serializer_class = ProjectGetSerializer
     authentication_classes = (TokenAuthentication,)
 
-    def consultant_mail_on_joining(self, project, password):
+    def consultant_mail_on_joining(self, project, password, link):
         try:
             cc = []
-            submission = project.submission
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
 
@@ -45,9 +44,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             if retention:
                 cc.append(retention.email)
-
             mail_data = {
                 'to': [project.consultant.email],
+                # 'to': ['sarang.m@consultadd.in', 'aditi.so@consultadd.in'],
                 'cc': cc,
                 'bcc': [],
                 'subject': f'{project.consultant.name} Consultadd Timesheet tracking app account created',
@@ -56,6 +55,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_name': project.consultant.name,
                     'consultant_email': project.consultant.email,
                     'password': password,
+                    'android_link': config.ANDROID_APP_LINK,
+                    'iphone_link': link,
                 },
             }
             res = send_email(mail_data, config.RELATIONS)
@@ -118,7 +119,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recordings = ", ".join(recordings) if len(recordings) != 0 else "NA"
 
             if resume:
-                path.append(resume.first().attachment_file.path)
+                serializer = AttachmentURLSerializer(resume.first())
+                path.append(serializer.data["attachment_file"])
 
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
@@ -287,7 +289,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     scrum_master_email = scrum_master.first().email
 
                 for i in project.attachments.all():
-                    path.append(i.attachment_file.path)
+                    serializer = AttachmentURLSerializer(i)
+                    path.append(serializer.data["attachment_file"])
 
                 res, error = self.po_mail(project, path, scrum_master_email, po_type)
                 if error == 'error':
@@ -440,7 +443,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project.save()
 
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
-            if prev_status_obj.status != new_status and new_status not in prev_statuses:
+            if new_status not in prev_statuses:
                 p_status, p_s_created = ProjectStatus.objects.get_or_create(
                     status=new_status,
                     is_current=True,
@@ -510,10 +513,19 @@ Joining Date :   {str(project.start_date)}\n\n
 """
                     }
                     post_msg_using_webhook(config.offer_url, data)
-
                     if os.environ.get('ENV', 'local') == 'prod':
-                        # resp, err = self.consultant_mail_on_joining(project, password)
-                        logger.info(f"Email sent to Consultant - {project.consultant.email}")
+                        links = IphoneAppLink.objects.filter(is_sent=False)
+                        iphone_link = None
+                        if links:
+                            link = links.first()
+                            iphone_link = link.link
+                            # resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                            if err == 'ok':
+                                link.is_sent = True
+                                link.sent_on = datetime.now()
+                                link.consultant = project.consultant
+                                link.save()
+                        # resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
 
             serializer = self.serializer_class(project)
 
@@ -686,7 +698,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
             total = consultants.count()
-            serializer = ConsultantTimeSheetSerializer(consultants[first:last], many=True)
+            serializer = ConsultantTimeSheetSerializer(consultants.order_by('-id', '-projects__timesheets__modified').distinct('id')[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)

@@ -31,6 +31,7 @@ VISA_CHOICES = (
     ('h1b', 'H1B'),
     ('other', 'Other'),
     ('gc_ead', 'GC EAD'),
+    ('tps_ead', 'TPs EAD'),
     ('cpt-ead', 'CPT EAD'),
     ('gc', 'Green Card Holder'),
     ('opt-ext', 'OPT Extension'),
