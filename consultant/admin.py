@@ -8,7 +8,6 @@ from .models import Consultant, ConsultantProfile, ConsultantMarketing, Consulta
 @admin.register(Consultant)
 class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('status',)
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
     list_display = ('id', 'name', 'email', 'date_of_birth', 'phone_no', 'skills', 'status', 'current_city', 'ssn',
@@ -26,7 +25,6 @@ class ConsultantToken(admin.ModelAdmin):
 @admin.register(ConsultantProfile)
 class ConsultantProfileAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     search_fields = ('id', 'consultant__name', 'consultant__email', 'profile_owner__employee_name')
     list_display = ('id', 'title', 'consultant', 'profile_owner', 'date_of_birth', 'linkedin', 'current_city',
                     'profile_owner', 'visa_type', 'visa_start', 'visa_end', 'links', 'education')
@@ -35,7 +33,6 @@ class ConsultantProfileAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(WorkAuth)
 class WorkAuthAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('is_current', 'visa_type')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'visa_type')
     list_display = ('id', 'consultant', 'visa_type', 'visa_start', 'visa_end', 'is_current')
@@ -44,7 +41,6 @@ class WorkAuthAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(Education)
 class EducationAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     search_fields = ('id', 'consultant__name', 'consultant__email', 'org_name', 'title', 'major', 'city')
     list_display = ('id', 'title', 'consultant', 'org_name', 'edu_type', 'major', 'start_date', 'end_date', 'city')
 

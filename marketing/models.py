@@ -57,7 +57,7 @@ SCREENING_CHOICES = (
 
 
 class VendorCompany(models.Model):
-    name = models.CharField(_('Company'), max_length=50)
+    name = models.CharField(_('Company'), max_length=100)
     created_by = models.CharField(_('Created By'), max_length=50, null=True, blank=True)
 
     def __str__(self):
