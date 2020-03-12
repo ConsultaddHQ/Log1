@@ -14,7 +14,7 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 
 from project.models import Project
 from consultant.serializers import *
-from marketing.models import Submission, Interview
+from marketing.models import Interview
 from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentURLSerializer
 
@@ -337,9 +337,9 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             consultant_id = kwargs.get('pk')
             if marketing_stage == 'interview':
                 interviews = Interview.objects.filter(
-                    submission__consultant_marketing__consultant_id=consultant_id,
-                    submission__consultant_marketing__status='open',
                     submission__consultant_marketing__end=None,
+                    submission__consultant_marketing__status='open',
+                    submission__consultant_marketing__consultant_id=consultant_id,
                 )
                 data, counts = self.get_interview_data(interviews, filter_by_status, first, last)
                 if counts == "error":

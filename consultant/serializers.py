@@ -150,6 +150,7 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
 
 
 class ConsultantBenchSerializer(serializers.ModelSerializer):
+    rate = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
     relation = serializers.SerializerMethodField()
@@ -158,7 +159,6 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     education = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
-    rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant

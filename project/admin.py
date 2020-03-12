@@ -7,11 +7,10 @@ from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('statuses__status',)
     search_fields = ('id', 'consultant__name', 'submission__client', 'submission__created_by__employee_name')
     list_display = ('id', 'submission', 'start_date', 'end_date', 'consultant', 'project_status_display',
-                    'client_address', 'city', 'vendor_address')
+                    'client_display', 'vendor_display', 'client_address', 'city', 'vendor_address')
 
     def project_status_display(self, obj):
         statuses = obj.statuses.filter(is_current=True)
@@ -21,11 +20,19 @@ class ProjectAdmin(admin.ModelAdmin, ExportCsvMixin):
 
     project_status_display.short_description = "Status"
 
+    def client_display(self, obj):
+        return obj.submission.client
+    client_display.short_description = "Client"
+
+    def vendor_display(self, obj):
+        return obj.submission.lead.vendor_company.name
+
+    vendor_display.short_description = "Vendor"
+
 
 @admin.register(ProjectSupport)
 class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_display = ('id', 'project', 'support', 'start', 'end')
     search_fields = ('id', 'project__consultant__name', 'status', 'project__submission__client',
                      'support__employee_name', 'project__submission__created_by__employee_name')
@@ -34,7 +41,6 @@ class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(ProjectStatus)
 class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('status', 'is_current')
     list_display = ('id', 'project', 'status', 'created', 'is_current')
     search_fields = ('project__consultant__name', 'status', 'project__submission__client', 'is_current')
@@ -43,7 +49,6 @@ class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(TimeSheet)
 class TimeSheetAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('status',)
     search_fields = ('id', 'project__id', 'project__consultant__name', 'project__consultant__email')
     list_display = ('id', 'project', 'is_active', 'status', 'hours', 'additional_hours', 'start', 'end', 'created')

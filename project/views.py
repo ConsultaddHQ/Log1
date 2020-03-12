@@ -46,7 +46,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 cc.append(retention.email)
             mail_data = {
                 'to': [project.consultant.email],
-                # 'to': ['sarang.m@consultadd.in', 'aditi.so@consultadd.in'],
                 'cc': cc,
                 'bcc': [],
                 'subject': f'{project.consultant.name} Consultadd Timesheet tracking app account created',
@@ -226,9 +225,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
         marketer = submission.created_by
         try:
             vendor = submission.vendor_contact
+            if vendor:
+                vendor_name = vendor.name
+                vendor_email = vendor.email
+                vendor_number = vendor.number
+            else:
+                vendor_name = None
+                vendor_email = None
+                vendor_number = None
+
+            to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
+
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
-            to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
 
             if recruiter:
                 to.append(recruiter.email)
@@ -249,11 +258,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'context': {
                     'end': project.end_date,
                     'rate': submission.rate,
-                    'vendor_name': vendor.name,
                     'remark': project.feedback,
                     'start': project.start_date,
-                    'vendor_email': vendor.email,
-                    'vendor_number': vendor.number,
+                    'vendor_name': vendor_name,
+                    'vendor_email': vendor_email,
+                    'vendor_number': vendor_number,
                     'client_name': submission.client,
                     'job_title': submission.lead.job_title,
                     'employer': submission.employer.title(),
@@ -512,7 +521,8 @@ Joining Date :   {str(project.start_date)}\n\n
 `Total Project Joined count of this month - {team_joined_count}`
 """
                     }
-                    post_msg_using_webhook(config.offer_url, data)
+                    post_msg_using_webhook(config.joined_url, data)
+
                     if os.environ.get('ENV', 'local') == 'prod':
                         links = IphoneAppLink.objects.filter(is_sent=False)
                         iphone_link = None
@@ -698,7 +708,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
             total = consultants.count()
-            serializer = ConsultantTimeSheetSerializer(consultants.order_by('-id', '-projects__timesheets__modified').distinct('id')[first:last], many=True)
+            queryset = consultants.order_by('-id', '-projects__timesheets__modified').distinct('id')[first:last]
+            serializer = ConsultantTimeSheetSerializer(queryset, many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)

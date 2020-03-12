@@ -81,7 +81,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             else:
                 project = get_object_or_404(Project, id=object_id)
 
-                msa, work_order, s_msa, s_work_order,  = 0, 0, 0, 0
+                msa, work_order, s_msa, s_work_order = 0, 0, 0, 0
                 client_address, vendor_address, reporting_details = 0, 0, 0
 
                 start_date = 1 if project.start_date else 0
@@ -114,7 +114,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     reporting_details = 1
 
                 list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
-                                  + reporting_details) / 6 >= 1 else False
+                                       + reporting_details) / 6 >= 1 else False
 
                 check_list = {
                     "total": 6,
@@ -147,8 +147,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
 
-                msa, client_address, vendor_address, work_order, reporting_details = 0, 0, 0, 0, 0
-                s_msa, s_work_order = 0, 0
+                client_address, vendor_address,  reporting_details = 0, 0, 0
+                msa, work_order, s_msa, s_work_order = 0, 0, 0, 0
 
                 start_date = 1 if project.start_date else 0
 

@@ -7,7 +7,6 @@ from marketing.models import VendorCompany, VendorContact, Lead, Submission, Int
 @admin.register(VendorCompany)
 class VendorCompanyAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('created_by', 'name')
     search_fields = ('id', 'name', 'created_by')
     list_display = ('id', 'name', 'created_by', 'vendor_display')
@@ -23,7 +22,6 @@ class VendorCompanyAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(VendorContact)
 class VendorContactAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('company__name',)
     list_display = ('id', 'name', 'email', 'number', 'company', 'created_by')
     search_fields = ('id', 'name', 'email', 'company__name', 'created_by__email', 'created_by__employee_name')
@@ -32,7 +30,6 @@ class VendorContactAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     search_fields = ('id', 'job_title', 'status', 'owner__employee_name', 'vendor_company__name', 'primary_skill')
     list_display = ('id', 'job_title', 'city', 'primary_skill', 'status', 'owner', 'vendor_company', 'sub_display')
 
@@ -47,7 +44,6 @@ class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('status',)
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
                      'consultant_marketing__consultant__email')
@@ -80,9 +76,8 @@ class VendorLayerAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(Interview)
 class InterviewAdmin(admin.ModelAdmin, ExportCsvMixin):
-    empty_value_display = '-------'
     actions = ['export_as_csv', 'make_status_feedback_due']
-    list_filter = ('status',)
+    list_filter = ('status', 'interview_mode', 'screening_type')
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
                      'calendar_id', 'submission__created_by__employee_name')
     list_display = ('id', 'round', 'supervisor', 'status', 'screening_type', 'start_time', 'end_time', 'submission',
