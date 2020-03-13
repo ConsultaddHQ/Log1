@@ -100,12 +100,15 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.query_params.get('query', '')
             teams = request.query_params.get('teams', None)
             user_type = request.query_params.get('type', None)
-            users = User.objects.exclude(role__name='consultant')
+            users = User.objects.exclude(role__name='consultant', is_active=False)
             if user_type:
                 users = users.filter(role__name=user_type)
             elif teams:
                 teams = teams.split(",")
-                users = users.filter(team__name__in=teams)
+                if 'Consultadd' in teams and 'superadmin' in request.user.roles:
+                    users = users.filter(role__name='marketer')
+                else:
+                    users = users.filter(team__name__in=teams)
             elif user_type == 'team':
                 if 'superadmin' in request.user.roles:
                     users = users.filter(role__name='marketer')

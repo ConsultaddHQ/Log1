@@ -19,6 +19,7 @@ from project.serializers import *
 from api_key.permissions import HasAPIKey
 from consultant.models import ConsultantPOC
 from marketing.models import Submission, User
+from attachment.views import download_s3_object, delete_temp_file
 from utils_app.utils import get_time_filter, post_msg_using_webhook
 from utils_app.mailing import send_email_attachment_multiple, send_email
 
@@ -118,8 +119,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recordings = ", ".join(recordings) if len(recordings) != 0 else "NA"
 
             if resume:
-                serializer = AttachmentURLSerializer(resume.first())
-                path.append(serializer.data["attachment_file"])
+                path.append(download_s3_object(resume.first().attachment_file.name))
 
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
@@ -156,6 +156,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'attachments': path
             }
             res = send_email_attachment_multiple(mail_data, submission.created_by.email)
+            delete_temp_file(path)
             logger.error("Support mail res for {}".format(submission.created_by.email), res)
             return res, "ok"
         except Exception as error:
@@ -288,6 +289,34 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project_id = request.query_params.get('project_id', None)
             if project_id:
                 project = get_object_or_404(Project, id=project_id)
+
+                client_address, vendor_address, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0
+
+                start_date = 1 if project.start_date else 0
+
+                if project.attachments.filter(attachment_type='msa_signed'):
+                    s_msa = 1
+
+                if project.attachments.filter(attachment_type='work_order_signed'):
+                    s_work_order = 1
+
+                if project.attachments.filter(attachment_type='work_order_msa_signed'):
+                    s_msa, s_work_order = 1, 1
+
+                if project.client_address and len(project.client_address.strip()) > 0:
+                    client_address = 1
+
+                if project.vendor_address and len(project.vendor_address.strip()) > 0:
+                    vendor_address = 1
+
+                if project.reporting_details and len(project.reporting_details.strip()) > 0:
+                    reporting_details = 1
+
+                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                                       + reporting_details) / 6 >= 1 else False
+
+                if not list_status:
+                    return Response({"error": "Complete all details"}, status=status.HTTP_400_BAD_REQUEST)
                 po_type = 'created'
                 if project.statuses.filter(is_current=True).first().status == 'on_boarded':
                     po_type = 'updated'
@@ -298,16 +327,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     scrum_master_email = scrum_master.first().email
 
                 for i in project.attachments.all():
-                    serializer = AttachmentURLSerializer(i)
-                    path.append(serializer.data["attachment_file"])
+                    path.append(download_s3_object(i.attachment_file.name))
 
                 res, error = self.po_mail(project, path, scrum_master_email, po_type)
-                if error == 'error':
-                    return Response({"result": str(res)}, status=status.HTTP_400_BAD_REQUEST)
-                project.status = 'on_boarded'
-                project.save()
-
-                return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
+                if not error == 'error':
+                    delete_temp_file(path)
+                    project.status = 'on_boarded'
+                    project.save()
+                    return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
+                return Response({"result": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({"error": "Invalid Id"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
@@ -503,20 +531,27 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         submission__created_by__team=request.user.team,
                     ).count()
 
+                    client_emoji = ':tophat: '
+                    role_emoji = ':fist_oncoming: '
+                    employer_emoji = ':briefcase: '
+                    marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
+                    recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
+                    consultant_gender_emoji = ':women: ' if project.consultant.gender == 'female' else ':man: '
+
                     # Sending message on Mattermost on joined status
                     data = {
                         "response_type": "in_channel",
                         "username": "Log1 Updates",
                         "text": f"""
 #### Project Joined :metal: :smile: :metal:\n
-Employer :   {project.submission.employer.title()}
-Marketer :   {project.marketer_name}
-Consultant :   {project.consultant.name}
-Recruiter :   {project.consultant.recruiter.employee_name}
-Location: {project.city}
-Client :  {project.submission.client}
-Role :  {project.submission.lead.job_title}
-Joining Date :   {str(project.start_date)}\n\n
+{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+{marketer_gender_emoji} Marketer :   {project.marketer_name}
+{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{employer_emoji} Employer :   {project.submission.employer.title()}
+:us: Location: {project.city}
+{client_emoji} Client :  {project.submission.client}
+{role_emoji} Role :  {project.submission.lead.job_title}
+:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n
 `Project Joined count of {project.submission.employer} for this month - {total_joined_count} `
 `Total Project Joined count of this month - {team_joined_count}`
 """
@@ -541,12 +576,12 @@ Joining Date :   {str(project.start_date)}\n\n
 
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
             total_offer_count = Project.objects.filter(
-                statuses__status='new',
+                statuses__status='received',
                 statuses__created__gte=day_one,
             ).count()
 
             team_offer_count = Project.objects.filter(
-                statuses__status='new',
+                statuses__status='received',
                 statuses__created__gte=day_one,
                 submission__created_by__team=request.user.team,
             ).count()
@@ -566,9 +601,18 @@ Joining Date :   {str(project.start_date)}\n\n
             # Discord message for PO
             if new_status == 'received' and not project.is_msg_sent:
                 interviews = project.submission.screening.exclude(status='cancelled')
+                ctb_gender = interviews.last().supervisor.gender
                 supervisors = "\n".join(
-                    [f"-    Round {interview.round}  {interview.supervisor.employee_name}\n" for interview in
+                    [f"-    Round {interview.round} - {interview.supervisor.employee_name}\n" for interview in
                      interviews if interview.supervisor])
+
+                client_emoji = ':tophat: '
+                role_emoji = ':fist_oncoming: '
+                employer_emoji = ':briefcase: '
+                ctb_gender_emoji = ':raising_hand_woman: ' if ctb_gender == 'female' else ':raising_hand_man: '
+                marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
+                recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
+                consultant_gender_emoji = ':women: ' if project.consultant.gender == 'female' else ':man: '
 
                 # Sending message on Mattermost
                 data = {
@@ -576,16 +620,16 @@ Joining Date :   {str(project.start_date)}\n\n
                     "username": "Log1 Updates",
                     "text": f"""
 #### Offer :metal: :smile: :metal:\n
-Employer :   {project.submission.employer.title()}
-Marketer :   {project.marketer_name}
-Consultant :   {project.consultant.name}
-Recruiter :   {project.consultant.recruiter.employee_name}
-CTB :
+{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+{marketer_gender_emoji} Marketer :   {project.marketer_name}
+{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{employer_emoji} Employer :   {project.submission.employer.title()}
+{ctb_gender_emoji} CTB :
 {supervisors}
-Location: {project.city}
-Client :  {project.submission.client}
-Role :  {project.submission.lead.job_title}
-Start Date :   {str(project.start_date)}\n\n
+:us: Location: {project.city}
+{client_emoji} Client :  {project.submission.client}
+{role_emoji} Role :  {project.submission.lead.job_title}
+:spiral_calendar: Start Date :   {str(project.start_date)}\n\n
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
 `Total offer count of this month - {total_offer_count}`
 """
@@ -626,19 +670,21 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
                 consultant=OuterRef("consultant_id"), end=None, poc_type='relation')
 
             data = projects.annotate(
+                location=F('city'),
                 status=F('statuses__status'),
                 client=F('submission__client'),
-                location=F('submission__lead__city'),
+                employer=F('submission__employer'),
+                job_desc=F('submission__lead__job_desc'),
                 job_title=F('submission__lead__job_title'),
                 marketer_email=F('submission__created_by__email'),
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-                recruiter=Subquery(recruiter.values('poc__employee_name')[:1]),
                 relation=Subquery(relation.values('poc__employee_name')[:1]),
+                recruiter=Subquery(recruiter.values('poc__employee_name')[:1]),
             ).values(
                 'id', 'client', 'consultant__name', 'consultant__email', 'status', 'feedback', 'client', 'start_date',
-                'consultant__phone_no', 'created', 'modified', 'recruiter', 'relation', 'marketer_name',
-                'marketer_email', 'vendor', 'location', 'end_date')
+                'consultant__phone_no', 'created', 'modified', 'recruiter', 'relation', 'marketer_name', 'job_title',
+                'marketer_email', 'vendor', 'location', 'end_date', 'job_desc', 'employer')
 
             return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as error:

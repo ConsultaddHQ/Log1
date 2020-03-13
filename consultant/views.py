@@ -502,7 +502,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.all()
+            consultants = Consultant.objects.exclude(status='archived')
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name)
@@ -525,10 +525,10 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 )
 
             consultants = consultants.order_by('id').distinct('id')
-            in_pool = consultants.filter(status='on_bench', marketing__in_pool=True, )
-            in_marketing = consultants.filter(status='on_bench', marketing__status='open', marketing__in_pool=False)
-            candidate = consultants.filter(status='on_bench').exclude(marketing__status='open')
             on_project = consultants.filter(status='on_project')
+            candidate = consultants.filter(status='on_bench', marketing__status='close')
+            in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True)
+            in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False)
 
             count = {
                 "in_pool": in_pool.count(),
@@ -603,7 +603,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericVie
             for marketer_id in marketer_ids:
                 marketer = get_object_or_404(User, id=marketer_id)
                 consultant_marketing.marketer.add(marketer)
-
+            return Response({"result": "Cycle Created"}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
