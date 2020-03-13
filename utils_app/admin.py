@@ -3,7 +3,7 @@ import csv
 from django.contrib import admin
 from django.http import HttpResponse
 
-from .models import City
+from .models import City, ScrumMeeting
 
 
 class ExportCsvMixin:
@@ -29,3 +29,10 @@ class CityAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     search_fields = ('name', 'state')
     list_display = ('id', 'name', 'state')
+
+
+@admin.register(ScrumMeeting)
+class ScrumMeetingAdmin(admin.ModelAdmin, ExportCsvMixin):
+    actions = ["export_as_csv"]
+    search_fields = ('previous', 'held_on')
+    list_display = ('id', 'held_on', 'previous')

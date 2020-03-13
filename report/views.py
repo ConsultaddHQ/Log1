@@ -27,7 +27,7 @@ class ScrumMeetingReport(GenericViewSet):
         scrum_meeting = ScrumMeeting.objects.filter(previous=True)
         if scrum_meeting:
             previous_meeting_date = scrum_meeting.first().held_on
-            teams = Team.objects.exclude(name__in=['Garuda', 'Flash', 'X+', 'Consultadd', 'Okyte'])
+            teams = Team.objects.filter(dept="Marketing")
             text = f"""
 #### Scrum Report ({str(previous_meeting_date)} - {str(date.today())}) :chart_with_upwards_trend:\n
 | Team | Interviews | Offers | Bench | Pool |
@@ -37,17 +37,21 @@ class ScrumMeetingReport(GenericViewSet):
                 team_name = team.name
                 pool = ConsultantMarketing.objects.filter(
                     teams__name=team_name, in_pool=True,
-                    status='open').distinct('consultant').order_by().count()
+                    status='open'
+                ).distinct('consultant').order_by().count()
                 bench = ConsultantMarketing.objects.filter(
                     teams__name=team_name, in_pool=False,
-                    status='open').distinct('consultant').order_by().count()
+                    status='open'
+                ).distinct('consultant').order_by().count()
                 interviews = Interview.objects.filter(
                     submission__created_by__team__name=team_name,
                     created__gte=previous_meeting_date
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offers = Project.objects.filter(
-                    submission__lead__marketer__team__name=team_name,
-                    created__gte=previous_meeting_date).count()
+                    statuses__status="received",
+                    statuses__created__gte=previous_meeting_date,
+                    submission__created_by__team__name=team_name,
+                ).count()
 
                 text += \
                     f"""| ** {team_name} ** | {interviews} | {offers} | {bench} | {pool} |\n"""

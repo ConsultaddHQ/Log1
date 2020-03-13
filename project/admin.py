@@ -43,7 +43,7 @@ class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     list_filter = ('status', 'is_current')
     list_display = ('id', 'project', 'status', 'created', 'is_current')
-    search_fields = ('project__consultant__name', 'status', 'project__submission__client', 'is_current')
+    search_fields = ('id', 'project__consultant__name', 'status', 'project__submission__client', 'is_current')
 
 
 @admin.register(TimeSheet)
