@@ -61,6 +61,7 @@ GENDER_CHOICE = (
 )
 
 WORK_TYPE_CHOICE = (
+    ('w2', 'W2'),
     ('c2c', 'C2C'),
     ('full_time', 'Full Time'),
 )

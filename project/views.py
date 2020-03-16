@@ -39,24 +39,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
             cc = []
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
-
             if recruiter:
                 cc.append(recruiter.email)
-
             if retention:
                 cc.append(retention.email)
+
             mail_data = {
                 'to': [project.consultant.email],
                 'cc': cc,
                 'bcc': [],
-                'subject': f'{project.consultant.name} Consultadd Timesheet tracking app account created',
                 'template': '../templates/consultant_account_creation.html',
+                'subject': f'Your account created on Consultadd Timesheet tracking app',
                 'context': {
+                    'iphone_link': link,
+                    'password': password,
+                    'tutorial_video': config.TUTORIAL_VIDEO,
+                    'android_link': config.ANDROID_APP_LINK,
                     'consultant_name': project.consultant.name,
                     'consultant_email': project.consultant.email,
-                    'password': password,
-                    'android_link': config.ANDROID_APP_LINK,
-                    'iphone_link': link,
                 },
             }
             res = send_email(mail_data, config.RELATIONS)
@@ -482,7 +482,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 p_status, p_s_created = ProjectStatus.objects.get_or_create(
-                    status=new_status,
+                    status=new_status.lower(),
                     is_current=True,
                     project=project
                 )
@@ -536,7 +536,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     employer_emoji = ':briefcase: '
                     marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
                     recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
-                    consultant_gender_emoji = ':women: ' if project.consultant.gender == 'female' else ':man: '
+                    consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
 
                     # Sending message on Mattermost on joined status
                     data = {
@@ -612,7 +612,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 ctb_gender_emoji = ':raising_hand_woman: ' if ctb_gender == 'female' else ':raising_hand_man: '
                 marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
                 recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
-                consultant_gender_emoji = ':women: ' if project.consultant.gender == 'female' else ':man: '
+                consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
 
                 # Sending message on Mattermost
                 data = {
@@ -707,13 +707,19 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            projects = Project.objects.filter(consultant_id=kwargs.get('pk', None), statuses__status='joined')
+            projects = Project.objects.filter(
+                statuses__is_current=True,
+                statuses__status='joined',
+                consultant_id=kwargs.get('pk', None),
+            )
             if projects:
                 project = projects.latest('id')
                 if start:
-                    queryset = TimeSheet.objects.filter(project=project, start__range=[start, end])
+                    queryset = TimeSheet.objects.filter(
+                        project=project, start__range=[start, end]
+                    ).exclude(status='draft')
                 else:
-                    queryset = TimeSheet.objects.filter(project=project)
+                    queryset = TimeSheet.objects.filter(project=project).exclude(status='draft')
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
