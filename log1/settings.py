@@ -212,8 +212,10 @@ NOTIFICATIONS_CHANNELS = {
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
-    ('CONSULTANT_PASSWORD', ('Consultadd@123', 'Consultant login password')),
+    ('TUTORIAL_VIDEO', ('http://bit.ly/38VJ19o', 'Tutorial video Link')),
+    ('CONSULTANT_PASSWORD', ('Consultadd@12345', 'Consultant login password')),
     ('ANDROID_APP_LINK', ('http://bit.ly/2TBgKRc', 'Andoird App Download Link')),
+
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
     ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
     ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
@@ -221,6 +223,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
+
     ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "Recruitment Channel")),
     ('offer_failure', ('https://mm.consultadd.com/hooks/n1j5juob5ffnfj93kehbzapeih', "Offer Failure Channel")),
     ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "45dayslimit Channel")),
@@ -231,7 +234,7 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK'),
+    'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEOs'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
     'Web-Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url',
                   'loud_speakers_url', 'joined_url'),

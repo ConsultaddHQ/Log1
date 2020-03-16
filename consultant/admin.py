@@ -8,7 +8,7 @@ from .models import Consultant, ConsultantProfile, ConsultantMarketing, Consulta
 @admin.register(Consultant)
 class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    list_filter = ('status',)
+    list_filter = ('status', 'work_type')
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
     list_display = ('id', 'name', 'email', 'date_of_birth', 'phone_no', 'skills', 'status', 'current_city', 'ssn',
                     'links', 'gender', 'work_type', 'password', 'is_active')
