@@ -48,7 +48,6 @@ class EducationAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(Experience)
 class ExperienceAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     search_fields = ('id', 'consultant__name', 'consultant__email', 'title', 'city')
     list_display = ('id', 'title', 'consultant', 'exp_type', 'start_date', 'end_date', 'city')
 
@@ -56,18 +55,16 @@ class ExperienceAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(FeedbackDetail)
 class FeedbackDetail(admin.ModelAdmin):
     search_fields = ('id',)
-    empty_value_display = '-------'
     list_display = ('id', 'role_knowledge', 'experience', 'programming', 'communication', 'problem_solving', 'organizational')
 
 
 @admin.register(ConsultantMarketing)
 class ConsultantMarketingAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_filter = ('status',)
     search_fields = ('id', 'consultant__name', 'consultant__email')
     list_display = ('id', 'cycle', 'consultant', 'start', 'end', 'in_pool', 'preferred_location', 'team_display',
-                    'status', 'primary_marketer', 'marketer_display')
+                    'status', 'primary_marketer')
 
     def team_display(self, obj):
         return ", ".join([
@@ -76,18 +73,10 @@ class ConsultantMarketingAdmin(admin.ModelAdmin, ExportCsvMixin):
 
     team_display.short_description = "Teams"
 
-    def marketer_display(self, obj):
-        return ", ".join([
-            marketer.employee_name for marketer in obj.marketer.all()
-        ])
-
-    marketer_display.short_description = "Marketers"
-
 
 @admin.register(ConsultantRateRevision)
 class ConsultantRateRevisionAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     search_fields = ('id', 'consultant__name', 'consultant__email')
     list_display = ('id', 'consultant', 'rate', 'start', 'end', 'feedback')
 
@@ -95,7 +84,6 @@ class ConsultantRateRevisionAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(ConsultantPOC)
 class ConsultantPOCAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     list_display = ('id', 'consultant', 'poc_type', 'poc', 'start', 'end')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'poc__employee_name')
 
@@ -103,7 +91,6 @@ class ConsultantPOCAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(ConsultantFeedback)
 class ConsultantFeedbackAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    empty_value_display = '-------'
     search_fields = ('id', 'consultant__name', 'feedback_type')
     list_display = ('id', 'consultant', 'rating', 'feedback_type', 'role', 'experience', 'programming', 'communication',
                     'problem_solving', 'organizational')

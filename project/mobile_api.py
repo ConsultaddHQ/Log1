@@ -135,7 +135,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
 
             # Push Notification
             message_body = {
-                "category": "rejected",
+                "category": "alert",
                 "show_in_foreground": True,
                 "title": f"{request.user.name} - {str(timesheet.end)}",
                 "click_action": "FLUTTER_NOTIFICATION_CLICK",

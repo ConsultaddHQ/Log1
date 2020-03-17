@@ -56,4 +56,4 @@ class Command(BaseCommand):
 | Not Joined Yet                 | {offers_not_joined} |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        mattermost_webhook(config.joined_url, data)

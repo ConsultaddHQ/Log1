@@ -47,4 +47,4 @@ class Command(BaseCommand):
 | Joined      | {joined_projects} |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        mattermost_webhook(config.marketing_report_url, data)

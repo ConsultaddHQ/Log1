@@ -59,4 +59,4 @@ class Command(BaseCommand):
             "text": text
         }
 
-        mattermost_webhook(config.offer_url, data)
+        mattermost_webhook(config.marketing_report_url, data)

@@ -59,7 +59,7 @@ class SlashCommandViewSets(GenericViewSet):
 
     def team_data_by_day(self, day, month, year, command):
         text = f"""#### Team Status :memo: \n
-Date - {month}-{day}-{year}
+Date - {self.months[month]} {day}, {year}
 command - {command}\n
 | Team Name | Scrum Master | Current Bench | Submission | Interview | Offer | Joined |
 |:----------|:-------------|:--------------|:-----------|:----------|:------|:-------|
