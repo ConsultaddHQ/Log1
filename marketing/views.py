@@ -146,10 +146,7 @@ class LeadViewSets(viewsets.ModelViewSet):
             archive = queryset.filter(status='archived').count()
 
             if filter_by_status:
-                if filter_by_status == 'archived':
-                    queryset = queryset.filter(status=filter_by_status).exclude(status='archived')
-                else:
-                    queryset = queryset.filter(status=filter_by_status)
+                queryset = queryset.filter(status=filter_by_status)
 
             data_counts = {
                 "new": new,
@@ -159,11 +156,18 @@ class LeadViewSets(viewsets.ModelViewSet):
                 "archive": archive,
             }
 
-            data = queryset.exclude(status='archived')[first:last].annotate(
-                company_name=F('vendor_company__name'),
-                company_id=F('vendor_company__id'),
-            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                     'company_name', 'status', 'created', 'modified', 'submission_count')
+            if filter_by_status == 'archived':
+                data = queryset[first:last].annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                         'company_name', 'status', 'created', 'modified', 'submission_count')
+            else:
+                data = queryset.exclude(status='archived')[first:last].annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                         'company_name', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
         except Exception as error:
@@ -262,6 +266,22 @@ class LeadViewSets(viewsets.ModelViewSet):
             lead.status = 'archived'
             lead.save()
             return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='archived')
+    def archived(self, request):
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+            last, first = page * page_size, page * page_size - page_size
+            leads = Lead.objects.filter(owner=request.user)
+            filter_by_status = 'archived'
+            data, data_counts = self.get_lead_data(leads, filter_by_status, first, last)
+            if data_counts == 'error':
+                return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -490,7 +510,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     Q(consultant_marketing__status='open',
                       consultant_marketing__consultant__pocs__poc=request.user,
                       consultant_marketing__consultant__pocs__poc_type='recruiter'
-                    )
+                      )
                 )
 
             if filter_for == 'my':

@@ -40,4 +40,4 @@ class Command(BaseCommand):
 | Joining in this Week | {joining_this_week} |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        mattermost_webhook(config.joined_url, data)

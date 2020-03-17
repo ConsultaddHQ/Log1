@@ -231,11 +231,12 @@ CONSTANCE_CONFIG = OrderedDict([
     ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "Loudspeaker Channel")),
     ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "Announcement Channel")),
     ('joined_url', ('https://mm.consultadd.com/hooks/ixfc4oeeofb53d149dc3cq5ddy', "Joining Announcement Channel")),
+    ('marketing_report_url', ('https://mm.consultadd.com/hooks/8iedae1ytffjmxpkd6cgry5hth', "Marketing Report Channel")),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEO'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
     'Web-Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url',
-                  'loud_speakers_url', 'joined_url'),
+                  'loud_speakers_url', 'joined_url', 'marketing_report_url'),
 }

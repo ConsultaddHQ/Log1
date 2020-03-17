@@ -22,7 +22,7 @@ from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
-from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, ConsultantMail
 
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
 
@@ -85,6 +85,7 @@ router.register(r'con_notify', ConsultantNotificationViewSet)
 router.register(r'consultant_app', ConsultantAppViewSets)
 router.register(r'consultant_auth', ConsultantAuthViewSets)
 router.register(r'consultant_password', ConsultantResetPasswordViewSets)
+router.register(r'mail', ConsultantMail)
 
 
 urlpatterns = [

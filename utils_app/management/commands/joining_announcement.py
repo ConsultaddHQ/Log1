@@ -51,4 +51,4 @@ class Command(BaseCommand):
 | Total Offer    |   {total_projects}    |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        mattermost_webhook(config.joined_url, data)
