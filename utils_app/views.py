@@ -57,6 +57,81 @@ class SlashCommandViewSets(GenericViewSet):
     months = ["Unknown", "January", "February", "March", "April", "May", "June", "July", "August", "September",
               "October", "November", "December"]
 
+    def team_data_by_day(self, day, month, year, command):
+        text = f"""#### Team Status :memo: \n
+Date - {month}-{day}-{year}
+command - {command}\n
+| Team Name | Scrum Master | Current Bench | Submission | Interview | Offer | Joined |
+|:----------|:-------------|:--------------|:-----------|:----------|:------|:-------|
+"""
+        scrum_master = "Sudeep B."
+        bench_consultant = Consultant.objects.filter(status='on_bench').count()
+        submission_count = Submission.objects.filter(
+            created__day=day,
+            created__year=year,
+            created__month=month
+        ).exclude(status='draft').count()
+        interview_count = Interview.objects.filter(
+            created__day=day,
+            created__year=year,
+            created__month=month,
+        ).exclude(status='cancelled').count()
+        offer_count = Project.objects.filter(
+            statuses__created__day=day,
+            statuses__status='received',
+            statuses__created__year=year,
+            statuses__created__month=month,
+        ).count()
+        joined_count = Project.objects.filter(
+            statuses__status='joined',
+            statuses__created__day=day,
+            statuses__created__year=year,
+            statuses__created__month=month,
+        ).count()
+
+        text += f"| Consultadd | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
+
+        teams = Team.objects.filter(dept='Marketing')
+        for team in teams:
+            bench_consultant = Consultant.objects.filter(
+                marketing__teams__name__iexact=team.name,
+                marketing__status='open'
+            ).count()
+            submission_count = Submission.objects.filter(
+                created__day=day,
+                created__year=year,
+                created__month=month,
+                created_by__team__name__iexact=team.name
+            ).exclude(status='draft').count()
+            interview_count = Interview.objects.filter(
+                created__day=day,
+                created__year=year,
+                created__month=month,
+                submission__created_by__team__name__iexact=team.name
+            ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+            offer_count = Project.objects.filter(
+                statuses__status='received',
+                statuses__created__day=day,
+                statuses__created__year=year,
+                statuses__created__month=month,
+                submission__created_by__team__name__iexact=team.name,
+            ).count()
+            joined_count = Project.objects.filter(
+                statuses__status='joined',
+                statuses__created__day=day,
+                statuses__created__year=year,
+                statuses__created__month=month,
+                submission__created_by__team__name__iexact=team.name,
+            ).count()
+            scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
+            scrum_master = None
+            if scrum_masters:
+                scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
+
+            text += f"| {team.name.title()} | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count}  |\n"
+
+        return text
+
     def team_data_by_start(self, start, command):
         text = f"""#### Team Status :memo: \n
 From Date - {start} to {str(date.today())}
@@ -107,19 +182,6 @@ command - {command}\n
                 scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
 
             text += f"| {team.name.title()} | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count}  |\n"
-
-        text += """\n\n
-| Team Name | Moved to Marketing |
-|:----------|:-------------------|
-"""
-        teams = Team.objects.filter(dept='Recruitment')
-        for team in teams:
-            consultant_count = Consultant.objects.filter(
-                pocs__poc__team=team,
-                pocs__poc_type='recruiter',
-                marketing__start__gte=start,
-            ).count()
-            text += f"| {team.name.title()} | {consultant_count} |\n"
 
         return text
 
@@ -198,19 +260,6 @@ command - {command}\n\n
 
             text += f"| {team.name.title()} | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
 
-        text += """\n\n
-| Team Name | Moved to Marketing |
-|:----------|:-------------------|
-"""
-        teams = Team.objects.filter(dept='Recruitment')
-        for team in teams:
-            consultant_count = Consultant.objects.filter(
-                pocs__poc__team=team,
-                pocs__poc_type='recruiter',
-                marketing__start__year=year,
-                marketing__start__month=month,
-            ).count()
-            text += f"| {team.name.title()} | {consultant_count} |\n"
         return text
 
     @action(methods=['get'], detail=False, url_path='consultant')
@@ -334,10 +383,12 @@ command - {command} {query}\n
                 return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
             text = slash_command
             arg1 = arguments[0]
+
             if arg1 == 'month':
                 if len(arguments) == 1:
                     start = date.today() - timedelta(days=30)
                     text = self.team_data_by_start(start, slash_command)
+
                 elif len(arguments) == 2:
                     arg2 = arguments[1]
                     this_month = datetime.today().month
@@ -348,6 +399,34 @@ command - {command} {query}\n
                     if month > this_month:
                         year = datetime.today().year - 1
                     text = self.team_data_by_month(month, year, slash_command)
+
+            elif arg1 == 'day':
+                this_month = datetime.today().month
+                year = datetime.today().year
+                if len(arguments) == 1:
+                    day = date.today().day
+                    text = self.team_data_by_day(day, this_month, year, slash_command)
+
+                elif len(arguments) == 2:
+                    arg2 = arguments[1]
+                    day = int(arg2) if arg2.isdigit() else None
+                    if not day:
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                    text = self.team_data_by_day(day, this_month, year, slash_command)
+
+                elif len(arguments) == 3:
+                    arg1 = arguments[1]
+                    arg2 = arguments[2]
+                    day = int(arg1) if arg1.isdigit() else None
+                    month = int(arg2) if arg2.isdigit() else None
+                    if not day:
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                    if not month:
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                    if month > this_month:
+                        year = datetime.today().year - 1
+                    text = self.team_data_by_day(day, month, year, slash_command)
+
             elif arg1 == 'week':
                 start = date.today() - timedelta(days=7)
                 text = self.team_data_by_start(start, slash_command)

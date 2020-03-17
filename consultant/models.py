@@ -201,7 +201,7 @@ class ConsultantToken(models.Model):
     fcm_tokens = GenericRelation(FCMDevice)
     key = models.CharField(_("Key"), max_length=40, primary_key=True)
     uuid = models.CharField(_("Universally Unique Identifier"), max_length=64, db_index=True, default='UUID')
-    consultant = models.OneToOneField(
+    consultant = models.ForeignKey(
         Consultant, related_name='consultant_token',
         on_delete=models.CASCADE, verbose_name=_("Consultant")
     )

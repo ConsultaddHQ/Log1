@@ -288,6 +288,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         try:
             project_id = request.query_params.get('project_id', None)
             if project_id:
+
                 project = get_object_or_404(Project, id=project_id)
 
                 client_address, vendor_address, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0
@@ -317,12 +318,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 if not list_status:
                     return Response({"error": "Complete all details"}, status=status.HTTP_400_BAD_REQUEST)
+
                 po_type = 'created'
                 if project.statuses.filter(is_current=True).first().status == 'on_boarded':
                     po_type = 'updated'
+
                 path = []
                 scrum_master_email = None
-                scrum_master = User.objects.filter(team=request.user.team, role__name='admin')
+                scrum_master = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
                 if scrum_master:
                     scrum_master_email = scrum_master.first().email
 
@@ -334,6 +337,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     delete_temp_file(path)
                     project.status = 'on_boarded'
                     project.save()
+                    project.consultant.status = 'on_project'
+                    project.consultant.save()
+
                     return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
                 return Response({"result": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             else:
@@ -528,7 +534,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     team_joined_count = Project.objects.filter(
                         statuses__status='joined',
                         statuses__created__gte=day_one,
-                        submission__created_by__team=request.user.team,
+                        submission__employer__iexact=project.submission.employer,
                     ).count()
 
                     client_emoji = ':tophat: '
@@ -583,7 +589,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             team_offer_count = Project.objects.filter(
                 statuses__status='received',
                 statuses__created__gte=day_one,
-                submission__created_by__team=request.user.team,
+                submission__employer__iexact=project.submission.employer,
             ).count()
 
             # Cancellation or Termination Mail
@@ -635,6 +641,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 """
                 }
                 post_msg_using_webhook(config.offer_url, data)
+                project.is_msg_sent = True
+                project.save()
 
             if os.environ.get('ENV', 'local') == 'prod':
                 if prev_status_obj.status not in termination_status and new_status in termination_status:

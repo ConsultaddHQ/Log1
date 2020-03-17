@@ -390,7 +390,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
         try:
             data = {
                 "total": sub,
-                "submission": sub.filter(status='sub'),
+                "sub": sub.filter(status='sub'),
                 "project": sub.filter(status='project'),
                 "interview": sub.filter(status='interview'),
             }
@@ -400,7 +400,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             data_counts = {
                 'total': data["total"].count(),
-                'sub': data["submission"].count(),
+                'sub': data["sub"].count(),
                 'project': data["project"].count(),
                 'interview': data["interview"].count()
             }

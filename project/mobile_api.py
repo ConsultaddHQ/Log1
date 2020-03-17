@@ -53,9 +53,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
         last, first = page * page_size, page * page_size - page_size
         try:
             projects = request.user.get_project().filter(
-                Q(statuses__status='joined', statuses__is_current=True) |
-                Q(end_date__gte=timezone.now()) |
-                Q(end_date=None)
+                Q(statuses__status='joined', statuses__is_current=True)
             ).order_by('-id')
             if projects:
                 project = projects.first()

@@ -66,7 +66,7 @@ class ConsultantAuthViewSets(GenericViewSet):
         if consultant:
             uuid = request.data.get('uuid', '')
             try:
-                token, created = ConsultantToken.objects.get_or_create(consultant=consultant)
+                token, created = ConsultantToken.objects.get_or_create(consultant=consultant, uuid=uuid)
                 content_type = ContentType.objects.get(model='consultanttoken')
                 fcm_device, created = FCMDevice.objects.get_or_create(
                     device_id=request.data.get('fcm_token', None),
@@ -137,7 +137,7 @@ class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
             Logout for authenticated user
         """
         uuid = request.META.get('HTTP_UUID', b'')
-        token = get_object_or_404(ConsultantToken, key=request.auth)
+        token = get_object_or_404(ConsultantToken, key=request.auth, uuid=uuid)
         fcm_token = FCMDevice.objects.filter(content_type__model='consultanttoken', object_id=token.key)
         token.delete()
         fcm_token.delete()

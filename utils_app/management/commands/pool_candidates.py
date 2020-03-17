@@ -24,17 +24,18 @@ class Command(BaseCommand):
 |:--|:-----------|:-------|:-----|:-------|:----------|:---------|
 """
         for con in in_pool_con:
-            days, marketer, recruiter = None, None, None
-            team = ", ".join(con.teams.all().values_list('name', flat=True))
-            if con.start:
-                days = (date.today() - con.start).days
-            if con.primary_marketer:
-                marketer = con.primary_marketer.employee_name
-            if con.recruiter:
-                recruiter = con.consultant.recruiter.employee_name
-            count += 1
+            if con.consultant.status != 'archived':
+                days, marketer, recruiter = None, None, None
+                team = ", ".join(con.teams.all().values_list('name', flat=True))
+                if con.start:
+                    days = (date.today() - con.start).days
+                if con.primary_marketer:
+                    marketer = con.primary_marketer.employee_name
+                if con.recruiter:
+                    recruiter = con.consultant.recruiter.employee_name
+                count += 1
 
-            text += \
+                text += \
 f"""| {count} | {con.consultant.name} | {team} | {days} | {con.consultant.skills} | {recruiter} | {marketer} |\n"""
 
         data = {
