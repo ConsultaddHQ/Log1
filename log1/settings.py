@@ -234,7 +234,7 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEOs'),
+    'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEO'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
     'Web-Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url',
                   'loud_speakers_url', 'joined_url'),

@@ -13,8 +13,8 @@ from employee.models import Team
 from project.models import Project
 from marketing.models import Interview
 from utils_app.models import ScrumMeeting
-from consultant.models import ConsultantMarketing
 from utils_app.utils import post_msg_using_webhook
+from consultant.models import ConsultantMarketing, Consultant
 
 
 class ScrumMeetingReport(GenericViewSet):
@@ -55,6 +55,20 @@ class ScrumMeetingReport(GenericViewSet):
 
                 text += \
                     f"""| ** {team_name} ** | {interviews} | {offers} | {bench} | {pool} |\n"""
+
+            text += """\n\n
+| Team Name | Moved to Marketing |
+|:----------|:-------------------|
+"""
+            teams = Team.objects.filter(dept='Recruitment')
+            for team in teams:
+                consultant_count = Consultant.objects.filter(
+                    pocs__poc__team=team,
+                    pocs__poc_type='recruiter',
+                    marketing__start__gte=previous_meeting_date,
+                ).count()
+
+                text += f"| {team.name.title()} | {consultant_count} |\n"
 
             data = {
                 "response_type": "in_channel",
