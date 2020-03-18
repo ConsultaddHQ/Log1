@@ -4,7 +4,9 @@ from notification.models import Notification, FCMDevice
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'title', 'description', 'timestamp', 'category', 'unread', 'deleted')
+    list_filter = ('sender_content_type__model', 'recipient_content_type__model', 'target_content_type__model')
+    list_display = ('id', 'title', 'description', 'timestamp', 'category', 'unread', 'deleted', 'sender_content_type',
+                    'recipient_content_type', 'target_content_type')
     search_fields = ('id', 'title')
 
 

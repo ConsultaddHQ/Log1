@@ -64,32 +64,6 @@ command - {command}\n
 | Team Name | Scrum Master | Current Bench | Submission | Interview | Offer | Joined |
 |:----------|:-------------|:--------------|:-----------|:----------|:------|:-------|
 """
-        scrum_master = "Sudeep B."
-        bench_consultant = Consultant.objects.filter(status='on_bench').count()
-        submission_count = Submission.objects.filter(
-            created__day=day,
-            created__year=year,
-            created__month=month
-        ).exclude(status='draft').count()
-        interview_count = Interview.objects.filter(
-            created__day=day,
-            created__year=year,
-            created__month=month,
-        ).exclude(status='cancelled').count()
-        offer_count = Project.objects.filter(
-            statuses__created__day=day,
-            statuses__status='received',
-            statuses__created__year=year,
-            statuses__created__month=month,
-        ).count()
-        joined_count = Project.objects.filter(
-            statuses__status='joined',
-            statuses__created__day=day,
-            statuses__created__year=year,
-            statuses__created__month=month,
-        ).count()
-
-        text += f"| Consultadd | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
 
         teams = Team.objects.filter(dept='Marketing')
         for team in teams:
@@ -110,10 +84,10 @@ command - {command}\n
                 submission__created_by__team__name__iexact=team.name
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             offer_count = Project.objects.filter(
-                statuses__status='received',
                 statuses__created__day=day,
                 statuses__created__year=year,
                 statuses__created__month=month,
+                statuses__status__in=['received', 'on_boarded'],
                 submission__created_by__team__name__iexact=team.name,
             ).count()
             joined_count = Project.objects.filter(
@@ -129,6 +103,36 @@ command - {command}\n
                 scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
 
             text += f"| {team.name.title()} | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count}  |\n"
+
+        scrum_master = "Sudeep B."
+        bench_consultant = Consultant.objects.filter(marketing__status='open').count()
+        submission_count = Submission.objects.filter(
+            created__day=day,
+            created__year=year,
+            created__month=month
+        ).exclude(status='draft').count()
+
+        interview_count = Interview.objects.filter(
+            created__day=day,
+            created__year=year,
+            created__month=month,
+        ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+
+        offer_count = Project.objects.filter(
+            statuses__created__day=day,
+            statuses__created__year=year,
+            statuses__created__month=month,
+            statuses__status__in=['received', 'on_boarded'],
+        ).count()
+
+        joined_count = Project.objects.filter(
+            statuses__status='joined',
+            statuses__created__day=day,
+            statuses__created__year=year,
+            statuses__created__month=month,
+        ).count()
+
+        text += f"| Total | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
 
         return text
 
@@ -139,17 +143,6 @@ command - {command}\n
 | Team Name | Scrum Master | Current Bench | Submission | Interview | Offer | Joined |
 |:----------|:-------------|:--------------|:-----------|:----------|:------|:-------|
 """
-        scrum_master = "Sudeep B."
-        bench_consultant = Consultant.objects.filter(status='on_bench').count()
-        submission_count = Submission.objects.filter(created__gte=start).exclude(status='draft').count()
-        interview_count = Interview.objects.filter(created__gte=start).exclude(status='cancelled').count()
-        offer_count = Project.objects.filter(statuses__status='received', statuses__created__gte=start).count()
-        joined_count = Project.objects.filter(
-            statuses__status='joined',
-            statuses__created__gte=start,
-        ).count()
-
-        text += f"| Consultadd | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
 
         teams = Team.objects.filter(dept='Marketing')
         for team in teams:
@@ -166,8 +159,8 @@ command - {command}\n
                 submission__created_by__team__name__iexact=team.name
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             offer_count = Project.objects.filter(
-                statuses__status='received',
                 statuses__created__gte=start,
+                statuses__status__in=['received', 'on_boarded'],
                 submission__created_by__team__name__iexact=team.name,
 
             ).count()
@@ -182,6 +175,21 @@ command - {command}\n
                 scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
 
             text += f"| {team.name.title()} | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count}  |\n"
+
+        scrum_master = "Sudeep B."
+        bench_consultant = Consultant.objects.filter(marketing__status='open').count()
+        submission_count = Submission.objects.filter(created__gte=start).exclude(status='draft').count()
+        interview_count = Interview.objects.filter(
+            created__gte=start).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+        offer_count = Project.objects.filter(
+            statuses__status__in=['received', 'on_boarded'], statuses__created__gte=start
+        ).count()
+        joined_count = Project.objects.filter(
+            statuses__status='joined',
+            statuses__created__gte=start,
+        ).count()
+
+        text += f"| Total | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
 
         return text
 
@@ -193,37 +201,9 @@ command - {command}\n\n
 |:----------|:-------------|:--------------|:-----------|:----------|:------|:-------|
 """
 
-        scrum_master = "Sudeep B."
-        bench_consultant = Consultant.objects.filter(status='on_bench').count()
-
-        submission_count = Submission.objects.filter(
-            created__year=year,
-            created__month=month,
-        ).exclude(status='draft').count()
-
-        interview_count = Interview.objects.filter(
-            created__year=year,
-            created__month=month,
-        ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
-
-        offer_count = Project.objects.filter(
-            statuses__created__month=month,
-            statuses__created__year=year,
-            statuses__status='received'
-        ).count()
-
-        joined_count = Project.objects.filter(
-            statuses__created__month=month,
-            statuses__created__year=year,
-            statuses__status='joined'
-        ).count()
-
-        text += f"| Consultadd | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
-
         teams = Team.objects.filter(dept='Marketing')
         for team in teams:
             bench_consultant = Consultant.objects.filter(
-                status='on_bench',
                 marketing__status='open',
                 marketing__teams__name__iexact=team.name,
             ).count()
@@ -240,9 +220,9 @@ command - {command}\n\n
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
 
             offer_count = Project.objects.filter(
-                statuses__status='received',
                 statuses__created__year=year,
                 statuses__created__month=month,
+                statuses__status__in=['received', 'on_boarded'],
                 submission__created_by__team__name__iexact=team.name,
             ).count()
 
@@ -260,6 +240,33 @@ command - {command}\n\n
 
             text += f"| {team.name.title()} | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
 
+        scrum_master = "Sudeep B."
+        bench_consultant = Consultant.objects.filter(marketing__status='open').count()
+
+        submission_count = Submission.objects.filter(
+            created__year=year,
+            created__month=month,
+        ).exclude(status='draft').count()
+
+        interview_count = Interview.objects.filter(
+            created__year=year,
+            created__month=month,
+        ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+
+        offer_count = Project.objects.filter(
+            statuses__created__year=year,
+            statuses__created__month=month,
+            statuses__status__in=['received', 'on_boarded'],
+        ).count()
+
+        joined_count = Project.objects.filter(
+            statuses__status='joined',
+            statuses__created__year=year,
+            statuses__created__month=month,
+        ).count()
+
+        text += f"| Total | {scrum_master} | {bench_consultant} | {submission_count} | {interview_count} | {offer_count} | {joined_count} |\n"
+
         return text
 
     @action(methods=['get'], detail=False, url_path='consultant')
@@ -274,7 +281,7 @@ command - {command}\n\n
             data_type = query.split(" ")[0]
             name = query.split(" ")[1]
 
-            consultants = Consultant.objects.filter(name__istartswith=name)
+            consultants = Consultant.objects.filter(name__istartswith=name).exclude(status='archived')
             text = "Bad Input"
 
             if data_type == 'poc':
@@ -300,8 +307,8 @@ command - {command} {query}\n
                 for consultant in consultants:
                     visa_type = consultant.work_auth.filter(is_current=True).first().visa_type
                     marketing = consultant.marketing.filter(status='open')
-                    preferred_location = marketing.first().preferred_location.replace('\r\n', ', ') if marketing else None
-                    text += f"""| {consultant.name} | {consultant.email} | {consultant.date_of_birth} | {consultant.status} | {visa_type} | {consultant.phone_no} | {consultant.skills} | {preferred_location} |\n"""
+                    pref_location = marketing.first().preferred_location.replace('\r\n', ', ') if marketing else None
+                    text += f"""| {consultant.name} | {consultant.email} | {consultant.date_of_birth} | {consultant.status} | {visa_type} | {consultant.phone_no} | {consultant.skills} | {pref_location} |\n"""
 
             elif data_type == 'status':
                 text = f"""#### Consultant STATUS :memo: \n
@@ -315,7 +322,8 @@ command - {command} {query}\n
                         days_on_bench = (date.today() - marketing.first().start).days
                     else:
                         days_on_bench = None
-                    submission_count = Submission.objects.filter(consultant_marketing__consultant=consultant).exclude(status='cancelled').count()
+                    submission_count = Submission.objects.filter(consultant_marketing__consultant=consultant).exclude(
+                        status='cancelled').count()
                     interview_count = Interview.objects.filter(
                         submission__consultant_marketing__consultant=consultant
                     ).exclude(status='cancelled').distinct('submission').order_by().count()

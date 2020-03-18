@@ -176,7 +176,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return EducationSerializer(obj.academics.all(), many=True).data
 
     def get_experience(self, obj):
-        return EducationSerializer(obj.experiences.all(), many=True).data
+        return ExperienceSerializer(obj.experiences.all(), many=True).data
 
     def get_rate(self, obj):
         rate_revision = obj.rates.filter(end=None)

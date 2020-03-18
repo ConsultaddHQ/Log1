@@ -501,6 +501,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
+                    project.submission.consultant_marketing.status = 'close'
+                    project.submission.consultant_marketing.end = date.today()
+                    project.submission.consultant_marketing.save()
 
                     password = config.CONSULTANT_PASSWORD
 
@@ -560,8 +563,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
 :spiral_calendar: Joining Date :   {str(project.start_date)}\n\n
-`Project Joined count of {project.submission.employer} for this month - {total_joined_count} `
-`Total Project Joined count of this month - {team_joined_count}`
+`Project Joined count of {project.submission.employer} for this month - {team_joined_count} `
+`Total Project Joined count of this month - {total_joined_count}`
 """
                     }
                     post_msg_using_webhook(config.joined_url, data)
@@ -767,6 +770,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultants = consultants.filter(
                     Q(name__istartswith=query) |
                     Q(projects__submission__client__icontains=query) |
+                    Q(projects__submission__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
             total = consultants.count()
