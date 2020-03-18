@@ -2,7 +2,7 @@ from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
-from consultant.models import ConsultantMarketing
+from consultant.models import ConsultantMarketing, Consultant
 from utils_app.utils import post_msg_using_webhook
 
 
@@ -20,12 +20,12 @@ class Command(BaseCommand):
         count = 1
         text = f"""
 #### Pool Candidates :beach_umbrella: \n
-| # | Consultant | Team   | Days | Skills | Recruiter | Marketer |
-|:--|:-----------|:-------|:-----|:-------|:----------|:---------|
+| # | Consultant | Team   | Days | Recruiter | Marketer |  Skills |Open Offer |
+|:--|:-----------|:-------|:-----|:----------|:---------|:--------|:-----------|
 """
         for con in in_pool_con:
             if con.consultant.status != 'archived':
-                days, marketer, recruiter = None, None, None
+                days, marketer, recruiter, open_offer = None, None, None, "NO"
                 team = ", ".join(con.teams.all().values_list('name', flat=True))
                 if con.start:
                     days = (date.today() - con.start).days
@@ -33,10 +33,12 @@ class Command(BaseCommand):
                     marketer = con.primary_marketer.employee_name
                 if con.recruiter:
                     recruiter = con.consultant.recruiter.employee_name
+                if con.consultant.projects.filter(statuses__is_current=True, statuses__status__in=['on_boarding', 'received']):
+                    open_offer = "YES"
                 count += 1
 
                 text += \
-f"""| {count} | {con.consultant.name} | {team} | {days} | {con.consultant.skills} | {recruiter} | {marketer} |\n"""
+f"""| {count} | {con.consultant.name} | {team} | {days} | {recruiter} | {marketer} | {con.consultant.skills} | {open_offer}|\n"""
 
         data = {
             "response_type": "in_channel",
