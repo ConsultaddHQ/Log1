@@ -1010,7 +1010,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'recipient_user_type': 'user',
                     'title': 'New Interview Created',
                 }
-                create_notification(user_list, notification_data)
+                # create_notification(user_list, notification_data)
                 return Response({"result": data[0], 'event_id': cal_res['id']}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -1137,7 +1137,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'sender_id': request.user.id,
                     'recipient_user_type': 'user',
                 }
-                create_notification(user_list, notification_data)
+                # create_notification(user_list, notification_data)
                 return Response({"result": data[0], "event_id": cal_res['id']}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -1192,7 +1192,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
             }
-            create_notification(user_list, notification_data)
+            # create_notification(user_list, notification_data)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             logger.error(error)

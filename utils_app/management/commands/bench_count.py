@@ -15,7 +15,10 @@ class Command(BaseCommand):
         on_bench_con = queryset.filter(status='on_bench').count()
         in_pool_con = queryset.filter(status='on_bench', marketing__in_pool=True).count()
         on_boarded = Consultant.objects.filter(
-            status='on_bench',
+            projects__statuses__status='on_boarded',
+            projects__statuses__is_current=True
+        ).count()
+        joined = Consultant.objects.filter(
             projects__statuses__status='on_boarded',
             projects__statuses__is_current=True
         ).count()
@@ -24,12 +27,13 @@ class Command(BaseCommand):
             "response_type": "in_channel",
             "username": "Log1 Updates",
             "text": f"""
-#### Bench Status :memo: \n
-| Consultant Status | Count            |
-|:------------------|:-----------------|
-| Bench             | {on_bench_con}   |
-| In Pool           | {in_pool_con}    | 
-| On boarded        | {on_boarded}     | 
+#### Consultant Bench Status :memo: \n
+| Status     | Count          |
+|:-----------|:---------------|
+| Bench      | {on_bench_con} |
+| In Pool    | {in_pool_con}  | 
+| On boarded | {on_boarded}   |
+| Joined     | {joined}       |
 """
         }
 

@@ -13,38 +13,31 @@ class Command(BaseCommand):
     # A command must define handle()
 
     def handle(self, *args, **options):
-        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
-                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
-        terminated = ["completed", "resigned-rate", "resigned-location", "resigned-full_time", "resigned-technology",
-                      "client-fired-budget", "client-fired-performance", "client-fired-security"]
-
-        new_offer = Project.objects.filter(
-            statuses__status='new', statuses__is_current=True
+        new = Project.objects.filter(
+            statuses__is_current=True, statuses__status__iexact='new'
         ).count()
 
-        received_projects = Project.objects.filter(
-            statuses__is_current=True, statuses__status__in=['received', 'on_boarded'],
+        received = Project.objects.filter(
+            statuses__is_current=True, statuses__status__iexact='received',
         ).count()
 
-        joined_projects = Project.objects.filter(
-            statuses__status='joined', statuses__is_current=True
+        on_boarded = Project.objects.filter(
+            statuses__is_current=True, statuses__status__iexact='on_boarded',
         ).count()
 
-        cancelled_terminated_projects = Project.objects.filter(
-            statuses__is_current=True, statuses__status__in=cancelled + terminated,
-        ).count()
+        total = new + received + on_boarded
 
         data = {
             "response_type": "in_channel",
             "username": "Log1 Updates",
             "text": f"""
 #### Open Offer Status :memo: \n
-| PO Status   |    Count   | 
-|:------------|:-----------|
-| new         | {new_offer} |
-| Yet to Join | {received_projects} |
-| Terminated  | {cancelled_terminated_projects} |
-| Joined      | {joined_projects} |
+| PO Status  |     Count    | 
+|:-----------|:-------------|
+| new        |    {new}     |
+| Received   |  {received}  |
+| On-boarded | {on_boarded} |
+| Total      |   {total}    |
 """
         }
         mattermost_webhook(config.marketing_report_url, data)

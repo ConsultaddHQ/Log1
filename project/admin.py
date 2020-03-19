@@ -62,7 +62,8 @@ class PayrollScheduleAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(IphoneAppLink)
-class PayrollScheduleAdmin(admin.ModelAdmin, ExportCsvMixin):
+class IphoneAppLinkAdmin(admin.ModelAdmin, ExportCsvMixin):
+    list_filter = ('is_sent',)
     list_display = ('id', 'code', 'sent_on', 'consultant', 'link', 'is_sent')
-    search_fields = ('id', 'code', 'link', 'consultant')
+    search_fields = ('id', 'code', 'link', 'consultant__name')
     actions = ["export_as_csv"]

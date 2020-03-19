@@ -1,10 +1,12 @@
 import logging
+
 from django.utils import timezone
 from datetime import timedelta, datetime
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -17,6 +19,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from employee.serializers import *
 from employee.models import Role, Team
 from utils_app.mailing import send_email
+from notification.models import FCMDevice
 from activity.views import create_activity
 from employee.models import ResetPasswordToken, clear_expired, get_password_reset_token_expiry_time, Asset
 
@@ -51,10 +54,10 @@ class EmployeeAuthViewSets(GenericViewSet):
                     "result": "User already exist",
                     "data": self.serializer_class(user, many=True).data[0]},
                     status=status.HTTP_406_NOT_ACCEPTABLE)
-            # user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
-            # for i in role:
-            #     r = Role.objects.get(name=i)
-            #     user.role.add(r)
+            user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
+            for i in role:
+                r = Role.objects.get(name=i)
+                user.role.add(r)
             return Response({"result": "success", "data": self.serializer_class(user).data}, status=201)
         except Exception as error:
             logger.error(error)
@@ -75,6 +78,15 @@ class EmployeeAuthViewSets(GenericViewSet):
         if user:
             user.last_login = datetime.now()
             user.save()
+            fcm_token, created = FCMDevice.objects.get_or_create(
+                device_id=request.data.get("fcm_token"),
+                content_type=ContentType.objects.get(model='user')
+            )
+            fcm_token.type = 'web'
+            fcm_token.name = 'windows'
+            fcm_token.object_id = user.id
+            fcm_token.save()
+
             return Response({"result": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
         logger.error("Incorrect Employee Id/Password")
         return Response({"error": "Incorrect Employee Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
@@ -134,7 +146,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
-        current_password = request.data.get('current_password')
+        current_password = request.data.get('cur_password')
         new_password = request.data.get('new_password')
         if request.user.check_password(current_password):
             request.user.set_password(new_password)
@@ -149,6 +161,9 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         """
         token = get_object_or_404(Token, key=request.auth)
         token.delete()
+        fcm_token = FCMDevice.objects.filter(object_id=token.user.id, content_type__model='user')
+        if fcm_token:
+            fcm_token.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

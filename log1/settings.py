@@ -114,6 +114,18 @@ REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSc
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
 
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'uuid',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 # Send Grid Configuration
 
 EMAIL_USE_TLS = True
@@ -232,11 +244,12 @@ CONSTANCE_CONFIG = OrderedDict([
     ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "Announcement Channel")),
     ('joined_url', ('https://mm.consultadd.com/hooks/ixfc4oeeofb53d149dc3cq5ddy', "Joining Announcement Channel")),
     ('marketing_report_url', ('https://mm.consultadd.com/hooks/8iedae1ytffjmxpkd6cgry5hth', "Marketing Report Channel")),
+    ('general_url', ('https://mm.consultadd.com/hooks/sih91mde8inq5roz3fejoefs5c', "General Channel")),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEO'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
     'Web-Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url',
-                  'loud_speakers_url', 'joined_url', 'marketing_report_url'),
+                  'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url'),
 }
