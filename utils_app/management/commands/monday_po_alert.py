@@ -11,33 +11,51 @@ class Command(BaseCommand):
     help = "this command is for posting your payload to MatterMost app"
 
     def handle(self, *args, **options):
+        end = date.today() - timedelta(days=1)
         start = date.today() - timedelta(days=7)
-        end = date.today() - timedelta(days=3)
 
         projects = Project.objects.filter(
             statuses__status__iexact='joined', statuses__is_current=True,
         )
 
-        joined_last_week = projects.filter(
-            statuses__created__range=[start, end]
-        ).count()
+        text = f"""
+#### Project Joined Last Week :memo: \n
+| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer |
+|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|
+"""
 
-        start = date.today()
-        end = date.today() + timedelta(days=4)
-
-        joining_this_week = projects.filter(
-            statuses__created__range=[start, end]
-        ).count()
+        joined_last_week = projects.filter(statuses__created__range=[start, end])
+        for project in joined_last_week:
+            submission = project.submission
+            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} |\n"
 
         data = {
             "response_type": "in_channel",
             "username": "Log1 Updates",
-            "text": f"""
-#### Open Offer Status :memo: \n
-| PO Status   |    Count   | 
-|:------------|:-----------|
-| Joined Last Week | {joined_last_week} |
-| Joining in this Week | {joining_this_week} |
-"""
+            "text": text
         }
+
         mattermost_webhook(config.joined_url, data)
+
+        text = f"""
+#### Project Joining in this Week :memo: \n
+| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer |
+|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|
+"""
+        start = date.today()
+        end = date.today() + timedelta(days=5)
+
+        joining_this_week = projects.filter(statuses__created__range=[start, end])
+
+        for project in joining_this_week:
+            submission = project.submission
+            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} |\n"
+
+        data = {
+            "response_type": "in_channel",
+            "username": "Log1 Updates",
+            "text": text
+        }
+
+        mattermost_webhook(config.joined_url, data)
+        mattermost_webhook(config.general_url, data)

@@ -8,10 +8,10 @@ from .models import Consultant, ConsultantProfile, ConsultantMarketing, Consulta
 @admin.register(Consultant)
 class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
-    list_filter = ('status', 'work_type')
+    list_filter = ('status', 'work_type', 'first_login')
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
     list_display = ('id', 'name', 'email', 'date_of_birth', 'phone_no', 'skills', 'status', 'current_city', 'ssn',
-                    'links', 'gender', 'work_type', 'password', 'is_active')
+                    'links', 'gender', 'work_type', 'password', 'is_active', 'first_login')
 
     class Media(object):
         css = {'all': ('no-more-warnings.css', )}

@@ -18,7 +18,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateMode
 from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
-from consultant.models import ConsultantPOC
+from consultant.models import ConsultantPOC, Consultant
 from marketing.models import Submission, User
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.utils import get_time_filter, post_msg_using_webhook
@@ -321,8 +321,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if not list_status:
                     return Response({"error": "Complete all details"}, status=status.HTTP_400_BAD_REQUEST)
 
+                prev_status = project.statuses.filter(is_current=True).first()
                 po_type = 'created'
-                if project.statuses.filter(is_current=True).first().status == 'on_boarded':
+                if prev_status.status == 'on_boarded':
                     po_type = 'updated'
 
                 path = []
@@ -337,10 +338,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 res, error = self.po_mail(project, path, scrum_master_email, po_type)
                 if not error == 'error':
                     delete_temp_file(path)
-                    project.status = 'on_boarded'
-                    project.save()
-                    project.consultant.status = 'on_project'
-                    project.consultant.save()
+                    if prev_status.status == 'received':
+                        new_status, created = ProjectStatus.objects.get_or_create(
+                            project=project,
+                            is_current=True,
+                            status='on_boarded',
+                        )
+                        if created:
+                            prev_status.is_current = False
+                            prev_status.save()
 
                     return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
                 return Response({"result": str(res)}, status=status.HTTP_400_BAD_REQUEST)
@@ -598,10 +604,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
             ).count()
 
             # Cancellation or Termination Mail
-            cancellation_status = ['dual-offer', 'client-cancelled', 'contract-conflicts',
+            cancellation_status = ['dual-offer', 'cancelled', 'client-cancelled', 'contract-conflicts',
                                    'candidate-absconded', 'candidate-denied-jd', 'candidate-denied-rate',
                                    'candidate-denied-location']
-            termination_status = ['completed', 'resigned-rate', 'terminated-other', 'resigned-location',
+            termination_status = ['completed', 'terminated', 'resigned-rate', 'terminated-other', 'resigned-location',
                                   'resigned-full_time', 'resigned-technology', 'client-fired-budget',
                                   'client-fired-performance', 'client-fired-security']
             scrum_master = None
@@ -654,6 +660,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                     resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
+                if new_status in termination_status:
+                    project.consultant.status = 'on_bench'
+                    project.consultant.save()
 
             return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:

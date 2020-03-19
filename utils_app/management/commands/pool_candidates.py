@@ -15,7 +15,7 @@ class Command(BaseCommand):
         in_pool_con = ConsultantMarketing.objects.filter(
             in_pool=True,
             status='open'
-        ).order_by('-start')
+        ).order_by('consultant_id', '-start').distinct('consultant_id')
 
         count = 1
         text = f"""
@@ -33,12 +33,13 @@ class Command(BaseCommand):
                     marketer = con.primary_marketer.employee_name
                 if con.recruiter:
                     recruiter = con.consultant.recruiter.employee_name
-                if con.consultant.projects.filter(statuses__is_current=True, statuses__status__in=['on_boarding', 'received']):
-                    open_offer = "YES"
+                open_offer_count = con.consultant.projects.filter(
+                    statuses__is_current=True, statuses__status__in=['on_boarding', 'received']
+                ).count()
                 count += 1
 
                 text += \
-f"""| {count} | {con.consultant.name} | {team} | {days} | {recruiter} | {marketer} | {con.consultant.skills} | {open_offer}|\n"""
+f"""| {count} | {con.consultant.name} | {team} | {days} | {recruiter} | {marketer} | {con.consultant.skills} | {open_offer_count}|\n"""
 
         data = {
             "response_type": "in_channel",
