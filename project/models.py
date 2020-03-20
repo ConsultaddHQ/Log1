@@ -6,7 +6,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from employee.models import User
 from marketing.models import Submission
 from consultant.models import Consultant
-from attachment.models import Attachment, attachment_upload
+from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 
 PROJECT_STATUS_CHOICES = (
@@ -19,7 +19,7 @@ PROJECT_STATUS_CHOICES = (
     ("on_boarded", "On Boarded"),
     ("complete", "Project Completed"),
 
-    # offer cancelled
+    # Offer cancelled
     ("cancelled", "Cancelled"),
     ("cancelled-dual_offer", "Dual Offer"),
     ("cancelled-client_cancelled", "Client Cancelled"),

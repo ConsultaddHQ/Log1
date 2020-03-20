@@ -24,7 +24,11 @@ class Command(BaseCommand):
             last_year = year
             last_month = month - 1
 
-        current_pay_period = PayrollSchedule.objects.filter(processing_date__month=month).first()
+        pay_month = month
+        if date.today().day > 15:
+            pay_month = month + 1
+
+        current_pay_period = PayrollSchedule.objects.filter(processing_date__month=pay_month).first()
         start_day = current_pay_period.pay_period_start
         end_day = current_pay_period.pay_period_end
 
@@ -32,8 +36,12 @@ class Command(BaseCommand):
             statuses__status__iexact='joined', statuses__created__year=last_year, statuses__created__month=last_month
         ).order_by('id').distinct('id').count()
 
+        joined_this_month = Project.objects.filter(
+            statuses__status__iexact='joined', statuses__created__year=year, statuses__created__month=month
+        ).order_by('id').distinct('id').count()
+
         expected_joining = Project.objects.filter(
-            start_date__year=year, start_date__day__gte=1, start_date__month=month
+            start_date__year=year, start_date__gte=date.today(), start_date__month=month
         ).count()
 
         joining_in_pay_period = Project.objects.filter(
@@ -50,12 +58,13 @@ class Command(BaseCommand):
             "text": f"""
 #### Projects joining status :memo: \n
 Pay Period - {str(start_day)} - {str(end_day)}\n
-| Project Status                 | Count                   | 
-|:-------------------------------|:------------------------|
-| Joined Last Month              | {joined_last_month}     |
-| Expected Joining this Month    | {expected_joining}      |
-| Expected Joining in Pay Period | {joining_in_pay_period} |
-| Not Joined Yet                 | {offers_not_joined}     |
+| Project Status                     | Count                   | 
+|:-----------------------------------|:------------------------|
+| Joined Last Month                  | {joined_last_month}     |
+| Joined This Month                  | {joined_this_month}     |
+| Expected Joining this Month        | {expected_joining}      |
+| Expected Joining in Pay Period     | {joining_in_pay_period} |
+| Joining Status Not updated in log1 | {offers_not_joined}     |
 """
         }
         mattermost_webhook(config.joined_url, data)

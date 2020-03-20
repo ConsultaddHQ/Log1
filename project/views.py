@@ -511,31 +511,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.submission.consultant_marketing.end = date.today()
                     project.submission.consultant_marketing.save()
 
-                    password = config.CONSULTANT_PASSWORD
-
-                    queryset = Consultant.objects.filter(email__exact=project.consultant.email)
-                    if queryset:
-                        consultant = queryset.first()
-                        consultant.set_password(password)
-                        consultant.is_active = True
-                        consultant.save()
-
-                    # Creating first week Timesheet on project status change to joined
-                    start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
-                    week_day = start_date.weekday()
-                    if week_day == 6:
-                        end_date = start_date + timedelta(days=6)
-                    else:
-                        end_date = start_date + timedelta(days=5 - week_day)
-
-                    TimeSheet.objects.get_or_create(
-                        hours=0,
-                        end=end_date,
-                        status='draft',
-                        project=project,
-                        start=start_date,
-                    )
-
                     day_one = datetime.today().replace(day=1, hour=0, minute=0)
                     total_joined_count = Project.objects.filter(
                         statuses__status='joined',
@@ -575,19 +550,43 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.joined_url, data)
 
-                    if os.environ.get('ENV', 'local') == 'prod':
-                        links = IphoneAppLink.objects.filter(is_sent=False)
-                        iphone_link = None
-                        if links:
-                            link = links.first()
-                            iphone_link = link.link
-                            # resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
-                            if err == 'ok':
-                                link.is_sent = True
-                                link.sent_on = datetime.now()
-                                link.consultant = project.consultant
-                                link.save()
-                        # resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                    # Creating first week Timesheet on project status change to joined
+                    start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
+                    week_day = start_date.weekday()
+                    if week_day == 6:
+                        end_date = start_date + timedelta(days=6)
+                    else:
+                        end_date = start_date + timedelta(days=5 - week_day)
+
+                    TimeSheet.objects.get_or_create(
+                        hours=0,
+                        end=end_date,
+                        status='draft',
+                        project=project,
+                        start=start_date,
+                    )
+
+                    if not IphoneAppLink.objects.filter(is_sent=True, consultant=project.consultant):
+                        password = config.CONSULTANT_PASSWORD
+
+                        queryset = Consultant.objects.filter(email__exact=project.consultant.email)
+                        if queryset:
+                            consultant = queryset.first()
+                            consultant.set_password(password)
+                            consultant.is_active = True
+                            consultant.save()
+
+                        if os.environ.get('ENV', 'local') == 'prod':
+                            links = IphoneAppLink.objects.filter(is_sent=False)
+                            if links:
+                                link = links.first()
+                                iphone_link = link.link
+                                resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                                if err == 'ok':
+                                    link.is_sent = True
+                                    link.sent_on = datetime.now()
+                                    link.consultant = project.consultant
+                                    link.save()
 
             serializer = self.serializer_class(project)
 
@@ -782,9 +781,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
-            total = consultants.count()
-            queryset = consultants.order_by('-id', '-projects__timesheets__modified').distinct('id')[first:last]
-            serializer = ConsultantTimeSheetSerializer(queryset, many=True)
+            queryset = consultants.order_by('-id').distinct('id')
+            queryset = queryset.order_by('projects__timesheets__modified').distinct('projects__timesheets__modified')
+            total = queryset.count()
+            serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)

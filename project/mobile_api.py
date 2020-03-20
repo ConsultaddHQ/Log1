@@ -180,3 +180,32 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
         queryset = PayrollSchedule.objects.all()
         serializer = self.serializer_class(queryset, many=True)
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
+
+class Test(GenericViewSet, ListModelMixin):
+    queryset = PayrollSchedule.objects.all()
+    serializer_class = PayrollScheduleSerializer
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        timesheet = request.query_params.get('timesheet')
+        device_id = request.query_params.get('fcm_token')
+        message_body = {
+            "category": "rejected",
+            "show_in_foreground": True,
+            "title": f"Timesheet rejected for week end {str(timesheet)}",
+            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+            "body": f"Timesheet rejected for week end {str(timesheet)}",
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target_id': timesheet,
+                'timestamp': str(timezone.now()),
+            },
+        }
+
+        result = push_notification([device_id], message_body)
+        if result:
+            return Response({"result": str(result)}, status=status.HTTP_200_OK)
+        return Response({"result": "Success"}, status=status.HTTP_200_OK)
