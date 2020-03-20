@@ -20,14 +20,14 @@ class Command(BaseCommand):
 
         text = f"""
 #### Project Joined Last Week :memo: \n
-| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer |
-|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|
+| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer | City |
+|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|:-----|
 """
 
         joined_last_week = projects.filter(statuses__created__range=[start, end])
         for project in joined_last_week:
             submission = project.submission
-            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} |\n"
+            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} | {project.city} |\n"
 
         data = {
             "response_type": "in_channel",
@@ -39,8 +39,8 @@ class Command(BaseCommand):
 
         text = f"""
 #### Project Joining in this Week :memo: \n
-| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer |
-|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|
+| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer | City |
+|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|:-----|
 """
         start = date.today()
         end = date.today() + timedelta(days=5)
@@ -49,7 +49,7 @@ class Command(BaseCommand):
 
         for project in joining_this_week:
             submission = project.submission
-            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} |\n"
+            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} | {project.city} |\n"
 
         data = {
             "response_type": "in_channel",
