@@ -46,7 +46,7 @@ class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     list_filter = ('status',)
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
-                     'consultant_marketing__consultant__email')
+                     'consultant_marketing__consultant__email', 'consultant_marketing__consultant__name')
     list_display = ('id', 'consultant_marketing', 'client', 'rate', 'created_by', 'lead_owner_display', 'lead',
                     'status', 'is_active', 'employer', 'screening_display', 'vendor_contact', 'visa_type',
                     'visa_start', 'visa_end', 'linkedin', 'date_of_birth', 'current_city', 'created', 'modified')

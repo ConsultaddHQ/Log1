@@ -18,7 +18,7 @@ from utils_app.views import CityViewSets, SlashCommandViewSets
 
 from attachment.views import AttachmentView, AttachmentGetView
 
-from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets
+from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, Test
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
@@ -85,6 +85,8 @@ router.register(r'con_notify', ConsultantNotificationViewSet)
 router.register(r'consultant_app', ConsultantAppViewSets)
 router.register(r'consultant_auth', ConsultantAuthViewSets)
 router.register(r'consultant_password', ConsultantResetPasswordViewSets)
+
+router.register(r'test', Test)
 
 
 urlpatterns = [
