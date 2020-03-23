@@ -448,7 +448,7 @@ command - {slash_command}\n
 | Name | Email | Phone No | Teams | Status | In Pool | RTG | Marketing Start | Recruiter | Preferred Location |
 |:-----|:------|:---------|:------|:-------|:--------|:----|:----------------|:----------|:-------------------|
 """
-                    bench_consultant = Consultant.objects.filter(status='on_bench')
+                    bench_consultant = Consultant.objects.filter(marketing__status='open')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
@@ -464,7 +464,6 @@ command - {slash_command}\n
 |:-----|:------|:---------|:-------|:--------|:----|:----------------|:----------|:-------------------|
 """
                     bench_consultant = Consultant.objects.filter(
-                        status='on_bench',
                         marketing__status='open',
                         marketing__teams__name__iexact=arg2,
                     )

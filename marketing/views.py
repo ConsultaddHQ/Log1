@@ -1041,6 +1041,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     interview.submission.is_active = False
                     interview.submission.status = 'in_offer'
                 interview.submission.save()
+
                 cal_res = {
                     'id': 'error'
                 }
@@ -1054,6 +1055,23 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
                         {interview.submission.client} :: {interview.consultant.name} :: 
                         {interview.marketer.employee_name}"""
+
+                if status_change == "true" and interview.status not in ['cancelled']:
+                    if interview.status == 'next_round':
+                        interview_status_emoji = ":+1: "
+                    elif interview.status == 'offer':
+                        interview_status_emoji = ":v: "
+                    else:
+                        interview_status_emoji = ":-1: "
+                    text = f"""#### {interview_status_emoji} Interview Feedback \n **CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name}** \n"""
+                    text += interview.feedback
+
+                    data = {
+                        "response_type": "in_channel",
+                        "username": "Log1 Updates",
+                        "text": text,
+                    }
+                    post_msg_using_webhook(config.announcement_url, data)
 
                 if status_change == 'false':
                     if reschedule == 'true':

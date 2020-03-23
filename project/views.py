@@ -332,7 +332,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if scrum_master:
                     scrum_master_email = scrum_master.first().email
 
-                for i in project.attachments.all():
+                for i in project.attachments.filter(
+                        attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
                     path.append(download_s3_object(i.attachment_file.name))
 
                 res, error = self.po_mail(project, path, scrum_master_email, po_type)
@@ -485,6 +486,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project.city = request.data.get('city', None)
             project.duration = request.data.get('duration', None)
             project.end_date = request.data.get('end_date', None)
+            project.feedback = request.data.get('feedback', None)
             project.start_date = request.data.get('start_date', None)
             project.payment_term = request.data.get('payment_term', None)
             project.client_address = request.data.get('client_address', None)
@@ -493,6 +495,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project.reporting_details = request.data.get('reporting_details', None)
             project.save()
 
+            client_emoji = ':tophat: '
+            role_emoji = ':fist_oncoming: '
+            employer_emoji = ':briefcase: '
+            marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
+            recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
+            consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
+
+            # For Status Change
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 p_status, p_s_created = ProjectStatus.objects.get_or_create(
@@ -504,6 +514,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     prev_status_obj.is_current = False
                     prev_status_obj.save()
 
+                # If status is Joined
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
@@ -522,13 +533,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         statuses__created__gte=day_one,
                         submission__employer__iexact=project.submission.employer,
                     ).count()
-
-                    client_emoji = ':tophat: '
-                    role_emoji = ':fist_oncoming: '
-                    employer_emoji = ':briefcase: '
-                    marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
-                    recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
-                    consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
 
                     # Sending message on Mattermost on joined status
                     data = {
@@ -581,60 +585,40 @@ class ProjectViewSets(viewsets.ModelViewSet):
                             if links:
                                 link = links.first()
                                 iphone_link = link.link
-                                resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                                # resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
                                 if err == 'ok':
                                     link.is_sent = True
                                     link.sent_on = datetime.now()
                                     link.consultant = project.consultant
-                                    link.save()
+                                    # link.save()
 
-            serializer = self.serializer_class(project)
+                # Discord message for PO , Status Received
+                if new_status == 'received' and not project.is_msg_sent:
+                    day_one = datetime.today().replace(day=1, hour=0, minute=0)
+                    total_offer_count = Project.objects.filter(
+                        statuses__status='received',
+                        statuses__created__gte=day_one,
+                    ).count()
 
-            day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_offer_count = Project.objects.filter(
-                statuses__status='received',
-                statuses__created__gte=day_one,
-            ).count()
+                    team_offer_count = Project.objects.filter(
+                        statuses__status='received',
+                        statuses__created__gte=day_one,
+                        submission__employer__iexact=project.submission.employer,
+                    ).count()
 
-            team_offer_count = Project.objects.filter(
-                statuses__status='received',
-                statuses__created__gte=day_one,
-                submission__employer__iexact=project.submission.employer,
-            ).count()
+                    interviews = project.submission.screening.exclude(status='cancelled')
+                    ctb_gender = interviews.last().supervisor.gender
+                    supervisors = "\n".join(
+                        [f"-    Round {interview.round} - {interview.supervisor.employee_name}\n" for
+                         interview in
+                         interviews if interview.supervisor])
+                    ctb_gender_emoji = ':raising_hand_woman: ' if ctb_gender == 'female' else ':raising_hand_man: '
 
-            # Cancellation or Termination Mail
-            cancellation_status = ['dual-offer', 'cancelled', 'client-cancelled', 'contract-conflicts',
-                                   'candidate-absconded', 'candidate-denied-jd', 'candidate-denied-rate',
-                                   'candidate-denied-location']
-            termination_status = ['completed', 'terminated', 'resigned-rate', 'terminated-other', 'resigned-location',
-                                  'resigned-full_time', 'resigned-technology', 'client-fired-budget',
-                                  'client-fired-performance', 'client-fired-security']
-            scrum_master = None
-            queryset = User.objects.filter(team=request.user.team, role__name='admin')
-            if queryset:
-                scrum_master = queryset.first().email
-
-            # Discord message for PO
-            if new_status == 'received' and not project.is_msg_sent:
-                interviews = project.submission.screening.exclude(status='cancelled')
-                ctb_gender = interviews.last().supervisor.gender
-                supervisors = "\n".join(
-                    [f"-    Round {interview.round} - {interview.supervisor.employee_name}\n" for interview in
-                     interviews if interview.supervisor])
-
-                client_emoji = ':tophat: '
-                role_emoji = ':fist_oncoming: '
-                employer_emoji = ':briefcase: '
-                ctb_gender_emoji = ':raising_hand_woman: ' if ctb_gender == 'female' else ':raising_hand_man: '
-                marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
-                recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
-                consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
-
-                # Sending message on Mattermost
-                data = {
-                    "response_type": "in_channel",
-                    "username": "Log1 Updates",
-                    "text": f"""
+                    # Sending message on Mattermost
+                    data = {
+                        "response_type": "in_channel",
+                        "username": "Log1 Updates",
+                        "text": f"""
 #### Offer :metal: :smile: :metal:\n
 {consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
@@ -649,19 +633,54 @@ class ProjectViewSets(viewsets.ModelViewSet):
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
 `Total offer count of this month - {total_offer_count}`
 """
-                }
-                post_msg_using_webhook(config.offer_url, data)
-                project.is_msg_sent = True
-                project.save()
+                                }
+                    post_msg_using_webhook(config.offer_url, data)
+                    project.is_msg_sent = True
+                    project.save()
 
-            if os.environ.get('ENV', 'local') == 'prod':
-                if prev_status_obj.status not in termination_status and new_status in termination_status:
-                    resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
-                elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                    resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
-                if new_status in termination_status:
-                    project.consultant.status = 'on_bench'
-                    project.consultant.save()
+                # Mail for Cancellation or Termination of Project
+                cancellation_status = ['dual-offer', 'cancelled', 'client-cancelled', 'contract-conflicts',
+                                       'candidate-absconded', 'candidate-denied-jd', 'candidate-denied-rate',
+                                       'candidate-denied-location']
+                termination_status = ['completed', 'terminated', 'resigned-rate', 'terminated-other',
+                                      'resigned-full_time', 'resigned-technology', 'client-fired-budget',
+                                      'client-fired-performance', 'client-fired-security', 'resigned-location']
+
+                text = f"""#### Offer Feedback \n"""
+                text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+{marketer_gender_emoji} Marketer :   {project.marketer_name}
+{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{employer_emoji} Employer :   {project.submission.employer.title()}
+:us: Location: {project.city}
+{client_emoji} Client :  {project.submission.client}
+{role_emoji} Role :  {project.submission.lead.job_title}
+:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n"""
+
+                text += "**Reason: **" + project.feedback
+
+                data = {
+                    "response_type": "in_channel",
+                    "username": "Log1 Updates",
+                    "text": text,
+                }
+
+                if os.environ.get('ENV', 'local') == 'prod':
+                    scrum_master = None
+                    queryset = User.objects.filter(team=request.user.team, role__name='admin')
+                    if queryset:
+                        scrum_master = queryset.first().email
+
+                    if prev_status_obj.status not in termination_status and new_status in termination_status:
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
+                        post_msg_using_webhook(config.announcement_url, data)
+
+                    elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
+                        post_msg_using_webhook(config.announcement_url, data)
+
+            serializer = self.serializer_class(project)
 
             return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -782,7 +801,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
             queryset = consultants.order_by('-id').distinct('id')
-            queryset = queryset.order_by('projects__timesheets__modified').distinct('projects__timesheets__modified')
+            queryset = queryset.order_by('-projects__timesheets__modified').distinct('projects__timesheets__modified')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
