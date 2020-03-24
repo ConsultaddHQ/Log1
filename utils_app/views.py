@@ -296,7 +296,7 @@ command - {command} {query}\n
                     marketing = consultant.marketing.filter(status='open')
                     primary_marketer_name = marketing.first().primary_marketer.employee_name if marketing else None
                     primary_marketer_team = marketing.first().primary_marketer.team.name if marketing else None
-                    text += f"| {consultant.name} | {consultant.email} |  {consultant.status} | {primary_marketer_name} | {primary_marketer_team} |  {recruiter} |  {retention} |\n"
+                    text += f"| {consultant.name} | {consultant.email} |  {consultant.status} | {primary_marketer_team} | {primary_marketer_name} |  {recruiter} |  {retention} |\n"
 
             elif data_type == 'info':
                 text = f"""#### Consultant INFO :memo: \n
@@ -329,7 +329,7 @@ command - {command} {query}\n
                     ).exclude(status='cancelled').distinct('submission').order_by().count()
                     project_count = Project.objects.filter(consultant=consultant).count()
 
-                    text += f"| {consultant.name} | {days_on_bench} | {consultant.status} | {submission_count} | {interview_count} | {project_count} |"
+                    text += f"| {consultant.name} | {days_on_bench} | {consultant.status} | {submission_count} | {interview_count} | {project_count} |\n"
 
             return Response({"text": text}, status=status.HTTP_200_OK)
         except Exception as error:

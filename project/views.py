@@ -483,23 +483,50 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project = get_object_or_404(Project, id=project_id)
             prev_status_obj = project.statuses.get(is_current=True)
 
-            project.city = request.data.get('city', None)
-            project.duration = request.data.get('duration', None)
-            project.end_date = request.data.get('end_date', None)
-            project.feedback = request.data.get('feedback', None)
-            project.start_date = request.data.get('start_date', None)
-            project.payment_term = request.data.get('payment_term', None)
-            project.client_address = request.data.get('client_address', None)
-            project.vendor_address = request.data.get('vendor_address', None)
-            project.invoicing_period = request.data.get('invoicing_period', None)
-            project.reporting_details = request.data.get('reporting_details', None)
+            data = {
+                "city": request.data.get('city', None),
+                "duration": request.data.get('duration', None),
+                "end_date": request.data.get('end_date', None),
+                "feedback": request.data.get('feedback', None),
+                "start_date": request.data.get('start_date', None),
+                "payment_term": request.data.get('payment_term', None),
+                "client_address": request.data.get('client_address', None),
+                "vendor_address": request.data.get('vendor_address', None),
+                "invoicing_period": request.data.get('invoicing_period', None),
+                "reporting_details": request.data.get('reporting_details', None),
+            }
+            if data["city"]:
+                project.city = data["city"]
+            if data["duration"]:
+                project.duration = data["duration"]
+            if data["end_date"]:
+                project.end_date = data["end_date"]
+            if data["feedback"]:
+                project.feedback = data["feedback"]
+            if data["start_date"]:
+                project.start_date = data["start_date"]
+            if data["payment_term"]:
+                project.payment_term = data["payment_term"]
+            if data["client_address"]:
+                project.client_address = data["client_address"]
+            if data["vendor_address"]:
+                project.vendor_address = data["vendor_address"]
+            if data["invoicing_period"]:
+                project.invoicing_period = data["invoicing_period"]
+            if data["reporting_details"]:
+                project.reporting_details = data["reporting_details"]
+
             project.save()
+
+            if project.consultant.recruiter:
+                recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
+            else:
+                recruiter_gender_emoji = ':man_office_worker: '
 
             client_emoji = ':tophat: '
             role_emoji = ':fist_oncoming: '
             employer_emoji = ':briefcase: '
             marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
-            recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
             consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
 
             # For Status Change
@@ -642,27 +669,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 cancellation_status = ['dual-offer', 'cancelled', 'client-cancelled', 'contract-conflicts',
                                        'candidate-absconded', 'candidate-denied-jd', 'candidate-denied-rate',
                                        'candidate-denied-location']
-                termination_status = ['completed', 'terminated', 'resigned-rate', 'terminated-other',
+                termination_status = ['terminated', 'resigned-rate', 'terminated-other',
                                       'resigned-full_time', 'resigned-technology', 'client-fired-budget',
                                       'client-fired-performance', 'client-fired-security', 'resigned-location']
-
-                text = f"""#### Offer Feedback \n"""
-                text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-:us: Location: {project.city}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n"""
-
-                text += "**Reason: **" + project.feedback
-
-                data = {
-                    "response_type": "in_channel",
-                    "username": "Log1 Updates",
-                    "text": text,
-                }
 
                 if os.environ.get('ENV', 'local') == 'prod':
                     scrum_master = None
@@ -674,11 +683,28 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                        post_msg_using_webhook(config.announcement_url, data)
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
-                        post_msg_using_webhook(config.announcement_url, data)
+
+                        text = f"""#### Offer Feedback \n"""
+                        text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+{marketer_gender_emoji} Marketer :   {project.marketer_name}
+{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{employer_emoji} Employer :   {project.submission.employer.title()}
+:us: Location: {project.city}
+{client_emoji} Client :  {project.submission.client}
+{role_emoji} Role :  {project.submission.lead.job_title}
+:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n"""
+
+                        text += "**Reason: **" + project.feedback
+
+                        data = {
+                            "response_type": "in_channel",
+                            "username": "Log1 Updates",
+                            "text": text,
+                        }
+                        post_msg_using_webhook(config.offer_failure_url, data)
 
             serializer = self.serializer_class(project)
 

@@ -1071,13 +1071,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         "username": "Log1 Updates",
                         "text": text,
                     }
-                    post_msg_using_webhook(config.announcement_url, data)
+                    post_msg_using_webhook(config.interviewfeedback_url, data)
 
                 if status_change == 'false':
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
                         interview.save()
-
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
                             text = "#### :stopwatch: Interview Rescheduled \n **CTB: {} :: Round:{} :: {} :: {} :: " \
@@ -1124,15 +1123,20 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         }
 
                         # Update interview on Google Calendar
-                        event_id = interview.calendar_id
                         if os.environ.get('ENV', 'local') == 'prod':
-                            try:
-                                cal_res['id'] = update_calendar(event_id, event)
-                            except Exception as error:
-                                logger.error(error)
-                                logger.error(cal_res)
-                                return Response({"result": "Calendar event update failed", "error": str(error)},
-                                                status=status.HTTP_400_BAD_REQUEST)
+                            event_id = interview.calendar_id
+                            if not event_id:
+                                cal_res = book_calendar(event)
+                                interview.calendar_id = cal_res['id']
+                                interview.save()
+                            else:
+                                try:
+                                    cal_res['id'] = update_calendar(event_id, event)
+                                except Exception as error:
+                                    logger.error(error)
+                                    logger.error(cal_res)
+                                    return Response({"result": "Calendar event update failed", "error": str(error)},
+                                                    status=status.HTTP_400_BAD_REQUEST)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
