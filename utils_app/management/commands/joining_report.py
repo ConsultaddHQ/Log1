@@ -24,9 +24,13 @@ class Command(BaseCommand):
             statuses__status__iexact='joined', statuses__created__year=last_year, statuses__created__month=last_month
         ).order_by('id').distinct('id').count()
 
-        joined_this_month = Project.objects.filter(
+        joined_this_month_t = Project.objects.filter(
             start_date__year=year, start_date__month=month, statuses__status__iexact='joined',
             statuses__created__year=year, statuses__created__month=month
+        ).order_by('id').distinct('id').count()
+
+        joined_this_month = Project.objects.filter(
+            statuses__status__iexact='joined', statuses__created__year=year, statuses__created__month=month
         ).order_by('id').distinct('id').count()
 
         expected_joining = Project.objects.filter(
@@ -44,12 +48,12 @@ class Command(BaseCommand):
             "username": "Log1 Updates",
             "text": f"""
 #### Projects joining status :memo: \n
-| Project Status                     | Count                   | 
-|:-----------------------------------|:------------------------|
-| Joined Last Month                  | {joined_last_month}     |
-| Joined This Month                  | {joined_this_month}     |
-| Expected Joining this Month        | {expected_joining}      |
-| Joining Status Not updated in log1 | {offers_not_joined}     |
+| Project Status                     | Count                    | 
+|:-----------------------------------|:-------------------------|
+| Joined Last Month                  | {joined_last_month}      |
+| Joined This Month | {joined_this_month_t}/{joined_this_month} |
+| Expected Joining this Month        | {expected_joining}       |
+| Joining Status Not updated in log1 | {offers_not_joined}      |
 """
         }
         mattermost_webhook(config.joined_url, data)

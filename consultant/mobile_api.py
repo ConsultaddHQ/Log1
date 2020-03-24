@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 # API for Mobile App
-class ConsultantAuthViewSets(GenericViewSet):
+class ConsultantAuthViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
     queryset = Consultant.objects.all()
@@ -101,7 +101,7 @@ class ConsultantAuthViewSets(GenericViewSet):
 
 
 # API for Mobile App
-class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
+class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
     permission_classes = (ConsultantIsAuthenticated,)
@@ -117,19 +117,24 @@ class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
         first_login = request.query_params.get('first_login', None)
         new_password = request.data.get('new_password', None)
         consultant = get_consultant(request)
-        if consultant.check_password(new_password):
-            return Response({"error": "Please use new password"}, status=status.HTTP_400_BAD_REQUEST)
         if first_login and new_password:
+            if consultant.check_password(new_password):
+                return Response({"error": "Please use new password", "error_in": "new"},
+                                status=status.HTTP_400_BAD_REQUEST)
             consultant.set_password(new_password)
             consultant.first_login = False
         else:
             current_password = request.data.get('current_password', None)
-            if current_password:
+            if current_password and consultant.check_password(current_password):
+                if consultant.check_password(new_password):
+                    return Response({"error": "Please use new password", "error_in": "new"},
+                                    status=status.HTTP_400_BAD_REQUEST)
                 consultant.set_password(new_password)
             else:
-                return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Wrong Current Password", "error_in": "current"},
+                                status=status.HTTP_400_BAD_REQUEST)
         consultant.save()
-        return Response({"result": "password updated"}, status=status.HTTP_200_OK)
+        return Response({"result": "Password Updated"}, status=status.HTTP_200_OK)
 
     @action(methods=['delete'], detail=False, url_path='logout')
     def logout(self, request):
@@ -145,7 +150,7 @@ class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
 
 
 # API for Mobile App
-class ConsultantResetPasswordViewSets(GenericViewSet):
+class ConsultantResetPasswordViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
     queryset = Consultant.objects.all()

@@ -14,17 +14,17 @@ class Command(BaseCommand):
         end = date.today() - timedelta(days=1)
         start = date.today() - timedelta(days=7)
 
-        projects = Project.objects.filter(
-            statuses__status__iexact='joined', statuses__is_current=True,
-        )
-
         text = f"""
 #### Project Joined Last Week :memo: \n
 | Consultant | Team | Client | Vendor | Marketer | Start Date | Employer | City |
 |:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|:-----|
 """
 
-        joined_last_week = projects.filter(statuses__created__range=[start, end])
+        joined_last_week = Project.objects.filter(
+            statuses__status__iexact='joined',
+            start_date__range=[start, end],
+            statuses__is_current=True,
+        )
         for project in joined_last_week:
             submission = project.submission
             text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} | {project.city} |\n"
@@ -44,8 +44,13 @@ class Command(BaseCommand):
 """
         start = date.today()
         end = date.today() + timedelta(days=5)
+        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
+                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
 
-        joining_this_week = projects.filter(statuses__created__range=[start, end])
+        joining_this_week = Project.objects.filter(start_date__range=[start, end]).exclude(
+            statuses__status__in=cancelled,
+            statuses__is_current=True,
+        )
 
         for project in joining_this_week:
             submission = project.submission

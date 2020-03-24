@@ -26,7 +26,7 @@ from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceT
 
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
 
-from consultant.mobile_api import ConsultantAuthViewSets, ConsultantAppViewSets, ConsultantResetPasswordViewSets
+from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets
@@ -82,9 +82,9 @@ router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)
 
 # Mobile Application routes
-router.register(r'consultant_app', ConsultantAppViewSets)
-router.register(r'consultant_auth', ConsultantAuthViewSets)
-router.register(r'consultant_password', ConsultantResetPasswordViewSets)
+router.register(r'consultant_app', ConsultantAppViewSet)
+router.register(r'consultant_auth', ConsultantAuthViewSet)
+router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
 router.register(r'test', Test)
 
