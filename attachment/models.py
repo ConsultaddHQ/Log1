@@ -71,7 +71,7 @@ class Attachment(TimeStampedModel):
 
     object_id = models.PositiveIntegerField()
     attachment_file = models.FileField(_('attachment'), upload_to=attachment_upload)
-    attachment_type = models.CharField(choices=ATTACHMENT_TYPE, blank=True, null=True, max_length=500)
+    attachment_type = models.CharField(choices=ATTACHMENT_TYPE, blank=True, null=True, max_length=50)
     content_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE,
         verbose_name='Model Name'

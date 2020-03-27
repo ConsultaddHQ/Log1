@@ -38,18 +38,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
     def consultant_mail_on_joining(self, project, password, link):
         try:
-            cc = []
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
-            if recruiter:
-                cc.append(recruiter.email)
-            if retention:
-                cc.append(retention.email)
-
             mail_data = {
                 'to': [project.consultant.email],
-                'cc': cc,
-                'bcc': [],
+                'cc': [],
+                'bcc': ['sarang.m@consultadd.in'],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Timesheet tracking app',
                 'context': {
@@ -597,27 +589,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         start=start_date,
                     )
 
-                    if not IphoneAppLink.objects.filter(is_sent=True, consultant=project.consultant):
+                    consultant = project.consultant
+                    if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant) and consultant.work_type != 'w2':
                         password = config.CONSULTANT_PASSWORD
-
-                        queryset = Consultant.objects.filter(email__exact=project.consultant.email)
-                        if queryset:
-                            consultant = queryset.first()
-                            consultant.set_password(password)
-                            consultant.is_active = True
-                            consultant.save()
+                        consultant.set_password(password)
+                        consultant.is_active = True
+                        consultant.save()
 
                         if os.environ.get('ENV', 'local') == 'prod':
                             links = IphoneAppLink.objects.filter(is_sent=False)
                             if links:
                                 link = links.first()
                                 iphone_link = link.link
-                                # resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                                resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
                                 if err == 'ok':
                                     link.is_sent = True
                                     link.sent_on = datetime.now()
-                                    link.consultant = project.consultant
-                                    # link.save()
+                                    link.consultant = consultant
+                                    link.save()
 
                 # Discord message for PO , Status Received
                 if new_status == 'received' and not project.is_msg_sent:

@@ -30,6 +30,7 @@ class Command(BaseCommand):
         ).order_by('id').distinct('id').count()
 
         joined_this_month = Project.objects.filter(
+            start_date__year=year, start_date__month=month, statuses__is_current=True,
             statuses__status__iexact='joined', statuses__created__year=year, statuses__created__month=month
         ).order_by('id').distinct('id').count()
 

@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
-from project.models import Project
+from project.models import Project, ProjectStatus
 from consultant.serializers import *
 from marketing.models import Interview
 from activity.serializers import CommentGetSerializer
@@ -125,13 +125,19 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 'on_boarded': on_boarded,
                 'not_joined': not_joined,
             }
+            project_status = ProjectStatus.objects.filter(
+                project=OuterRef("pk"), is_current=True)
+
             data = queryset[first:last].annotate(
                 rate=F('submission__rate'),
                 client=F('submission__client'),
+                employer=F('submission__employer'),
                 consultant_name=F('consultant__name'),
+                status=Subquery(project_status.values('status')[:1]),
                 company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name')
-            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created')
+                marketer_name=F('submission__created_by__employee_name'),
+            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
+                     'status', 'employer')
             return data, data_counts
         except Exception as error:
             logger.error(error)
