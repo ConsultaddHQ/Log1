@@ -12,23 +12,30 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type', 'file_name', 'verified')
+        fields = ('id', 'petition', 'creator', 'doc_type', 'file_name')
 
 
 class DocumentURLSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type', 'file', 'verified')
+        fields = ('id', 'petition', 'creator', 'doc_type', 'file')
 
 
 class PetitionSerializer(serializers.ModelSerializer):
     docs = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    assigned_to = serializers.SerializerMethodField()
 
     class Meta:
         model = Petition
-        fields = '__all__'
+        fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'docs', 'status')
 
     def get_docs(self, obj):
         return DocumentURLSerializer(obj.documents.all(), many=True).data
 
+    def get_consultant(self, obj):
+        return obj.beneficiary.name
+
+    def get_assigned_to(self, obj):
+        return obj.assigned_to.employee_name

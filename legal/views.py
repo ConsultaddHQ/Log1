@@ -3,9 +3,9 @@ import logging
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status, exceptions
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
@@ -16,9 +16,10 @@ from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
 from utils_app.mailing import send_email
-from legal.models import Petition, Document
+from consultant.models import Consultant
 from employee.token import get_token_generator
-from legal.serializers import PetitionSerializer, DocumentSerializer, DocumentURLSerializer
+from legal.models import DOCUMENT_TYPE, Petition, Document
+from legal.serializers import PetitionSerializer, DocumentURLSerializer
 
 logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
@@ -30,6 +31,13 @@ class PetitionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateM
     serializer_class = PetitionSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @action(methods=['get'], detail=False, url_path='doc_types')
+    def doc_types(self, request):
+        data = []
+        for i in DOCUMENT_TYPE:
+            data.append({"name": i[0], "value": i[1]})
+        return Response({"results": data}, status=status.HTTP_200_OK)
 
     @action(methods=['get'], detail=True, url_path='doc_request')
     def doc_request(self, request, *args, **kwargs):
@@ -85,6 +93,11 @@ class PetitionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateM
                 petition_type=request.data['petition_type'],
                 beneficiary_type=request.data['beneficiary_type'],
             )
+            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
+            consultant.p_password = TOKEN_GENERATOR_CLASS.generate_token()
+            consultant.visa_petition = True
+            consultant.p_is_active = True
+            consultant.save()
             serializer = self.serializer_class(petition)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -108,13 +121,20 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
 
+    @action(methods=['get'], detail=False, url_path='doc_types')
+    def doc_types(self, request):
+        data = []
+        for i in DOCUMENT_TYPE:
+            data.append({"name": i[0], "value": i[1]})
+        return Response({"results": data}, status=status.HTTP_200_OK)
+
     def list(self, request, *args, **kwargs):
         try:
             queryset = Petition.objects.filter(beneficiary=request.user, is_active=True)
             if queryset:
                 petition = queryset.first()
                 serializer = self.serializer_class(petition.documents.all(), many=True)
-                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+                return Response({"error": serializer.data}, status=status.HTTP_400_BAD_REQUEST)
             return Response({"error": "Petition not available"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -123,17 +143,14 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         try:
             petition_id = request.data.get('petition')
             file_type = request.data.get('file_type')
-            if request.FILES.getlist('file'):
-                for file in request.FILES.getlist('file'):
-                    Document.objects.create(
-                        file=file,
-                        creator=None,
-                        verified=False,
-                        doc_type=file_type,
-                        petition_id=petition_id,
-                    )
-            else:
-                return Response({"error": "File not Found"}, status=status.HTTP_400_BAD_REQUEST)
+            for file in request.FILES.getlist('file'):
+                Document.objects.create(
+                    file=file,
+                    creator=None,
+                    verified=False,
+                    doc_type=file_type,
+                    petition_id=petition_id,
+                )
             documents = Document.objects.filter(petition=petition_id)
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
