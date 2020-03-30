@@ -29,6 +29,18 @@ class ConsultantLoginSerializer(UserSerializer):
         return token.key
 
 
+class ConsultantPetitionLoginSerializer(UserSerializer):
+    token = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'token', 'email', 'name')
+
+    def get_token(self, obj):
+        token, created = ConsultantPetitionToken.objects.get_or_create(consultant=obj)
+        return token.key
+
+
 class ConsultantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant

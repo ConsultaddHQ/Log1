@@ -149,9 +149,9 @@ class TimeSheet(TimeStampedModel):
     is_active = models.BooleanField(_('Is Active'), default=True)
     remark = models.TextField(_("Remark"), null=True, blank=True)
     hours = models.FloatField(max_length=20, null=True, blank=True)
+    status_updated_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
     additional_hours = models.FloatField(max_length=20, null=True, blank=True, default=0)
     status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS, default='draft')
-    status_updated_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
     status_updated_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='timesheet_edits',

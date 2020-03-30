@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from utils_app.admin import ExportCsvMixin
 from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, FeedbackDetail, \
-    ConsultantPOC, ConsultantFeedback, Education, Experience, WorkAuth, ConsultantToken
+    ConsultantPOC, ConsultantFeedback, Education, Experience, WorkAuth, ConsultantToken, ConsultantPetitionToken
 
 
 @admin.register(Consultant)
@@ -19,6 +19,11 @@ class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 @admin.register(ConsultantToken)
 class ConsultantToken(admin.ModelAdmin):
+    list_display = ('consultant', 'key', 'created')
+
+
+@admin.register(ConsultantPetitionToken)
+class ConsultantPetitionTokenAdmin(admin.ModelAdmin):
     list_display = ('consultant', 'key', 'created')
 
 

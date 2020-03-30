@@ -18,9 +18,9 @@ from utils_app.views import CityViewSets, SlashCommandViewSets
 
 from attachment.views import AttachmentView, AttachmentGetView
 
-from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, Test
-
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
+
+from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, ProjectViewSet, Test
 
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
 
@@ -32,8 +32,9 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
     InterviewViewSets, VendorLayerViewSets
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
-    ConsultantProfileViewSets, ConsultantPOCViewSets, WorkAuthViewSets
+    ConsultantProfileViewSets, ConsultantPOCViewSets, WorkAuthViewSets, ConsultantPetitionAuthViewSet
 
+from legal.views import PetitionViewSets, PetitionDocsViewSets
 
 schema_view = get_swagger_view(title="New Log1 Documentation")
 
@@ -67,9 +68,6 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
 
-router.register(r'timesheet', TimeSheetViewSets)
-router.register(r'payroll', PayrollScheduleViewSets)
-
 router.register(r'cmd', SlashCommandViewSets)
 
 router.register(r'report', ScrumMeetingReport)
@@ -81,12 +79,22 @@ router.register(r'ckiller_data', CkillerSubmissionView)
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)
 
+
 # Mobile Application routes
 router.register(r'consultant_app', ConsultantAppViewSet)
 router.register(r'consultant_auth', ConsultantAuthViewSet)
 router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
+router.register(r'client', ProjectViewSet)
+router.register(r'timesheet', TimeSheetViewSets)
+router.register(r'payroll', PayrollScheduleViewSets)
+
 router.register(r'test', Test)
+
+# Legal App APIs
+router.register(r'petition', PetitionViewSets)
+router.register(r'petition_docs', PetitionDocsViewSets)
+router.register(r'client', ConsultantPetitionAuthViewSet)
 
 
 urlpatterns = [

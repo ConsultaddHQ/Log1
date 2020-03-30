@@ -51,6 +51,7 @@ PROJECT_APPS = [
     'activity.apps.ActivityConfig',
     'ckiller.apps.CkillerConfig',
     'report.apps.ReportConfig',
+    'legal.apps.LegalConfig',
     'notification.apps.NotificationConfig',
     'impersonate.apps.ImpersonateConfig'
 ]

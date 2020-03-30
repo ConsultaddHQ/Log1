@@ -12,9 +12,9 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
-from project.models import Project, ProjectStatus
 from consultant.serializers import *
 from marketing.models import Interview
+from project.models import Project, ProjectStatus
 from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentURLSerializer
 
@@ -936,3 +936,36 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
         except KeyError as err:
             logger.error(err)
             return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# API for Petition Web App
+class ConsultantPetitionAuthViewSet(GenericViewSet):
+    permission_classes = ()
+    authentication_classes = ()
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantPetitionLoginSerializer
+
+    @action(methods=['post'], detail=False, url_path='login')
+    def login(self, request):
+        """
+            Normal Login
+            :param request, email, password
+        """
+        email = request.data.get('email').lower()
+        if email:
+            consultant = get_object_or_404(Consultant, email=email)
+        else:
+            return Response({"error": "Email is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+        consultant = Consultant.objects.filter(email=consultant.email, p_password=request.data.get('password').strip())
+        if consultant:
+            consultant = consultant.first()
+            if not consultant.p_is_active:
+                return Response({"error": "User account is not Active"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                serializer = self.serializer_class(consultant)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        logger.error("Incorrect Email Id OR Password")
+        return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
