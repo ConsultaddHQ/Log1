@@ -65,19 +65,6 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            project_id = kwargs.get('pk')
-            consultant = request.user
-            project=Project.objects.filter(
-                id=project_id,
-                consultant=consultant,
-                statuses__status='joined')
-            if project:
-                pass
-        except:
-            pass
-
     def update(self, request, *args, **kwargs):
         try:
             screenshot = False
@@ -225,9 +212,10 @@ class Test(GenericViewSet, ListModelMixin):
 
 
 class ConsultantProjectViewSet(GenericViewSet, ListModelMixin):
+    queryset = TimeSheet.objects.all()
+    serializer_class = TimeSheetSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
-    queryset = Project.objects.all()
 
     def list(self, request, *args, **kwargs):
         try:
@@ -242,3 +230,24 @@ class ConsultantProjectViewSet(GenericViewSet, ListModelMixin):
             return Response({'result': result}, status=status.HTTP_200_OK)
         except:
             return Response({'error': 'Bad Request'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        last, first = page * page_size, page * page_size - page_size
+        try:
+            project_id = kwargs.get('pk')
+            consultant = request.user
+            project = Project.objects.filter(
+                id=project_id,
+                consultant=consultant,
+                statuses__status='joined')
+            if project:
+                project = project.first()
+                queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True)
+                serializer = self.serializer_class(queryset[first:last], many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": "No Weeks"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
