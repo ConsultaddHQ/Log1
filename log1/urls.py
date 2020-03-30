@@ -20,7 +20,7 @@ from attachment.views import AttachmentView, AttachmentGetView
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
-from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, ProjectViewSet, Test
+from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, Test
 
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
 
@@ -85,7 +85,6 @@ router.register(r'consultant_app', ConsultantAppViewSet)
 router.register(r'consultant_auth', ConsultantAuthViewSet)
 router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
-router.register(r'client', ProjectViewSet)
 router.register(r'timesheet', TimeSheetViewSets)
 router.register(r'payroll', PayrollScheduleViewSets)
 
@@ -94,7 +93,7 @@ router.register(r'test', Test)
 # Legal App APIs
 router.register(r'petition', PetitionViewSets)
 router.register(r'petition_docs', PetitionDocsViewSets)
-router.register(r'client', ConsultantPetitionAuthViewSet)
+router.register(r'consultant_petition', ConsultantPetitionAuthViewSet)
 
 
 urlpatterns = [

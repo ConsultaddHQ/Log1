@@ -9,15 +9,25 @@ from consultant.models import Consultant
 from utils_app.models import TimeStampedModel
 
 DOCUMENT_TYPE = (
+    ('I94', 'I94'),
+    ('msa', 'MSA'),
+    ('visa', 'Visa'),
     ('other', 'Other'),
+    ('I20', 'Form I20'),
     ('resume', 'Resume'),
-    ('visa', 'Visa Docs'),
-    ('msa', 'MSA/Agreement'),
-    ('photo_id', 'Photo Id'),
-    ('misc', 'Miscellaneous'),
+    ('paystub', 'Paystub'),
     ('timesheet', 'Timesheet'),
     ('work_order', 'Work Order'),
-    ('academic', 'Academic Docs'),
+    ('ssc', 'Social Security Card'),
+    ('degree', 'Degree Certificate'),
+    ('client_letter', 'Client Letter'),
+    ('vendor_letter', 'Vendor Letter'),
+    ('insurance_card', 'Insurance Cards'),
+    ('transcript', 'Academic Transcripts'),
+    ('ead', 'Employment Authorization Card'),
+    ('experience_letter', 'Experience Letter'),
+    ('review_sheet', 'Performance Review Sheet '),
+    ('previous_visa_approval', 'Previous Approval Notices'),
 )
 
 PETITION_TYPES = (
@@ -28,20 +38,20 @@ PETITION_TYPES = (
 
 PETITION_STATUSES = (
     ('new', 'New'),
+    ('rfe', 'RFE'),
+    ('denied', 'Denied'),
+    ('shipped', 'Shipped'),
+    ('approved', 'Approved'),
     ('assigned', 'Assigned'),
-    ('doc_request_sent', 'Document Request Sent'),
+    ('reviewed', 'Reviewed'),
     ('lca_filed', 'LCA Filed'),
+    ('print', 'Sent for Print'),
     ('lca_approved', 'LCA Approved'),
     ('under_review', 'Under Review'),
-    ('reviewed', 'Reviewed'),
-    ('print', 'Sent for Print'),
-    ('shipped', 'Shipped'),
-    ('doc_acknowledged', 'Docs Acknowledged'),
-    ('rfe', 'RFE'),
     ('rfe_responded', 'RFE Docs Sent'),
+    ('doc_acknowledged', 'Docs Acknowledged'),
+    ('doc_request_sent', 'Document Request Sent'),
     ('rfe_doc_acknowledged', 'RFE Docs Acknowledged'),
-    ('approved', 'Approved'),
-    ('denied', 'Denied'),
 )
 
 
