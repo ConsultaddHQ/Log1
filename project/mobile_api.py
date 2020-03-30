@@ -209,3 +209,21 @@ class Test(GenericViewSet, ListModelMixin):
         if result:
             return Response({"result": str(result)}, status=status.HTTP_200_OK)
         return Response({"result": "Success"}, status=status.HTTP_200_OK)
+
+class ConsultantProjectViewSet(GenericViewSet, ListModelMixin):
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
+    queryset = Project.objects.all()
+
+    def list(self, request, *args, **kwargs):
+        try:
+            consultant = request.user
+            result = Project.objects.filter(
+                consultant=consultant,
+                statuses__status='joined'
+                ).annotate(
+                client=F('submission')
+                ).values('id','start_date')
+            print(result)
+        except:
+            pass

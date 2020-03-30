@@ -32,8 +32,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = (IsAuthenticated,)
-    get_serializer_class = ProjectGetSerializer
-    create_serializer_class = ProjectGetSerializer
     authentication_classes = (TokenAuthentication,)
 
     def consultant_mail_on_joining(self, project, password, link):
@@ -352,7 +350,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
-            serializer = self.get_serializer_class(project)
+            serializer = self.ProjectGetSerializer(project)
             return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
