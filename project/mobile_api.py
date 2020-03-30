@@ -1,5 +1,5 @@
 import logging
-from django.db.models import Q
+from django.db.models import Q, F
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from django.contrib.contenttypes.models import ContentType
-from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
 from project.serializers import *
 from notification.models import FCMDevice
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 # API for Mobile App (For Consultants)
-class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
+class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin):
     queryset = TimeSheet.objects.all()
     serializer_class = TimeSheetSerializer
     permission_classes = (ConsultantIsAuthenticated,)
@@ -209,3 +209,45 @@ class Test(GenericViewSet, ListModelMixin):
         if result:
             return Response({"result": str(result)}, status=status.HTTP_200_OK)
         return Response({"result": "Success"}, status=status.HTTP_200_OK)
+
+
+class ConsultantProjectViewSet(GenericViewSet, ListModelMixin):
+    queryset = TimeSheet.objects.all()
+    serializer_class = TimeSheetSerializer
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            consultant = request.user
+            result = Project.objects.filter(
+                consultant=consultant,
+                statuses__status='joined'
+                ).annotate(
+                client=F('submission__client'),
+                employer=F('submission__employer',)
+                ).values('id', 'start_date', 'client', 'employer')
+            return Response({'result': result}, status=status.HTTP_200_OK)
+        except:
+            return Response({'error': 'Bad Request'}, status=status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        last, first = page * page_size, page * page_size - page_size
+        try:
+            project_id = kwargs.get('pk')
+            consultant = request.user
+            project = Project.objects.filter(
+                id=project_id,
+                consultant=consultant,
+                statuses__status='joined')
+            if project:
+                project = project.first()
+                queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True)
+                serializer = self.serializer_class(queryset[first:last], many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": "No Weeks"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
