@@ -123,14 +123,17 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         try:
             petition_id = request.data.get('petition')
             file_type = request.data.get('file_type')
-            for file in request.FILES.getlist('file'):
-                Document.objects.create(
-                    file=file,
-                    creator=None,
-                    verified=False,
-                    doc_type=file_type,
-                    petition_id=petition_id,
-                )
+            if request.FILES.getlist('file'):
+                for file in request.FILES.getlist('file'):
+                    Document.objects.create(
+                        file=file,
+                        creator=None,
+                        verified=False,
+                        doc_type=file_type,
+                        petition_id=petition_id,
+                    )
+            else:
+                return Response({"error": "File not Found"}, status=status.HTTP_400_BAD_REQUEST)
             documents = Document.objects.filter(petition=petition_id)
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)

@@ -103,6 +103,6 @@ urlpatterns = [
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-if os.getenv('DEBUG', False):
+if bool(os.getenv('DEBUG', 'False')):
     urlpatterns.append(path('api/swagger/', schema_view))
     urlpatterns.append(path('api/docs/', include_docs_urls(title='New Log1', public=True)))

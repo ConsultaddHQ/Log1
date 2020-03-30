@@ -293,6 +293,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             try:
                 education = get_object_or_404(Education, id=kwargs.get('pk'))
                 serializer = EducationSerializer(education, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)
@@ -326,6 +328,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             try:
                 experience = get_object_or_404(Experience, id=kwargs.get('pk'))
                 serializer = ExperienceSerializer(experience, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)

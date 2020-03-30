@@ -1066,7 +1066,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         interview_status = "Failed"
                         interview_status_emoji = ":-1: "
-                    text = f"""#### {interview_status_emoji} Interview Feedback \n **CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name}** ({interview_status})\n"""
+                    text = f"""#### {interview_status_emoji} Interview Feedback \n **CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status}) ** \n"""
                     text += interview.feedback
 
                     data = {

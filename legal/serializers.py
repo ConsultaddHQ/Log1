@@ -12,14 +12,14 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type', 'file_name')
+        fields = ('id', 'petition', 'creator', 'doc_type', 'file_name', 'verified')
 
 
 class DocumentURLSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type', 'file')
+        fields = ('id', 'petition', 'creator', 'doc_type', 'file', 'verified')
 
 
 class PetitionSerializer(serializers.ModelSerializer):
