@@ -51,7 +51,8 @@ class TimeSheetAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
     list_filter = ('status',)
     search_fields = ('id', 'project__id', 'project__consultant__name', 'project__consultant__email')
-    list_display = ('id', 'project', 'is_active', 'status', 'hours', 'additional_hours', 'start', 'end', 'created')
+    list_display = ('id', 'project', 'is_active', 'status', 'hours', 'additional_hours', 'start', 'end', 'created',
+                    'con_comment')
 
 
 @admin.register(PayrollSchedule)

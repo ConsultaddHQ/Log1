@@ -13,7 +13,7 @@ project_folder = os.path.expanduser(BASE_DIR)
 load_dotenv(os.path.join(project_folder, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', False)
+DEBUG = bool(os.environ.get('DEBUG', False))
 
 ALLOWED_HOSTS = ['*']
 
@@ -51,6 +51,7 @@ PROJECT_APPS = [
     'activity.apps.ActivityConfig',
     'ckiller.apps.CkillerConfig',
     'report.apps.ReportConfig',
+    'legal.apps.LegalConfig',
     'notification.apps.NotificationConfig',
     'impersonate.apps.ImpersonateConfig'
 ]
@@ -251,7 +252,7 @@ CONSTANCE_CONFIG = OrderedDict([
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEO'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
-    'Web-Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url',
+    'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url',
                   'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
                   'interviewfeedback_url'),
 }

@@ -6,6 +6,7 @@ from django.contrib.auth.models import BaseUserManager
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.auth.hashers import make_password, check_password
 
 from activity.models import Comment
 from employee.models import User, Team
@@ -105,6 +106,10 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         choices=WORK_TYPE_CHOICE,
         default='full_time'
     )
+
+    p_is_active = models.BooleanField(default=False)
+    visa_petition = models.BooleanField(_('Petition login'), default=False)
+    p_password = models.CharField(_('password'), max_length=10, blank=True, null=True)
 
     objects = ConsultantManager()
 
@@ -217,6 +222,34 @@ class ConsultantToken(models.Model):
         return super(ConsultantToken, self).save(*args, **kwargs)
 
     def generate_key(self):
+        return binascii.hexlify(os.urandom(20)).decode()
+
+    def __str__(self):
+        return self.key
+
+
+class ConsultantPetitionToken(models.Model):
+    """
+    The default authorization token model.
+    """
+    key = models.CharField(_("Key"), max_length=40, primary_key=True)
+    consultant = models.ForeignKey(
+        Consultant, related_name='petition_token',
+        on_delete=models.CASCADE, verbose_name=_("Consultant")
+    )
+    created = models.DateTimeField(_("Created"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Consultant Petition Token")
+        verbose_name_plural = _("Consultant Petition Tokens")
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            self.key = self.generate_key()
+        return super(ConsultantPetitionToken, self).save(*args, **kwargs)
+
+    @staticmethod
+    def generate_key():
         return binascii.hexlify(os.urandom(20)).decode()
 
     def __str__(self):

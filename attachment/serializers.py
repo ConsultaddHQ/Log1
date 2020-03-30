@@ -8,7 +8,7 @@ class AttachmentSerializer(serializers.ModelSerializer):
     file_name = serializers.SerializerMethodField()
 
     def get_file_name(self, obj):
-        return os.path.split(obj.attachment_file.name)[0]
+        return os.path.split(obj.attachment_file.name)[1]
 
     class Meta:
         model = Attachment

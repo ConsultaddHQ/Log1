@@ -32,26 +32,16 @@ class ProjectViewSets(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = (IsAuthenticated,)
-    get_serializer_class = ProjectGetSerializer
-    create_serializer_class = ProjectGetSerializer
     authentication_classes = (TokenAuthentication,)
 
     def consultant_mail_on_joining(self, project, password, link):
         try:
-            cc = []
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
-            if recruiter:
-                cc.append(recruiter.email)
-            if retention:
-                cc.append(retention.email)
-
             mail_data = {
                 'to': [project.consultant.email],
-                'cc': cc,
-                'bcc': [],
+                'cc': [],
+                'bcc': ['sarang.m@consultadd.in'],
                 'template': '../templates/consultant_account_creation.html',
-                'subject': f'Your account created on Consultadd Timesheet tracking app',
+                'subject': f'Your account created on Consultadd Time Track App',
                 'context': {
                     'iphone_link': link,
                     'password': password,
@@ -360,7 +350,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
-            serializer = self.get_serializer_class(project)
+            serializer = ProjectGetSerializer(project)
             return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -581,43 +571,41 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.joined_url, data)
 
-                    # Creating first week Timesheet on project status change to joined
-                    start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
-                    week_day = start_date.weekday()
-                    if week_day == 6:
-                        end_date = start_date + timedelta(days=6)
-                    else:
-                        end_date = start_date + timedelta(days=5 - week_day)
+                    consultant = project.consultant
+                    if not consultant.work_type == 'w2':
+                        # Creating first week Timesheet on project status change to joined
+                        start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
+                        week_day = start_date.weekday()
+                        if week_day == 6:
+                            end_date = start_date + timedelta(days=6)
+                        else:
+                            end_date = start_date + timedelta(days=5 - week_day)
 
-                    TimeSheet.objects.get_or_create(
-                        hours=0,
-                        end=end_date,
-                        status='draft',
-                        project=project,
-                        start=start_date,
-                    )
+                        TimeSheet.objects.get_or_create(
+                            hours=0,
+                            end=end_date,
+                            status='draft',
+                            project=project,
+                            start=start_date,
+                        )
 
-                    if not IphoneAppLink.objects.filter(is_sent=True, consultant=project.consultant):
-                        password = config.CONSULTANT_PASSWORD
-
-                        queryset = Consultant.objects.filter(email__exact=project.consultant.email)
-                        if queryset:
-                            consultant = queryset.first()
+                        if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
+                            password = config.CONSULTANT_PASSWORD
                             consultant.set_password(password)
                             consultant.is_active = True
                             consultant.save()
 
-                        if os.environ.get('ENV', 'local') == 'prod':
-                            links = IphoneAppLink.objects.filter(is_sent=False)
-                            if links:
-                                link = links.first()
-                                iphone_link = link.link
-                                # resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
-                                if err == 'ok':
-                                    link.is_sent = True
-                                    link.sent_on = datetime.now()
-                                    link.consultant = project.consultant
-                                    # link.save()
+                            if os.environ.get('ENV', 'local') == 'prod':
+                                links = IphoneAppLink.objects.filter(is_sent=False)
+                                if links:
+                                    link = links.first()
+                                    iphone_link = link.link
+                                    resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                                    if err == 'ok':
+                                        link.is_sent = True
+                                        link.sent_on = datetime.now()
+                                        link.consultant = consultant
+                                        link.save()
 
                 # Discord message for PO , Status Received
                 if new_status == 'received' and not project.is_msg_sent:
@@ -826,8 +814,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
-            queryset = consultants.order_by('-id').distinct('id')
-            queryset = queryset.order_by('-projects__timesheets__modified').distinct('projects__timesheets__modified')
+            queryset = consultants.order_by('-id', '-projects__timesheets__modified').distinct('id')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)

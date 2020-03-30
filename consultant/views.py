@@ -12,9 +12,9 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
-from project.models import Project
 from consultant.serializers import *
 from marketing.models import Interview
+from project.models import Project, ProjectStatus
 from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentURLSerializer
 
@@ -125,13 +125,19 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
                 'on_boarded': on_boarded,
                 'not_joined': not_joined,
             }
+            project_status = ProjectStatus.objects.filter(
+                project=OuterRef("pk"), is_current=True)
+
             data = queryset[first:last].annotate(
                 rate=F('submission__rate'),
                 client=F('submission__client'),
+                employer=F('submission__employer'),
                 consultant_name=F('consultant__name'),
+                status=Subquery(project_status.values('status')[:1]),
                 company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name')
-            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created')
+                marketer_name=F('submission__created_by__employee_name'),
+            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
+                     'status', 'employer')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -287,6 +293,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             try:
                 education = get_object_or_404(Education, id=kwargs.get('pk'))
                 serializer = EducationSerializer(education, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)
@@ -320,6 +328,8 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             try:
                 experience = get_object_or_404(Experience, id=kwargs.get('pk'))
                 serializer = ExperienceSerializer(experience, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)
@@ -930,3 +940,36 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
         except KeyError as err:
             logger.error(err)
             return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# API for Petition Web App
+class ConsultantPetitionAuthViewSet(GenericViewSet):
+    permission_classes = ()
+    authentication_classes = ()
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantPetitionLoginSerializer
+
+    @action(methods=['post'], detail=False, url_path='login')
+    def login(self, request):
+        """
+            Normal Login
+            :param request, email, password
+        """
+        email = request.data.get('email').lower()
+        if email:
+            consultant = get_object_or_404(Consultant, email=email)
+        else:
+            return Response({"error": "Email is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+        consultant = Consultant.objects.filter(email=consultant.email, p_password=request.data.get('password').strip())
+        if consultant:
+            consultant = consultant.first()
+            if not consultant.p_is_active:
+                return Response({"error": "User account is not Active"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                serializer = self.serializer_class(consultant)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        logger.error("Incorrect Email Id OR Password")
+        return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
