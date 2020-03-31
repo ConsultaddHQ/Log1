@@ -94,7 +94,7 @@ router.register(r'test', Test)
 # Legal App APIs
 router.register(r'petition', PetitionViewSets)
 router.register(r'petition_docs', PetitionDocsViewSets)
-router.register(r'consultant_petition', ConsultantPetitionAuthViewSet)
+router.register(r'timesheet_v2', ConsultantPetitionAuthViewSet)
 
 
 urlpatterns = [

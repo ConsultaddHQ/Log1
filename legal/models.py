@@ -69,10 +69,11 @@ def attachment_upload(instance, filename):
 
 class Types(models.Model):
     name = models.CharField(_('Name '), max_length=40, null=True, blank=True)
-    display_name = models.CharField(_('Display Name'), max_length=40, null=True, blank=True)
+    category = models.CharField(_('Category '), max_length=100, null=True, blank=True)
+    display_name = models.CharField(_('Display Name'), max_length=50, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.name} - {self.display_name}"
+        return f"{self.name} - {self.category}"
 
     class Meta:
         verbose_name = 'Document Type'

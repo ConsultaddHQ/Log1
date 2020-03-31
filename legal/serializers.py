@@ -5,8 +5,12 @@ from legal.models import Petition, Document
 
 
 class DocumentSerializer(serializers.ModelSerializer):
-    file_name = serializers.SerializerMethodField()
     doc_type_name = serializers.SerializerMethodField()
+    file_name = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+
+    def get_category(self, obj):
+        return obj.doc_type.category
 
     def get_doc_type_name(self, obj):
         return obj.doc_type.name
@@ -16,18 +20,22 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file_name')
+        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file_name', 'verified', 'category')
 
 
 class DocumentURLSerializer(serializers.ModelSerializer):
     doc_type_name = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+
+    def get_category(self, obj):
+        return obj.doc_type.category
 
     def get_doc_type_name(self, obj):
         return obj.doc_type.name
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file')
+        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file', 'verified', 'category')
 
 
 class PetitionSerializer(serializers.ModelSerializer):

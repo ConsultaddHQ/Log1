@@ -33,12 +33,21 @@ class PetitionViewSets(viewsets.ModelViewSet):
     get_serializer_class = PetitionGetSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @action(methods=['get'], detail=False, url_path='doc_types')
-    def doc_types(self, request):
-        data = []
-        doc_types = DocumentList.objects.all()
+    @action(methods=['get'], detail=True, url_path='doc_types')
+    def doc_types(self, request, *args, **kwargs):
+        data = dict()
+        doc_types = DocumentList.objects.filter(petition_id=kwargs.get('pk'))
+        categories = Types.objects.all().order_by('category').distinct('category')
+        for category in categories:
+            data[category.category] = []
         for i in doc_types:
-            data.append({"id": i.doc_type.id, "name": i.doc_type.name, "value": i.doc_type.display_name})
+            if i.doc_type.category:
+                data[i.doc_type.category].append({
+                    "id": i.doc_type.id,
+                    "name": i.doc_type.name,
+                    "category": i.doc_type.category,
+                    "value": i.doc_type.display_name,
+                })
         return Response({"results": data}, status=status.HTTP_200_OK)
 
     @action(methods=['post'], detail=False, url_path='upload_doc')
@@ -55,7 +64,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     petition_id=petition_id,
                 )
             documents = Document.objects.filter(petition=petition_id)
-            serializer = self.serializer_class(documents, many=True)
+            serializer = DocumentURLSerializer(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -63,7 +72,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['put'], detail=False, url_path='verify_doc')
     def verify_doc(self, request):
         try:
-            doc_type_id = request.data.get('doc_type_id')
+            doc_type_id = request.data.get('file_type')
             petition = request.data.get('petition')
             documents = Document.objects.filter(petition_id=petition, doc_type_id=doc_type_id)
             documents.update(verified=True)
@@ -125,7 +134,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     Q(assigned_to__employee_name=request.user)
                 )
             serializer = self.serializer_class(queryset, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -172,10 +181,23 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
 
     @action(methods=['get'], detail=False, url_path='doc_types')
     def doc_types(self, request):
-        data = []
-        doc_types = DocumentList.objects.filter(to_show=True)
+        data = dict()
+        petition = Petition.objects.filter(beneficiary=request.user, is_active=True)
+        if not petition:
+            return Response({"error": "Petition not found"}, status=status.HTTP_400_BAD_REQUEST)
+        petition_id = petition.first()
+        doc_types = DocumentList.objects.filter(to_show=True, petition_id=petition_id)
+        categories = Types.objects.all().order_by('category').distinct('category')
+        for category in categories:
+            data[category.category] = []
         for i in doc_types:
-            data.append({"id": i.doc_type.id, "name": i.doc_type.name, "value": i.doc_type.display_name})
+            if i.doc_type.category:
+                data[i.doc_type.category].append({
+                    "id": i.doc_type.id,
+                    "name": i.doc_type.name,
+                    "category": i.doc_type.category,
+                    "value": i.doc_type.display_name,
+                })
         return Response({"results": data}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
@@ -184,7 +206,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             if queryset:
                 petition = queryset.first()
                 serializer = self.serializer_class(petition.documents.all(), many=True)
-                return Response({"error": serializer.data}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
             return Response({"error": "Petition not available"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

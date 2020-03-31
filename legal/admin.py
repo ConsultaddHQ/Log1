@@ -5,8 +5,8 @@ from .models import Petition, Document, Types, DocumentList
 
 @admin.register(Types)
 class TypesAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'display_name')
-    search_fields = ('id', 'name', 'display_name')
+    list_display = ('id', 'name', 'category', 'display_name')
+    search_fields = ('id', 'name', 'category', 'display_name')
 
 
 @admin.register(DocumentList)
