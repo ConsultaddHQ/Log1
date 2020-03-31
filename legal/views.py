@@ -130,8 +130,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 )
             if query:
                 queryset = queryset.filter(
-                    Q(created_by__employee_name__istartswith=request.user) |
-                    Q(assigned_to__employee_name=request.user)
+                    Q(beneficiary__name__istartswith=query) |
+                    Q(assigned_to__employee_name=query)
                 )
             serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=status.HTTP_200_OK)
@@ -149,8 +149,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 beneficiary_type=request.data['beneficiary_type'],
             )
             if petition.beneficiary_type:
-                for i in Types.objects.all():
-                    DocumentList.objects.get_or_create(petition=petition, doc_type=i)
+                for i in Types.objects.exclude(category="Beneficiary Documents from the petitioner"):
+                    DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=True)
+                for i in Types.objects.filter(category="Beneficiary Documents from the petitioner"):
+                    DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
             consultant = get_object_or_404(Consultant, id=request.data['consultant'])
             consultant.p_password = TOKEN_GENERATOR_CLASS.generate_token()
             consultant.visa_petition = True

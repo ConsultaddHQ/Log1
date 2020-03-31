@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 # API for Mobile App (For Consultants)
-class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin):
+class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = TimeSheet.objects.all()
     serializer_class = TimeSheetSerializer
     permission_classes = (ConsultantIsAuthenticated,)

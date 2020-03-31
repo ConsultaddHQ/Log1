@@ -654,12 +654,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.save()
 
                 # Mail for Cancellation or Termination of Project
-                cancellation_status = ['dual-offer', 'cancelled', 'client-cancelled', 'contract-conflicts',
-                                       'candidate-absconded', 'candidate-denied-jd', 'candidate-denied-rate',
-                                       'candidate-denied-location']
-                termination_status = ['terminated', 'resigned-rate', 'terminated-other',
-                                      'resigned-full_time', 'resigned-technology', 'client-fired-budget',
-                                      'client-fired-performance', 'client-fired-security', 'resigned-location']
+                cancellation_status = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
+                                       'cancelled-contract_conflicts', 'cancelled-candidate_denied',
+                                       'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                                       'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
+                termination_status = ['terminated', 'terminated-resigned', 'terminated-fired',
+                                      'terminated-resigned_rate_issue', 'terminated-resigned_technology_issue',
+                                      'terminated-fired_budget_issue', 'terminated-fired_security_issue',
+                                      'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
+                                      'terminated-resigned_full_time_offer']
 
                 if os.environ.get('ENV', 'local') == 'prod':
                     scrum_master = None
