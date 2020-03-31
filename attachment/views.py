@@ -156,7 +156,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
     def destroy(self, request, *args, **kwargs):
         try:
             attachment_id = self.request.query_params.get('attachment_id', None)
-            attachment = get_object_or_404(Attachment, id=attachment_id)
+            attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
             if attachment.content_type.model != 'project':
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()

@@ -9,28 +9,33 @@ from consultant.models import Consultant
 from utils_app.models import TimeStampedModel
 
 DOCUMENT_TYPE = (
-    ('I94', 'I94'),
-    ('msa', 'MSA'),
     ('visa', 'Visa'),
-    ('other', 'Other'),
     ('I20', 'Form I20'),
     ('resume', 'Resume'),
-    ('paystub', 'Paystub'),
-    ('timesheet', 'Timesheet'),
-    ('work_order', 'Work Order'),
+    ('I94', 'I94 Record'),
+    ('passport', 'Passport'),
+    ('msa', 'Agreement (MSA)'),
+    ('paystub', 'Recent Paystub'),
+    ('sevis', 'SEVIS Certificate'),
     ('ssc', 'Social Security Card'),
     ('degree', 'Degree Certificate'),
+    ('offer_letter', 'Offer Letter'),
+    ('work_order', 'SOW (Work Order)'),
     ('client_letter', 'Client Letter'),
     ('vendor_letter', 'Vendor Letter'),
     ('insurance_card', 'Insurance Cards'),
     ('transcript', 'Academic Transcripts'),
+    ('timesheet', 'Last 2 Month Timesheet'),
+    ('job_desc', 'Detailed Job Description'),
     ('ead', 'Employment Authorization Card'),
     ('experience_letter', 'Experience Letter'),
-    ('review_sheet', 'Performance Review Sheet '),
-    ('previous_visa_approval', 'Previous Approval Notices'),
+    ('employment_agreement', 'Employment Agreement'),
+    ('previous_approval', 'Previous Approval Notices'),
+    ('performance_review_sheet', 'Performance Review Sheet'),
 )
 
 PETITION_TYPES = (
+    ('gc', 'Green Card'),
     ('h1b_fresh', 'H1B New'),
     ('h1b_extension', 'H1B Extension'),
     ('h1b_amendment', 'H1B Amendment'),
@@ -60,6 +65,19 @@ def attachment_upload(instance, filename):
     if instance.petition:
         return f'attachments/visa_petition/{instance.petition.pk}/{filename}'
     return None
+
+
+class Types(models.Model):
+    name = models.CharField(_('Name '), max_length=40, null=True, blank=True)
+    category = models.CharField(_('Category '), max_length=100, null=True, blank=True)
+    display_name = models.CharField(_('Display Name'), max_length=50, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.category}"
+
+    class Meta:
+        verbose_name = 'Document Type'
+        verbose_name_plural = 'Document Types'
 
 
 class Petition(TimeStampedModel):
@@ -104,15 +122,38 @@ class Petition(TimeStampedModel):
         return super(Petition, self).save(*args, **kwargs)
 
 
+class DocumentList(models.Model):
+    created = models.DateTimeField(_('Created'), default=timezone.now)
+    to_show = models.BooleanField(_('Show to Consultant'), default=True)
+    doc_type = models.ForeignKey(
+        Types, on_delete=models.CASCADE,
+        verbose_name='Document Type',
+        related_name='doc_list'
+    )
+    petition = models.ForeignKey(
+        Petition, on_delete=models.CASCADE,
+        related_name='document_list',
+        verbose_name='Petition',
+    )
+
+    def __str__(self):
+        return f"{self.doc_type.name} - {self.petition.beneficiary.name}"
+
+
 class Document(TimeStampedModel):
-    file = models.FileField(_('attachment'), upload_to=attachment_upload, blank=True, null=True, default=None)
-    doc_type = models.CharField(_('Document Type'), choices=DOCUMENT_TYPE, max_length=50)
+    remark = models.TextField(_('Remark'), null=True, blank=True)
     verified = models.BooleanField(_('Is File Verified'), default=False)
+    file = models.FileField(_('attachment'), upload_to=attachment_upload, blank=True, null=True, default=None)
+    doc_type = models.ForeignKey(
+        Types, on_delete=models.CASCADE,
+        verbose_name='Document Type',
+        related_name='document'
+    )
     creator = models.ForeignKey(
         User, on_delete=models.CASCADE,
         related_name='petition_documents',
         verbose_name='Uploaded By',
-        blank=True, null=True,
+        default=None, null=True,
     )
     petition = models.ForeignKey(
         Petition, on_delete=models.CASCADE,

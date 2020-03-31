@@ -654,12 +654,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.save()
 
                 # Mail for Cancellation or Termination of Project
-                cancellation_status = ['dual-offer', 'cancelled', 'client-cancelled', 'contract-conflicts',
-                                       'candidate-absconded', 'candidate-denied-jd', 'candidate-denied-rate',
-                                       'candidate-denied-location']
-                termination_status = ['terminated', 'resigned-rate', 'terminated-other',
-                                      'resigned-full_time', 'resigned-technology', 'client-fired-budget',
-                                      'client-fired-performance', 'client-fired-security', 'resigned-location']
+                cancellation_status = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
+                                       'cancelled-contract_conflicts', 'cancelled-candidate_denied',
+                                       'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                                       'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
+                termination_status = ['terminated', 'terminated-resigned', 'terminated-fired',
+                                      'terminated-resigned_rate_issue', 'terminated-resigned_technology_issue',
+                                      'terminated-fired_budget_issue', 'terminated-fired_security_issue',
+                                      'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
+                                      'terminated-resigned_full_time_offer']
 
                 if os.environ.get('ENV', 'local') == 'prod':
                     scrum_master = None
@@ -814,7 +817,12 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
-            queryset = consultants.order_by('-id', '-projects__timesheets__modified').distinct('id')
+            submitted = TimeSheet.objects.filter(project__consultant=OuterRef('pk'), is_active=True, status='submitted')
+            rejected = TimeSheet.objects.filter(project__consultant=OuterRef('pk'), is_active=True, status='rejected')
+            queryset = consultants.annotate(
+                timesheet=Subquery(submitted.order_by('-id').values('status')[:1]),
+                rejected=Subquery(rejected.order_by('-id').values('status')[:1]),
+            ).order_by('-id', '-projects__timesheets__modified').distinct('id')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
@@ -833,6 +841,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 timesheet.status_updated_by = request.user
                 timesheet.save()
                 if request.data.get('status') == 'rejected':
+                    timesheet.is_active = False
+                    timesheet.save()
+
+                    timesheet = TimeSheet.objects.create(
+                        hours=0,
+                        status='rejected',
+                        end=timesheet.end,
+                        start=timesheet.start,
+                        project=timesheet.project,
+                    )
                     recipient_content_type = ContentType.objects.get(model='consultant')
                     sender_content_type = ContentType.objects.get(model='user')
                     target_content_type = ContentType.objects.get(model='timesheet')
