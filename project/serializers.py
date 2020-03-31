@@ -102,7 +102,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeSheet
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'status_updated_at', 'status_updated_by',
-                  'modified', 'attachments', 'remark', 'project')
+                  'modified', 'attachments', 'remark', 'project', 'con_comment')
 
     def get_attachments(self, obj):
         return AttachmentURLSerializer(obj.attachments.all(), many=True).data
@@ -119,11 +119,15 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
 class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
+    timesheet = serializers.SerializerMethodField()
     ts_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'ts_status', 'project')
+        fields = ('id', 'name', 'email', 'ts_status', 'project', 'timesheet')
+
+    def get_timesheet(self, obj):
+        return obj.timesheet
 
     def get_project(self, obj):
         project = Project.objects.filter(consultant=obj)

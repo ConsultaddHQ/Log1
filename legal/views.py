@@ -3,41 +3,74 @@ import logging
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 
 from constance import config
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
+from legal.models import *
 from utils_app.mailing import send_email
 from consultant.models import Consultant
 from employee.token import get_token_generator
-from legal.models import DOCUMENT_TYPE, Petition, Document
-from legal.serializers import PetitionSerializer, DocumentURLSerializer
+from legal.serializers import PetitionSerializer, PetitionGetSerializer, DocumentURLSerializer
 
 logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
 
 # Api for Legal Team
-class PetitionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin):
+class PetitionViewSets(viewsets.ModelViewSet):
     queryset = Petition.objects.all()
     serializer_class = PetitionSerializer
     permission_classes = (IsAuthenticated,)
+    get_serializer_class = PetitionGetSerializer
     authentication_classes = (TokenAuthentication,)
 
     @action(methods=['get'], detail=False, url_path='doc_types')
     def doc_types(self, request):
         data = []
-        for i in DOCUMENT_TYPE:
-            data.append({"name": i[0], "value": i[1]})
+        doc_types = DocumentList.objects.all()
+        for i in doc_types:
+            data.append({"id": i.doc_type.id, "name": i.doc_type.name, "value": i.doc_type.display_name})
         return Response({"results": data}, status=status.HTTP_200_OK)
+
+    @action(methods=['post'], detail=False, url_path='upload_doc')
+    def upload_doc(self, request):
+        try:
+            petition_id = request.data.get('petition')
+            file_type = request.data.get('file_type')
+            for file in request.FILES.getlist('file'):
+                Document.objects.create(
+                    file=file,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id=file_type,
+                    petition_id=petition_id,
+                )
+            documents = Document.objects.filter(petition=petition_id)
+            serializer = self.serializer_class(documents, many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=False, url_path='verify_doc')
+    def verify_doc(self, request):
+        try:
+            doc_type_id = request.data.get('doc_type_id')
+            petition = request.data.get('petition')
+            documents = Document.objects.filter(petition_id=petition, doc_type_id=doc_type_id)
+            documents.update(verified=True)
+            serializer = DocumentURLSerializer(documents, many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=True, url_path='doc_request')
     def doc_request(self, request, *args, **kwargs):
@@ -63,25 +96,38 @@ class PetitionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateM
                 },
             }
             send_email(mail_data, config.LEGAL)
+            return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
-            return error, "error"
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            petition = get_object_or_404(Petition, id=petition_id)
+            serializer = self.get_serializer_class(petition)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
-        filter_for = request.query_params.get('filter', 'all')
-        query = request.query_params.get('query', None)
-        queryset = Petition.objects.filter(is_active=True)
-        if filter_for == 'my':
-            queryset = queryset.filter(
-                Q(created_by=request.user) |
-                Q(assigned_to=request.user)
-            )
-        if query:
-            queryset = queryset.filter(
-                Q(created_by__employee_name__istartswith=request.user) |
-                Q(assigned_to__employee_name=request.user)
-            )
-        serializer = self.serializer_class(queryset, many=True)
-        return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        try:
+            filter_for = request.query_params.get('filter', 'all')
+            query = request.query_params.get('query', None)
+            queryset = Petition.objects.filter(is_active=True)
+            if filter_for == 'my':
+                queryset = queryset.filter(
+                    Q(created_by=request.user) |
+                    Q(assigned_to=request.user)
+                )
+            if query:
+                queryset = queryset.filter(
+                    Q(created_by__employee_name__istartswith=request.user) |
+                    Q(assigned_to__employee_name=request.user)
+                )
+            serializer = self.serializer_class(queryset, many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -93,6 +139,9 @@ class PetitionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateM
                 petition_type=request.data['petition_type'],
                 beneficiary_type=request.data['beneficiary_type'],
             )
+            if petition.beneficiary_type:
+                for i in Types.objects.all():
+                    DocumentList.objects.get_or_create(petition=petition, doc_type=i)
             consultant = get_object_or_404(Consultant, id=request.data['consultant'])
             consultant.p_password = TOKEN_GENERATOR_CLASS.generate_token()
             consultant.visa_petition = True
@@ -124,8 +173,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     @action(methods=['get'], detail=False, url_path='doc_types')
     def doc_types(self, request):
         data = []
-        for i in DOCUMENT_TYPE:
-            data.append({"name": i[0], "value": i[1]})
+        doc_types = DocumentList.objects.filter(to_show=True)
+        for i in doc_types:
+            data.append({"id": i.doc_type.id, "name": i.doc_type.name, "value": i.doc_type.display_name})
         return Response({"results": data}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
@@ -148,7 +198,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     file=file,
                     creator=None,
                     verified=False,
-                    doc_type=file_type,
+                    doc_type_id=file_type,
                     petition_id=petition_id,
                 )
             documents = Document.objects.filter(petition=petition_id)

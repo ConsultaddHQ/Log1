@@ -67,6 +67,18 @@ def attachment_upload(instance, filename):
     return None
 
 
+class Types(models.Model):
+    name = models.CharField(_('Name '), max_length=40, null=True, blank=True)
+    display_name = models.CharField(_('Display Name'), max_length=40, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.display_name}"
+
+    class Meta:
+        verbose_name = 'Document Type'
+        verbose_name_plural = 'Document Types'
+
+
 class Petition(TimeStampedModel):
     is_active = models.BooleanField(_('Is Petition Active'), default=True)
     lca_no = models.CharField(_('LCA No.'), max_length=40, null=True, blank=True)
@@ -109,16 +121,38 @@ class Petition(TimeStampedModel):
         return super(Petition, self).save(*args, **kwargs)
 
 
+class DocumentList(models.Model):
+    created = models.DateTimeField(_('Created'), default=timezone.now)
+    to_show = models.BooleanField(_('Show to Consultant'), default=True)
+    doc_type = models.ForeignKey(
+        Types, on_delete=models.CASCADE,
+        verbose_name='Document Type',
+        related_name='doc_list'
+    )
+    petition = models.ForeignKey(
+        Petition, on_delete=models.CASCADE,
+        related_name='document_list',
+        verbose_name='Petition',
+    )
+
+    def __str__(self):
+        return f"{self.doc_type.name} - {self.petition.beneficiary.name}"
+
+
 class Document(TimeStampedModel):
     remark = models.TextField(_('Remark'), null=True, blank=True)
     verified = models.BooleanField(_('Is File Verified'), default=False)
-    doc_type = models.CharField(_('Document Type'), choices=DOCUMENT_TYPE, max_length=50)
     file = models.FileField(_('attachment'), upload_to=attachment_upload, blank=True, null=True, default=None)
+    doc_type = models.ForeignKey(
+        Types, on_delete=models.CASCADE,
+        verbose_name='Document Type',
+        related_name='document'
+    )
     creator = models.ForeignKey(
         User, on_delete=models.CASCADE,
         related_name='petition_documents',
         verbose_name='Uploaded By',
-        blank=True, null=True,
+        default=None, null=True,
     )
     petition = models.ForeignKey(
         Petition, on_delete=models.CASCADE,
