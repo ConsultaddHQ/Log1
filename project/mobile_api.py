@@ -72,17 +72,6 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), status__in=['draft', 'rejected'],
                                           is_active=True)
             timesheet_id = timesheet.id
-            if timesheet.status == 'rejected':
-                timesheet.is_active = False
-                timesheet.save()
-
-                timesheet = TimeSheet.objects.create(
-                    status='rejected',
-                    end=timesheet.end,
-                    start=timesheet.start,
-                    project=timesheet.project,
-                )
-
             timesheet.status = 'submitted'
             if zero_hours:
                 timesheet.hours = 0.0
@@ -261,18 +250,6 @@ class ConsultantProjectViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), status__in=['draft', 'rejected'],
                                           is_active=True)
             timesheet_id = timesheet.id
-            if timesheet.status == 'rejected':
-                timesheet.is_active = False
-                timesheet.save()
-
-                timesheet = TimeSheet.objects.create(
-                    hours=0,
-                    status='rejected',
-                    end=timesheet.end,
-                    start=timesheet.start,
-                    project=timesheet.project,
-                )
-
             hours = float(request.data.get('hours'))
             timesheet.status = 'submitted'
             if zero_hours:

@@ -87,14 +87,14 @@ router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
 router.register(r'timesheet', TimeSheetViewSets)
 router.register(r'payroll', PayrollScheduleViewSets)
-router.register(r'consultant_timesheet_project', ConsultantProjectViewSet)
+router.register(r'timesheet_v2', ConsultantProjectViewSet)
 
 router.register(r'test', Test)
 
 # Legal App APIs
 router.register(r'petition', PetitionViewSets)
 router.register(r'petition_docs', PetitionDocsViewSets)
-router.register(r'timesheet_v2', ConsultantPetitionAuthViewSet)
+router.register(r'consultant_petition', ConsultantPetitionAuthViewSet)
 
 
 urlpatterns = [
