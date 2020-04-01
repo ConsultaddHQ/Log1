@@ -93,20 +93,23 @@ class PetitionViewSets(viewsets.ModelViewSet):
         try:
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
             beneficiary = petition.beneficiary
+            petition_type = petition.get_petition_type_display()
             mail_data = {
                 # 'to': [beneficiary.email],
-                'to': ['sarang.m@consultadd.in'],
+                'to': ['siddharth.g@consultadd.com'],
                 'cc': [],
-                'bcc': [],
+                'bcc': ['sarang.m@consultadd.in'],
                 'template': '../templates/doc_upload_request.html',
-                'subject': f'Upload your H1b Petition Documents',
+                'subject': f'Your H1B process - Request for documents',
                 'context': {
-                    'link': "link",
-                    'password': "password",
+                    'visa': petition_type,
+                    'pin': beneficiary.pin,
                     'name': beneficiary.name,
+                    'petitioner_name': petition.assigned_to.employee_name,
+                    'link': f"{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
                 },
             }
-            send_email(mail_data, config.LEGAL)
+            send_email(mail_data, petition.assigned_to.email)
             return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
