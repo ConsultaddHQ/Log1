@@ -189,7 +189,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
 # Api for Consultant
 class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, DestroyModelMixin):
     queryset = Document.objects.all()
-    serializer_class = DocumentURLSerializer
+    serializer_class = DocumentSerializer
     permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
 
