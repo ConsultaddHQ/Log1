@@ -8,37 +8,14 @@ from employee.models import User
 from consultant.models import Consultant
 from utils_app.models import TimeStampedModel
 
-DOCUMENT_TYPE = (
-    ('visa', 'Visa'),
-    ('I20', 'Form I20'),
-    ('resume', 'Resume'),
-    ('I94', 'I94 Record'),
-    ('passport', 'Passport'),
-    ('msa', 'Agreement (MSA)'),
-    ('paystub', 'Recent Paystub'),
-    ('sevis', 'SEVIS Certificate'),
-    ('ssc', 'Social Security Card'),
-    ('degree', 'Degree Certificate'),
-    ('offer_letter', 'Offer Letter'),
-    ('work_order', 'SOW (Work Order)'),
-    ('client_letter', 'Client Letter'),
-    ('vendor_letter', 'Vendor Letter'),
-    ('insurance_card', 'Insurance Cards'),
-    ('transcript', 'Academic Transcripts'),
-    ('timesheet', 'Last 2 Month Timesheet'),
-    ('job_desc', 'Detailed Job Description'),
-    ('ead', 'Employment Authorization Card'),
-    ('experience_letter', 'Experience Letter'),
-    ('employment_agreement', 'Employment Agreement'),
-    ('previous_approval', 'Previous Approval Notices'),
-    ('performance_review_sheet', 'Performance Review Sheet'),
-)
 
 PETITION_TYPES = (
     ('gc', 'Green Card'),
     ('h1b_fresh', 'H1B New'),
+    ('h1b_transfer', 'H1B Transfer'),
     ('h1b_extension', 'H1B Extension'),
     ('h1b_amendment', 'H1B Amendment'),
+    ('h1b_cap_exempt', 'H1B Cap Exempt'),
 )
 
 PETITION_STATUSES = (
@@ -142,7 +119,7 @@ class DocumentList(models.Model):
 
 class Document(TimeStampedModel):
     remark = models.TextField(_('Remark'), null=True, blank=True)
-    verified = models.BooleanField(_('Is File Verified'), default=False)
+    verified = models.BooleanField(_('Is File Verified'), default=None, null=True)
     file = models.FileField(_('attachment'), upload_to=attachment_upload, blank=True, null=True, default=None)
     doc_type = models.ForeignKey(
         Types, on_delete=models.CASCADE,

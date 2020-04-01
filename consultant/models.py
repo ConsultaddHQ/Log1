@@ -109,7 +109,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
 
     p_is_active = models.BooleanField(default=False)
     visa_petition = models.BooleanField(_('Petition login'), default=False)
-    p_password = models.CharField(_('password'), max_length=10, blank=True, null=True)
+    pin = models.CharField(_('Pin'), max_length=10, blank=True, null=True)
 
     objects = ConsultantManager()
 

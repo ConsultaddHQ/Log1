@@ -149,8 +149,8 @@ def get_interviews(data):
                     "id": event["id"],
                     "visibility": False,
                     "updated": event["updated"],
-                    "end": event["end"]["dateTime"],
-                    "start": event["start"]["dateTime"],
+                    "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
+                    "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"]["date"],
                 }
             else:
                 data = {
@@ -158,8 +158,8 @@ def get_interviews(data):
                     "visibility": True,
                     "created": event["created"],
                     "updated": event["updated"],
-                    "end": event["end"]["dateTime"],
-                    "start": event["start"]["dateTime"],
+                    "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
+                    "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"]["date"],
                     "title": event["summary"] if "summary" in event else "",
                     "description": event["description"] if "description" in event else "",
                     "attendees": [i["email"] for i in event["attendees"]] if "attendees" in event else [],

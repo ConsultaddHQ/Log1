@@ -849,6 +849,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         status='rejected',
                         end=timesheet.end,
                         start=timesheet.start,
+                        remark=timesheet.remark,
                         project=timesheet.project,
                     )
                     recipient_content_type = ContentType.objects.get(model='consultant')
