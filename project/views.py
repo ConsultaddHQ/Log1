@@ -846,7 +846,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
                     timesheet = TimeSheet.objects.create(
                         hours=0,
-                        status='rejected',
+                        status='draft',
                         end=timesheet.end,
                         start=timesheet.start,
                         remark=timesheet.remark,
