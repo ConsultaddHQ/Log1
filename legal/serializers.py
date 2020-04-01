@@ -47,7 +47,11 @@ class PetitionSerializer(serializers.ModelSerializer):
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'status')
 
     def get_consultant(self, obj):
-        return obj.beneficiary.name
+        return {
+            "id": obj.beneficiary.id,
+            "name": obj.beneficiary.name,
+            "email": obj.beneficiary.email,
+        }
 
     def get_assigned_to(self, obj):
         return obj.assigned_to.employee_name
@@ -67,7 +71,11 @@ class PetitionGetSerializer(serializers.ModelSerializer):
         return DocumentURLSerializer(obj.documents.all(), many=True).data
 
     def get_consultant(self, obj):
-        return obj.beneficiary.name
+        return {
+            "id": obj.beneficiary.id,
+            "name": obj.beneficiary.name,
+            "email": obj.beneficiary.email,
+        }
 
     def get_assigned_to(self, obj):
         return obj.assigned_to.employee_name
