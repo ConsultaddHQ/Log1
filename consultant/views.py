@@ -264,6 +264,19 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             logger.error(err)
             return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=False, url_path='search')
+    def search(self, request, *args, **kwargs):
+        try:
+            query = request.query_params.get('query', None)
+            if query:
+                consultants = Consultant.objects.filter(name__istartswith=query).order_by('name')
+            else:
+                consultants = Consultant.objects.all().order_by('name')
+            data = consultants[:10].values('id', 'name', 'email')
+            return Response({"results": data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
