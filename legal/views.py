@@ -110,7 +110,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 },
             }
             send_email(mail_data, petition.assigned_to.email)
-            return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
+            petition.status = "doc_request_sent"
+            petition.save()
+            return Response({
+                "result": {"id": petition.id, "status": petition.status, "message": "mail sent"}
+            }, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -145,6 +149,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         try:
+            petition = Petition.objects.filter(beneficiary_id=request.data['consultant'])
+            if petition:
+                return Response({"error": "already exist"}, status=status.HTTP_400_BAD_REQUEST)
             petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
@@ -158,7 +165,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             for i in Types.objects.filter(category="Beneficiary Documents from the petitioner"):
                 DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
 
-            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
+            consultant = petition.beneficiary
             consultant.pin = TOKEN_GENERATOR_CLASS.generate_token()
             consultant.visa_petition = True
             consultant.p_is_active = True
