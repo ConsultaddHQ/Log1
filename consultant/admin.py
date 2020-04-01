@@ -11,7 +11,7 @@ class ConsultantAdmin(admin.ModelAdmin, ExportCsvMixin):
     list_filter = ('status', 'work_type', 'first_login')
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
     list_display = ('id', 'name', 'email', 'date_of_birth', 'phone_no', 'skills', 'status', 'current_city', 'ssn',
-                    'links', 'gender', 'work_type', 'password', 'is_active', 'first_login')
+                    'links', 'gender', 'work_type', 'password', 'is_active', 'first_login', 'pin')
 
     class Media(object):
         css = {'all': ('no-more-warnings.css', )}

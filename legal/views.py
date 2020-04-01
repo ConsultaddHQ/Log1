@@ -16,10 +16,10 @@ from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
 from legal.models import *
+from legal.serializers import *
 from utils_app.mailing import send_email
 from consultant.models import Consultant
 from employee.token import get_token_generator
-from legal.serializers import PetitionSerializer, PetitionGetSerializer, DocumentURLSerializer
 
 logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
@@ -72,10 +72,17 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['put'], detail=False, url_path='verify_doc')
     def verify_doc(self, request):
         try:
-            doc_type_id = request.data.get('file_type')
+            remark = request.data.get('remark')
             petition = request.data.get('petition')
+            doc_type_id = request.data.get('file_type')
+            verification_status = request.data.get('status')
             documents = Document.objects.filter(petition_id=petition, doc_type_id=doc_type_id)
-            documents.update(verified=True)
+            if verification_status == 'verified':
+                documents.update(verified=True)
+            elif verification_status == 'rejected':
+                documents.update(verified=False)
+            documents.update(remark=remark)
+            documents.save()
             serializer = DocumentURLSerializer(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -84,13 +91,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=True, url_path='doc_request')
     def doc_request(self, request, *args, **kwargs):
         try:
-            password = TOKEN_GENERATOR_CLASS.generate_token()
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
             beneficiary = petition.beneficiary
-            beneficiary.p_password = password
-            beneficiary.visa_petition = True
-            beneficiary.p_is_active = True
-            beneficiary.save()
             mail_data = {
                 # 'to': [beneficiary.email],
                 'to': ['sarang.m@consultadd.in'],
@@ -148,13 +150,13 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 petition_type=request.data['petition_type'],
                 beneficiary_type=request.data['beneficiary_type'],
             )
-            if petition.beneficiary_type:
-                for i in Types.objects.exclude(category="Beneficiary Documents from the petitioner"):
-                    DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=True)
-                for i in Types.objects.filter(category="Beneficiary Documents from the petitioner"):
-                    DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
+            for i in Types.objects.exclude(category="Beneficiary Documents from the petitioner"):
+                DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=True)
+            for i in Types.objects.filter(category="Beneficiary Documents from the petitioner"):
+                DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
+
             consultant = get_object_or_404(Consultant, id=request.data['consultant'])
-            consultant.p_password = TOKEN_GENERATOR_CLASS.generate_token()
+            consultant.pin = TOKEN_GENERATOR_CLASS.generate_token()
             consultant.visa_petition = True
             consultant.p_is_active = True
             consultant.save()
@@ -221,7 +223,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 Document.objects.create(
                     file=file,
                     creator=None,
-                    verified=False,
+                    verified=None,
                     doc_type_id=file_type,
                     petition_id=petition_id,
                 )

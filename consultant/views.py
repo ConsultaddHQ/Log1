@@ -960,7 +960,7 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
             consultant = get_object_or_404(Consultant, email=email)
         else:
             return Response({"error": "Email is Empty"}, status=status.HTTP_400_BAD_REQUEST)
-        consultant = Consultant.objects.filter(email=consultant.email, p_password=request.data.get('password').strip())
+        consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
         if consultant:
             consultant = consultant.first()
             if not consultant.p_is_active:
