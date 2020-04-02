@@ -41,10 +41,23 @@ class PetitionViewSets(viewsets.ModelViewSet):
         for category in categories:
             data[category.category] = []
         for i in doc_types:
+            documents = Document.objects.filter(petition_id=kwargs.get('pk'), doc_type=i.doc_type)
+            if documents:
+                document = documents.first()
+                remark = document.remark
+                if document.verified is None:
+                    verify_status = 'in_review'
+                else:
+                    verify_status = "accepted" if document.verified else "rejected"
+            else:
+                remark = None
+                verify_status = "not_uploaded"
             if i.doc_type.category:
                 data[i.doc_type.category].append({
+                    "remark": remark,
                     "id": i.doc_type.id,
                     "name": i.doc_type.name,
+                    "status": verify_status,
                     "category": i.doc_type.category,
                     "value": i.doc_type.display_name,
                 })
@@ -77,12 +90,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
             doc_type_id = request.data.get('file_type')
             verification_status = request.data.get('status')
             documents = Document.objects.filter(petition_id=petition, doc_type_id=doc_type_id)
-            if verification_status == 'verified':
+            if verification_status == 'accepted':
                 documents.update(verified=True)
             elif verification_status == 'rejected':
                 documents.update(verified=False)
             documents.update(remark=remark)
-            documents.save()
             serializer = DocumentURLSerializer(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -95,10 +107,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             beneficiary = petition.beneficiary
             petition_type = petition.get_petition_type_display()
             mail_data = {
-                # 'to': [beneficiary.email],
-                'to': ['siddharth.g@consultadd.com'],
+                'to': [beneficiary.email],
                 'cc': [],
-                'bcc': ['sarang.m@consultadd.in'],
+                'bcc': [],
                 'template': '../templates/doc_upload_request.html',
                 'subject': f'Your H1B process - Request for documents',
                 'context': {
@@ -128,6 +139,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        last, first = page * page_size, page * page_size - page_size
+
         try:
             filter_for = request.query_params.get('filter', 'all')
             query = request.query_params.get('query', None)
@@ -142,8 +157,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     Q(beneficiary__name__istartswith=query) |
                     Q(assigned_to__employee_name=query)
                 )
-            serializer = self.serializer_class(queryset, many=True)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            total = queryset.count()
+            serializer = self.serializer_class(queryset[first:last], many=True)
+            return Response({"results": serializer.data, "total": total}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -155,6 +171,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
+                employer=request.data['employer'],
                 beneficiary_id=request.data['consultant'],
                 assigned_to_id=request.data['assigned_to'],
                 petition_type=request.data['petition_type'],
@@ -199,16 +216,29 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         petition = Petition.objects.filter(beneficiary=request.user, is_active=True)
         if not petition:
             return Response({"error": "Petition not found"}, status=status.HTTP_400_BAD_REQUEST)
-        petition_id = petition.first()
+        petition_id = petition.first().id
         doc_types = DocumentList.objects.filter(to_show=True, petition_id=petition_id)
         categories = Types.objects.all().order_by('category').distinct('category')
         for category in categories:
             data[category.category] = []
         for i in doc_types:
+            documents = Document.objects.filter(petition_id=petition_id, doc_type=i.doc_type)
+            if documents:
+                document = documents.first()
+                remark = document.remark
+                if document.verified is None:
+                    verify_status = 'in_review'
+                else:
+                    verify_status = "accepted" if document.verified else "rejected"
+            else:
+                remark = None
+                verify_status = "not_uploaded"
             if i.doc_type.category:
                 data[i.doc_type.category].append({
+                    "remark": remark,
                     "id": i.doc_type.id,
                     "name": i.doc_type.name,
+                    "status": verify_status,
                     "category": i.doc_type.category,
                     "value": i.doc_type.display_name,
                 })
