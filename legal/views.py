@@ -38,9 +38,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': ['sarang.m@consultadd.in'],
                 'cc': [],
-                'bcc': [],
-                'template': '../templates/doc_upload_request.html',
-                'subject': f'Document Rejection',
+                'bcc': ['siddharth.g@consultadd.com'],
+                'template': '../templates/rejection_email.html',
+                'subject': f'Your H1B process - Need correction in documents',
                 'context': {
                     'name': beneficiary_name,
                     'remark': document.remark,
@@ -48,8 +48,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     'petitioner_name': petition.assigned_to.employee_name,
                 },
             }
-            # res = send_email(mail_data, petition.assigned_to.email)
-            return "res", "ok"
+            res = send_email(mail_data, petition.assigned_to.email)
+            return res, "ok"
         except Exception as error:
             return error, 'error'
 
