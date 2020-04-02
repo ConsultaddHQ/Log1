@@ -2,6 +2,7 @@ import logging
 
 from django.utils import timezone
 from datetime import timedelta, datetime
+from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext_lazy as _
@@ -126,7 +127,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 else:
                     users = users.filter(team=request.user.team, role__name='marketer')
             users = users.filter(employee_name__istartswith=query)
-            users = users.annotate(name='employee_name').order_by('name')
+            users = users.annotate(name=Lower('employee_name')).order_by('name')
             data = users.values('id', 'employee_id', 'email', 'name')
             return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as error:

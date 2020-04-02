@@ -338,8 +338,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         if created:
                             prev_status.is_current = False
                             prev_status.save()
-
-                    return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
+                    return Response({"result": "mail sent", "message": res}, status=status.HTTP_200_OK)
                 return Response({"result": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({"error": "Invalid Id"}, status=status.HTTP_400_BAD_REQUEST)
@@ -817,12 +816,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     Q(projects__submission__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 )
-            submitted = TimeSheet.objects.filter(project__consultant=OuterRef('pk'), is_active=True, status='submitted')
-            rejected = TimeSheet.objects.filter(project__consultant=OuterRef('pk'), is_active=True, status='rejected')
-            queryset = consultants.annotate(
-                timesheet=Subquery(submitted.order_by('-id').values('status')[:1]),
-                rejected=Subquery(rejected.order_by('-id').values('status')[:1]),
-            ).order_by('-id', '-projects__timesheets__modified').distinct('id')
+            consultants = consultants.exclude(projects__timesheets=None)
+            queryset = consultants.order_by('id', '-projects__timesheets__modified').distinct('id')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)

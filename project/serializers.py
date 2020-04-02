@@ -119,15 +119,11 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
 class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
-    timesheet = serializers.SerializerMethodField()
     ts_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'ts_status', 'project', 'timesheet')
-
-    def get_timesheet(self, obj):
-        return obj.timesheet
+        fields = ('id', 'name', 'email', 'ts_status', 'project')
 
     def get_project(self, obj):
         project = Project.objects.filter(consultant=obj)
