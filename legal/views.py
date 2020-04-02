@@ -33,6 +33,26 @@ class PetitionViewSets(viewsets.ModelViewSet):
     get_serializer_class = PetitionGetSerializer
     authentication_classes = (TokenAuthentication,)
 
+    def rejection_mail(self, beneficiary_name, petition, document):
+        try:
+            mail_data = {
+                'to': ['sarang.m@consultadd.in'],
+                'cc': [],
+                'bcc': [],
+                'template': '../templates/doc_upload_request.html',
+                'subject': f'Document Rejection',
+                'context': {
+                    'name': beneficiary_name,
+                    'remark': document.remark,
+                    'doc_type': document.doc_type.name,
+                    'petitioner_name': petition.assigned_to.employee_name,
+                },
+            }
+            # res = send_email(mail_data, petition.assigned_to.email)
+            return "res", "ok"
+        except Exception as error:
+            return error, 'error'
+
     @action(methods=['get'], detail=True, url_path='doc_types')
     def doc_types(self, request, *args, **kwargs):
         data = dict()
@@ -86,17 +106,25 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def verify_doc(self, request):
         try:
             remark = request.data.get('remark')
-            petition = request.data.get('petition')
+            petition_id = request.data.get('petition')
             doc_type_id = request.data.get('file_type')
             verification_status = request.data.get('status')
-            documents = Document.objects.filter(petition_id=petition, doc_type_id=doc_type_id)
+            documents = Document.objects.filter(petition_id=petition_id, doc_type_id=doc_type_id)
+            message = None
             if verification_status == 'accepted':
                 documents.update(verified=True)
             elif verification_status == 'rejected':
                 documents.update(verified=False)
+                if documents:
+                    petition = documents.first().petition
+                    res, error = self.rejection_mail(petition.beneficiary.name, petition, documents.first())
+                    if error == 'error':
+                        message = str(res)
+                    else:
+                        message = "mail sent"
             documents.update(remark=remark)
             serializer = DocumentURLSerializer(documents, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data, "message": message}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
