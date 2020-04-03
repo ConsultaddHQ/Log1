@@ -329,6 +329,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 res, error = self.po_mail(project, path, scrum_master_email, po_type)
                 if not error == 'error':
                     delete_temp_file(path)
+                    project.submission.consultant_marketing.status = 'close'
+                    project.submission.consultant_marketing.save()
                     if prev_status.status == 'received':
                         new_status, created = ProjectStatus.objects.get_or_create(
                             project=project,

@@ -528,7 +528,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             consultants = Consultant.objects.exclude(status='archived')
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
-                consultants = consultants.filter(marketing__teams__name=team_name)
+                consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
 
             # Location wise Filter
             if location:

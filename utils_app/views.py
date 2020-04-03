@@ -33,8 +33,8 @@ class CityViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query')
-        city = City.objects.filter(name__icontains=query)
-        data = city[:20].values('id', 'name', 'state')
+        city = City.objects.filter(name__istartswith=query)
+        data = city[:40].values('id', 'name', 'state')
         return Response({"results": data}, status=status.HTTP_200_OK)
 
 

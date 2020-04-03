@@ -20,7 +20,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file_name', 'verified', 'category')
+        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file_name', 'verified', 'category', 'remark')
 
 
 class DocumentURLSerializer(serializers.ModelSerializer):
@@ -35,7 +35,7 @@ class DocumentURLSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Document
-        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file', 'verified', 'category')
+        fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file', 'verified', 'category', 'remark')
 
 
 class PetitionSerializer(serializers.ModelSerializer):

@@ -11,14 +11,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 
-from constance import config
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
 from legal.models import *
 from legal.serializers import *
 from utils_app.mailing import send_email
-from consultant.models import Consultant
 from employee.token import get_token_generator
 
 logger = logging.getLogger(__name__)
@@ -36,9 +34,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def rejection_mail(self, beneficiary_name, petition, document):
         try:
             mail_data = {
-                'to': ['sarang.m@consultadd.in'],
+                'to': [petition.beneficiary.email],
                 'cc': [],
-                'bcc': ['siddharth.g@consultadd.com'],
+                'bcc': [],
                 'template': '../templates/rejection_email.html',
                 'subject': f'Your H1B process - Need correction in documents',
                 'context': {
@@ -113,8 +111,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
             message = None
             if verification_status == 'accepted':
                 documents.update(verified=True)
+                documents.update(remark=remark)
             elif verification_status == 'rejected':
                 documents.update(verified=False)
+                documents.update(remark=remark)
                 if documents:
                     petition = documents.first().petition
                     res, error = self.rejection_mail(petition.beneficiary.name, petition, documents.first())
@@ -122,7 +122,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
                         message = str(res)
                     else:
                         message = "mail sent"
-            documents.update(remark=remark)
             serializer = DocumentURLSerializer(documents, many=True)
             return Response({"result": serializer.data, "message": message}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
