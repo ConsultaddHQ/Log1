@@ -6,7 +6,6 @@ from django.contrib.auth.models import BaseUserManager
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
-from django.contrib.auth.hashers import make_password, check_password
 
 from activity.models import Comment
 from employee.models import User, Team
@@ -38,7 +37,7 @@ VISA_CHOICES = (
     ('opt-ext', 'OPT Extension'),
     ('us_citizen', 'US CITIZEN'),
     ('not_auth', 'Not Authorized'),
-    ('gc:ead', 'Green Card Holder EAD'),
+    ('gc_ead', 'Green Card Holder EAD'),
 )
 
 EDUCATION_CHOICES = (

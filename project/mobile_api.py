@@ -40,7 +40,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             project_ids = request.user.get_project().filter(
                 statuses__status__in=project_status, statuses__is_current=True
             ).order_by('-id').values_list('id', flat=True)
-            queryset = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True).order_by('project')
+            queryset = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True).order_by('status', 'end')
             serializer = self.serializer_class(queryset[first:last], many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -57,7 +57,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             ).order_by('-id')
             if projects:
                 project = projects.first()
-                queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True)
+                queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True).order_by('end')
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             return Response({"result": "No Weeks"}, status=status.HTTP_404_NOT_FOUND)
