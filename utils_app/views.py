@@ -38,17 +38,6 @@ class CityViewSets(ListModelMixin, GenericViewSet):
         return Response({"results": data}, status=status.HTTP_200_OK)
 
 
-class UtilsViewSets(GenericViewSet):
-    queryset = City.objects.all()
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
-
-    @action(methods=['get'], detail=False, url_path='project/statuses')
-    def project_statuses(self, request):
-        data = [{"name": x} for x, y in PROJECT_STATUS_CHOICES if x not in ['offer', 'paper_work', 'cancelled']]
-        return Response({"results": data}, status=status.HTTP_200_OK)
-
-
 class SlashCommandViewSets(GenericViewSet):
     authentication_classes = ()
     queryset = User.objects.all()

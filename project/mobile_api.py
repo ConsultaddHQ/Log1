@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
 from project.serializers import *
+from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
@@ -40,9 +41,16 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             project_ids = request.user.get_project().filter(
                 statuses__status__in=project_status, statuses__is_current=True
             ).order_by('-id').values_list('id', flat=True)
-            queryset = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True).order_by('status', 'end')
-            serializer = self.serializer_class(queryset[first:last], many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            pending = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True,
+                                               status='draft').order_by('start')
+            data = [i for i in pending]
+            submitted = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True,
+                                                 status__in=['submitted', 'rejected']).order_by('-start')
+            for i in submitted:
+                data.append(i)
+            total = len(data)
+            serializer = self.serializer_class(data[first:last], many=True)
+            return Response({"total": total, "result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -57,7 +65,8 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             ).order_by('-id')
             if projects:
                 project = projects.first()
-                queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True).order_by('end')
+                queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'],
+                                                    is_active=True).order_by('end')
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             return Response({"result": "No Weeks"}, status=status.HTTP_404_NOT_FOUND)
@@ -216,6 +225,46 @@ class ConsultantProjectViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
             queryset = TimeSheet.objects.filter(project_id=project_id, is_active=True).order_by('project')
             serializer = self.serializer_class(queryset[first:last], many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['POST'], detail=False, url_path='contact_us')
+    def contact_us(self, request):
+        contact_type = request.data.get('type')
+        comment = request.data.get('comment')
+        try:
+            if contact_type == 'finance':
+                mail_data = {
+                    'to': ['sarang.m@consultadd.com'],
+                    'cc': [],
+                    'bcc': [],
+                    'subject': f'Timesheet app contact us comment from {request.user.name}',
+                    'template': '../templates/timesheet_contact_us.html',
+                    'context': {
+                        "consultant_name": request.user.name,
+                        "consultant_email": request.user.email,
+                        "comment": comment,
+                    },
+                }
+                # send_email(mail_data, request.user.email)
+            elif contact_type == 'support':
+                mail_data = {
+                    'to': ['sarang.m@consultadd.com'],
+                    'cc': [],
+                    'bcc': [],
+                    'subject': f'Timesheet app contact us comment from {request.user.name}',
+                    'template': '../templates/timesheet_contact_us.html',
+                    'context': {
+                        "consultant_name": request.user.name,
+                        "consultant_email": request.user.email,
+                        "comment": comment,
+                    },
+                }
+                # send_email(mail_data, request.user.email)
+            else:
+                return Response({"result": "Select correct option"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
