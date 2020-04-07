@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from django.db.models import Q, F
 from django.shortcuts import get_object_or_404
 
@@ -232,19 +233,20 @@ class ConsultantProjectViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
     @action(methods=['POST'], detail=False, url_path='contact_us')
     def contact_us(self, request):
         contact_type = request.data.get('type')
-        comment = request.data.get('comment')
+        message = request.data.get('message')
+        phone_type = request.data.get('phone_type', None)
         try:
             if contact_type == 'finance':
                 mail_data = {
                     'to': ['sarang.m@consultadd.com'],
                     'cc': [],
                     'bcc': [],
-                    'subject': f'Timesheet app contact us comment from {request.user.name}',
+                    'subject': f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}',
                     'template': '../templates/timesheet_contact_us.html',
                     'context': {
                         "consultant_name": request.user.name,
                         "consultant_email": request.user.email,
-                        "comment": comment,
+                        "message": message,
                     },
                 }
                 # send_email(mail_data, request.user.email)
@@ -253,12 +255,12 @@ class ConsultantProjectViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
                     'to': ['sarang.m@consultadd.com'],
                     'cc': [],
                     'bcc': [],
-                    'subject': f'Timesheet app contact us comment from {request.user.name}',
+                    'subject': f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}',
                     'template': '../templates/timesheet_contact_us.html',
                     'context': {
                         "consultant_name": request.user.name,
                         "consultant_email": request.user.email,
-                        "comment": comment,
+                        "message": message,
                     },
                 }
                 # send_email(mail_data, request.user.email)

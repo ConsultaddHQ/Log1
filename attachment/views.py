@@ -1,5 +1,8 @@
 import boto3
 import logging
+from datetime import datetime
+from botocore.exceptions import ClientError
+from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
@@ -34,7 +37,7 @@ def get_s3_object(key):
 
 
 def download_s3_object(key):
-    file_name = key.split('/')[1] + "_" + key.split('/')[2] + "_" + key.split('/')[3]
+    file_name = key.split('/')[1] + "_" + str(datetime.now()) + "_" + key.split('/')[3]
     s3 = boto3.client('s3',
                       region_name=os.getenv('AWS_REGION_NAME'),
                       aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
@@ -50,6 +53,24 @@ def delete_temp_file(paths):
             os.remove(path)
         else:
             logger.error(path, "The file does not exist")
+
+
+def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
+    bucket_name = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    s3 = boto3.client(
+            's3', region_name=os.getenv('AWS_REGION_NAME'),
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+        )
+    try:
+        response = s3.generate_presigned_post(
+            bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
+        )
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    return response
 
 
 class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, GenericViewSet):
@@ -166,7 +187,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
 
-                client_address, vendor_address,  reporting_details = 0, 0, 0
+                client_address, vendor_address, reporting_details = 0, 0, 0
                 msa, work_order, s_msa, s_work_order = 0, 0, 0, 0
 
                 start_date = 1 if project.start_date else 0
@@ -231,3 +252,18 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             return Response({"result": url}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, url_path='upload')
+    def upload(self, request):
+        content_object = ContentType.objects.get(model=request.data['obj_type'])
+        file_name = request.data['file_name']
+        object_id = request.data['object_id']
+
+        object_name = 'media/attachments/{app}_{model}/{pk}/{filename}'.format(
+            app=content_object.app_label,
+            model=content_object.model.lower(),
+            pk=object_id,
+            filename=file_name,
+        )
+        response = presigned_post_url(object_name=object_name)
+        return Response({"result": response}, status=status.HTTP_200_OK)

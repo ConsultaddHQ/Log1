@@ -128,7 +128,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     def get_project(self, obj):
         project = Project.objects.filter(consultant=obj)
         if project:
-            project = project.latest('id')
+            project = project.latest('-id')
             return {
                 'id': project.id,
                 'start_date': project.start_date,

@@ -39,7 +39,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': [project.consultant.email],
                 'cc': [],
-                'bcc': ['sarang.m@consultadd.in'],
+                'bcc': ['sarang.m@consultadd.com'],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'context': {
@@ -143,6 +143,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_email': project.consultant.email,
                     'consultant_phone_no': project.consultant.phone_no,
                     'marketer_name': submission.created_by.employee_name,
+                    'consultant_location': project.consultant.current_city,
                     'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
                 },
                 'attachments': path
@@ -453,7 +454,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     if support_mail_error == 'error' or offer_mail_error == 'error':
                         logger.error(support_mail_res)
                         logger.error(offer_mail_res)
-                        return Response({"error": "error", "support_mail_error": str(offer_mail_error),
+                        return Response({"error": "error", "support_mail_error": str(support_mail_res),
                                          "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
 
                 return Response({
@@ -649,7 +650,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
 `Total offer count of this month - {total_offer_count}`
 """
-                                }
+                    }
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
                     project.save()
@@ -796,6 +797,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_name = request.query_params.get('consultant_name', None)
 
         try:
+
             project_status = ['joined', 'terminated-resigned', 'terminated', 'terminated-resigned_location_issue',
                               'terminated-resigned_location_issue', 'terminated-resigned_full_time_offer',
                               'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
@@ -804,22 +806,25 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             if consultant_id:
                 consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
             elif consultant_name:
-                consultants = Consultant.objects.filter(name__icontains=consultant_name)
+                consultants = Consultant.objects.filter(name__istartswith=consultant_name)
             else:
                 consultant_ids = Project.objects.filter(
                     statuses__status__in=project_status, statuses__is_current=True
                 ).values_list('consultant', flat=True)
-                consultants = Consultant.objects.filter(id__in=list(consultant_ids)).exclude(status='archived')
+                consultants = Consultant.objects.filter(
+                    id__in=list(consultant_ids),
+                    projects__timesheets__status__in=['submitted', 'rejected']
+                ).exclude(status='archived').order_by('id').distinct('id')
 
             if query:
-                consultants = consultants.filter(
+                consultants = Consultant.objects.filter(
                     Q(name__istartswith=query) |
                     Q(projects__submission__client__icontains=query) |
                     Q(projects__submission__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
-                )
-            consultants = consultants.exclude(projects__timesheets=None)
-            queryset = consultants.order_by('id', '-projects__timesheets__modified').distinct('id')
+                ).order_by('id').distinct('id')
+
+            queryset = consultants.order_by('name').distinct('name')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
