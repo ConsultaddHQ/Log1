@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
 
 
-class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
+class ConsultantViewSets(viewsets.ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
@@ -259,6 +259,22 @@ class ConsultantViewSets(ListModelMixin, RetrieveModelMixin, CreateModelMixin, U
             serializer = ConsultantUpdateSerializer(obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except KeyError as err:
+            logger.error(err)
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        roles = request.user.roles
+        if not ('superadmin' in roles or 'recruiter' in roles):
+            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+            consultant.status = 'archived'
+            consultant.save()
+            profiles = consultant.marketing.filter(end=None)
+            profiles.update(end=date.today(), status='close')
+            serializer = ConsultantUpdateSerializer(consultant)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -608,18 +624,31 @@ class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericVie
 
     def create(self, request, *args, **kwargs):
         try:
-            prev_marketing_obj = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'],
-                                                                    status='open')
-            cycle = 1
-            if prev_marketing_obj:
-                cycle = prev_marketing_obj.first().cycle + 1
+            prev_marketing_obj = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'])
 
+            latest_marketing_cycle = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'],
+                                                                        status='close').latest('end')
+            reset_days = request.data.get('reset_days', 'true')
+            if reset_days == 'true':
+                previous_marketing_days = 0
+            else:
+                if not latest_marketing_cycle:
+                    previous_marketing_days = 0
+                else:
+                    previous_marketing_days = (latest_marketing_cycle.end - latest_marketing_cycle.start).days
+
+            prev_marketing_obj.update(status='close')
+
+            cycle = 1
+            if latest_marketing_cycle:
+                cycle = latest_marketing_cycle.cycle + 1
             consultant_marketing = ConsultantMarketing.objects.create(
                 cycle=cycle,
                 rtg=request.data['rtg'],
                 in_pool=request.data['in_pool'],
                 start=request.data['marketing_start'],
                 consultant_id=request.data['consultant'],
+                previous_marketing_days=previous_marketing_days,
                 primary_marketer_id=request.data['primary_marketer'],
                 preferred_location=request.data['preferred_location'],
             )

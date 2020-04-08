@@ -141,7 +141,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     def get_ts_status(self, obj):
         queryset = TimeSheet.objects.filter(project__consultant=obj)
         sub_ts = True if queryset.filter(status='submitted') else False
-        rej_ts = True if queryset.filter(status='rejected', is_active=True) else False
+        rej_ts = True if queryset.filter(status='rejected', is_active=False) else False
         data = {
             'rejected': rej_ts,
             'submitted': sub_ts,

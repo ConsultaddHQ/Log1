@@ -12,11 +12,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from utils_app.models import City
+from project.models import Project
 from employee.models import User, Team
 from consultant.models import Consultant
 from employee.serializers import UserSerializer
 from marketing.models import Submission, Interview
-from project.models import Project, PROJECT_STATUS_CHOICES
 
 logger = logging.getLogger(__name__)
 
@@ -434,33 +434,35 @@ command - {command} {query}\n
                     text = f"""#### Team Status :memo: \n
 Team - {arg2.title()}
 command - {slash_command}\n
-| Name | Email | Phone No | Teams | Status | In Pool | RTG | Marketing Start | Recruiter | Preferred Location |
-|:-----|:------|:---------|:------|:-------|:--------|:----|:----------------|:----------|:-------------------|
+| Name | Email | Phone No | Teams | Status | In Pool | RTG | Marketing Start | Days | Recruiter | Preferred Location |
+|:-----|:------|:---------|:------|:-------|:--------|:----|:----------------|:-----|:----------|:-------------------|
 """
-                    bench_consultant = Consultant.objects.filter(marketing__status='open')
+                    bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='archived')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
-                        recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
                         teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
-                        text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {recruiter} | {preferred_location} |\n"
+                        recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
+                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
                 else:
                     text = f"""#### Team Status :memo: \n
 Team - {arg2.title()}
 command - {slash_command}\n
-| Name | Email | Phone No | Status | In Pool | RTG | Marketing Start | Recruiter | Preferred Location |
-|:-----|:------|:---------|:-------|:--------|:----|:----------------|:----------|:-------------------|
+| Name | Email | Phone No | Status | In Pool | RTG | Marketing Start | Days | Recruiter | Preferred Location |
+|:-----|:------|:---------|:-------|:--------|:----|:----------------|:-----|:----------|:-------------------|
 """
                     bench_consultant = Consultant.objects.filter(
                         marketing__status='open',
                         marketing__teams__name__iexact=arg2,
-                    )
+                    ).exclude(status='archived')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} |  {recruiter} | {preferred_location} |\n"
+                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
             else:
                 return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)

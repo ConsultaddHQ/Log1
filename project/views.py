@@ -442,7 +442,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = sub.consultant
                 project.save()
 
-                queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'], is_active=True)
+                queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
                 scrum_masters = [{"email": user.email} for user in queryset]
 
                 support_mail_res = "Development Server"
@@ -510,6 +510,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             project.save()
 
+            # Emoji for Mattermost update
             if project.consultant.recruiter:
                 recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
             else:
@@ -534,6 +535,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     prev_status_obj.save()
 
                 # If status is Joined
+                if new_status.startswith('cancelled'):
+                    project.submission.consultant_marketing.status = 'open'
+                    project.submission.consultant_marketing.save()
+
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
@@ -699,6 +704,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         }
                         post_msg_using_webhook(config.offer_failure_url, data)
 
+                    elif prev_status_obj.status != 'complete' and new_status == "complete":
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Completion')
+
             serializer = self.serializer_class(project)
 
             return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
@@ -813,7 +821,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 ).values_list('consultant', flat=True)
                 consultants = Consultant.objects.filter(
                     id__in=list(consultant_ids),
-                    projects__timesheets__status__in=['submitted', 'rejected']
+                    projects__timesheets__is_active=True,
+                    projects__timesheets__status='submitted',
                 ).exclude(status='archived').order_by('id').distinct('id')
 
             if query:

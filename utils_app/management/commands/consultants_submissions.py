@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, date
 from django.core.management import BaseCommand
 
 from constance import config
+
+from employee.models import User
 from marketing.models import Submission
 from consultant.models import Consultant
 from utils_app.mailing import send_email
@@ -22,6 +24,7 @@ class Command(BaseCommand):
             else:
                 days = 2
                 last_2_days = today - timedelta(days=2)
+            scrum_masters = []
             queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days)
             submissions = []
             if not queryset:
@@ -38,10 +41,14 @@ class Command(BaseCommand):
                     }
                 )
                 count += 1
+                users = User.objects.filter(team__in=submission.created_by.team, role__in=['admin', 'proxy'])
+                for user in users:
+                    scrum_masters.append(user.email)
+            cc = list(set(scrum_masters))
             mail_data = {
                 'bcc': [],
                 'to': [consultant.email],
-                'cc': [config.RELATIONS, config.RECRUITMENT],
+                'cc': cc + [config.RELATIONS, config.RECRUITMENT],
                 'subject': '{} - Submissions - {}'.format(consultant.name, str(date.today())),
                 'template': '../templates/consultants_submissions.html',
                 'context': {

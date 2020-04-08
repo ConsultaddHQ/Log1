@@ -1,5 +1,5 @@
 import logging
-
+from datetime import datetime
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
@@ -17,10 +17,30 @@ from consultant.authentication import ConsultantPetitionTokenAuthentication
 from legal.models import *
 from legal.serializers import *
 from utils_app.mailing import send_email
+from notification.models import FCMDevice
 from employee.token import get_token_generator
+from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
+
+petition_status = {
+    'new': 'New',
+    'rfe': 'RFE',
+    'denied': 'Denied',
+    'shipped': 'Shipped',
+    'approved': 'Approved',
+    'assigned': 'Assigned',
+    'reviewed': 'Reviewed',
+    'lca_filed': 'LCA Filed',
+    'print': 'Sent for Print',
+    'lca_approved': 'LCA Approved',
+    'under_review': 'Under Review',
+    'rfe_responded': 'RFE Docs Sent',
+    'doc_acknowledged': 'Docs Acknowledged',
+    'doc_request_sent': 'Document Request Sent',
+    'rfe_doc_acknowledged': 'RFE Docs Acknowledged',
+}
 
 
 # Api for Legal Team
@@ -237,6 +257,30 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
 
+    @action(methods=['post'], detail=False, url_path='contact_us')
+    def contact_us(self, request):
+        try:
+            petition = get_object_or_404(Petition, id=request.data['petition_id'], beneficiary=request.user)
+            beneficiary = petition.beneficiary
+            mail_data = {
+                # 'to': [petition.assigned_to.email],
+                'to': ['sarang.m@consultadd.com'],
+                'cc': [],
+                'bcc': [],
+                'template': '../templates/petition_contact_us.html',
+                'subject': f'Petition app issue from {request.user.name} :: {str(datetime.now())}',
+                'context': {
+                    'message': request.data['message'],
+                    'name': petition.assigned_to.employee_name,
+                    'consultant_name': petition.beneficiary.name,
+                    'consultant_email': petition.beneficiary.email,
+                },
+            }
+            send_email(mail_data, beneficiary.email)
+            return Response({"result": {"message": "mail sent"}}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['get'], detail=False, url_path='doc_types')
     def doc_types(self, request):
         data = dict()
@@ -295,6 +339,40 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     petition_id=petition_id,
                 )
             documents = Document.objects.filter(petition=petition_id)
+            petition = get_object_or_404(Petition, id=petition_id)
+
+            data = {
+                "title": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
+                "category": "alert",
+                "target_id": request.user.id,
+                "target_type": "consultant",
+                "sender_id": request.user.id,
+                "recipient_user_type": "user",
+                "sender_user_type": "consultant",
+                "description": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
+            }
+            create_notification([petition.assigned_to], data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "title": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
+                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "body": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target_id': petition_id,
+                    'timestamp': str(timezone.now()),
+                },
+            }
+
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id=petition.assigned_to.id, content_type__model='user').values_list(
+                    'device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
