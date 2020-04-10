@@ -17,11 +17,11 @@ from django.db.models import Count, Q, F, Max
 from django.shortcuts import get_object_or_404
 
 from marketing.serializers import *
-from utils_app.utils import get_time_filter
 from consultant.models import ConsultantProfile
 from utils_app.utils import post_msg_using_webhook
 from notification.views import create_notification
 from attachment.models import Attachment, create_attachment
+from utils_app.utils import get_time_filter, get_time_filter_by_start
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
 
 logger = logging.getLogger(__name__)
@@ -448,6 +448,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub_id = kwargs.get('pk')
                 sub = get_object_or_404(Submission, id=sub_id)
 
+            interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
+            if interviews:
+                serializer = SubmissionDetailSerializer(sub)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
             if sub.created_by == request.user:
                 serializer = SubmissionDetailSerializer(sub)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
@@ -823,7 +828,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             self.change_to_feedback_due()
 
             # Search Interview by Client, VendorContact and Consultant
-
+            roles = request.user.roles
             if query:
                 query = query.strip()
                 queryset = Interview.objects.filter(
@@ -836,12 +841,19 @@ class InterviewViewSets(viewsets.ModelViewSet):
             else:
                 queryset = Interview.objects.exclude(submission__consultant_marketing__status='close')
             if filter_for == 'my':
+                if 'interviewee' in roles:
+                    queryset = queryset.filter(
+                        Q(submission__created_by=request.user) |
+                        Q(supervisor=request.user)
+                    )
+                else:
+                    queryset = queryset.filter(submission__created_by=request.user)
                 queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=request.user.team)
 
             # Interview List for Scrum Master and Proxy Scrum Master (team interviews) and marketer
-            roles = request.user.roles
+
             if 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__teams=request.user.team,
@@ -868,7 +880,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                       submission__consultant_marketing__consultant__pocs__poc_type='relation')
                 )
 
-            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
+            queryset = get_time_filter_by_start(queryset, filter_by_time).order_by('-modified').distinct('modified')
 
             data, screen_data = self.get_interview_data(queryset, filter_by_status, first, last)
 

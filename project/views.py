@@ -349,6 +349,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=True, url_path="send_support_mail")
+    def send_support_mail(self, request, *args, **kwargs):
+        try:
+            project_id = kwargs.get('pk')
+            project = get_object_or_404(Project, id=project_id)
+
+            queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'], is_active=True)
+            scrum_masters = [{"email": user.email} for user in queryset]
+            submission = project.submission
+            support_mail_res, support_mail_error = self.support_mail(project, submission, scrum_masters)
+
+            if support_mail_error == 'error':
+                return Response({"error": str(support_mail_res)}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"result": str(support_mail_res)}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def retrieve(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
@@ -868,7 +886,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     target_content_type = ContentType.objects.get(model='timesheet')
 
                     Notification.objects.create(
-                        title=f"Timesheet rejected for week end {str(timesheet.end)}",
+                        title=f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         category="rejected",
                         target_object_id=timesheet.id,
                         sender_object_id=request.user.id,
@@ -876,16 +894,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         target_content_type=target_content_type,
                         recipient_content_type=recipient_content_type,
                         recipient_object_id=timesheet.project.consultant.id,
-                        description=f"Timesheet rejected for week end {str(timesheet.end)}",
+                        description=f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                     )
 
                     # Push Notification
                     message_body = {
                         "category": "rejected",
                         "show_in_foreground": True,
-                        "title": f"Timesheet rejected for week end {str(timesheet.end)}",
+                        "title": f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         "click_action": "FLUTTER_NOTIFICATION_CLICK",
-                        "body": f"Timesheet rejected for week end {str(timesheet.end)}",
+                        "body": f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         "data": {
                             'is_read': False,
                             'is_deleted': False,

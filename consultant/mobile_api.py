@@ -107,6 +107,19 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
+    @action(methods=['post'], detail=False, url_path='set_password')
+    def set_consultant_password(self, request):
+        try:
+            if request.user.is_superuser:
+                consultant = get_object_or_404(Consultant, id=request.data['consultant_id'])
+                consultant.set_password(request.data['new_password'])
+                consultant.save()
+                return Response({'result': {'message': 'Password Changed Successfully'}}, status=status.HTTP_200_OK)
+            else:
+                return Response({'result': {'message': 'Unauthorized Access'}}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as error:
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def list(self, request, *args, **kwargs):
         queryset = Consultant.objects.all()
         serializer = self.serializer_class(queryset, many=True)

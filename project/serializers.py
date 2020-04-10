@@ -98,11 +98,19 @@ class PayrollScheduleSerializer(serializers.ModelSerializer):
 class TimeSheetSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
 
     class Meta:
         model = TimeSheet
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'status_updated_at', 'status_updated_by',
                   'modified', 'attachments', 'remark', 'project', 'con_comment')
+
+    def get_start(self, obj):
+        return obj.start.strftime("%m/%d/%Y")
+
+    def get_end(self, obj):
+        return obj.end.strftime("%m/%d/%Y")
 
     def get_attachments(self, obj):
         return AttachmentURLSerializer(obj.attachments.all(), many=True).data
@@ -126,7 +134,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'email', 'ts_status', 'project')
 
     def get_project(self, obj):
-        project = Project.objects.filter(consultant=obj)
+        project = Project.objects.filter(consultant=obj, statuses__status='joined', statuses__is_current=True)
         if project:
             project = project.latest('-id')
             return {

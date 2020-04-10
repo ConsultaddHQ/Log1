@@ -10,7 +10,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin
 
 from consultant.serializers import *
 from marketing.models import Interview
@@ -137,7 +137,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
             ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
-                     'status', 'employer')
+                     'status', 'employer', 'start_date', 'end_date')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -608,8 +608,9 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 marketing_start=Subquery(marketing.values('start')[:1]),
                 recruiter=Subquery(poc.values('poc__employee_name')[:1]),
                 preferred_location=Subquery(marketing.values('preferred_location')[:1]),
+                previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
             ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
-                     'marketing_start')
+                     'marketing_start', 'previous_marketing_days')
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -675,6 +676,17 @@ class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericVie
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='stop_marketing')
+    def stop_marketing(self, request, *args, **kwargs):
+        try:
+            marketing = get_object_or_404(ConsultantMarketing, id=kwargs.get('pk'))
+            marketing.end = request.data.get('end')
+            marketing.status = 'close'
+            marketing.save()
+            return Response({"result": "marketing stopped"}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get', 'post'], detail=False, url_path='remarketing')

@@ -24,22 +24,31 @@ from notification.views import create_notification, push_notification
 logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
-petition_status = {
-    'new': 'New',
-    'rfe': 'RFE',
-    'denied': 'Denied',
-    'shipped': 'Shipped',
-    'approved': 'Approved',
-    'assigned': 'Assigned',
-    'reviewed': 'Reviewed',
-    'lca_filed': 'LCA Filed',
-    'print': 'Sent for Print',
-    'lca_approved': 'LCA Approved',
-    'under_review': 'Under Review',
-    'rfe_responded': 'RFE Docs Sent',
-    'doc_acknowledged': 'Docs Acknowledged',
-    'doc_request_sent': 'Document Request Sent',
-    'rfe_doc_acknowledged': 'RFE Docs Acknowledged',
+
+DOCUMENT_TYPE = {
+    "6": 'I94',
+    "20": 'MSA',
+    "4": 'Visa',
+    "1": 'Resume',
+    "9": 'Paystub',
+    "8": 'Form I20',
+    "5": 'Passport',
+    "17": 'Timesheet',
+    "22": 'Work Order',
+    "21": 'Offer Letter',
+    "15": 'Client Letter',
+    "24": 'Consultadd W2',
+    "16": 'Vendor Letter',
+    "18": 'Insurance Cards',
+    "2": 'Degree Certificate',
+    "13": 'Experience Letter',
+    "3": 'Academic Transcripts',
+    "23": 'Employment Agreement',
+    "19": 'Social Security Card',
+    "11": 'Detailed Job Description',
+    "7": 'Previous Approval Notices',
+    "14": 'Performance Review Sheet ',
+    "12": 'Employment Authorization Card',
 }
 
 
@@ -341,37 +350,39 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             documents = Document.objects.filter(petition=petition_id)
             petition = get_object_or_404(Petition, id=petition_id)
 
-            data = {
-                "title": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
-                "category": "alert",
-                "target_id": request.user.id,
-                "target_type": "consultant",
-                "sender_id": request.user.id,
-                "recipient_user_type": "user",
-                "sender_user_type": "consultant",
-                "description": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
-            }
-            create_notification([petition.assigned_to], data)
+            if file_type in DOCUMENT_TYPE.keys():
+                title = f"{DOCUMENT_TYPE[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})"
+                data = {
+                    "title": title,
+                    "category": "alert",
+                    "description": title,
+                    "target_type": "consultant",
+                    "target_id": request.user.id,
+                    "sender_id": request.user.id,
+                    "recipient_user_type": "user",
+                    "sender_user_type": "consultant",
+                }
+                create_notification([petition.assigned_to], data)
 
-            # Push Notification
-            message_body = {
-                "category": "alert",
-                "show_in_foreground": True,
-                "title": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
-                "click_action": "FLUTTER_NOTIFICATION_CLICK",
-                "body": f"{petition_status[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target_id': petition_id,
-                    'timestamp': str(timezone.now()),
-                },
-            }
+                # Push Notification
+                message_body = {
+                    "body": title,
+                    "title": title,
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                    "data": {
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target_id': petition_id,
+                        'timestamp': str(timezone.now()),
+                    },
+                }
 
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id=petition.assigned_to.id, content_type__model='user').values_list(
-                    'device_id', flat=True))
-            push_notification(registration_ids, message_body)
+                registration_ids = list(
+                    FCMDevice.objects.filter(object_id=petition.assigned_to.id, content_type__model='user').values_list(
+                        'device_id', flat=True))
+                push_notification(registration_ids, message_body)
 
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
