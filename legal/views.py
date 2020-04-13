@@ -62,8 +62,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
     def rejection_mail(self, beneficiary_name, petition, document):
         try:
+            to = ['sarang.m@consultadd.com']
+            if os.environ.get('ENV') == 'prod':
+                to = [petition.beneficiary.email]
             mail_data = {
-                'to': [petition.beneficiary.email],
+                'to': to,
                 'cc': [],
                 'bcc': [],
                 'template': '../templates/rejection_email.html',
@@ -162,8 +165,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
             beneficiary = petition.beneficiary
             petition_type = petition.get_petition_type_display()
+            to = ['sarang.m@consultadd.com']
+            if os.environ.get('ENV') == 'prod':
+                to = [beneficiary.email]
             mail_data = {
-                'to': [beneficiary.email],
+                'to': to,
                 'cc': [],
                 'bcc': [],
                 'template': '../templates/doc_upload_request.html',
@@ -271,9 +277,11 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         try:
             petition = get_object_or_404(Petition, id=request.data['petition_id'], beneficiary=request.user)
             beneficiary = petition.beneficiary
+            to = ['sarang.m@consultadd.com']
+            if os.environ.get('ENV') == 'prod':
+                to = [petition.assigned_to.email]
             mail_data = {
-                # 'to': [petition.assigned_to.email],
-                'to': ['sarang.m@consultadd.com'],
+                'to': to,
                 'cc': [],
                 'bcc': [],
                 'template': '../templates/petition_contact_us.html',

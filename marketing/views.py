@@ -1258,21 +1258,26 @@ class InterviewViewSets(viewsets.ModelViewSet):
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put'], detail=False, url_path='upload')
-    def upload(self, request):
-        file_name = request.data['file_name']
-        object_id = request.data['object_id']
-
-        object_name = 'media/attachments/recordings/{pk}/{filename}'.format(
-            pk=object_id,
-            filename=file_name,
-        )
-        interview = get_object_or_404(Interview, id=object_id)
-        response = presigned_post_url(object_name=object_name)
-        if interview.attachment_link:
-            interview.attachment_link = interview.attachment_link + " , " + MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
-        interview.save()
-        return Response({"result": response}, status=status.HTTP_200_OK)
+    @action(methods=['put', 'delete'], detail=False, url_path='upload_recording')
+    def upload(self, request, *args, **kwargs):
+        try:
+            if request.method == 'put':
+                file_name = request.data['file_name']
+                object_id = kwargs.get('pk')
+                object_name = f'media/attachments/recordings/{object_id}/{file_name}'
+                interview = get_object_or_404(Interview, id=object_id)
+                response = presigned_post_url(object_name=object_name)
+                interview.attachment_link = MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
+                interview.save()
+                return Response({"result": response}, status=status.HTTP_200_OK)
+            else:
+                interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+                interview.attachment_link = None
+                interview.save()
+                return Response({"result": "link deleted"}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Suggestions for Interview
     @action(methods=['get'], detail=False, url_path='suggestions')
