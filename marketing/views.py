@@ -16,7 +16,9 @@ from django.db.models.functions import Lower
 from django.db.models import Count, Q, F, Max
 from django.shortcuts import get_object_or_404
 
+from log1.settings import MEDIA_URL
 from marketing.serializers import *
+from attachment.views import presigned_post_url
 from consultant.models import ConsultantProfile
 from utils_app.utils import post_msg_using_webhook
 from notification.views import create_notification
@@ -1234,6 +1236,43 @@ class InterviewViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='update_notes')
+    def update_notes(self, request, *args, **kwargs):
+        try:
+            queryset = Interview.objects.filter(
+                Q(id=kwargs.get('pk')) &
+                (
+                    Q(submission__created_by=request.user) |
+                    Q(supervisor=request.user)
+                )
+            )
+            if queryset:
+                interview = queryset.first()
+                interview.notes = request.data.get('notes')
+                interview.save()
+                serializer = InterviewCreateSerializer(interview)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": "You are not allowed to upload"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=False, url_path='upload')
+    def upload(self, request):
+        file_name = request.data['file_name']
+        object_id = request.data['object_id']
+
+        object_name = 'media/attachments/recordings/{pk}/{filename}'.format(
+            pk=object_id,
+            filename=file_name,
+        )
+        interview = get_object_or_404(Interview, id=object_id)
+        response = presigned_post_url(object_name=object_name)
+        if interview.attachment_link:
+            interview.attachment_link = interview.attachment_link + " , " + MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
+        interview.save()
+        return Response({"result": response}, status=status.HTTP_200_OK)
 
     # Suggestions for Interview
     @action(methods=['get'], detail=False, url_path='suggestions')

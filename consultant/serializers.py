@@ -186,7 +186,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
                   'profiles', 'education', 'experience', 'rate', 'marketing')
 
     def get_work_auth(self, obj):
-        return WorkAuthSerializer(obj.work_auth.filter(is_current=True), many=True).data
+        return WorkAuthSerializer(obj.work_auth.all(), many=True).data
 
     def get_profiles(self, obj):
         return ConsultantProfileSerializer(obj.profiles.all(), many=True).data

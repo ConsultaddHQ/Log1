@@ -31,7 +31,7 @@ def get_s3_object(key):
             'Bucket': os.getenv('AWS_STORAGE_BUCKET_NAME'),
             'Key': f'media/{key}'
         },
-        ExpiresIn=60
+        ExpiresIn=3600
     )
     return url
 

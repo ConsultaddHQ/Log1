@@ -798,7 +798,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultant_id=kwargs.get('pk', None),
             )
             if projects:
-                project = projects.latest('id')
+                project = projects.latest('-id')
                 if start:
                     queryset = TimeSheet.objects.filter(
                         project=project, start__range=[start, end]

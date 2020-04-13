@@ -240,6 +240,7 @@ class Interview(TimeStampedModel):
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
     end_time = models.DateTimeField(_('End Date'), null=True, blank=True)
+    notes = models.TextField(_('Interview Notes'), null=True, blank=True)
     description = models.TextField(_('Description'), null=True, blank=True)
     start_time = models.DateTimeField(_('Start Date'), null=True, blank=True)
     call_details = models.TextField(_('Call Details'), null=True, blank=True)

@@ -3,7 +3,7 @@ from rest_framework import serializers
 from marketing.models import *
 from project.models import Project
 from employee.serializers import UserSerializer
-from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
+from attachment.serializers import AttachmentSerializer
 from consultant.serializers import ConsultantSerializer
 
 
@@ -59,7 +59,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                   'reporting_details', 'attachments')
 
     def get_attachments(self, obj):
-        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -139,7 +139,7 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         return obj.created_by.id
 
     def get_attachments(self, obj):
-        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
 
     def get_consultant(self, obj):
         return ConsultantSerializer(obj.consultant).data
