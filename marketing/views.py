@@ -1258,10 +1258,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put', 'delete'], detail=False, url_path='upload_recording')
-    def upload(self, request, *args, **kwargs):
+    @action(methods=['put', 'delete'], detail=True, url_path='upload_recording')
+    def upload_recording(self, request, *args, **kwargs):
         try:
-            if request.method == 'put':
+            if request.method == 'PUT':
                 file_name = request.data['file_name']
                 object_id = kwargs.get('pk')
                 object_name = f'media/attachments/recordings/{object_id}/{file_name}'
@@ -1269,12 +1269,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 response = presigned_post_url(object_name=object_name)
                 interview.attachment_link = MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
                 interview.save()
-                return Response({"result": response}, status=status.HTTP_200_OK)
+                return Response({"result": response}, status=status.HTTP_202_ACCEPTED)
             else:
                 interview = get_object_or_404(Interview, id=kwargs.get('pk'))
                 interview.attachment_link = None
                 interview.save()
-                return Response({"result": "link deleted"}, status=status.HTTP_204_NO_CONTENT)
+                return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

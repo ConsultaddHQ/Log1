@@ -636,7 +636,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericVie
                 if not latest_marketing_cycle:
                     previous_marketing_days = 0
                 else:
-                    previous_marketing_days = (latest_marketing_cycle.end - latest_marketing_cycle.start).days
+                    previous_marketing_days = 0
+                    if latest_marketing_cycle.end and latest_marketing_cycle.start:
+                        previous_marketing_days = (latest_marketing_cycle.end - latest_marketing_cycle.start).days
 
             prev_marketing_obj.update(status='close')
 
@@ -650,9 +652,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericVie
                 start=request.data['marketing_start'],
                 consultant_id=request.data['consultant'],
                 previous_marketing_days=previous_marketing_days,
-                primary_marketer_id=request.data['primary_marketer'],
                 preferred_location=request.data['preferred_location'],
             )
+            primary_marketer = request.data.get('primary_marketer', None)
+            if primary_marketer:
+                consultant_marketing.primary_marketer_id = primary_marketer
+                consultant_marketing.save()
 
             teams = request.data.get('teams', [])
             for team in teams:
