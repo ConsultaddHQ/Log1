@@ -31,6 +31,15 @@ def close_marketing():
         return error
 
 
+def start_marketing():
+    try:
+        marketing = ConsultantMarketing.objects.filter(start__lte=date.today(), status='close', end=None)
+        marketing.update(status='open')
+        return None
+    except Exception as error:
+        return error
+
+
 class ConsultantViewSets(viewsets.ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -155,6 +164,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
+            start_marketing()
             consultants = Consultant.objects.filter(marketing__status='open')
             roles = request.user.roles
 
@@ -183,6 +193,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             close_marketing()
+            start_marketing()
             consultant_id = kwargs.get('pk')
             submission = request.query_params.get('submission', 'false')
             if submission.lower() == "true":
@@ -556,6 +567,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
         try:
             close_marketing()
+            start_marketing()
             consultants = Consultant.objects.exclude(status='archived')
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
@@ -641,6 +653,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
+            start_marketing()
             marketing = ConsultantMarketing.objects.filter(
                 consultant_id=request.query_params.get('consultant')
             )
@@ -674,6 +687,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 cycle = latest_marketing_cycle.cycle + 1
             consultant_marketing = ConsultantMarketing.objects.create(
                 cycle=cycle,
+                status='close',
                 rtg=request.data['rtg'],
                 in_pool=request.data['in_pool'],
                 start=request.data['marketing_start'],
@@ -694,6 +708,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             for marketer_id in marketer_ids:
                 marketer = get_object_or_404(User, id=marketer_id)
                 consultant_marketing.marketer.add(marketer)
+
+            start_marketing()
             return Response({"result": "Cycle Created"}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)

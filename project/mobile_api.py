@@ -42,11 +42,13 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             project_ids = request.user.get_project().filter(
                 statuses__status__in=project_status, statuses__is_current=True
             ).order_by('-id').values_list('id', flat=True)
+
             pending = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True,
                                                status='draft').order_by('start')
             data = [i for i in pending]
+
             submitted = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True,
-                                                 status__in=['submitted', 'rejected']).order_by('-start')
+                                                 status__in=['submitted', 'rejected', 'approved']).order_by('-start')
             for i in submitted:
                 data.append(i)
             total = len(data)

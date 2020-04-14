@@ -29,6 +29,7 @@ MARKETING_STATUS_CHOICE = (
 VISA_CHOICES = (
     ('tps', 'TPs'),
     ('h1b', 'H1B'),
+    ('cpt', 'CPT'),
     ('other', 'Other'),
     ('gc_ead', 'GC EAD'),
     ('tps_ead', 'TPs EAD'),
