@@ -112,7 +112,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.query_params.get('query', '')
             teams = request.query_params.get('teams', None)
             user_type = request.query_params.get('type', None)
-            users = User.objects.exclude(role__name='consultant', is_active=False)
+            users = User.objects.exclude(role__name='consultant').exclude(is_active=False)
             if user_type == 'relation':
                 users = users.filter(team__name='Retention')
             elif user_type:
@@ -224,7 +224,7 @@ class ResetPasswordViewSets(GenericViewSet):
                         'employee_id': user.employee_id,
                         'name': user.employee_name,
                         'email': user.email,
-                        'token': token,
+                        'token': token.key,
                     },
                 }
                 res, error = user.send_mail(mail_data)

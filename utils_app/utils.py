@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 def get_time_filter(queryset, filter_by):
     if filter_by == 'today':
-        queryset = queryset.filter(created__gte=date.today())
+        queryset = queryset.filter(created__date=date.today())
 
     elif filter_by == 'last_day':
         today = date.today()
@@ -14,7 +14,7 @@ def get_time_filter(queryset, filter_by):
             last_day = today - timedelta(days=3)
         else:
             last_day = today - timedelta(days=1)
-        queryset = queryset.filter(created__gte=last_day)
+        queryset = queryset.filter(created__date=last_day)
 
     elif filter_by == 'week':
         today = date.today()
@@ -36,7 +36,7 @@ def get_time_filter(queryset, filter_by):
 
 def get_time_filter_by_start(queryset, filter_by):
     if filter_by == 'today':
-        queryset = queryset.filter(start_time__gte=date.today())
+        queryset = queryset.filter(start_time__date=date.today())
 
     elif filter_by == 'last_day':
         today = date.today()
@@ -45,7 +45,7 @@ def get_time_filter_by_start(queryset, filter_by):
             last_day = today - timedelta(days=3)
         else:
             last_day = today - timedelta(days=1)
-        queryset = queryset.filter(start_time__gte=last_day)
+        queryset = queryset.filter(start_time__date=last_day)
 
     elif filter_by == 'week':
         today = date.today()

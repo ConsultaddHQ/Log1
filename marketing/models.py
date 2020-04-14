@@ -146,7 +146,7 @@ class Submission(TimeStampedModel):
     comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is active'), default=False)
     email = models.EmailField(_('Marketing Email'), null=True, blank=True)
-    client = models.CharField(_('Client'), max_length=50, null=True, blank=True)
+    client = models.CharField(_('Client'), max_length=100, null=True, blank=True)
     phone = models.CharField(_('Marketing Phone'), max_length=20, null=True, blank=True)
     status = models.CharField(_('Status'), max_length=20, choices=SUB_CHOICES, default='sub')
 
