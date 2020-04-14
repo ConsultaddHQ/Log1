@@ -22,6 +22,15 @@ logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
 
 
+def close_marketing():
+    try:
+        marketing = ConsultantMarketing.objects.filter(end__lte=date.today(), status='open')
+        marketing.update(status='close')
+        return None
+    except Exception as error:
+        return error
+
+
 class ConsultantViewSets(viewsets.ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -144,31 +153,36 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             return error, 'error'
 
     def list(self, request, *args, **kwargs):
-        consultants = Consultant.objects.filter(marketing__status='open')
-        roles = request.user.roles
+        try:
+            close_marketing()
+            consultants = Consultant.objects.filter(marketing__status='open')
+            roles = request.user.roles
 
-        if 'marketer' in request.user.roles:
-            consultants = consultants.filter(
-                Q(marketing__in_pool=True, marketing__status='open') |
-                Q(marketing__marketer=request.user, marketing__status='open')
-            )
-        elif 'admin' in roles or 'proxy' in roles:
-            consultants = consultants.filter(
-                Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
-                Q(marketing__in_pool=True, marketing__status='open')
-            )
+            if 'marketer' in request.user.roles:
+                consultants = consultants.filter(
+                    Q(marketing__in_pool=True, marketing__status='open') |
+                    Q(marketing__marketer=request.user, marketing__status='open')
+                )
+            elif 'admin' in roles or 'proxy' in roles:
+                consultants = consultants.filter(
+                    Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
+                    Q(marketing__in_pool=True, marketing__status='open')
+                )
 
-        elif 'recruiter' in roles:
-            consultants = consultants.filter(
-                pocs__poc=request.user
-            )
+            elif 'recruiter' in roles:
+                consultants = consultants.filter(
+                    pocs__poc=request.user
+                )
 
-        consultants = consultants.order_by('id').distinct('id')
-        serializer = ConsultantListSerializer(consultants, many=True)
-        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            consultants = consultants.order_by('id').distinct('id')
+            serializer = ConsultantListSerializer(consultants, many=True)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, *args, **kwargs):
         try:
+            close_marketing()
             consultant_id = kwargs.get('pk')
             submission = request.query_params.get('submission', 'false')
             if submission.lower() == "true":
@@ -541,6 +555,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
+            close_marketing()
             consultants = Consultant.objects.exclude(status='archived')
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
@@ -557,7 +572,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             elif query:
                 consultants = consultants.filter(
                     Q(email__iexact=query) |
-                    Q(name__istartswith=query) |
+                    Q(name__icontains=query) |
                     Q(skills__istartswith=query) |
                     Q(current_city__istartswith=query) |
                     Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
@@ -625,6 +640,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     def list(self, request, *args, **kwargs):
         try:
+            close_marketing()
             marketing = ConsultantMarketing.objects.filter(
                 consultant_id=request.query_params.get('consultant')
             )
@@ -699,8 +715,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
         try:
             marketing = get_object_or_404(ConsultantMarketing, id=kwargs.get('pk'))
             marketing.end = request.data.get('end')
-            marketing.status = 'close'
             marketing.save()
+            close_marketing()
             return Response({"result": "marketing stopped"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

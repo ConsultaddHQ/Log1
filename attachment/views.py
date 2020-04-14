@@ -247,7 +247,7 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            attachment = get_object_or_404(Attachment, id=kwargs.get('pk'), creator=request.user)
+            attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
             url = get_s3_object(attachment.attachment_file.name)
             return Response({"result": url}, status=status.HTTP_200_OK)
         except Exception as error:
