@@ -850,7 +850,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     )
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
-                queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=request.user.team)
 

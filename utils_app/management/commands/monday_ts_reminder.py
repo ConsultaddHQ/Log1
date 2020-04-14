@@ -17,13 +17,13 @@ class Command(BaseCommand):
         for timesheet in timesheets:
             # consultant = timesheet.project.consultant
             consultant = Consultant.objects.get(id=90)
-            title = f"Please submit timesheet for the week {str(timesheet.start)} - {str(timesheet.end)}"
+            title = f"Reminder: Please submit timesheet for the week {str(timesheet.start)} - {str(timesheet.end)}"
             message_body = {
+                "body": title,
+                "title": None,
                 "category": "info",
                 "show_in_foreground": True,
-                "title": title,
                 "click_action": "FLUTTER_NOTIFICATION_CLICK",
-                "body": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
@@ -46,7 +46,6 @@ class Command(BaseCommand):
                 target_content_type=target_content_type,
                 recipient_content_type=recipient_content_type,
             )
-
             tokens = list(consultant.consultant_token.all().values_list('key', flat=True))
             device_ids = list(FCMDevice.objects.filter(object_id__in=tokens).values_list('device_id', flat=True))
             result = push_notification(device_ids, message_body)

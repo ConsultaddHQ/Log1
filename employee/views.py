@@ -113,7 +113,9 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             teams = request.query_params.get('teams', None)
             user_type = request.query_params.get('type', None)
             users = User.objects.exclude(role__name='consultant', is_active=False)
-            if user_type:
+            if user_type == 'relation':
+                users = users.filter(team__name='Retention')
+            elif user_type:
                 users = users.filter(role__name__iexact=user_type)
             elif teams:
                 teams = teams.split(",")
@@ -126,6 +128,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     users = users.filter(role__name='marketer')
                 else:
                     users = users.filter(team=request.user.team, role__name='marketer')
+
             users = users.filter(employee_name__istartswith=query)
             users = users.annotate(name=Lower('employee_name')).order_by('name')
             data = users.values('id', 'employee_id', 'email', 'name')

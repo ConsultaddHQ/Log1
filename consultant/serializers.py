@@ -3,7 +3,8 @@ from rest_framework import serializers
 
 from consultant.models import *
 from employee.models import User
-from project.models import ProjectSupport
+from marketing.models import Interview
+from project.models import Project, ProjectSupport
 from employee.serializers import TeamSerializer, UserSerializer
 
 
@@ -84,6 +85,38 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
         model = ConsultantMarketing
         fields = ('id', 'teams', 'marketer', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
                   'primary_marketer')
+
+
+class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
+    primary_marketer = serializers.SerializerMethodField()
+    primary_marketer_team = serializers.SerializerMethodField()
+    submission_count = serializers.SerializerMethodField()
+    interview_count = serializers.SerializerMethodField()
+    project_count = serializers.SerializerMethodField()
+    teams = TeamSerializer(many=True)
+
+    def get_primary_marketer(self, obj):
+        return obj.primary_marketer.employee_name
+
+    def get_primary_marketer_team(self, obj):
+        return obj.primary_marketer.team.name
+
+    def get_submission_count(self, obj):
+        return obj.submissions.count()
+
+    def get_interview_count(self, obj):
+        return Interview.objects.filter(
+            submission__consultant_marketing=obj
+        ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+
+    def get_project_count(self, obj):
+        return Project.objects.filter(submission__consultant_marketing=obj).count()
+
+    class Meta:
+        model = ConsultantMarketing
+        fields = ('id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
+                  'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count',
+                  'project_count')
 
 
 class ConsultantRateRevisionSerializer(serializers.ModelSerializer):

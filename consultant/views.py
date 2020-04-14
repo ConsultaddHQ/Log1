@@ -617,11 +617,22 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
+class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantMarketing.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantMarketingSerializer
+
+    def list(self, request, *args, **kwargs):
+        try:
+            marketing = ConsultantMarketing.objects.filter(
+                consultant_id=request.query_params.get('consultant')
+            )
+            serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -694,47 +705,29 @@ class ConsultantMarketingViewSets(CreateModelMixin, UpdateModelMixin, GenericVie
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get', 'post'], detail=False, url_path='remarketing')
+    @action(methods=['get'], detail=False, url_path='remarketing')
     def remarketing(self, request, *args, **kwargs):
-        if request.method == 'GET':
-            try:
-                marketing = ConsultantMarketing.objects.filter(consultant_id=request.query_params.get('consultant'))
-                data = marketing.values('id', 'start', 'end', 'rtg', 'in_pool', 'cycle', 'preferred_location',
-                                        'status', 'primary_marketer__employee_name', 'primary_marketer__team__name')
-                return Response({"result": data}, status=status.HTTP_202_ACCEPTED)
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            try:
-                prev_marketing_obj = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'],
-                                                                        status='open')
-                cycle = 1
-                if prev_marketing_obj:
-                    cycle = prev_marketing_obj.first().cycle + 1
+        try:
+            marketing = ConsultantMarketing.objects.filter(
+                consultant_id=request.query_params.get('consultant')
+            )
+            serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-                consultant_marketing = ConsultantMarketing.objects.create(
-                    cycle=cycle,
-                    rtg=request.data['rtg'],
-                    in_pool=request.data['in_pool'],
-                    start=request.data['marketing_start'],
-                    consultant_id=request.data['consultant'],
-                    primary_marketer_id=request.data['primary_marketer'],
-                    preferred_location=request.data['preferred_location'],
-                )
-
-                teams = request.data.get('teams', [])
-                for team in teams:
-                    consultant_marketing.teams.add(get_object_or_404(Team, name=team))
-
-                marketer_ids = request.data.get('marketers', [])
-                for marketer_id in marketer_ids:
-                    marketer = get_object_or_404(User, id=marketer_id)
-                    consultant_marketing.marketer.add(marketer)
-
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+    @action(methods=['get'], detail=False, url_path='previous_marketing')
+    def previous_marketing(self, request, *args, **kwargs):
+        try:
+            marketing = ConsultantMarketing.objects.filter(
+                consultant_id=request.query_params.get('consultant')
+            ).latest('end')
+            serializer = ConsultantMarketingCycleSerializer(marketing)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     # Marketer assignment
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
