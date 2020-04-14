@@ -16,12 +16,14 @@ from django.db.models.functions import Lower
 from django.db.models import Count, Q, F, Max
 from django.shortcuts import get_object_or_404
 
+from log1.settings import MEDIA_URL
 from marketing.serializers import *
-from utils_app.utils import get_time_filter
+from attachment.views import presigned_post_url
 from consultant.models import ConsultantProfile
 from utils_app.utils import post_msg_using_webhook
 from notification.views import create_notification
 from attachment.models import Attachment, create_attachment
+from utils_app.utils import get_time_filter, get_time_filter_by_start
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
 
 logger = logging.getLogger(__name__)
@@ -448,6 +450,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub_id = kwargs.get('pk')
                 sub = get_object_or_404(Submission, id=sub_id)
 
+            interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
+            if interviews:
+                serializer = SubmissionDetailSerializer(sub)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
             if sub.created_by == request.user:
                 serializer = SubmissionDetailSerializer(sub)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
@@ -823,7 +830,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             self.change_to_feedback_due()
 
             # Search Interview by Client, VendorContact and Consultant
-
+            roles = request.user.roles
             if query:
                 query = query.strip()
                 queryset = Interview.objects.filter(
@@ -836,12 +843,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
             else:
                 queryset = Interview.objects.exclude(submission__consultant_marketing__status='close')
             if filter_for == 'my':
-                queryset = queryset.filter(submission__created_by=request.user)
+                if 'interviewee' in roles:
+                    queryset = queryset.filter(
+                        Q(submission__created_by=request.user) |
+                        Q(supervisor=request.user)
+                    )
+                else:
+                    queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=request.user.team)
 
             # Interview List for Scrum Master and Proxy Scrum Master (team interviews) and marketer
-            roles = request.user.roles
+
             if 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__teams=request.user.team,
@@ -868,7 +881,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                       submission__consultant_marketing__consultant__pocs__poc_type='relation')
                 )
 
-            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
+            queryset = get_time_filter_by_start(queryset, filter_by_time).order_by('-modified').distinct('modified')
 
             data, screen_data = self.get_interview_data(queryset, filter_by_status, first, last)
 
@@ -1219,6 +1232,48 @@ class InterviewViewSets(viewsets.ModelViewSet):
             }
             # create_notification(user_list, notification_data)
             return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='update_notes')
+    def update_notes(self, request, *args, **kwargs):
+        try:
+            queryset = Interview.objects.filter(
+                Q(id=kwargs.get('pk')) &
+                (
+                    Q(submission__created_by=request.user) |
+                    Q(supervisor=request.user)
+                )
+            )
+            if queryset:
+                interview = queryset.first()
+                interview.notes = request.data.get('notes')
+                interview.save()
+                serializer = InterviewCreateSerializer(interview)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": "You are not allowed to upload"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put', 'delete'], detail=True, url_path='upload_recording')
+    def upload_recording(self, request, *args, **kwargs):
+        try:
+            if request.method == 'PUT':
+                file_name = request.data['file_name']
+                object_id = kwargs.get('pk')
+                object_name = f'media/attachments/recordings/{object_id}/{file_name}'
+                interview = get_object_or_404(Interview, id=object_id)
+                response = presigned_post_url(object_name=object_name)
+                interview.attachment_link = MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
+                interview.save()
+                return Response({"result": response}, status=status.HTTP_202_ACCEPTED)
+            else:
+                interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+                interview.attachment_link = None
+                interview.save()
+                return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

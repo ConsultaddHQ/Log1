@@ -87,7 +87,7 @@ class Petition(TimeStampedModel):
     )
 
     def __str__(self):
-        return f'{self.beneficiary.name} attached {self.status}'
+        return f'{self.beneficiary.name} :: {self.status}'
 
     def save(self, *args, **kwargs):
         """

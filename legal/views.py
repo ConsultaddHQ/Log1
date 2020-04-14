@@ -1,5 +1,5 @@
 import logging
-
+from datetime import datetime
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
@@ -17,10 +17,39 @@ from consultant.authentication import ConsultantPetitionTokenAuthentication
 from legal.models import *
 from legal.serializers import *
 from utils_app.mailing import send_email
+from notification.models import FCMDevice
 from employee.token import get_token_generator
+from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
+
+
+DOCUMENT_TYPE = {
+    "6": 'I94',
+    "20": 'MSA',
+    "4": 'Visa',
+    "1": 'Resume',
+    "9": 'Paystub',
+    "8": 'Form I20',
+    "5": 'Passport',
+    "17": 'Timesheet',
+    "22": 'Work Order',
+    "21": 'Offer Letter',
+    "15": 'Client Letter',
+    "24": 'Consultadd W2',
+    "16": 'Vendor Letter',
+    "18": 'Insurance Cards',
+    "2": 'Degree Certificate',
+    "13": 'Experience Letter',
+    "3": 'Academic Transcripts',
+    "23": 'Employment Agreement',
+    "19": 'Social Security Card',
+    "11": 'Detailed Job Description',
+    "7": 'Previous Approval Notices',
+    "14": 'Performance Review Sheet ',
+    "12": 'Employment Authorization Card',
+}
 
 
 # Api for Legal Team
@@ -33,8 +62,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
     def rejection_mail(self, beneficiary_name, petition, document):
         try:
+            to = ['sarang.m@consultadd.com']
+            if os.environ.get('ENV') == 'prod':
+                to = [petition.beneficiary.email]
             mail_data = {
-                'to': [petition.beneficiary.email],
+                'to': to,
                 'cc': [],
                 'bcc': [],
                 'template': '../templates/rejection_email.html',
@@ -133,8 +165,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
             beneficiary = petition.beneficiary
             petition_type = petition.get_petition_type_display()
+            to = ['sarang.m@consultadd.com']
+            if os.environ.get('ENV') == 'prod':
+                to = [beneficiary.email]
             mail_data = {
-                'to': [beneficiary.email],
+                'to': to,
                 'cc': [],
                 'bcc': [],
                 'template': '../templates/doc_upload_request.html',
@@ -237,6 +272,32 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
 
+    @action(methods=['post'], detail=False, url_path='contact_us')
+    def contact_us(self, request):
+        try:
+            petition = get_object_or_404(Petition, id=request.data['petition_id'], beneficiary=request.user)
+            beneficiary = petition.beneficiary
+            to = ['sarang.m@consultadd.com']
+            if os.environ.get('ENV') == 'prod':
+                to = [petition.assigned_to.email]
+            mail_data = {
+                'to': to,
+                'cc': [],
+                'bcc': [],
+                'template': '../templates/petition_contact_us.html',
+                'subject': f'Petition app issue from {request.user.name} :: {str(datetime.now())}',
+                'context': {
+                    'message': request.data['message'],
+                    'name': petition.assigned_to.employee_name,
+                    'consultant_name': petition.beneficiary.name,
+                    'consultant_email': petition.beneficiary.email,
+                },
+            }
+            send_email(mail_data, beneficiary.email)
+            return Response({"result": {"message": "mail sent"}}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['get'], detail=False, url_path='doc_types')
     def doc_types(self, request):
         data = dict()
@@ -295,6 +356,42 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     petition_id=petition_id,
                 )
             documents = Document.objects.filter(petition=petition_id)
+            petition = get_object_or_404(Petition, id=petition_id)
+
+            if file_type in DOCUMENT_TYPE.keys():
+                title = f"{DOCUMENT_TYPE[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})"
+                data = {
+                    "title": title,
+                    "category": "alert",
+                    "description": title,
+                    "target_type": "consultant",
+                    "target_id": request.user.id,
+                    "sender_id": request.user.id,
+                    "recipient_user_type": "user",
+                    "sender_user_type": "consultant",
+                }
+                create_notification([petition.assigned_to], data)
+
+                # Push Notification
+                message_body = {
+                    "body": title,
+                    "title": title,
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                    "data": {
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target_id': petition_id,
+                        'timestamp': str(timezone.now()),
+                    },
+                }
+
+                registration_ids = list(
+                    FCMDevice.objects.filter(object_id=petition.assigned_to.id, content_type__model='user').values_list(
+                        'device_id', flat=True))
+                push_notification(registration_ids, message_body)
+
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:

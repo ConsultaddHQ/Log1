@@ -39,7 +39,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': [project.consultant.email],
                 'cc': [],
-                'bcc': ['sarang.m@consultadd.in'],
+                'bcc': ['sarang.m@consultadd.com'],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'context': {
@@ -143,6 +143,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_email': project.consultant.email,
                     'consultant_phone_no': project.consultant.phone_no,
                     'marketer_name': submission.created_by.employee_name,
+                    'consultant_location': project.consultant.current_city,
                     'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
                 },
                 'attachments': path
@@ -348,6 +349,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=True, url_path="send_support_mail")
+    def send_support_mail(self, request, *args, **kwargs):
+        try:
+            project_id = kwargs.get('pk')
+            project = get_object_or_404(Project, id=project_id)
+
+            queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
+            scrum_masters = [{"email": user.email} for user in queryset]
+            submission = project.submission
+            support_mail_res, support_mail_error = self.support_mail(project, submission, scrum_masters)
+
+            if support_mail_error == 'error':
+                return Response({"error": str(support_mail_res)}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"result": str(support_mail_res)}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def retrieve(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
@@ -441,7 +460,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = sub.consultant
                 project.save()
 
-                queryset = User.objects.filter(team=request.user.team, role__name=['admin', 'proxy'], is_active=True)
+                queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
                 scrum_masters = [{"email": user.email} for user in queryset]
 
                 support_mail_res = "Development Server"
@@ -453,7 +472,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     if support_mail_error == 'error' or offer_mail_error == 'error':
                         logger.error(support_mail_res)
                         logger.error(offer_mail_res)
-                        return Response({"error": "error", "support_mail_error": str(offer_mail_error),
+                        return Response({"error": "error", "support_mail_error": str(support_mail_res),
                                          "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
 
                 return Response({
@@ -509,6 +528,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             project.save()
 
+            # Emoji for Mattermost update
             if project.consultant.recruiter:
                 recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
             else:
@@ -533,6 +553,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     prev_status_obj.save()
 
                 # If status is Joined
+                if new_status.startswith('cancelled'):
+                    project.submission.consultant_marketing.status = 'open'
+                    project.submission.consultant_marketing.save()
+
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
@@ -649,7 +673,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
 `Total offer count of this month - {total_offer_count}`
 """
-                                }
+                    }
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
                     project.save()
@@ -697,6 +721,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                             "text": text,
                         }
                         post_msg_using_webhook(config.offer_failure_url, data)
+
+                    elif prev_status_obj.status != 'complete' and new_status == "complete":
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Completion')
 
             serializer = self.serializer_class(project)
 
@@ -771,7 +798,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultant_id=kwargs.get('pk', None),
             )
             if projects:
-                project = projects.latest('id')
+                project = projects.latest('-id')
                 if start:
                     queryset = TimeSheet.objects.filter(
                         project=project, start__range=[start, end]
@@ -796,6 +823,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_name = request.query_params.get('consultant_name', None)
 
         try:
+
             project_status = ['joined', 'terminated-resigned', 'terminated', 'terminated-resigned_location_issue',
                               'terminated-resigned_location_issue', 'terminated-resigned_full_time_offer',
                               'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
@@ -804,22 +832,26 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             if consultant_id:
                 consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
             elif consultant_name:
-                consultants = Consultant.objects.filter(name__icontains=consultant_name)
+                consultants = Consultant.objects.filter(name__istartswith=consultant_name)
             else:
                 consultant_ids = Project.objects.filter(
                     statuses__status__in=project_status, statuses__is_current=True
                 ).values_list('consultant', flat=True)
-                consultants = Consultant.objects.filter(id__in=list(consultant_ids)).exclude(status='archived')
+                consultants = Consultant.objects.filter(
+                    id__in=list(consultant_ids),
+                    projects__timesheets__is_active=True,
+                    projects__timesheets__status='submitted',
+                ).exclude(status='archived').order_by('id').distinct('id')
 
             if query:
-                consultants = consultants.filter(
+                consultants = Consultant.objects.filter(
                     Q(name__istartswith=query) |
                     Q(projects__submission__client__icontains=query) |
                     Q(projects__submission__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
-                )
-            consultants = consultants.exclude(projects__timesheets=None)
-            queryset = consultants.order_by('id', '-projects__timesheets__modified').distinct('id')
+                ).order_by('id').distinct('id')
+
+            queryset = consultants.order_by('name').distinct('name')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
             return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
@@ -854,7 +886,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     target_content_type = ContentType.objects.get(model='timesheet')
 
                     Notification.objects.create(
-                        title=f"Timesheet rejected for week end {str(timesheet.end)}",
+                        title=f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         category="rejected",
                         target_object_id=timesheet.id,
                         sender_object_id=request.user.id,
@@ -862,16 +894,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         target_content_type=target_content_type,
                         recipient_content_type=recipient_content_type,
                         recipient_object_id=timesheet.project.consultant.id,
-                        description=f"Timesheet rejected for week end {str(timesheet.end)}",
+                        description=f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                     )
 
                     # Push Notification
                     message_body = {
                         "category": "rejected",
                         "show_in_foreground": True,
-                        "title": f"Timesheet rejected for week end {str(timesheet.end)}",
+                        "title": f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         "click_action": "FLUTTER_NOTIFICATION_CLICK",
-                        "body": f"Timesheet rejected for week end {str(timesheet.end)}",
+                        "body": f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         "data": {
                             'is_read': False,
                             'is_deleted': False,

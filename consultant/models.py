@@ -114,6 +114,9 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
 
     USERNAME_FIELD = 'email'
 
+    class Meta:
+        ordering = ('name',)
+
     def save(self, *args, **kwargs):
         """
             On save timestamps
@@ -366,6 +369,7 @@ class ConsultantMarketing(TimeStampedModel):
     in_pool = models.BooleanField(_('In Pool'), default=False)
     end = models.DateField(_('Marketing End Date'), blank=True, null=True)
     start = models.DateField(_('Marketing Start Date'), blank=True, null=True)
+    previous_marketing_days = models.IntegerField(_('Previous Cycle Days'), default=0)
     preferred_location = models.TextField(_('Preferred Location'), null=True, blank=True)
     status = models.CharField(
         _('status'), max_length=10,

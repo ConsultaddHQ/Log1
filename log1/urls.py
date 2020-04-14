@@ -20,7 +20,7 @@ from attachment.views import AttachmentView, AttachmentGetView
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
-from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, Test, ConsultantProjectViewSet
+from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, Test, TimeSheetV2ViewSets
 
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
 
@@ -87,7 +87,7 @@ router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
 router.register(r'timesheet', TimeSheetViewSets)
 router.register(r'payroll', PayrollScheduleViewSets)
-router.register(r'timesheet_v2', ConsultantProjectViewSet)
+router.register(r'timesheet_v2', TimeSheetV2ViewSets)
 
 router.register(r'test', Test)
 
