@@ -34,19 +34,40 @@ class ConsultantAuthViewSet(GenericViewSet):
             :param request, email, password, employee_id, name, phone, gender, team, role
         """
         try:
-            email = request.data.get('email')
-            password = request.data.get('password').strip()
+            name = request.data.get('name')
+            company = request.data.get('company')
+            website = request.data.get('website')
+            email = request.data.get('email').strip()
+            designation = request.data.get('designation')
+            customer_mail_data = {
+                'to': [email],
+                'cc': [],
+                'bcc': ['aditi.so@consultadd.in'],
+                'subject': 'Signup on Consultadd Time Track App',
+                'template': '../templates/con_signup_mail.html',
+                'context': {
+                    'name': name
+                },
+            }
 
-            queryset = Consultant.objects.filter(email__exact=email)
-            if queryset:
-                consultant = queryset.first()
-                consultant.set_password(password)
-                consultant.is_active = True
-                consultant.save()
+            send_email(customer_mail_data, "log1@consultadd.com")
 
-                return Response({"result": "Success"}, status=status.HTTP_201_CREATED)
-            else:
-                return Response({"error": "Consultant Does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            mail_data = {
+                'to': ['aditi.so@consultadd.in'],
+                'cc': [],
+                'bcc': [],
+                'subject': f'{name} Signed up on Consultadd Time Track App',
+                'template': '../templates/signup_mail.html',
+                'context': {
+                    'name': name,
+                    'email': email,
+                    'website': website,
+                    'company': company,
+                    'designation': designation,
+                },
+            }
+            send_email(mail_data, "log1@consultadd.com")
+            return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
