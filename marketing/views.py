@@ -498,9 +498,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:
                 sub = sub.filter(
-                    (Q(created_by__team=request.user.team) |
-                     Q(consultant_marketing__in_pool=True) |
-                     Q(consultant_marketing__teams=request.user.team))
+                    Q(created_by__team=request.user.team) |
+                    Q(consultant_marketing__in_pool=True) |
+                    Q(consultant_marketing__teams=request.user.team)
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
@@ -1242,8 +1242,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
             queryset = Interview.objects.filter(
                 Q(id=kwargs.get('pk')) &
                 (
-                    Q(submission__created_by=request.user) |
-                    Q(supervisor=request.user)
+                        Q(submission__created_by=request.user) |
+                        Q(supervisor=request.user)
                 )
             )
             if queryset:

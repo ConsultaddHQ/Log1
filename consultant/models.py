@@ -27,18 +27,18 @@ MARKETING_STATUS_CHOICE = (
 )
 
 VISA_CHOICES = (
-    ('tps', 'TPs'),
-    ('h1b', 'H1B'),
-    ('cpt', 'CPT'),
-    ('other', 'Other'),
-    ('gc_ead', 'GC EAD'),
-    ('tps_ead', 'TPs EAD'),
-    ('cpt-ead', 'CPT EAD'),
-    ('gc', 'Green Card Holder'),
-    ('opt-ext', 'OPT Extension'),
+    ('j1', 'J-1'),
+    ('tps', 'TPS'),
+    ('h1b', 'H-1B'),
+    ('opt', 'OPT-EAD'),
+    ('cpt', 'CPT-EAD'),
+    ('gc', 'Green Card'),
+    ('l2_ead', 'L2-EAD'),
+    ('asylum', 'Asylum'),
+    ('h4_ead', 'H-4-EAD'),
+    ('gc_ead', 'Green Card-EAD'),
     ('us_citizen', 'US CITIZEN'),
-    ('not_auth', 'Not Authorized'),
-    ('gc_ead', 'Green Card Holder EAD'),
+    ('opt_ext', 'OPT-EAD Extension'),
 )
 
 EDUCATION_CHOICES = (
