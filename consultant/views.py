@@ -24,8 +24,10 @@ dont_have_access = 'you don\'t have access'
 
 def close_marketing():
     try:
-        marketing = ConsultantMarketing.objects.filter(end__lte=date.today(), status='open')
-        marketing.update(status='close')
+        queryset = ConsultantMarketing.objects.filter(end__lte=date.today(), status='open')
+        for marketing in queryset:
+            marketing.status = 'close'
+            marketing.save()
         return None
     except Exception as error:
         return error
@@ -33,8 +35,10 @@ def close_marketing():
 
 def start_marketing():
     try:
-        marketing = ConsultantMarketing.objects.filter(start__lte=date.today(), status='close', end=None)
-        marketing.update(status='open')
+        queryset = ConsultantMarketing.objects.filter(start__lte=date.today(), status='close', end=None)
+        for marketing in queryset:
+            marketing.status = 'open'
+            marketing.save()
         return None
     except Exception as error:
         return error
