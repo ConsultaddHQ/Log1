@@ -25,9 +25,7 @@ dont_have_access = 'you don\'t have access'
 def close_marketing():
     try:
         queryset = ConsultantMarketing.objects.filter(end__lte=date.today(), status='open')
-        for marketing in queryset:
-            marketing.status = 'close'
-            marketing.save()
+        queryset.update(status='close')
         return None
     except Exception as error:
         return error
@@ -36,9 +34,7 @@ def close_marketing():
 def start_marketing():
     try:
         queryset = ConsultantMarketing.objects.filter(start__lte=date.today(), status='close', end=None)
-        for marketing in queryset:
-            marketing.status = 'open'
-            marketing.save()
+        queryset.update(status='open')
         return None
     except Exception as error:
         return error
@@ -309,6 +305,19 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             logger.error(err)
             return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['post'], detail=False, url_path='set_password')
+    def set_consultant_password(self, request):
+        try:
+            if request.user.is_superuser:
+                consultant = get_object_or_404(Consultant, id=request.data['consultant_id'])
+                consultant.set_password(request.data['new_password'])
+                consultant.save()
+                return Response({'result': {'message': 'Password Changed Successfully'}}, status=status.HTTP_200_OK)
+            else:
+                return Response({'result': {'message': 'Unauthorized Access'}}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as error:
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['get'], detail=False, url_path='search')
     def search(self, request, *args, **kwargs):
         try:
@@ -570,8 +579,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            close_marketing()
-            start_marketing()
             consultants = Consultant.objects.exclude(status='archived')
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':

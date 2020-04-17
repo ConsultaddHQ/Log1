@@ -81,7 +81,7 @@ class InterviewAdmin(admin.ModelAdmin, ExportCsvMixin):
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
                      'calendar_id', 'submission__created_by__employee_name')
     list_display = ('id', 'round', 'supervisor', 'status', 'screening_type', 'start_time', 'end_time', 'submission',
-                    'interview_mode', 'feedback', 'calendar_id', 'guest_display')
+                    'attachment_link', 'interview_mode', 'feedback', 'calendar_id', 'guest_display')
 
     def guest_display(self, obj):
         return ", ".join([

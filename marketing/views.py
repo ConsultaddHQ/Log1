@@ -505,10 +505,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
+                consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
                 sub = sub.filter(
                     Q(created_by=request.user) |
                     Q(consultant_marketing__in_pool=True) |
-                    Q(consultant_marketing__marketer=request.user)
+                    Q(consultant_marketing__consultant__in=consultant_ids)
                 )
 
             # Submissions of a Recruiters consultants (except those are on project)
@@ -1274,6 +1275,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.attachment_link = None
                 interview.save()
                 return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, url_path='recording')
+    def recording(self, request, *args, **kwargs):
+        try:
+            from attachment.views import get_s3_object
+            object_id = kwargs.get('pk')
+            interview = get_object_or_404(Interview, id=object_id)
+            url = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
+            return Response({"result": url}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
