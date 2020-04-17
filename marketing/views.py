@@ -1285,8 +1285,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
             from attachment.views import get_s3_object
             object_id = kwargs.get('pk')
             interview = get_object_or_404(Interview, id=object_id)
-            url = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
-            return Response({"result": url}, status=status.HTTP_200_OK)
+            if interview.attachment_link:
+                url = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
+                return Response({"result": url}, status=status.HTTP_200_OK)
+            return Response({"error": "Recording not available"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

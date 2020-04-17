@@ -57,7 +57,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, "error"
 
-    def send_offer_received_mail(self, project, submission, scrum_master):
+    def send_offer_received_mail(self, project, submission, scrum_masters):
         try:
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.email,
                   submission.created_by.team.email]
@@ -72,8 +72,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            if scrum_master:
-                cc.append(scrum_master)
+            if scrum_masters:
+                cc = cc + scrum_masters
 
             mail_data = {
                 'to': to,
@@ -101,7 +101,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, "error"
 
-    def support_mail(self, project, submission, scrum_master):
+    def support_mail(self, project, submission, scrum_masters):
         try:
             path, recordings = [], []
             resume = submission.attachments.filter(attachment_type='resume')
@@ -122,8 +122,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            if scrum_master:
-                cc.append(scrum_master)
+            if scrum_masters:
+                cc = cc + scrum_masters
 
             consultant_name = project.consultant.name
             mail_data = {
@@ -150,10 +150,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res = send_email_attachment_multiple(mail_data, submission.created_by.email)
             delete_temp_file(path)
-            logger.error("Support mail res for {}".format(submission.created_by.email), res)
             return res, "ok"
         except Exception as error:
-            logger.error("Support mail exception error for {}".format(submission.created_by.email), error)
             return error, "error"
 
     def po_mail(self, project, path, scrum_master_email, po_type):
@@ -461,7 +459,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.save()
 
                 queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
-                scrum_masters = [{"email": user.email} for user in queryset]
+                scrum_masters = [user.email for user in queryset]
 
                 support_mail_res = "Development Server"
                 offer_mail_res = "Development Server"
