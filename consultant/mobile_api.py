@@ -9,7 +9,6 @@ from rest_framework import status, exceptions
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 
-from project.models import Project
 from consultant.serializers import *
 from consultant.auth import consultant_authenticate
 from consultant.permissions import ConsultantIsAuthenticated
@@ -30,23 +29,44 @@ class ConsultantAuthViewSet(GenericViewSet):
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
-            User Register
-            :param request, email, password, employee_id, name, phone, gender, team, role
+            Consultant Register
+            :param request, email, name, company, website, designation
         """
         try:
-            email = request.data.get('email')
-            password = request.data.get('password').strip()
+            name = request.data.get('name')
+            company = request.data.get('company')
+            website = request.data.get('website')
+            email = request.data.get('email').strip()
+            designation = request.data.get('designation')
+            customer_mail_data = {
+                'to': [email],
+                'cc': [],
+                'bcc': ['aditi.so@consultadd.in'],
+                'subject': 'Signup on Consultadd Time Track App',
+                'template': '../templates/con_signup_mail.html',
+                'context': {
+                    'name': name
+                },
+            }
 
-            queryset = Consultant.objects.filter(email__exact=email)
-            if queryset:
-                consultant = queryset.first()
-                consultant.set_password(password)
-                consultant.is_active = True
-                consultant.save()
+            send_email(customer_mail_data, "log1@consultadd.com")
 
-                return Response({"result": "Success"}, status=status.HTTP_201_CREATED)
-            else:
-                return Response({"error": "Consultant Does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            mail_data = {
+                'to': ['aditi.so@consultadd.in'],
+                'cc': [],
+                'bcc': [],
+                'subject': f'{name} Signed up on Consultadd Time Track App',
+                'template': '../templates/signup_mail.html',
+                'context': {
+                    'name': name,
+                    'email': email,
+                    'website': website,
+                    'company': company,
+                    'designation': designation,
+                },
+            }
+            send_email(mail_data, "log1@consultadd.com")
+            return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -55,7 +75,7 @@ class ConsultantAuthViewSet(GenericViewSet):
     def login(self, request):
         """
             Normal Login
-            :param request, email, password
+            :param request, email, password, uuid, fcm_token, device_type
         """
         email = request.data.get('email').lower()
         if email:
@@ -106,19 +126,6 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     serializer_class = ConsultantLoginSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
-
-    @action(methods=['post'], detail=False, url_path='set_password')
-    def set_consultant_password(self, request):
-        try:
-            if request.user.is_superuser:
-                consultant = get_object_or_404(Consultant, id=request.data['consultant_id'])
-                consultant.set_password(request.data['new_password'])
-                consultant.save()
-                return Response({'result': {'message': 'Password Changed Successfully'}}, status=status.HTTP_200_OK)
-            else:
-                return Response({'result': {'message': 'Unauthorized Access'}}, status=status.HTTP_401_UNAUTHORIZED)
-        except Exception as error:
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
         queryset = Consultant.objects.all()

@@ -13,7 +13,7 @@ project_folder = os.path.expanduser(BASE_DIR)
 load_dotenv(os.path.join(project_folder, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = bool(os.environ.get('DEBUG', False))
+DEBUG = True if os.environ.get('DEBUG', False) == 'True' else False
 
 ALLOWED_HOSTS = ['*']
 
