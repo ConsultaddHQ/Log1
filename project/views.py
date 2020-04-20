@@ -354,7 +354,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project = get_object_or_404(Project, id=project_id)
 
             queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
-            scrum_masters = [{"email": user.email} for user in queryset]
+            scrum_masters = [user.email for user in queryset]
             submission = project.submission
             support_mail_res, support_mail_error = self.support_mail(project, submission, scrum_masters)
 
