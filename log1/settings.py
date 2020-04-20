@@ -53,7 +53,8 @@ PROJECT_APPS = [
     'report.apps.ReportConfig',
     'legal.apps.LegalConfig',
     'notification.apps.NotificationConfig',
-    'impersonate.apps.ImpersonateConfig'
+    'impersonate.apps.ImpersonateConfig',
+    'messaging.apps.MessagingConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
