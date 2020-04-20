@@ -12,6 +12,7 @@ from rest_framework.authentication import TokenAuthentication
 
 from twilio.rest import Client
 from employee.models import Asset
+from api_key.permissions import APIKey
 from messaging.models import Message, Conversation
 from messaging.serializers import MessageSerializer
 
@@ -89,11 +90,11 @@ class ReceiveSMSViewSet(GenericViewSet):
     @action(methods=['get', 'post'], detail=False, url_path='sms')
     def receive_sms(self, request):
         try:
-            account_sid = os.environ.get('ACCOUNT_SID')
-            if account_sid == request.query_params.get('ApiKey', None):
-                to = request.POST.get('To')
-                body = request.POST.get('Body')
-                from_ = request.POST.get('From')
+            api_key = request.query_params.get('api_key', None)
+            if APIKey.objects.is_valid(api_key):
+                to = request.data.get('To')
+                body = request.data.get('Body')
+                from_ = request.data.get('From')
                 user1 = Asset.objects.filter(number=to).first().id
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=from_)
                 Message.objects.create(
@@ -103,9 +104,9 @@ class ReceiveSMSViewSet(GenericViewSet):
                 )
                 conversation.modified = datetime.now()
                 conversation.save()
-                return HttpResponse(status=201)
+                return HttpResponse(status=status.HTTP_201_CREATED)
             else:
-                return HttpResponse(status=401)
+                return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
             print(e)
-            return HttpResponse(status=400)
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
