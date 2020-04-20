@@ -602,15 +602,21 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 )
 
             consultants = consultants.order_by('id').distinct('id')
+
             on_project = consultants.filter(status='on_project')
+
             open_candidates = list(ConsultantMarketing.objects.filter(
                 status='open'
             ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
-            candidate_ids = list(ConsultantMarketing.objects.filter(
-                status='close'
-            ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
-            candidate = consultants.filter(id__in=candidate_ids, status='on_bench').exclude(id__in=open_candidates)
+
+            # candidate_ids = list(ConsultantMarketing.objects.filter(
+            #     status='close'
+            # ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
+
+            candidate = consultants.filter(status='on_bench').exclude(id__in=open_candidates)
+
             in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True)
+
             in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False)
 
             count = {
@@ -776,8 +782,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
     def marketer_assignment(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -801,8 +806,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['put'], detail=True, url_path='team_assignment')
     def team_assignment(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -824,8 +828,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['put'], detail=True, url_path='remove_marketer')
     def remove_marketer(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -849,8 +852,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['put'], detail=True, url_path='remove_team')
     def remove_team(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:

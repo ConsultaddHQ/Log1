@@ -20,7 +20,7 @@ class Command(BaseCommand):
         today = datetime.today()
         if today.weekday() == 0:
             days = 3
-            last_2_days = today - timedelta(days=4)
+            last_2_days = today - timedelta(days=5)
         else:
             days = 2
             last_2_days = today - timedelta(days=2)
