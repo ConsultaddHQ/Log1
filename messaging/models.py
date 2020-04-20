@@ -1,32 +1,49 @@
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
+
 from employee.models import Asset
+from utils_app.models import TimeStampedModel
 
 
-class Conversation(models.Model):
+class Conversation(TimeStampedModel):
     user1 = models.ForeignKey(
         Asset, on_delete=models.CASCADE,
         verbose_name='User1',
         related_name='threads',
     )
-    user2 = models.CharField(max_length=20)
-    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
-    modified = models.DateTimeField(_('Modified'), default=timezone.now)
+    user2 = models.CharField(_('User2'), max_length=20)
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Conversation, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.user1} - {self.user2}"
+        return f"{self.user1.number} - {self.user2}"
 
 
 class Message(models.Model):
     conversation = models.ForeignKey(
         Conversation, on_delete=models.CASCADE,
-        verbose_name='conversation',
+        verbose_name='Conversation',
         related_name='messages'
     )
-    text = models.TextField(max_length=2000)
+    text = models.TextField(_("Message text"), max_length=2000)
     created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
-    is_sent = models.BooleanField(default=True)
+    is_sent = models.BooleanField(_('Message Sent or Received'), default=True)
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        return super(Message, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.text
+        return f"{self.conversation.id} - {self.is_sent} - {self.created}"
