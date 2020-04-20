@@ -45,8 +45,8 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             asset_id = request.query_params.get('user1', None)
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
-            conversations = Conversation.objects.filter(user1=asset) \
-                .order_by('messages__conversation', '-messages__created').distinct('messages__conversation')\
+            conversations = Conversation.objects.filter(user1=asset)\
+                .order_by('id', '-messages__created').distinct('id')\
                 .values('id', 'user2', 'created', 'modified', 'messages__text')
             return Response({"results": conversations}, status=status.HTTP_200_OK)
         except Exception as err:
@@ -68,35 +68,44 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     from_=from_,
                     to=to
                 )
-            conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=to)
-            message = Message.objects.create(
-                text=body,
-                is_sent=True,
-                conversation=conversation
-            )
-            conversation.modified = datetime.now()
-            conversation.save()
-            serializer = self.serializer_class(message)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            if twilio_message.sid:
+                conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=to)
+                message = Message.objects.create(
+                    text=body,
+                    is_sent=True,
+                    conversation=conversation
+                )
+                serializer = self.serializer_class(message)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Message not sent, please try again."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get', 'post'], detail=False, url_path='receive')
+
+class ReceiveSMSViewSet(GenericViewSet):
+    queryset = Conversation.objects.all()
+
+    @action(methods=['get', 'post'], detail=False, url_path='sms')
     def receive_sms(self, request):
         try:
-            to = request.POST.get('To')
-            body = request.POST.get('Body')
-            from_ = request.POST.get('From')
-            user1 = Asset.objects.filter(number=to).first().id
-            conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=from_)
-            Message.objects.create(
-                text=body,
-                is_sent=False,
-                conversation_id=conversation.id
-            )
-            conversation.modified = datetime.now()
-            conversation.save()
-            return HttpResponse(status=201)
+            account_sid = os.environ.get('ACCOUNT_SID')
+            if account_sid == request.query_params.get('ApiKey', None):
+                to = request.POST.get('To')
+                body = request.POST.get('Body')
+                from_ = request.POST.get('From')
+                user1 = Asset.objects.filter(number=to).first().id
+                conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=from_)
+                Message.objects.create(
+                    text=body,
+                    is_sent=False,
+                    conversation_id=conversation.id
+                )
+                conversation.modified = datetime.now()
+                conversation.save()
+                return HttpResponse(status=201)
+            else:
+                return HttpResponse(status=401)
         except Exception as e:
             print(e)
             return HttpResponse(status=400)

@@ -36,7 +36,7 @@ from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, Consul
 
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 
-from messaging.views import SMSViewSet
+from messaging.views import SMSViewSet, ReceiveSMSViewSet
 
 schema_view = get_swagger_view(title="New Log1 Documentation")
 
@@ -97,7 +97,9 @@ router.register(r'test', Test)
 router.register(r'petition', PetitionViewSets)
 router.register(r'petition_docs', PetitionDocsViewSets)
 router.register(r'consultant_petition', ConsultantPetitionAuthViewSet)
+
 router.register(r'twilio', SMSViewSet)
+router.register(r'twilio_receive', ReceiveSMSViewSet)
 
 
 urlpatterns = [
