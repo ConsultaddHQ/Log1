@@ -110,6 +110,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                           if interview.attachment_link is not None]
             recordings = ", ".join(recordings) if len(recordings) != 0 else "NA"
 
+            notes = [interview.notes for interview in submission.screening.all()
+                     if interview.notes is not None]
+            recordings = "\n".join(recordings) if len(recordings) != 0 else "NA"
+
             if resume:
                 path.append(download_s3_object(resume.first().attachment_file.name))
 
@@ -133,6 +137,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'subject': f'Support Initiation for {consultant_name} {submission.client} {submission.lead.city}',
                 'template': '../templates/support.html',
                 'context': {
+                    'notes': notes,
                     'recordings': recordings,
                     'start': project.start_date,
                     'employer': submission.employer,

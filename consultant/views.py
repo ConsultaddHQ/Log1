@@ -16,7 +16,7 @@ from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
 from activity.serializers import CommentGetSerializer
-from attachment.serializers import AttachmentURLSerializer
+from attachment.serializers import AttachmentSerializer
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -220,14 +220,14 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 ssn=data['ssn'],
                 name=data['name'],
                 email=data['email'],
-                skype=data['skype'],
-                links=data['links'],
                 skills=data['skills'],
                 gender=data['gender'],
                 date_of_birth=data['dob'],
                 phone_no=data['phone_no'],
-                work_type=data['work_type'],
                 current_city=data['current_city'],
+                skype=request.data.get('skype', None),
+                links=request.data.get('links', None),
+                work_type=request.data.get('skype', 'full_time'),
 
             )
 
@@ -253,12 +253,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             )
 
             # Creating Retention of Consultant
-            ConsultantPOC.objects.create(
-                consultant=consultant,
-                poc_type='retention',
-                start=timezone.now(),
-                poc_id=data['retention']
-            )
+            if request.data.get('retention', None):
+                ConsultantPOC.objects.create(
+                    consultant=consultant,
+                    poc_type='retention',
+                    start=timezone.now(),
+                    poc_id=data['retention']
+                )
 
             # Creating Work-Auth
             WorkAuth.objects.create(
@@ -515,7 +516,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
-            serializer = AttachmentURLSerializer(queryset, many=True)
+            serializer = AttachmentSerializer(queryset, many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -608,10 +609,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             open_candidates = list(ConsultantMarketing.objects.filter(
                 status='open'
             ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
-
-            # candidate_ids = list(ConsultantMarketing.objects.filter(
-            #     status='close'
-            # ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
 
             candidate = consultants.filter(status='on_bench').exclude(id__in=open_candidates)
 

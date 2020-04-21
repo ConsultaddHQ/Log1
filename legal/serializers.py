@@ -68,7 +68,7 @@ class PetitionGetSerializer(serializers.ModelSerializer):
                   'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active')
 
     def get_docs(self, obj):
-        return DocumentURLSerializer(obj.documents.all(), many=True).data
+        return DocumentSerializer(obj.documents.all(), many=True).data
 
     def get_consultant(self, obj):
         return {
