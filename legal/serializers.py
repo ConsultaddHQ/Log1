@@ -62,7 +62,7 @@ class PetitionSerializer(serializers.ModelSerializer):
     def get_total_documents(self, obj):
         return DocumentList.objects.filter(petition=obj).count()
 
-    def get_uploaded_document(self, obj):
+    def get_uploaded_documents(self, obj):
         return Document.objects.filter(petition=obj).count()
 
 
