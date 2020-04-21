@@ -42,13 +42,12 @@ class PetitionSerializer(serializers.ModelSerializer):
     consultant = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
     total_documents = serializers.SerializerMethodField()
-    uploaded_document = serializers.SerializerMethodField()
-
+    uploaded_documents = serializers.SerializerMethodField()
 
     class Meta:
         model = Petition
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'status',
-                  'total_documents', 'uploaded_document')
+                  'total_documents', 'uploaded_documents')
 
     def get_consultant(self, obj):
         return {
