@@ -88,7 +88,7 @@ def book_calendar(data):
             ],
         },
     }
-    event = service.events().insert(calendarId='admin@log1.com', body=event).execute()
+    event = service.events().insert(calendarId='admin@log1.com', body=event, sendUpdates='all').execute()
     return event
 
 
@@ -123,7 +123,8 @@ def update_calendar(event_id, data):
             ],
         },
     }
-    updated_event = service.events().update(calendarId='admin@log1.com', eventId=event_id, body=event).execute()
+    updated_event = service.events().update(calendarId='admin@log1.com', eventId=event_id, body=event,
+                                            sendUpdates='all').execute()
     return updated_event['id']
 
 
@@ -174,4 +175,4 @@ def get_interviews(data):
 
 def delete_calendar_booking(event_id):
     service = calendar_con()
-    service.events().delete(calendarId='admin@log1.com', eventId=event_id).execute()
+    service.events().delete(calendarId='admin@log1.com', eventId=event_id, sendUpdates='all').execute()

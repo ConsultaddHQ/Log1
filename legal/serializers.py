@@ -1,7 +1,7 @@
 import os
 from rest_framework import serializers
 
-from legal.models import Petition, Document
+from legal.models import Petition, Document, DocumentList
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -41,10 +41,13 @@ class DocumentURLSerializer(serializers.ModelSerializer):
 class PetitionSerializer(serializers.ModelSerializer):
     consultant = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
+    total_documents = serializers.SerializerMethodField()
+    uploaded_documents = serializers.SerializerMethodField()
 
     class Meta:
         model = Petition
-        fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'status')
+        fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'status',
+                  'total_documents', 'uploaded_documents')
 
     def get_consultant(self, obj):
         return {
@@ -55,6 +58,12 @@ class PetitionSerializer(serializers.ModelSerializer):
 
     def get_assigned_to(self, obj):
         return obj.assigned_to.employee_name
+
+    def get_total_documents(self, obj):
+        return DocumentList.objects.filter(petition=obj).count()
+
+    def get_uploaded_documents(self, obj):
+        return Document.objects.filter(petition=obj).count()
 
 
 class PetitionGetSerializer(serializers.ModelSerializer):
@@ -68,7 +77,7 @@ class PetitionGetSerializer(serializers.ModelSerializer):
                   'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active')
 
     def get_docs(self, obj):
-        return DocumentURLSerializer(obj.documents.all(), many=True).data
+        return DocumentSerializer(obj.documents.all(), many=True).data
 
     def get_consultant(self, obj):
         return {

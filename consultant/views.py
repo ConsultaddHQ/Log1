@@ -16,7 +16,7 @@ from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
 from activity.serializers import CommentGetSerializer
-from attachment.serializers import AttachmentURLSerializer
+from attachment.serializers import AttachmentSerializer
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -220,14 +220,14 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 ssn=data['ssn'],
                 name=data['name'],
                 email=data['email'],
-                skype=data['skype'],
-                links=data['links'],
                 skills=data['skills'],
                 gender=data['gender'],
                 date_of_birth=data['dob'],
                 phone_no=data['phone_no'],
-                work_type=data['work_type'],
                 current_city=data['current_city'],
+                skype=request.data.get('skype', None),
+                links=request.data.get('links', None),
+                work_type=request.data.get('work_type', 'full_time'),
 
             )
 
@@ -253,12 +253,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             )
 
             # Creating Retention of Consultant
-            ConsultantPOC.objects.create(
-                consultant=consultant,
-                poc_type='retention',
-                start=timezone.now(),
-                poc_id=data['retention']
-            )
+            if request.data.get('retention', None):
+                ConsultantPOC.objects.create(
+                    consultant=consultant,
+                    poc_type='retention',
+                    start=timezone.now(),
+                    poc_id=data['retention']
+                )
 
             # Creating Work-Auth
             WorkAuth.objects.create(
@@ -515,7 +516,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
-            serializer = AttachmentURLSerializer(queryset, many=True)
+            serializer = AttachmentSerializer(queryset, many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -602,15 +603,17 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 )
 
             consultants = consultants.order_by('id').distinct('id')
+
             on_project = consultants.filter(status='on_project')
+
             open_candidates = list(ConsultantMarketing.objects.filter(
                 status='open'
             ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
-            candidate_ids = list(ConsultantMarketing.objects.filter(
-                status='close'
-            ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
-            candidate = consultants.filter(id__in=candidate_ids, status='on_bench').exclude(id__in=open_candidates)
+
+            candidate = consultants.filter(status='on_bench').exclude(id__in=open_candidates)
+
             in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True)
+
             in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False)
 
             count = {
@@ -676,10 +679,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     def create(self, request, *args, **kwargs):
         try:
-            prev_marketing_obj = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'])
+            queryset = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'], status='close')
+            if queryset:
+                latest_marketing_cycle = queryset.latest('end')
+            else:
+                latest_marketing_cycle = None
 
-            latest_marketing_cycle = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'],
-                                                                        status='close').latest('end')
             reset_days = request.data.get('reset_days', 'true')
             if reset_days == 'true':
                 previous_marketing_days = 0
@@ -691,11 +696,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     if latest_marketing_cycle.end and latest_marketing_cycle.start:
                         previous_marketing_days = (latest_marketing_cycle.end - latest_marketing_cycle.start).days
 
-            prev_marketing_obj.update(status='close')
-
             cycle = 1
             if latest_marketing_cycle:
                 cycle = latest_marketing_cycle.cycle + 1
+
             consultant_marketing = ConsultantMarketing.objects.create(
                 cycle=cycle,
                 status='close',
@@ -776,8 +780,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
     def marketer_assignment(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -801,8 +804,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['put'], detail=True, url_path='team_assignment')
     def team_assignment(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -824,8 +826,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['put'], detail=True, url_path='remove_marketer')
     def remove_marketer(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -849,8 +850,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['put'], detail=True, url_path='remove_team')
     def remove_team(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('pk')
-            queryset = ConsultantMarketing.objects.filter(consultant_id=consultant_id, status='open')
+            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
             if queryset:
                 consultant_marketing = queryset.first()
             else:
