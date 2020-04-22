@@ -241,10 +241,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 to.append(retention.email)
 
-            cc = [marketer.email, config.SUPERADMIN]
+            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
 
-            if scrum_master_email:
-                cc.append(scrum_master_email)
             mail_data = {
                 'to': to,
                 'cc': cc,
@@ -334,6 +332,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if not error == 'error':
                     delete_temp_file(path)
                     project.submission.consultant_marketing.status = 'close'
+                    project.submission.consultant_marketing.end = project.start_date
                     project.submission.consultant_marketing.save()
                     if prev_status.status == 'received':
                         new_status, created = ProjectStatus.objects.get_or_create(
@@ -463,8 +462,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = sub.consultant
                 project.save()
 
-                queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
-                scrum_masters = [user.email for user in queryset]
+                scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'],
+                                                         is_active=True).values_list('email', flat=True))
 
                 support_mail_res = "Development Server"
                 offer_mail_res = "Development Server"
@@ -692,19 +691,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
                                       'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
                                       'terminated-resigned_full_time_offer']
 
-                if os.environ.get('ENV', 'local') == 'prod':
-                    scrum_master = None
-                    queryset = User.objects.filter(team=request.user.team, role__name='admin')
-                    if queryset:
-                        scrum_master = queryset.first().email
+                if os.environ.get('ENV', 'local') == 'local':
+                    scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy']
+                                                             ).values_list('email', flat=True))
 
                     if prev_status_obj.status not in termination_status and new_status in termination_status:
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Termination')
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
 
                         text = f"""#### Offer Feedback \n"""
                         text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
@@ -726,7 +723,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         post_msg_using_webhook(config.offer_failure_url, data)
 
                     elif prev_status_obj.status != 'complete' and new_status == "complete":
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Completion')
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Completion')
 
             serializer = self.serializer_class(project)
 

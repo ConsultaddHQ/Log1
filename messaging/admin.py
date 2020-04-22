@@ -14,6 +14,6 @@ class ConversationAdmin(admin.ModelAdmin, ExportCsvMixin):
 @admin.register(Message)
 class MessageAdmin(admin.ModelAdmin, ExportCsvMixin):
     actions = ["export_as_csv"]
+    list_filter = ('is_sent',)
     list_display = ('id', 'conversation', 'text', 'is_sent', 'created')
-    list_filter = ('conversation__user1__owner__employee_name', 'is_sent')
     search_fields = ('id', 'conversation__user1__owner__employee_name', 'user2')

@@ -11,6 +11,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
+from api_key.models import APIKey
 from utils_app.models import City
 from project.models import Project
 from employee.models import User, Team
@@ -28,8 +29,8 @@ def mattermost_webhook(url, data):
 
 class CityViewSets(ListModelMixin, GenericViewSet):
     queryset = City.objects.all()
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query')
@@ -39,10 +40,9 @@ class CityViewSets(ListModelMixin, GenericViewSet):
 
 
 class SlashCommandViewSets(GenericViewSet):
-    authentication_classes = ()
     queryset = User.objects.all()
-    permission_classes = ()
     serializer_class = UserSerializer
+
     months = ["Unknown", "January", "February", "March", "April", "May", "June", "July", "August", "September",
               "October", "November", "December"]
 
@@ -261,6 +261,10 @@ command - {command}\n\n
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request, *args, **kwargs):
         try:
+            api_key = request.query_params.get('api_key', None)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
+
             query = request.query_params.get('text', None)
             command = request.query_params.get('command', None)
 
@@ -328,6 +332,10 @@ command - {command} {query}\n
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
+            api_key = request.query_params.get('api_key', None)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
+
             query = request.query_params.get('text', None)
             command = request.query_params.get('command', None)
             if not query and len(query) < 3:
@@ -372,6 +380,10 @@ command - {command} {query}\n
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
+            api_key = request.query_params.get('api_key', None)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
+
             query = request.query_params.get('text', None)
             command = request.query_params.get('command', None)
             arguments = query.split()
