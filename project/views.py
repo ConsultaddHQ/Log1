@@ -61,7 +61,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         try:
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.team.email]
 
-            cc = [config.SUPERADMIN] + scrum_masters
+            cc = [config.SUPERADMIN, submission.created_by.email] + scrum_masters
 
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
@@ -115,7 +115,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
-            cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email] + scrum_masters
+            cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
+            cc = cc + scrum_masters
 
             if recruiter:
                 cc.append(recruiter.email)
@@ -163,7 +164,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
-            cc = [config.SUPERADMIN] + scrum_master_email
+            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
                 cc.append(recruiter.email)
             if retention:
