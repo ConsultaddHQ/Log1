@@ -101,7 +101,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
         try:
             content_type = ContentType.objects.get(model=request.data['obj_type'])
             object_id = request.data['object_id']
-            if content_type.model == 'submission':
+            if content_type.model == 'submission' and request.data['obj_type'] == 'resume':
                 resume = Attachment.objects.filter(object_id=object_id, content_type=content_type,
                                                    attachment_type='resume')
                 if resume:

@@ -35,6 +35,7 @@ THIRD_PARTY_APPS = [
     'explorer',
     'constance',
     'corsheaders',
+    'import_export',
     'rest_framework_swagger',
     'constance.backends.database',
 ]
@@ -258,5 +259,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
     'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEO'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
     'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url',
-                  'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url', 'interview_feedback_url'),
+                  'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url', 'interview_feedback_url',
+                  'project_termination_url'),
 }

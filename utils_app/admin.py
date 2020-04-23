@@ -1,9 +1,9 @@
 import csv
-
 from django.contrib import admin
 from django.http import HttpResponse
+from import_export.admin import ExportActionModelAdmin
 
-from .models import City, ScrumMeeting
+from utils_app.models import City, ScrumMeeting
 
 
 class ExportCsvMixin:
@@ -24,7 +24,7 @@ class ExportCsvMixin:
 
 
 @admin.register(City)
-class CityAdmin(admin.ModelAdmin, ExportCsvMixin):
+class CityAdmin(ExportActionModelAdmin):
     list_filter = ('state',)
     actions = ["export_as_csv"]
     search_fields = ('name', 'state')
@@ -32,7 +32,7 @@ class CityAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(ScrumMeeting)
-class ScrumMeetingAdmin(admin.ModelAdmin, ExportCsvMixin):
+class ScrumMeetingAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     search_fields = ('previous', 'held_on')
     list_display = ('id', 'held_on', 'previous')

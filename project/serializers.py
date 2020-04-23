@@ -146,7 +146,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
             return {
                 'id': project.id,
                 'start_date': project.start_date,
-                'team': project.submission.employer,
+                'team': project.submission.employer.title(),
                 'client': project.submission.client,
                 'vendor': project.submission.lead.vendor_company.name,
             }

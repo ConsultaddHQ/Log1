@@ -1,11 +1,11 @@
 from django.contrib import admin
+from import_export.admin import ExportActionModelAdmin
 
-from utils_app.admin import ExportCsvMixin
 from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, ProjectStatus, IphoneAppLink
 
 
 @admin.register(Project)
-class ProjectAdmin(admin.ModelAdmin, ExportCsvMixin):
+class ProjectAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('statuses__status',)
     search_fields = ('id', 'consultant__name', 'submission__client', 'submission__created_by__employee_name')
@@ -31,7 +31,7 @@ class ProjectAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(ProjectSupport)
-class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
+class ProjectSupportAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_display = ('id', 'project', 'support', 'start', 'end')
     search_fields = ('id', 'project__consultant__name', 'status', 'project__submission__client',
@@ -39,7 +39,7 @@ class ProjectSupportAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(ProjectStatus)
-class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
+class ProjectStatusAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('status', 'is_current')
     list_display = ('id', 'project', 'status', 'created', 'is_current')
@@ -47,7 +47,7 @@ class ProjectStatusAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(TimeSheet)
-class TimeSheetAdmin(admin.ModelAdmin, ExportCsvMixin):
+class TimeSheetAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('status',)
     search_fields = ('id', 'project__id', 'project__consultant__name', 'project__consultant__email')
@@ -56,14 +56,14 @@ class TimeSheetAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(PayrollSchedule)
-class PayrollScheduleAdmin(admin.ModelAdmin, ExportCsvMixin):
+class PayrollScheduleAdmin(ExportActionModelAdmin):
     list_display = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
     search_fields = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
     actions = ["export_as_csv"]
 
 
 @admin.register(IphoneAppLink)
-class IphoneAppLinkAdmin(admin.ModelAdmin, ExportCsvMixin):
+class IphoneAppLinkAdmin(ExportActionModelAdmin):
     list_filter = ('is_sent',)
     list_display = ('id', 'code', 'sent_on', 'consultant', 'link', 'is_sent')
     search_fields = ('id', 'code', 'link', 'consultant__name')
