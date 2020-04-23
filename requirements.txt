@@ -28,3 +28,4 @@ pyfcm==1.4.7
 django-constance[database]
 environs==7.2.0
 twilio==6.38.0
+django-import-export==2.0.2
