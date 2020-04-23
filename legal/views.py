@@ -283,6 +283,44 @@ class PetitionViewSets(viewsets.ModelViewSet):
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['put'], detail=False, url_path='submit_lca')
+    def submit_lca(self, request, *args, **kwargs):
+        try:
+            petition = get_object_or_404(Petition, id=request.data['petition'])
+            if petition.status == 'doc_request_sent':
+                petition.status = 'lca_filed'
+                petition.lca_no = request.data['lca_no']
+                petition.save()
+                serializer = PetitionGetSerializer(petition)
+                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Can't Submit LCA"}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, url_path='approve_lca')
+    def approve_lca(self, request):
+        try:
+            petition_id = request.data.get('petition')
+            petition = get_object_or_404(Petition, id=petition_id)
+            if petition.status == 'lca_filed':
+                Document.objects.create(
+                    file=request.FILES.get('file'),
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id=request.data.get('file_type'),
+                    petition_id=petition_id,
+                )
+                petition.status = 'lca_approved'
+                petition.save()
+                documents = Document.objects.filter(petition=petition_id)
+                serializer = DocumentSerializer(documents, many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                return Response({"error": "Can't Approve LCA"}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Api for Consultant
 class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, DestroyModelMixin):
