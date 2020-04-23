@@ -299,7 +299,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=False, url_path='approve_lca')
-    def approve_lca(self, request):
+    def approve_lca(self, request, *args, **kwargs):
         try:
             petition_id = request.data.get('petition')
             petition = get_object_or_404(Petition, id=petition_id)
@@ -321,6 +321,28 @@ class PetitionViewSets(viewsets.ModelViewSet):
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['post'], detail=False, url_path='review')
+    def sent_for_review(self, request, *args, **kwargs):
+        try:
+            petition_id = request.data.get('petition')
+            petition = get_object_or_404(Petition, id=petition_id)
+            if petition.status == 'lca_approved':
+                Document.objects.create(
+                    file=request.FILES.get('file'),
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id=request.data.get('file_type'),
+                    petition_id=petition_id,
+                )
+                petition.status = 'under_review'
+                petition.save()
+                documents = Document.objects.filter(petition=petition_id)
+                serializer = DocumentSerializer(documents, many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                return Response({"error": "Can't Approve LCA"}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 # Api for Consultant
 class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, DestroyModelMixin):
