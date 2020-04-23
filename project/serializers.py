@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 
 from project.models import *
@@ -134,13 +135,18 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'email', 'ts_status', 'project')
 
     def get_project(self, obj):
-        project = Project.objects.filter(consultant=obj, statuses__status='joined', statuses__is_current=True)
+        project = Project.objects.filter(
+            Q(consultant=obj, statuses__is_current=True) & (
+              Q(statuses__status='joined') |
+              Q(statuses__status__istartswith='terminated')
+            )
+        )
         if project:
             project = project.latest('-id')
             return {
                 'id': project.id,
                 'start_date': project.start_date,
-                'team': project.submission.employer,
+                'team': project.submission.employer.title(),
                 'client': project.submission.client,
                 'vendor': project.submission.lead.vendor_company.name,
             }

@@ -3,6 +3,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import UserCreationForm
 from django.utils.translation import ugettext_lazy as _
+from import_export.admin import ExportActionModelAdmin
+
 
 from utils_app.admin import ExportCsvMixin
 from rest_framework.authtoken.models import Token
@@ -23,7 +25,6 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
 
     actions = ["export_as_csv"]
     date_hierarchy = 'last_login'
-    empty_value_display = '-------'
     list_filter = ('team', 'role', 'is_active')
     search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
     list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'roles')
@@ -60,30 +61,26 @@ class TokenAdmin(admin.ModelAdmin):
 
 
 @admin.register(Team)
-class TeamAdmin(admin.ModelAdmin):
+class TeamAdmin(ExportActionModelAdmin):
     list_filter = ('dept',)
-    empty_value_display = '-------'
     search_fields = ('name', 'email')
     list_display = ('id', 'name', 'email', 'dept')
 
 
 @admin.register(Role)
-class RoleAdmin(admin.ModelAdmin):
+class RoleAdmin(ExportActionModelAdmin):
     search_fields = ('name',)
     list_display = ('id', 'name')
-    empty_value_display = '-------'
 
 
 @admin.register(ResetPasswordToken)
 class ResetPasswordTokenAdmin(admin.ModelAdmin):
-    empty_value_display = '-------'
     list_display = ('user', 'key', 'ip_address', 'user_agent')
     search_fields = ('user__employee_name', 'user__email', 'key')
 
 
 @admin.register(Asset)
-class AssetAdmin(admin.ModelAdmin):
-    empty_value_display = '-------'
+class AssetAdmin(ExportActionModelAdmin):
     list_filter = ('asset_type',)
     list_display = ('id', 'owner', 'email', 'asset_type')
     search_fields = ('id', 'owner__employee_name', 'email', 'asset_type')

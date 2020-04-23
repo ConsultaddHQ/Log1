@@ -1088,7 +1088,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         "username": "Log1 Updates",
                         "text": text,
                     }
-                    post_msg_using_webhook(config.interviewfeedback_url, data)
+                    post_msg_using_webhook(config.interview_feedback_url, data)
 
                 if status_change == 'false':
                     if reschedule == 'true':

@@ -1,11 +1,11 @@
 from django.contrib import admin
+from import_export.admin import ExportActionModelAdmin
 
-from utils_app.admin import ExportCsvMixin
 from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer
 
 
 @admin.register(VendorCompany)
-class VendorCompanyAdmin(admin.ModelAdmin, ExportCsvMixin):
+class VendorCompanyAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('created_by', 'name')
     search_fields = ('id', 'name', 'created_by')
@@ -20,7 +20,7 @@ class VendorCompanyAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(VendorContact)
-class VendorContactAdmin(admin.ModelAdmin, ExportCsvMixin):
+class VendorContactAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('company__name',)
     list_display = ('id', 'name', 'email', 'number', 'company', 'created_by')
@@ -28,7 +28,7 @@ class VendorContactAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(Lead)
-class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
+class LeadAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     search_fields = ('id', 'job_title', 'status', 'owner__employee_name', 'vendor_company__name', 'primary_skill')
     list_display = ('id', 'job_title', 'city', 'primary_skill', 'status', 'owner', 'vendor_company', 'sub_display')
@@ -42,7 +42,7 @@ class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(Submission)
-class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
+class SubmissionAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('status',)
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
@@ -67,7 +67,7 @@ class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(VendorLayer)
-class VendorLayerAdmin(admin.ModelAdmin, ExportCsvMixin):
+class VendorLayerAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('vendor_company__name',)
     search_fields = ('vendor_company__name',)
@@ -75,7 +75,7 @@ class VendorLayerAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(Interview)
-class InterviewAdmin(admin.ModelAdmin, ExportCsvMixin):
+class InterviewAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv', 'make_status_feedback_due']
     list_filter = ('status', 'interview_mode', 'screening_type')
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
