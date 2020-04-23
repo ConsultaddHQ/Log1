@@ -13,7 +13,7 @@ project_folder = os.path.expanduser(BASE_DIR)
 load_dotenv(os.path.join(project_folder, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = bool(os.environ.get('DEBUG', False))
+DEBUG = True if os.environ.get('DEBUG', False) == 'True' else False
 
 ALLOWED_HOSTS = ['*']
 
@@ -53,7 +53,8 @@ PROJECT_APPS = [
     'report.apps.ReportConfig',
     'legal.apps.LegalConfig',
     'notification.apps.NotificationConfig',
-    'impersonate.apps.ImpersonateConfig'
+    'impersonate.apps.ImpersonateConfig',
+    'messaging.apps.MessagingConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -172,7 +173,6 @@ PUBLIC_MEDIA_LOCATION = 'media'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
 DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 
-
 MODELS_PATH = os.path.join(BASE_DIR, 'models')
 
 # Password Reset Token Expiry Time
@@ -227,7 +227,8 @@ CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 CONSTANCE_CONFIG = OrderedDict([
     ('TUTORIAL_VIDEO', ('http://bit.ly/38VJ19o', 'Tutorial video Link')),
     ('CONSULTANT_PASSWORD', ('Consultadd@12345', 'Consultant login password')),
-    ('ANDROID_APP_LINK', ('http://bit.ly/2TBgKRc', 'Andoird App Download Link')),
+    ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
+                          'Andoird App Download Link')),
 
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
     ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
@@ -237,22 +238,25 @@ CONSTANCE_CONFIG = OrderedDict([
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
 
+    ('general_url', ('https://mm.consultadd.com/hooks/sih91mde8inq5roz3fejoefs5c', "General Channel")),
     ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "Recruitment Channel")),
     ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "45dayslimit Channel")),
     ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "Offer Announcement Channel")),
     ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "Loudspeaker Channel")),
     ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "Announcement Channel")),
     ('joined_url', ('https://mm.consultadd.com/hooks/ixfc4oeeofb53d149dc3cq5ddy', "Joining Announcement Channel")),
-    ('marketing_report_url', ('https://mm.consultadd.com/hooks/8iedae1ytffjmxpkd6cgry5hth', "Marketing Report Channel")),
-    ('general_url', ('https://mm.consultadd.com/hooks/sih91mde8inq5roz3fejoefs5c', "General Channel")),
     ('offer_failure_url', ('https://mm.consultadd.com/hooks/3mtmostff3fx8pfyyf1odph93h', "Offer Failure Channel")),
-    ('interviewfeedback_url', ('https://mm.consultadd.com/hooks/e15z9x3xspgsbcxei84tqf919r', "InterviewFeedback Channel")),
+    ('marketing_report_url', ('https://mm.consultadd.com/hooks/8iedae1ytffjmxpkd6cgry5hth',
+                              "Marketing Report Channel")),
+    ('project_termination_url', ('https://mm.consultadd.com/hooks/d8j164agxb8djkczo6rjwat5wr',
+                                 "Project Terminations Channel")),
+    ('interview_feedback_url', ('https://mm.consultadd.com/hooks/e15z9x3xspgsbcxei84tqf919r',
+                                "InterviewFeedback Channel")),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEO'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
-    'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url',
-                  'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
-                  'interviewfeedback_url'),
+    'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url',
+                  'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url', 'interview_feedback_url'),
 }

@@ -19,6 +19,7 @@ from legal.serializers import *
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from employee.token import get_token_generator
+from attachment.views import presigned_post_url, get_s3_object
 from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
     queryset = Petition.objects.all()
     serializer_class = PetitionSerializer
     permission_classes = (IsAuthenticated,)
-    get_serializer_class = PetitionGetSerializer
     authentication_classes = (TokenAuthentication,)
 
     def rejection_mail(self, beneficiary_name, petition, document):
@@ -127,7 +127,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     petition_id=petition_id,
                 )
             documents = Document.objects.filter(petition=petition_id)
-            serializer = DocumentURLSerializer(documents, many=True)
+            serializer = DocumentSerializer(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -154,7 +154,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                         message = str(res)
                     else:
                         message = "mail sent"
-            serializer = DocumentURLSerializer(documents, many=True)
+            serializer = DocumentSerializer(documents, many=True)
             return Response({"result": serializer.data, "message": message}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -191,11 +191,30 @@ class PetitionViewSets(viewsets.ModelViewSet):
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=False, url_path='doc_url')
+    def doc_url(self, request, *args, **kwargs):
+        try:
+            document_id = request.query_params.get('document_id')
+            document = get_object_or_404(Document, id=document_id)
+            url = get_s3_object(document.file.name)
+            return Response({"result": url}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, url_path='upload')
+    def upload(self, request):
+        file_name = request.data['file_name']
+        object_id = request.data['object_id']
+
+        object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
+        response = presigned_post_url(object_name=object_name)
+        return Response({"result": response}, status=status.HTTP_200_OK)
+
     def retrieve(self, request, *args, **kwargs):
         try:
             petition_id = kwargs.get('pk')
             petition = get_object_or_404(Petition, id=petition_id)
-            serializer = self.get_serializer_class(petition)
+            serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -331,6 +350,25 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     "value": i.doc_type.display_name,
                 })
         return Response({"results": data}, status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=False, url_path='doc_url')
+    def doc_url(self, request, *args, **kwargs):
+        try:
+            document_id = request.query_params.get('document_id')
+            document = get_object_or_404(Document, id=document_id, petition__beneficiary=request.user)
+            url = get_s3_object(document.file.name)
+            return Response({"result": url}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, url_path='upload')
+    def upload(self, request):
+        file_name = request.data['file_name']
+        object_id = request.data['object_id']
+
+        object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
+        response = presigned_post_url(object_name=object_name)
+        return Response({"result": response}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
         try:

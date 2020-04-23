@@ -290,7 +290,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
 
             email_asset = asset.filter(asset_type='email')
             social_asset = asset.filter(asset_type='social')
-            number_asset = asset.filter(asset_type='number')
+            number_asset = asset.filter(asset_type='number').exclude(provider='twilio')
             job_board_asset = asset.filter(asset_type='job_board')
 
             data = {
