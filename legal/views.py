@@ -40,13 +40,14 @@ DOCUMENT_TYPE = {
     "15": 'Client Letter',
     "24": 'Consultadd W2',
     "16": 'Vendor Letter',
+    "25": 'LCA Document',
+    "26": 'Final Petition',
     "18": 'Insurance Cards',
     "2": 'Degree Certificate',
     "13": 'Experience Letter',
     "3": 'Academic Transcripts',
     "23": 'Employment Agreement',
     "19": 'Social Security Card',
-    "25": 'LCA Document',
     "11": 'Detailed Job Description',
     "7": 'Previous Approval Notices',
     "14": 'Performance Review Sheet ',
@@ -285,31 +286,68 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['put'], detail=True, url_path='lca')
-    def lca_status(self, request, *args, **kwargs):
+    def lca(self, request, *args, **kwargs):
         try:
             petition_id = kwargs.get('pk')
             petition = get_object_or_404(Petition, id=petition_id)
-            lca_no = request.data.get('lca_no')
-            file = request.FILES.get('file')
+            lca_no = request.data.get('lca_no', None)
+            file = request.FILES.get('file', None)
             if petition.status == 'doc_request_sent' and lca_no:
                 petition.status = 'lca_filed'
                 petition.lca_no = lca_no
-                petition.save()
-                serializer = PetitionGetSerializer(petition)
-                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+
             elif petition.status == 'lca_filed' and file:
                 Document.objects.create(
                     file=file,
                     verified=True,
-                    creator=request.user,
                     doc_type_id='25',
+                    creator=request.user,
                     petition_id=petition_id,
                 )
                 petition.status = 'lca_approved'
-                petition.save()
-                serializer = PetitionGetSerializer(petition)
-                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
-            return Response({'error': 'Details not match, please try again'}, status=status.HTTP_403_FORBIDDEN)
+            else:
+                return Response({'error': 'Data is missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+            petition.save()
+            serializer = PetitionGetSerializer(petition)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='petition_file')
+    def final_petition_file(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            file = request.FILES.get('file')
+            request_status = request.data.get('status')
+            petition = get_object_or_404(Petition, id=petition_id)
+
+            if petition.status != 'print':
+                if file:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='26',
+                        petition_id=petition_id,
+                    )
+                    if petition.status == 'lca_approved':
+                        petition.status = 'under_review'
+
+                if request_status == 'reviewed' or request_status == 'print':
+                    document = Document.objects.filter(petition=petition_id, doc_type_id='26').first()
+                    if not document:
+                        return Response({"error": "Please upload document before moving further"},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                petition.status = request_status
+
+            else:
+                return Response({"error": "Changes can't be done at this stage"}, status=status.HTTP_400_BAD_REQUEST)
+
+            petition.save()
+            serializer = PetitionGetSerializer(petition)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
