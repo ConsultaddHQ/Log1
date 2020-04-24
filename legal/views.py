@@ -46,6 +46,7 @@ DOCUMENT_TYPE = {
     "3": 'Academic Transcripts',
     "23": 'Employment Agreement',
     "19": 'Social Security Card',
+    "25": 'LCA Document',
     "11": 'Detailed Job Description',
     "7": 'Previous Approval Notices',
     "14": 'Performance Review Sheet ',
@@ -283,66 +284,35 @@ class PetitionViewSets(viewsets.ModelViewSet):
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put'], detail=False, url_path='submit_lca')
-    def submit_lca(self, request, *args, **kwargs):
+    @action(methods=['put'], detail=True, url_path='lca')
+    def lca_status(self, request, *args, **kwargs):
         try:
-            petition = get_object_or_404(Petition, id=request.data['petition'])
-            if petition.status == 'doc_request_sent':
+            petition_id = kwargs.get('pk')
+            petition = get_object_or_404(Petition, id=petition_id)
+            lca_no = request.data.get('lca_no')
+            file = request.FILES.get('file')
+            if petition.status == 'doc_request_sent' and lca_no:
                 petition.status = 'lca_filed'
-                petition.lca_no = request.data['lca_no']
+                petition.lca_no = lca_no
                 petition.save()
                 serializer = PetitionGetSerializer(petition)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": "Can't Submit LCA"}, status=status.HTTP_403_FORBIDDEN)
-        except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(methods=['post'], detail=False, url_path='approve_lca')
-    def approve_lca(self, request, *args, **kwargs):
-        try:
-            petition_id = request.data.get('petition')
-            petition = get_object_or_404(Petition, id=petition_id)
-            if petition.status == 'lca_filed':
+            elif petition.status == 'lca_filed' and file:
                 Document.objects.create(
-                    file=request.FILES.get('file'),
+                    file=file,
                     verified=True,
                     creator=request.user,
-                    doc_type_id=request.data.get('file_type'),
+                    doc_type_id='25',
                     petition_id=petition_id,
                 )
                 petition.status = 'lca_approved'
                 petition.save()
-                documents = Document.objects.filter(petition=petition_id)
-                serializer = DocumentSerializer(documents, many=True)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            else:
-                return Response({"error": "Can't Approve LCA"}, status=status.HTTP_403_FORBIDDEN)
+                serializer = PetitionGetSerializer(petition)
+                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({'error': 'Details not match, please try again'}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['post'], detail=False, url_path='review')
-    def sent_for_review(self, request, *args, **kwargs):
-        try:
-            petition_id = request.data.get('petition')
-            petition = get_object_or_404(Petition, id=petition_id)
-            if petition.status == 'lca_approved':
-                Document.objects.create(
-                    file=request.FILES.get('file'),
-                    verified=True,
-                    creator=request.user,
-                    doc_type_id=request.data.get('file_type'),
-                    petition_id=petition_id,
-                )
-                petition.status = 'under_review'
-                petition.save()
-                documents = Document.objects.filter(petition=petition_id)
-                serializer = DocumentSerializer(documents, many=True)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            else:
-                return Response({"error": "Can't Approve LCA"}, status=status.HTTP_403_FORBIDDEN)
-        except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 # Api for Consultant
 class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, DestroyModelMixin):
