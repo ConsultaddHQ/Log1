@@ -536,26 +536,27 @@
                                 <td class="content-cell">
                                     <div class="f-fallback">
                                         <h1>Hello</h1><br>
-                                        <h1>Submissions of last {{ days }} days</h1>
+                                        <h2>Submissions done from {{start}} to {{ end }}</h2>
 
 
 
                                             <table class="tableheading">
                                               <tr>
-                                                <th style="text-align:center;width: 24px;">Consultant Id</th>
-                                                <th style="text-align: center;width: 20px;">Consultant Name</th>
-                                                <th style="width: 70px;text-align: center;">Consultant Email</th>
-                                                <th style="width: 70px;text-align: center;">Submission Ids</th>
+                                                <th style="text-align:center;width: 24px;">Id</th>
+                                                <th style="text-align: center;width: 20px;">Name</th>
+                                                <th style="width: 70px;text-align: center;">Mail Status</th>
+                                                <th style="width: 70px;text-align: center;">Submissions</th>
                                               </tr>
                                                 {% for i in data %}
                                               <tr>
-                                                <td style="text-align:center;width: 24px;">{{i.consultant}}</td>
-                                                <td style="text-align: center;">{{i.consultant_name}}</td>
-                                                <td style="width: 104px;text-align: center;">{{i.consultant_email}}</td>
-                                                <td style="width: 50px;text-align: center;">{{i.submissions}}</td>
+                                                <td style="text-align:center;">{{i.consultant}}</td>
+                                                <td style="text-align:center;">{{i.consultant_name}}</td>
+                                                <td style="text-align:center;">{{i.mail_res}}</td>
+                                                <td style="text-align:center;">{{i.submissions}}</td>
                                               </tr>
                                               {% endfor %}
                                             </table>
+                                    <br>
                                         <p> <strong>Thanks,
                                             <br>The Consultadd Team</strong>
                                         </p>

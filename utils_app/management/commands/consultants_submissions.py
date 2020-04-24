@@ -43,7 +43,7 @@ class Command(BaseCommand):
                     }
                 )
                 count += 1
-                users = User.objects.filter(team__in=submission.created_by.team, role__in=['admin', 'proxy'])
+                users = User.objects.filter(team=submission.created_by.team, role__name__in=['admin', 'proxy'])
                 for user in users:
                     scrum_masters.append(user.email)
                 submission_ids.append(submission.id)

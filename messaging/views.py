@@ -14,7 +14,7 @@ from twilio.rest import Client
 from employee.models import Asset
 from api_key.permissions import APIKey
 from messaging.models import Message, Conversation
-from messaging.serializers import MessageSerializer
+from messaging.serializers import MessageSerializer, ConversationSerializer
 
 
 class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
@@ -86,6 +86,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
 class ReceiveSMSViewSet(GenericViewSet):
     queryset = Conversation.objects.all()
+    serializer_class = ConversationSerializer
 
     @action(methods=['get', 'post'], detail=False, url_path='sms')
     def receive_sms(self, request):

@@ -59,10 +59,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
     def send_offer_received_mail(self, project, submission, scrum_masters):
         try:
-            to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.email,
-                  submission.created_by.team.email]
+            to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.team.email]
 
-            cc = [config.SUPERADMIN]
+            cc = [config.SUPERADMIN, submission.created_by.email] + scrum_masters
 
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
@@ -71,9 +70,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             if retention:
                 cc.append(retention.email)
-
-            if scrum_masters:
-                cc = cc + scrum_masters
 
             mail_data = {
                 'to': to,
@@ -119,15 +115,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
-            cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.email, submission.created_by.team.email]
+            cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
+            cc = cc + scrum_masters
 
             if recruiter:
                 cc.append(recruiter.email)
             if retention:
                 cc.append(retention.email)
-
-            if scrum_masters:
-                cc = cc + scrum_masters
 
             consultant_name = project.consultant.name
             mail_data = {
@@ -170,22 +164,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
-
+            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
-                to.append(recruiter.email)
+                cc.append(recruiter.email)
             if retention:
-                to.append(retention.email)
-
-            cc = [marketer.email, config.SUPERADMIN]
-            if scrum_master_email:
-                cc.append(scrum_master_email)
+                cc.append(retention.email)
 
             consultant_name = project.consultant.name
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'On Boarding of {consultant_name} :: {submission.employer} :: '
+                'subject': f'On Boarding of {consultant_name} :: {submission.employer.title()} :: '
                            f'{str(project.start_date)} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
                 'context': {
@@ -236,15 +226,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recruiter = project.consultant.recruiter
             retention = project.consultant.relation
 
+            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
-                to.append(recruiter.email)
+                cc.append(recruiter.email)
             if retention:
-                to.append(retention.email)
+                cc.append(retention.email)
 
-            cc = [marketer.email, config.SUPERADMIN]
-
-            if scrum_master_email:
-                cc.append(scrum_master_email)
             mail_data = {
                 'to': to,
                 'cc': cc,
@@ -321,19 +308,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     po_type = 'updated'
 
                 path = []
-                scrum_master_email = None
-                scrum_master = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
-                if scrum_master:
-                    scrum_master_email = scrum_master.first().email
+                scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy']
+                                                         ).values_list('email', flat=True))
 
                 for i in project.attachments.filter(
                         attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
                     path.append(download_s3_object(i.attachment_file.name))
 
-                res, error = self.po_mail(project, path, scrum_master_email, po_type)
+                res, error = self.po_mail(project, path, scrum_masters, po_type)
                 if not error == 'error':
                     delete_temp_file(path)
                     project.submission.consultant_marketing.status = 'close'
+                    project.submission.consultant_marketing.end = project.start_date
                     project.submission.consultant_marketing.save()
                     if prev_status.status == 'received':
                         new_status, created = ProjectStatus.objects.get_or_create(
@@ -463,8 +449,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = sub.consultant
                 project.save()
 
-                queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
-                scrum_masters = [user.email for user in queryset]
+                scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'],
+                                                         is_active=True).values_list('email', flat=True))
 
                 support_mail_res = "Development Server"
                 offer_mail_res = "Development Server"
@@ -589,6 +575,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
 {employer_emoji} Employer :   {project.submission.employer.title()}
+{employer_emoji} Team :   {project.submission.created_by.team.name}
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
@@ -667,6 +654,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
 {employer_emoji} Employer :   {project.submission.employer.title()}
+{employer_emoji} Team :   {project.submission.created_by.team.name}
 {ctb_gender_emoji} CTB :
 {supervisors}
 :us: Location: {project.city}
@@ -692,25 +680,46 @@ class ProjectViewSets(viewsets.ModelViewSet):
                                       'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
                                       'terminated-resigned_full_time_offer']
 
-                if os.environ.get('ENV', 'local') == 'prod':
-                    scrum_master = None
-                    queryset = User.objects.filter(team=request.user.team, role__name='admin')
-                    if queryset:
-                        scrum_master = queryset.first().email
+                if os.environ.get('ENV', 'local') == 'local':
+                    scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy']
+                                                             ).values_list('email', flat=True))
 
                     if prev_status_obj.status not in termination_status and new_status in termination_status:
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Termination')
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Termination')
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
 
-                    elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Cancellation')
-
-                        text = f"""#### Offer Feedback \n"""
+                        text = f"""#### Offer Termination Feedback \n"""
                         text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
 {employer_emoji} Employer :   {project.submission.employer.title()}
+{employer_emoji} Team :   {project.submission.created_by.team.name}
+{client_emoji} Client :  {project.submission.client}
+{role_emoji} Role :  {project.submission.lead.job_title}
+:spiral_calendar: Start Date :   {str(project.start_date)}
+:spiral_calendar: End Date :   {str(project.end_date)}
+:x: Status :   {str(p_status.get_status_display())}
+\n\n"""
+
+                        text += "**Reason: **" + project.feedback
+
+                        data = {
+                            "response_type": "in_channel",
+                            "username": "Log1 Updates",
+                            "text": text,
+                        }
+                        post_msg_using_webhook(config.project_termination_url, data)
+
+                    elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
+
+                        text = f"""#### Offer Cancellation Feedback \n"""
+                        text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+{marketer_gender_emoji} Marketer :   {project.marketer_name}
+{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{employer_emoji} Employer :   {project.submission.employer.title()}
+{employer_emoji} Team :   {project.submission.created_by.team.name}
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
@@ -726,7 +735,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         post_msg_using_webhook(config.offer_failure_url, data)
 
                     elif prev_status_obj.status != 'complete' and new_status == "complete":
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_master, 'PO Completion')
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Completion')
 
             serializer = self.serializer_class(project)
 
@@ -796,10 +805,11 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
         try:
             projects = Project.objects.filter(
-                statuses__is_current=True,
-                statuses__status='joined',
-                consultant_id=kwargs.get('pk', None),
+                statuses__is_current=True, consultant_id=kwargs.get('pk', None), statuses__status='joined'
             )
+            if not projects:
+                projects = projects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
+                                           statuses__status__istartswith='terminated')
             if projects:
                 project = projects.latest('-id')
                 if start:

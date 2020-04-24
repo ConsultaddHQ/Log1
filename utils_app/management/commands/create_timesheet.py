@@ -3,7 +3,7 @@ from django.db.models import Max
 from datetime import datetime, timedelta
 from django.core.management import BaseCommand
 
-from project.models import Project, TimeSheet
+from project.models import TimeSheet
 
 logger = logging.getLogger(__name__)
 
@@ -14,22 +14,28 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        projects = list(
-            TimeSheet.objects.all().order_by('project_id').distinct('project_id').values_list('project_id', flat=True))
+        timesheets = TimeSheet.objects.all().order_by('project_id').distinct('project_id')
         count = 0
-        end_date = datetime.today().date() + timedelta(days=2)
-        for p in projects:
-            project = Project.objects.get(id=p)
+        end_date = datetime.today().date()
+        for t in timesheets:
+            project = t.project
             last_timesheet = TimeSheet.objects.filter(project=project).aggregate(Max('end'))
             if last_timesheet['end__max'] is not None:
                 end_date = last_timesheet['end__max']
-            while end_date < datetime.today().date() + timedelta(days=30):
+
+            if project.statuses.filter(is_current=True, status__istartswith='terminated'):
+                if end_date + timedelta(days=7) > project.end_date:
+                    continue
+
+            while end_date <= datetime.today().date():
                 timesheet, created = TimeSheet.objects.get_or_create(
-                    hours=0,
                     project=project,
                     end=end_date + timedelta(days=7),
                     start=end_date + timedelta(days=1),
                 )
-                end_date = timesheet.end
+                if created:
+                    timesheet.hours = 0
+                    timesheet.save()
+                end_date = end_date + timedelta(days=7)
         print(count)
 
