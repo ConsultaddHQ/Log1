@@ -529,6 +529,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
             marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
             consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
 
+            if project.consultant.recruiter:
+                recruiter = project.consultant.recruiter.employee_name
+            else:
+                recruiter = "NA"
+
             # For Status Change
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -573,7 +578,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 #### Project Joined :metal: :smile: :metal:\n
 {consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 :us: Location: {project.city}
@@ -652,7 +657,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 #### Offer :metal: :smile: :metal:\n
 {consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 {ctb_gender_emoji} CTB :
@@ -680,7 +685,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                                       'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
                                       'terminated-resigned_full_time_offer']
 
-                if os.environ.get('ENV', 'local') == 'local':
+                if os.environ.get('ENV', 'local') == 'prod':
                     scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy']
                                                              ).values_list('email', flat=True))
 
@@ -692,7 +697,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text = f"""#### Offer Termination Feedback \n"""
                         text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 {client_emoji} Client :  {project.submission.client}
@@ -702,7 +707,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :x: Status :   {str(p_status.get_status_display())}
 \n\n"""
 
-                        text += "**Reason: **" + project.feedback
+                        text += "**Reason: **" + project.feedback if project.feedback else "None"
 
                         data = {
                             "response_type": "in_channel",
@@ -717,7 +722,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text = f"""#### Offer Cancellation Feedback \n"""
                         text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {project.consultant.recruiter.employee_name}
+{recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 :us: Location: {project.city}
@@ -725,7 +730,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {role_emoji} Role :  {project.submission.lead.job_title}
 :spiral_calendar: Joining Date :   {str(project.start_date)}\n\n"""
 
-                        text += "**Reason: **" + project.feedback
+                        text += "**Reason: **" + project.feedback if project.feedback else "None"
 
                         data = {
                             "response_type": "in_channel",
