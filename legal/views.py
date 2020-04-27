@@ -42,6 +42,9 @@ DOCUMENT_TYPE = {
     "16": 'Vendor Letter',
     "25": 'LCA Document',
     "26": 'Final Petition',
+    "27": 'Receipt Acknowledgement',
+    "28": 'RFE Petition',
+    "29": 'RFE Denied',
     "18": 'Insurance Cards',
     "2": 'Degree Certificate',
     "13": 'Experience Letter',
@@ -345,6 +348,65 @@ class PetitionViewSets(viewsets.ModelViewSet):
             else:
                 return Response({"error": "Changes can't be done at this stage"}, status=status.HTTP_400_BAD_REQUEST)
 
+            petition.save()
+            serializer = PetitionGetSerializer(petition)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='petition_status')
+    def petition_shipping_status(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            fedex_no = request.data.get('fedex_no')
+            receipt_no = request.data.get('receipt_no')
+            file = request.FILES.get('file')
+            request_status = request.data.get('status')
+            petition = get_object_or_404(Petition, id=petition_id)
+            if petition.status == 'print' and request_status == 'shipped':
+                if fedex_no:
+                    petition.fedex_no = fedex_no
+                else:
+                    return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+            elif petition.status == 'shipped' and request_status == 'doc_acknowledged':
+                if file and receipt_no:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='27',
+                        petition_id=petition_id,
+                    )
+                    petition.uscis_no = receipt_no
+                else:
+                    return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+            elif petition.status == 'rfe' and request_status == 'rfe_responded':
+                if file:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='28',
+                        petition_id=petition_id,
+                    )
+                else:
+                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+            elif petition.status == 'denied' and request_status == 'rfe_doc_acknowledged':
+                if file:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='29',
+                        petition_id=petition_id,
+                    )
+                else:
+                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+            petition.status = request_status
             petition.save()
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
