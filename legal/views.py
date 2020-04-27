@@ -370,7 +370,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     petition.fedex_no = fedex_no
                 else:
                     return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
-                petition.status = 'shipped'
 
             elif petition.status == 'shipped' and request_status == 'doc_acknowledged':
                 if file and receipt_no:
@@ -384,7 +383,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     petition.uscis_no = receipt_no
                 else:
                     return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
-                petition.status = 'doc_acknowledged'
 
             elif request_status == 'rfe':
                 if file:
@@ -397,7 +395,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     )
                 else:
                     return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
-                petition.status = 'rfe'
 
             elif petition.status == 'rfe' and request_status == 'rfe_responded':
                 if file:
@@ -410,10 +407,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     )
                 else:
                     return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
-                petition.status = 'rfe_responded'
-
-            elif request_status == 'rfe_doc_acknowledged':
-                petition.status = 'rfe_doc_acknowledged'
 
             elif request_status == 'denied':
                 if file:
@@ -426,7 +419,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     )
                 else:
                     return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
-                petition.status = 'denied'
 
             elif request_status == 'approved':
                 if file:
@@ -439,8 +431,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     )
                 else:
                     return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
-                petition.status = 'approved'
 
+            petition.status = request_status
             petition.save()
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
