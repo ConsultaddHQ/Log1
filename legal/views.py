@@ -43,8 +43,10 @@ DOCUMENT_TYPE = {
     "25": 'LCA Document',
     "26": 'Final Petition',
     "27": 'Receipt Acknowledgement',
-    "28": 'RFE Petition',
-    "29": 'RFE Denied',
+    "28": 'RFE',
+    "29": 'RFE Response',
+    "30": 'Denial Notice',
+    "31": 'Approval Notice',
     "18": 'Insurance Cards',
     "2": 'Degree Certificate',
     "13": 'Experience Letter',
@@ -368,6 +370,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     petition.fedex_no = fedex_no
                 else:
                     return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                petition.status = 'shipped'
 
             elif petition.status == 'shipped' and request_status == 'doc_acknowledged':
                 if file and receipt_no:
@@ -381,8 +384,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     petition.uscis_no = receipt_no
                 else:
                     return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                petition.status = 'doc_acknowledged'
 
-            elif petition.status == 'rfe' and request_status == 'rfe_responded':
+            elif request_status == 'rfe':
                 if file:
                     Document.objects.create(
                         file=file,
@@ -393,8 +397,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     )
                 else:
                     return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                petition.status = 'rfe'
 
-            elif petition.status == 'denied' and request_status == 'rfe_doc_acknowledged':
+            elif petition.status == 'rfe' and request_status == 'rfe_responded':
                 if file:
                     Document.objects.create(
                         file=file,
@@ -405,8 +410,37 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     )
                 else:
                     return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                petition.status = 'rfe_responded'
 
-            petition.status = request_status
+            elif request_status == 'rfe_doc_acknowledged':
+                petition.status = 'rfe_doc_acknowledged'
+
+            elif request_status == 'denied':
+                if file:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='30',
+                        petition_id=petition_id,
+                    )
+                else:
+                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                petition.status = 'denied'
+
+            elif request_status == 'approved':
+                if file:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='31',
+                        petition_id=petition_id,
+                    )
+                else:
+                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                petition.status = 'approved'
+
             petition.save()
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
