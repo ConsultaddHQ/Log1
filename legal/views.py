@@ -29,6 +29,7 @@ TOKEN_GENERATOR_CLASS = get_token_generator()
 DOCUMENT_TYPE = {
     "6": 'I94',
     "20": 'MSA',
+    "28": 'RFE',
     "4": 'Visa',
     "1": 'Resume',
     "9": 'Paystub',
@@ -37,15 +38,13 @@ DOCUMENT_TYPE = {
     "17": 'Timesheet',
     "22": 'Work Order',
     "21": 'Offer Letter',
-    "15": 'Client Letter',
-    "24": 'Consultadd W2',
-    "16": 'Vendor Letter',
-    "25": 'LCA Document',
-    "26": 'Final Petition',
-    "27": 'Receipt Acknowledgement',
-    "28": 'RFE',
     "29": 'RFE Response',
+    "25": 'LCA Document',
+    "16": 'Vendor Letter',
+    "15": 'Client Letter',
     "30": 'Denial Notice',
+    "24": 'Consultadd W2',
+    "26": 'Final Petition',
     "31": 'Approval Notice',
     "18": 'Insurance Cards',
     "2": 'Degree Certificate',
@@ -53,6 +52,7 @@ DOCUMENT_TYPE = {
     "3": 'Academic Transcripts',
     "23": 'Employment Agreement',
     "19": 'Social Security Card',
+    "27": 'Receipt Acknowledgement',
     "11": 'Detailed Job Description',
     "7": 'Previous Approval Notices',
     "14": 'Performance Review Sheet ',
@@ -434,6 +434,21 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition.save()
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['delete'], detail=True, url_path='document')
+    def document(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            doc_id = request.query_params.get('doc_id', None)
+            if doc_id:
+                petition = get_object_or_404(Petition, id=petition_id)
+                doc = get_object_or_404(Document, id=doc_id)
+                doc.delete()
+                serializer = PetitionGetSerializer(petition)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": "document id is missing"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
