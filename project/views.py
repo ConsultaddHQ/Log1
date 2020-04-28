@@ -108,7 +108,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             notes = [interview.notes for interview in submission.screening.all()
                      if interview.notes is not None]
-            recordings = "\n".join(recordings) if len(recordings) != 0 else "NA"
+            notes = "\n".join(notes) if len(notes) != 0 else "NA"
 
             if resume:
                 path.append(download_s3_object(resume.first().attachment_file.name))
@@ -619,7 +619,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                                 links = IphoneAppLink.objects.filter(is_sent=False)
                                 if links:
                                     link = links.first()
-                                    iphone_link = link.link
+                                    iphone_link = config.IPHONE_APP_LINK
                                     resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
                                     if err == 'ok':
                                         link.is_sent = True
@@ -813,8 +813,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 statuses__is_current=True, consultant_id=kwargs.get('pk', None), statuses__status='joined'
             )
             if not projects:
-                projects = projects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
-                                           statuses__status__istartswith='terminated')
+                projects = Project.objects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
+                                                  statuses__status__istartswith='terminated')
             if projects:
                 project = projects.latest('-id')
                 if start:

@@ -2,8 +2,11 @@ from datetime import date, timedelta
 from django.core.management import BaseCommand
 
 from constance import config
+from django.db.models import Q
+
 from project.models import Project
-from utils_app.views import mattermost_webhook
+from consultant.models import Consultant
+from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -35,7 +38,7 @@ class Command(BaseCommand):
             "text": text
         }
 
-        mattermost_webhook(config.joined_url, data)
+        post_msg_using_webhook(config.joined_url, data)
 
         text = f"""
 #### Project Joining in this Week :memo: \n
@@ -62,5 +65,26 @@ class Command(BaseCommand):
             "text": text
         }
 
-        mattermost_webhook(config.joined_url, data)
-        mattermost_webhook(config.general_url, data)
+        post_msg_using_webhook(config.joined_url, data)
+        post_msg_using_webhook(config.general_url, data)
+
+        queryset = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
+        on_bench_con = queryset.count()
+        ba_con = queryset.filter(
+            Q(skills__istartswith='ba') |
+            Q(skills__istartswith='workday')
+        ).count()
+
+        data = {
+            "response_type": "in_channel",
+            "username": "Log1 Updates",
+            "text": f"""
+#### Consultants on Bench :memo: \n
+| Status     | Count          |
+|:-----------|:---------------|
+| Total      | {on_bench_con} |
+| Dev    | {ba_con}  |
+| BA | {on_bench_con - ba_con}   |
+"""
+}
+        post_msg_using_webhook(config.recruitment_url, data)

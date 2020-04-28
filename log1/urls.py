@@ -8,21 +8,25 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_swagger.views import get_swagger_view
 from rest_framework.documentation import include_docs_urls
 
-from report.views import ScrumMeetingReport
+from utils_app.views import CityViewSets
 
 from ckiller.views import CkillerSubmissionView
 
 from impersonate.views import ImpersonateViewSets
 
-from utils_app.views import CityViewSets, SlashCommandViewSets
+from messaging.views import SMSViewSet, ReceiveSMSViewSet
+
+from legal.views import PetitionViewSets, PetitionDocsViewSets
 
 from attachment.views import AttachmentView, AttachmentGetView
 
+from report.views import ScrumMeetingReport, SlashCommandViewSets
+
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
-from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, Test, TimeSheetV2ViewSets
-
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
+
+from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeSheetV2ViewSets, Test
 
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
 
@@ -33,10 +37,6 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
     ConsultantProfileViewSets, ConsultantPOCViewSets, WorkAuthViewSets, ConsultantPetitionAuthViewSet
-
-from legal.views import PetitionViewSets, PetitionDocsViewSets
-
-from messaging.views import SMSViewSet, ReceiveSMSViewSet
 
 schema_view = get_swagger_view(title="New Log1 Documentation")
 
@@ -109,6 +109,6 @@ urlpatterns = [
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
-if bool(os.getenv('DEBUG', 'False')):
+if os.getenv('DEBUG', 'False') == 'True':
     urlpatterns.append(path('api/swagger/', schema_view))
     urlpatterns.append(path('api/docs/', include_docs_urls(title='New Log1', public=True)))

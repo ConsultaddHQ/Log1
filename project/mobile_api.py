@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from django.db.models import Q, F
+from django.db.models import F
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
@@ -63,8 +63,13 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
         try:
+            project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
+                              'terminated-resigned_rate_issue', 'terminated-resigned_location_issue',
+                              'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
+                              'terminated-fired_budget_issue', 'terminated-fired_performance_issue',
+                              'terminated-fired_security_issue']
             projects = request.user.get_project().filter(
-                Q(statuses__status='joined', statuses__is_current=True)
+                Q(statuses__status__in=project_status, statuses__is_current=True)
             ).order_by('-id')
             if projects:
                 project = projects.first()
@@ -237,10 +242,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     def contact_us(self, request):
         message = request.data.get('message')
         contact_type = request.data.get('type')
-        phone_type = request.data.get('phone_type', None)
+        phone_type = request.data.get('device_type', None)
         try:
             if contact_type == 'finance':
-                to = ['aditi.so@consultadd.in']
+                to = ['finance@consultadd.com']
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
                 to = ['aditi.so@consultadd.in']
