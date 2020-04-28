@@ -55,6 +55,7 @@ class Project(TimeStampedModel):
     attachments = GenericRelation(Attachment)
     end_date = models.DateField(_('End Date'), null=True, blank=True)
     start_date = models.DateField(_('Start Date'), null=True, blank=True)
+    is_remote = models.BooleanField(_('Is Remote Project'), default=False)
     feedback = models.TextField(_('Reason of Failure'), null=True, blank=True)
     payment_term = models.IntegerField(_('Payment Term'), null=True, blank=True)
     client_address = models.TextField(_('Client Address'), null=True, blank=True)

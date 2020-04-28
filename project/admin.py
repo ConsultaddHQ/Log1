@@ -10,7 +10,7 @@ class ProjectAdmin(ExportActionModelAdmin):
     list_filter = ('statuses__status',)
     search_fields = ('id', 'consultant__name', 'submission__client', 'submission__created_by__employee_name')
     list_display = ('id', 'submission', 'start_date', 'end_date', 'consultant', 'project_status_display',
-                    'client_display', 'vendor_display', 'client_address', 'city', 'vendor_address')
+                    'client_display', 'vendor_display', 'client_address', 'city', 'vendor_address', 'is_remote')
 
     def project_status_display(self, obj):
         statuses = obj.statuses.filter(is_current=True)

@@ -28,7 +28,8 @@ from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceT
 
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeSheetV2ViewSets, Test
 
-from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets
+from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
+    AllUsersViewSet
 
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 
@@ -42,6 +43,7 @@ schema_view = get_swagger_view(title="New Log1 Documentation")
 
 router = DefaultRouter()
 
+router.register(r'users', AllUsersViewSet)
 router.register(r'assets', AssetsViewSets)
 router.register(r'auth', EmployeeAuthViewSets)
 router.register(r'employee', EmployeeViewSets)

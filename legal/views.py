@@ -26,40 +26,6 @@ logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
 
-DOCUMENT_TYPE = {
-    "6": 'I94',
-    "20": 'MSA',
-    "28": 'RFE',
-    "4": 'Visa',
-    "1": 'Resume',
-    "9": 'Paystub',
-    "8": 'Form I20',
-    "5": 'Passport',
-    "17": 'Timesheet',
-    "22": 'Work Order',
-    "21": 'Offer Letter',
-    "29": 'RFE Response',
-    "25": 'LCA Document',
-    "16": 'Vendor Letter',
-    "15": 'Client Letter',
-    "30": 'Denial Notice',
-    "24": 'Consultadd W2',
-    "26": 'Final Petition',
-    "31": 'Approval Notice',
-    "18": 'Insurance Cards',
-    "2": 'Degree Certificate',
-    "13": 'Experience Letter',
-    "3": 'Academic Transcripts',
-    "23": 'Employment Agreement',
-    "19": 'Social Security Card',
-    "27": 'Receipt Acknowledgement',
-    "11": 'Detailed Job Description',
-    "7": 'Previous Approval Notices',
-    "14": 'Performance Review Sheet ',
-    "12": 'Employment Authorization Card',
-}
-
-
 # Api for Legal Team
 class PetitionViewSets(viewsets.ModelViewSet):
     queryset = Petition.objects.all()
@@ -565,8 +531,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             documents = Document.objects.filter(petition=petition_id)
             petition = get_object_or_404(Petition, id=petition_id)
 
-            if file_type in DOCUMENT_TYPE.keys():
-                title = f"{DOCUMENT_TYPE[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})"
+            doc_type = Types.objects.filter(id=file_type).first()
+            if doc_type:
+                title = f"{doc_type.display_name} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})"
                 data = {
                     "title": title,
                     "category": "alert",

@@ -1,4 +1,5 @@
 import logging
+from itertools import chain
 
 from django.utils import timezone
 from datetime import timedelta, datetime
@@ -7,6 +8,7 @@ from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import F, Value, CharField
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -18,6 +20,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
 from employee.serializers import *
 from employee.models import Role, Team
+from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
@@ -479,3 +482,27 @@ class AssetsViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AllUsersViewSet(GenericViewSet, ListModelMixin):
+    queryset = User.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            query = request.query_params.get('query', '')
+
+            users = self.queryset.filter(employee_name__istartswith=query, is_active=True).annotate(
+                name=F('employee_name'),
+                type=Value('user', CharField())
+            ).values('id', 'name', 'type')
+
+            consultants = Consultant.objects.filter(name__istartswith=query).exclude(status='archived').annotate(
+                type=Value('consultant', CharField())
+            ).values('id', 'name', 'type')
+
+            result_list = list(chain(consultants[:5], users[:5]))
+            return Response({"results": result_list}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)

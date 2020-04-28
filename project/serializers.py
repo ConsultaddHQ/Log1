@@ -36,7 +36,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.submission.client
 
     def get_consultant_name(self, obj):
-        return obj.submission.consultant.name
+        if obj.consultant:
+            return obj.consultant.name
+        return None
 
     def get_company_name(self, obj):
         return obj.submission.lead.vendor_company.name
@@ -146,8 +148,8 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
             return {
                 'id': project.id,
                 'start_date': project.start_date,
-                'team': project.submission.employer.title(),
                 'client': project.submission.client,
+                'team': project.submission.employer.title(),
                 'vendor': project.submission.lead.vendor_company.name,
             }
         return None

@@ -432,6 +432,22 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if hasattr(sub, 'project'):
                 return Response({"error": "Project already exist"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
+            is_remote = request.data.get('is_remote', None)
+            if is_remote:
+                if request.data['remote_consultant_type'] == 'user':
+                    user = User.objects.get(id=request.data["remote_consultant_id"])
+                    consultant, created = Consultant.objects.get_or_create(
+                        email=user.email,
+                        status='on_bench',
+                        gender=user.gender,
+                        name=user.employee_name,
+                    )
+                else:
+                    consultant = get_object_or_404(Consultant, id=request.data["remote_consultant_id"])
+
+            else:
+                consultant = sub.consultant
+
             serializer = self.serializer_class(data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -446,7 +462,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 sub.save()
 
                 project.city = sub.lead.city
-                project.consultant = sub.consultant
+                project.consultant = consultant
                 project.save()
 
                 scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'],
@@ -464,6 +480,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         return Response({"error": "error", "support_mail_error": str(support_mail_res),
                                          "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
 
+                serializer = self.serializer_class(project)
                 return Response({
                     "result": serializer.data,
                     "support_mail": str(support_mail_res),
