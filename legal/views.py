@@ -363,6 +363,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             fedex_no = request.data.get('fedex_no')
             receipt_no = request.data.get('receipt_no')
             file = request.FILES.get('file')
+            rfe_doc = request.FILES.get('rfe_doc')
             request_status = request.data.get('status')
             petition = get_object_or_404(Petition, id=petition_id)
             if petition.status == 'print' and request_status == 'shipped':
@@ -384,17 +385,14 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 else:
                     return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
 
-            elif request_status == 'rfe':
-                if file:
-                    Document.objects.create(
-                        file=file,
-                        verified=True,
-                        creator=request.user,
-                        doc_type_id='28',
-                        petition_id=petition_id,
-                    )
-                else:
-                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+            elif rfe_doc:
+                Document.objects.create(
+                    file=file,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id='28',
+                    petition_id=petition_id,
+                )
 
             elif petition.status == 'rfe' and request_status == 'rfe_responded':
                 if file:
