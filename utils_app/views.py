@@ -1,6 +1,4 @@
-import json
 import logging
-import requests
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -12,11 +10,6 @@ from rest_framework.authentication import TokenAuthentication
 from utils_app.models import City
 
 logger = logging.getLogger(__name__)
-
-
-def mattermost_webhook(url, data):
-    headers = {'Content-Type': 'application/json'}
-    requests.post(url, headers=headers, data=json.dumps(data))
 
 
 class CityViewSets(ListModelMixin, GenericViewSet):

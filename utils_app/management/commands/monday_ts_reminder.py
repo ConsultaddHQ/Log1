@@ -1,10 +1,12 @@
+from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
 
 from datetime import date
-from project.models import *
-from consultant.models import *
-from notification.views import create_notification, push_notification
+from project.models import TimeSheet
+from consultant.models import Consultant
+from notification.views import push_notification
+from notification.models import Notification, FCMDevice
 
 
 class Command(BaseCommand):
@@ -27,6 +29,7 @@ class Command(BaseCommand):
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
+                    'target': 'timesheet',
                     'target_id': timesheet.id,
                     'timestamp': str(timezone.now()),
                 },

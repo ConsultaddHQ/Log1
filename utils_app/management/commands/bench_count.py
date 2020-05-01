@@ -11,17 +11,17 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        queryset = Consultant.objects.filter(marketing__status='open').exclude(status='archived').order_by('id').distinct('id')
+        queryset = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
         on_bench_con = queryset.count()
         in_pool_con = queryset.filter(marketing__in_pool=True).count()
         on_boarded = Consultant.objects.filter(
             projects__statuses__status='on_boarded',
             projects__statuses__is_current=True
-        ).exclude(status='archived').order_by('id').distinct('id').count()
+        ).exclude(status='archived').distinct().count()
         joined = Consultant.objects.filter(
             projects__statuses__status='on_boarded',
             projects__statuses__is_current=True
-        ).exclude(status='archived').order_by('id').distinct('id').count()
+        ).exclude(status='archived').distinct().count()
 
         data = {
             "response_type": "in_channel",

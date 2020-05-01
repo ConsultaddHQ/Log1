@@ -18,7 +18,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
-                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name')
+                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
+                  'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -139,8 +140,8 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     def get_project(self, obj):
         project = Project.objects.filter(
             Q(consultant=obj, statuses__is_current=True) & (
-              Q(statuses__status='joined') |
-              Q(statuses__status__istartswith='terminated')
+                    Q(statuses__status__istartswith='terminated') |
+                    Q(statuses__status__in=['joined', 'complete', 'extended'])
             )
         )
         if project:
@@ -155,14 +156,17 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         return None
 
     def get_ts_status(self, obj):
-        project = Project.objects.filter(consultant=obj, statuses__status='joined', statuses__is_current=True)
-        if project:
-            project = project.latest('-id')
-            queryset = TimeSheet.objects.filter(project=project)
-            sub_ts = True if queryset.filter(status='submitted') else False
-            rej_ts = True if queryset.filter(status='rejected', is_active=False) else False
-            return {'rejected': rej_ts, 'submitted': sub_ts}
-        return {'rejected': False, 'submitted': False}
+        projects = Project.objects.filter(
+            Q(consultant=obj, statuses__is_current=True) & (
+                    Q(statuses__status__istartswith='terminated') |
+                    Q(statuses__status__in=['joined', 'complete', 'extended'])
+            )
+        )
+        project_ids = list(projects.values_list('id', flat=True))
+        queryset = TimeSheet.objects.filter(project_id__in=project_ids)
+        sub_ts = True if queryset.filter(status='submitted') else False
+        rej_ts = True if queryset.filter(status='rejected', is_active=False) else False
+        return {'rejected': rej_ts, 'submitted': sub_ts}
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
@@ -175,7 +179,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'reporting_details')
+                  'start_date', 'end_date', 'reporting_details' 'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)

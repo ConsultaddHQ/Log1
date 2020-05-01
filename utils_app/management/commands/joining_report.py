@@ -2,8 +2,8 @@ from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
-from utils_app.views import mattermost_webhook
-from project.models import Project, PayrollSchedule
+from project.models import Project
+from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -57,4 +57,4 @@ class Command(BaseCommand):
 | Joining Status Not updated in log1 | {offers_not_joined}      |
 """
         }
-        mattermost_webhook(config.joined_url, data)
+        post_msg_using_webhook(config.joined_url, data)

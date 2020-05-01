@@ -438,10 +438,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     user = User.objects.get(id=request.data["remote_consultant_id"])
                     consultant, created = Consultant.objects.get_or_create(
                         email=user.email,
-                        status='on_bench',
                         gender=user.gender,
                         name=user.employee_name,
                     )
+                    consultant.status = 'on_project'
+                    consultant.remote_only = True
+                    consultant.save()
                 else:
                     consultant = get_object_or_404(Consultant, id=request.data["remote_consultant_id"])
 
@@ -455,13 +457,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 ProjectStatus.objects.create(
                     status='new',
                     project=project,
-                    is_current=True
+                    is_current=True,
                 )
 
                 sub.status = 'project'
                 sub.save()
 
                 project.city = sub.lead.city
+                project.is_remote = is_remote
                 project.consultant = consultant
                 project.save()
 
@@ -510,6 +513,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 "vendor_address": request.data.get('vendor_address', None),
                 "invoicing_period": request.data.get('invoicing_period', None),
                 "reporting_details": request.data.get('reporting_details', None),
+                "remote_consultant_id": request.data.get('remote_consultant_id', None),
+                "remote_consultant_type": request.data.get('remote_consultant_type', None),
+
             }
             if data["city"]:
                 project.city = data["city"]
@@ -532,6 +538,23 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if data["reporting_details"]:
                 project.reporting_details = data["reporting_details"]
 
+            if data["remote_consultant_id"]:
+                if data['remote_consultant_type'] == 'user':
+                    user = User.objects.get(id=request.data["remote_consultant_id"])
+                    consultant, created = Consultant.objects.get_or_create(
+                        email=user.email,
+                        gender=user.gender,
+                        name=user.employee_name,
+                    )
+                    consultant.status = 'on_project'
+                    consultant.remote_only = True
+                    consultant.save()
+                else:
+                    consultant = get_object_or_404(Consultant, id=request.data["remote_consultant_id"])
+                project.consultant = consultant
+
+            is_remote = request.data.get('is_remote', None)
+            project.is_remote = is_remote
             project.save()
 
             # Emoji for Mattermost update
@@ -555,9 +578,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 p_status, p_s_created = ProjectStatus.objects.get_or_create(
-                    status=new_status.lower(),
                     is_current=True,
-                    project=project
+                    project=project,
+                    status=new_status.lower(),
                 )
                 if p_s_created:
                     prev_status_obj.is_current = False
@@ -833,13 +856,13 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 projects = Project.objects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
                                                   statuses__status__istartswith='terminated')
             if projects:
-                project = projects.latest('-id')
+                ids = list(projects.values_list('id', flat=True))
                 if start:
                     queryset = TimeSheet.objects.filter(
-                        project=project, start__range=[start, end]
+                        project__in=ids, start__range=[start, end]
                     ).exclude(status='draft')
                 else:
-                    queryset = TimeSheet.objects.filter(project=project).exclude(status='draft')
+                    queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
@@ -867,7 +890,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             if consultant_id:
                 consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
             elif consultant_name:
-                consultants = Consultant.objects.filter(name__istartswith=consultant_name)
+                consultants = Consultant.objects.filter(name__istartswith=consultant_name).exclude(status='archived')
             else:
                 consultant_ids = Project.objects.filter(
                     statuses__status__in=project_status, statuses__is_current=True
@@ -942,6 +965,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         "data": {
                             'is_read': False,
                             'is_deleted': False,
+                            'target': 'timesheet',
                             'target_id': timesheet.id,
                             'timestamp': str(timezone.now()),
                         },

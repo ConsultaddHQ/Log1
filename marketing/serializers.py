@@ -56,7 +56,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'created', 'duration', 'start_date', 'end_date', 'city', 'feedback', 'consultant',
                   'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list',
-                  'reporting_details', 'attachments')
+                  'reporting_details', 'attachments', 'is_remote')
 
     def get_attachments(self, obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data

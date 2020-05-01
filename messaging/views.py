@@ -36,8 +36,9 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def retrieve(self, request, *args, **kwargs):
         try:
             conversation_id = kwargs.get('pk', None)
-            messages = Message.objects.filter(conversation=conversation_id).order_by('created')\
-                .values('id', 'text', 'created', 'is_sent', 'conversation_id')
+            messages = Message.objects.filter(
+                conversation=conversation_id, conversation__user1__owner=request.user
+            ).order_by('created').values('id', 'text', 'created', 'is_sent', 'conversation_id')
             return Response({"results": messages}, status=status.HTTP_200_OK)
         except Exception as err:
             return Response({'error': str(err)}, status=status.HTTP_400_BAD_REQUEST)

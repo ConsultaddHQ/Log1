@@ -249,9 +249,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         try:
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
-            serializer = self.serializer_class(petition, data=request.data)
+            serializer = PetitionUpdateSerializer(petition, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            serializer = self.serializer_class(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -330,6 +331,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
             receipt_no = request.data.get('receipt_no')
             file = request.FILES.get('file')
             rfe_doc = request.FILES.get('rfe_doc')
+            approved_doc = request.FILES.get('approved_doc')  # optional
+            denied_doc = request.FILES.get('denied_doc')  # optional
             request_status = request.data.get('status')
             petition = get_object_or_404(Petition, id=petition_id)
             if petition.status == 'print' and request_status == 'shipped':
@@ -353,7 +356,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
             elif rfe_doc:
                 Document.objects.create(
-                    file=file,
+                    file=rfe_doc,
                     verified=True,
                     creator=request.user,
                     doc_type_id='28',
@@ -372,29 +375,23 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 else:
                     return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
 
-            elif request_status == 'denied':
-                if file:
-                    Document.objects.create(
-                        file=file,
-                        verified=True,
-                        creator=request.user,
-                        doc_type_id='30',
-                        petition_id=petition_id,
-                    )
-                else:
-                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+            elif denied_doc:
+                Document.objects.create(
+                    file=file,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id='30',
+                    petition_id=petition_id,
+                )
 
-            elif request_status == 'approved':
-                if file:
-                    Document.objects.create(
-                        file=file,
-                        verified=True,
-                        creator=request.user,
-                        doc_type_id='31',
-                        petition_id=petition_id,
-                    )
-                else:
-                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+            elif approved_doc:
+                Document.objects.create(
+                    file=file,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id='31',
+                    petition_id=petition_id,
+                )
 
             petition.status = request_status
             petition.save()
@@ -552,10 +549,11 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     "title": title,
                     "category": "alert",
                     "show_in_foreground": True,
-                    "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                    "click_action": "https://log1.app",
                     "data": {
                         'is_read': False,
                         'is_deleted': False,
+                        'target': 'petition',
                         'target_id': petition_id,
                         'timestamp': str(timezone.now()),
                     },

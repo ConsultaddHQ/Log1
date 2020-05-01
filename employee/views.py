@@ -133,7 +133,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     users = users.filter(team=request.user.team, role__name='marketer')
 
             users = users.filter(employee_name__istartswith=query)
-            users = users.annotate(name=Lower('employee_name')).order_by('name')
+            users = users.annotate(name=F('employee_name')).order_by(Lower('name'))
             data = users.values('id', 'employee_id', 'email', 'name')
             return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as error:

@@ -5,7 +5,7 @@ from constance import config
 from employee.models import Team
 from project.models import Project
 from marketing.models import Submission, Interview
-from utils_app.views import mattermost_webhook
+from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -17,12 +17,15 @@ class Command(BaseCommand):
         start = date.today() - timedelta(days=7)
         end = date.today() - timedelta(days=1)
 
-        joined_or_terminated = ["resigned-rate", "resigned-location", "resigned-full_time", "resigned-technology",
-                                "client-fired-budget", "client-fired-performance", "client-fired-security", "joined",
-                                "completed"]
-
-        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
-                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
+        cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
+                     'cancelled-contract_conflicts', 'cancelled-candidate_denied',
+                     'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                     'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
+        joined_or_terminated = ['joined', 'complete', 'terminated', 'terminated-resigned', 'terminated-fired',
+                                'terminated-resigned_rate_issue', 'terminated-resigned_technology_issue',
+                                'terminated-fired_budget_issue', 'terminated-fired_security_issue',
+                                'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
+                                'terminated-resigned_full_time_offer']
 
         text = f"""
 #### Project Details :memo: \n
@@ -85,4 +88,4 @@ class Command(BaseCommand):
             "text": text
         }
 
-        mattermost_webhook(config.marketing_report_url, data)
+        post_msg_using_webhook(config.marketing_report_url, data)

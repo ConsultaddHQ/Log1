@@ -3,7 +3,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.views import mattermost_webhook
+from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -42,7 +42,7 @@ class Command(BaseCommand):
 | On boarded | {on_boarded_projects} |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        post_msg_using_webhook(config.offer_url, data)
 
         data = {
             "response_type": "in_channel",
@@ -57,4 +57,4 @@ class Command(BaseCommand):
 | Total Offer  | {total_projects} |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        post_msg_using_webhook(config.offer_url, data)

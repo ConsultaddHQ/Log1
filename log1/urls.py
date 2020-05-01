@@ -36,10 +36,10 @@ from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, C
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets
 
-from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantMarketingViewSets, \
-    ConsultantProfileViewSets, ConsultantPOCViewSets, WorkAuthViewSets, ConsultantPetitionAuthViewSet
+from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
+    ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet
 
-schema_view = get_swagger_view(title="New Log1 Documentation")
+SCHEMA_VIEW = get_swagger_view(title="New Log1 Documentation")
 
 router = DefaultRouter()
 
@@ -112,5 +112,5 @@ urlpatterns = [
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if os.getenv('DEBUG', 'False') == 'True':
-    urlpatterns.append(path('api/swagger/', schema_view))
+    urlpatterns.append(path('api/swagger/', SCHEMA_VIEW))
     urlpatterns.append(path('api/docs/', include_docs_urls(title='New Log1', public=True)))

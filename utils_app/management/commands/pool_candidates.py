@@ -2,7 +2,7 @@ from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
-from consultant.models import ConsultantMarketing, Consultant
+from consultant.models import ConsultantMarketing
 from utils_app.utils import post_msg_using_webhook
 
 

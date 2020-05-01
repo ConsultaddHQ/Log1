@@ -38,6 +38,12 @@ class DocumentURLSerializer(serializers.ModelSerializer):
         fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file', 'verified', 'category', 'remark')
 
 
+class PetitionUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Petition
+        fields = '__all__'
+
+
 class PetitionSerializer(serializers.ModelSerializer):
     consultant = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
