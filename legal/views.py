@@ -203,7 +203,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
             queryset = Petition.objects.filter(is_active=True)
             if filter_for == 'my':
                 queryset = queryset.filter(
-                    Q(created_by=request.user) |
                     Q(assigned_to=request.user)
                 )
             if query:
@@ -377,7 +376,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
             elif denied_doc:
                 Document.objects.create(
-                    file=file,
+                    file=denied_doc,
                     verified=True,
                     creator=request.user,
                     doc_type_id='30',
@@ -386,7 +385,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
             elif approved_doc:
                 Document.objects.create(
-                    file=file,
+                    file=approved_doc,
                     verified=True,
                     creator=request.user,
                     doc_type_id='31',

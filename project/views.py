@@ -18,12 +18,12 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateMode
 from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
-from consultant.models import ConsultantPOC, Consultant
 from marketing.models import Submission, User
+from consultant.models import ConsultantPOC, Consultant
 from attachment.views import download_s3_object, delete_temp_file
-from utils_app.utils import get_time_filter, post_msg_using_webhook
-from notification.views import push_notification, Notification, FCMDevice
 from utils_app.mailing import send_email_attachment_multiple, send_email
+from notification.views import push_notification, Notification, FCMDevice
+from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         try:
             mail_data = {
                 'to': [project.consultant.email],
-                'cc': [],
+                'cc': [config.FINANCE],
                 'bcc': ['sarang.m@consultadd.com'],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
@@ -650,7 +650,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         )
 
                         if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
-                            password = config.CONSULTANT_PASSWORD
+                            password = password_generator(password_length=10, strength=3)
                             consultant.set_password(password)
                             consultant.is_active = True
                             consultant.save()
