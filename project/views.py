@@ -118,7 +118,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
             cc = cc + scrum_masters
 
+            recruiter_name = "NA"
             if recruiter:
+                recruiter_name = recruiter.employee_name
                 cc.append(recruiter.email)
             if retention:
                 cc.append(retention.email)
@@ -137,6 +139,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'employer': submission.employer,
                     'client_name': submission.client,
                     'location': submission.lead.city,
+                    'recruiter_name': recruiter_name,
                     'consultant_name': consultant_name,
                     'job_title': submission.lead.job_title,
                     'consultant_email': project.consultant.email,
@@ -432,10 +435,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if hasattr(sub, 'project'):
                 return Response({"error": "Project already exist"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
-            is_remote = request.data.get('is_remote', None)
-            if is_remote:
-                if request.data['remote_consultant_type'] == 'user':
-                    user = User.objects.get(id=request.data["remote_consultant_id"])
+            is_remote = request.data.get('is_remote', False)
+            remote_consultant_id = request.data.get('remote_consultant_id', None)
+            if remote_consultant_id:
+                if request.data.get('remote_consultant_type', None) == 'user':
+                    user = User.objects.get(id=remote_consultant_id)
                     consultant, created = Consultant.objects.get_or_create(
                         email=user.email,
                         gender=user.gender,
@@ -445,8 +449,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     consultant.remote_only = True
                     consultant.save()
                 else:
-                    consultant = get_object_or_404(Consultant, id=request.data["remote_consultant_id"])
-
+                    consultant = get_object_or_404(Consultant, id=remote_consultant_id)
+                    consultant.status = 'on_project'
+                    consultant.remote_only = True
+                    consultant.save()
             else:
                 consultant = sub.consultant
 

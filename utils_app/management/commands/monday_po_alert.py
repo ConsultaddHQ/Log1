@@ -45,8 +45,10 @@ class Command(BaseCommand):
 """
         start = date.today()
         end = date.today() + timedelta(days=5)
-        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
-                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
+
+        cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled', 'cancelled-contract_conflicts',
+                     'cancelled-candidate_denied', 'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                     'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
 
         joining_this_week = Project.objects.filter(start_date__range=[start, end]).exclude(
             statuses__status__in=cancelled,

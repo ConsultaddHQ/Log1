@@ -13,10 +13,15 @@ class Command(BaseCommand):
     # A command must define handle()
 
     def handle(self, *args, **options):
-        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
-                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
-        terminated = ["completed", "resigned-rate", "resigned-location", "resigned-full_time", "resigned-technology",
-                      "client-fired-budget", "client-fired-performance", "client-fired-security"]
+        cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled', 'cancelled-contract_conflicts',
+                     'cancelled-candidate_denied', 'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                     'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
+
+        terminated = ["completed", 'terminated', 'terminated-resigned', 'terminated-resigned_rate_issue',
+                      'terminated-resigned_technology_issue', 'terminated-fired_budget_issue', 'terminated-fired',
+                      'terminated-fired_security_issue', 'terminated-resigned_location_issue',
+                      'terminated-fired_performance_issue', 'terminated-resigned_full_time_offer']
+
         month = date.today().month
         new_offer = Project.objects.filter(statuses__status='new', statuses__is_current=True).count()
         received_projects = Project.objects.filter(statuses__status='received', statuses__is_current=True).count()
