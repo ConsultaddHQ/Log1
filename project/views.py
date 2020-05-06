@@ -18,12 +18,12 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateMode
 from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
-from consultant.models import ConsultantPOC, Consultant
 from marketing.models import Submission, User
+from consultant.models import ConsultantPOC, Consultant
 from attachment.views import download_s3_object, delete_temp_file
-from utils_app.utils import get_time_filter, post_msg_using_webhook
-from notification.views import push_notification, Notification, FCMDevice
 from utils_app.mailing import send_email_attachment_multiple, send_email
+from notification.views import push_notification, Notification, FCMDevice
+from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         try:
             mail_data = {
                 'to': [project.consultant.email],
-                'cc': [],
+                'cc': [config.FINANCE],
                 'bcc': ['sarang.m@consultadd.com'],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
@@ -108,7 +108,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             notes = [interview.notes for interview in submission.screening.all()
                      if interview.notes is not None]
-            recordings = "\n".join(recordings) if len(recordings) != 0 else "NA"
+            notes = "\n".join(notes) if len(notes) != 0 else "NA"
 
             if resume:
                 path.append(download_s3_object(resume.first().attachment_file.name))
@@ -118,7 +118,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
             cc = cc + scrum_masters
 
+            recruiter_name = "NA"
             if recruiter:
+                recruiter_name = recruiter.employee_name
                 cc.append(recruiter.email)
             if retention:
                 cc.append(retention.email)
@@ -137,6 +139,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'employer': submission.employer,
                     'client_name': submission.client,
                     'location': submission.lead.city,
+                    'recruiter_name': recruiter_name,
                     'consultant_name': consultant_name,
                     'job_title': submission.lead.job_title,
                     'consultant_email': project.consultant.email,
@@ -432,6 +435,27 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if hasattr(sub, 'project'):
                 return Response({"error": "Project already exist"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
+            is_remote = request.data.get('is_remote', False)
+            remote_consultant_id = request.data.get('remote_consultant_id', None)
+            if remote_consultant_id:
+                if request.data.get('remote_consultant_type', None) == 'user':
+                    user = User.objects.get(id=remote_consultant_id)
+                    consultant, created = Consultant.objects.get_or_create(
+                        email=user.email,
+                        gender=user.gender,
+                        name=user.employee_name,
+                    )
+                    consultant.status = 'on_project'
+                    consultant.remote_only = True
+                    consultant.save()
+                else:
+                    consultant = get_object_or_404(Consultant, id=remote_consultant_id)
+                    consultant.status = 'on_project'
+                    consultant.remote_only = True
+                    consultant.save()
+            else:
+                consultant = sub.consultant
+
             serializer = self.serializer_class(data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -439,14 +463,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 ProjectStatus.objects.create(
                     status='new',
                     project=project,
-                    is_current=True
+                    is_current=True,
                 )
 
                 sub.status = 'project'
                 sub.save()
 
                 project.city = sub.lead.city
-                project.consultant = sub.consultant
+                project.is_remote = is_remote
+                project.consultant = consultant
                 project.save()
 
                 scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'],
@@ -464,6 +489,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         return Response({"error": "error", "support_mail_error": str(support_mail_res),
                                          "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
 
+                serializer = self.serializer_class(project)
                 return Response({
                     "result": serializer.data,
                     "support_mail": str(support_mail_res),
@@ -493,6 +519,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 "vendor_address": request.data.get('vendor_address', None),
                 "invoicing_period": request.data.get('invoicing_period', None),
                 "reporting_details": request.data.get('reporting_details', None),
+                "remote_consultant_id": request.data.get('remote_consultant_id', None),
+                "remote_consultant_type": request.data.get('remote_consultant_type', None),
+
             }
             if data["city"]:
                 project.city = data["city"]
@@ -515,6 +544,23 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if data["reporting_details"]:
                 project.reporting_details = data["reporting_details"]
 
+            if data["remote_consultant_id"]:
+                if data['remote_consultant_type'] == 'user':
+                    user = User.objects.get(id=request.data["remote_consultant_id"])
+                    consultant, created = Consultant.objects.get_or_create(
+                        email=user.email,
+                        gender=user.gender,
+                        name=user.employee_name,
+                    )
+                    consultant.status = 'on_project'
+                    consultant.remote_only = True
+                    consultant.save()
+                else:
+                    consultant = get_object_or_404(Consultant, id=request.data["remote_consultant_id"])
+                project.consultant = consultant
+
+            is_remote = request.data.get('is_remote', None)
+            project.is_remote = is_remote
             project.save()
 
             # Emoji for Mattermost update
@@ -538,9 +584,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 p_status, p_s_created = ProjectStatus.objects.get_or_create(
-                    status=new_status.lower(),
                     is_current=True,
-                    project=project
+                    project=project,
+                    status=new_status.lower(),
                 )
                 if p_s_created:
                     prev_status_obj.is_current = False
@@ -610,7 +656,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         )
 
                         if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
-                            password = config.CONSULTANT_PASSWORD
+                            password = password_generator(password_length=10, strength=3)
                             consultant.set_password(password)
                             consultant.is_active = True
                             consultant.save()
@@ -619,7 +665,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                                 links = IphoneAppLink.objects.filter(is_sent=False)
                                 if links:
                                     link = links.first()
-                                    iphone_link = link.link
+                                    iphone_link = config.IPHONE_APP_LINK
                                     resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
                                     if err == 'ok':
                                         link.is_sent = True
@@ -813,16 +859,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 statuses__is_current=True, consultant_id=kwargs.get('pk', None), statuses__status='joined'
             )
             if not projects:
-                projects = projects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
-                                           statuses__status__istartswith='terminated')
+                projects = Project.objects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
+                                                  statuses__status__istartswith='terminated')
             if projects:
-                project = projects.latest('-id')
+                ids = list(projects.values_list('id', flat=True))
                 if start:
                     queryset = TimeSheet.objects.filter(
-                        project=project, start__range=[start, end]
+                        project__in=ids, start__range=[start, end]
                     ).exclude(status='draft')
                 else:
-                    queryset = TimeSheet.objects.filter(project=project).exclude(status='draft')
+                    queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
@@ -850,7 +896,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             if consultant_id:
                 consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
             elif consultant_name:
-                consultants = Consultant.objects.filter(name__istartswith=consultant_name)
+                consultants = Consultant.objects.filter(name__istartswith=consultant_name).exclude(status='archived')
             else:
                 consultant_ids = Project.objects.filter(
                     statuses__status__in=project_status, statuses__is_current=True
@@ -925,6 +971,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         "data": {
                             'is_read': False,
                             'is_deleted': False,
+                            'target': 'timesheet',
                             'target_id': timesheet.id,
                             'timestamp': str(timezone.now()),
                         },

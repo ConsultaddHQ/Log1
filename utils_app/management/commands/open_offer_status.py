@@ -1,9 +1,8 @@
-from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.views import mattermost_webhook
+from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -40,4 +39,4 @@ class Command(BaseCommand):
 | Total      |   {total}    |
 """
         }
-        mattermost_webhook(config.marketing_report_url, data)
+        post_msg_using_webhook(config.marketing_report_url, data)

@@ -2,8 +2,9 @@ from datetime import date, timedelta
 from django.core.management import BaseCommand
 
 from constance import config
+
 from project.models import Project
-from utils_app.views import mattermost_webhook
+from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -35,7 +36,7 @@ class Command(BaseCommand):
             "text": text
         }
 
-        mattermost_webhook(config.joined_url, data)
+        post_msg_using_webhook(config.joined_url, data)
 
         text = f"""
 #### Project Joining in this Week :memo: \n
@@ -44,8 +45,10 @@ class Command(BaseCommand):
 """
         start = date.today()
         end = date.today() + timedelta(days=5)
-        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
-                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
+
+        cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled', 'cancelled-contract_conflicts',
+                     'cancelled-candidate_denied', 'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                     'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
 
         joining_this_week = Project.objects.filter(start_date__range=[start, end]).exclude(
             statuses__status__in=cancelled,
@@ -62,5 +65,5 @@ class Command(BaseCommand):
             "text": text
         }
 
-        mattermost_webhook(config.joined_url, data)
-        mattermost_webhook(config.general_url, data)
+        post_msg_using_webhook(config.joined_url, data)
+        post_msg_using_webhook(config.general_url, data)

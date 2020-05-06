@@ -222,9 +222,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 email=data['email'],
                 skills=data['skills'],
                 gender=data['gender'],
-                date_of_birth=data['dob'],
                 phone_no=data['phone_no'],
                 current_city=data['current_city'],
+                date_of_birth=data['date_of_birth'],
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
@@ -236,12 +236,12 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 title="Original",
                 links=data['links'],
                 consultant=consultant,
-                date_of_birth=data['dob'],
                 visa_end=data['visa_end'],
                 profile_owner=request.user,
                 visa_type=data['visa_type'],
                 visa_start=data['visa_start'],
                 current_city=data['current_city'],
+                date_of_birth=data['date_of_birth'],
             )
 
             # Creating Recruiter of Consultant

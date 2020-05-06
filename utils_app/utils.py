@@ -1,4 +1,5 @@
 import json
+import random
 import requests
 from datetime import date, timedelta
 
@@ -73,3 +74,28 @@ def post_msg_using_webhook(url, data):
     except Exception as error:
         print(error)
         return None
+
+
+def password_generator(password_length=10, strength=3):
+    lower = "abcdefghijklmnopqrstuvwxyz"
+    upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()"
+    password = ""
+
+    # if strength selected is strong
+    if strength == 1:
+        for i in range(0, password_length):
+            password = password + random.choice(lower)
+        return password
+
+    # if strength selected is medium
+    elif strength == 2:
+        for i in range(0, password_length):
+            password = password + random.choice(upper)
+        return password
+
+    # if strength selected is strong
+    else:
+        for i in range(0, password_length):
+            password = password + random.choice(digits)
+        return password

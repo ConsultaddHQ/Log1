@@ -26,33 +26,6 @@ logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
 
-DOCUMENT_TYPE = {
-    "6": 'I94',
-    "20": 'MSA',
-    "4": 'Visa',
-    "1": 'Resume',
-    "9": 'Paystub',
-    "8": 'Form I20',
-    "5": 'Passport',
-    "17": 'Timesheet',
-    "22": 'Work Order',
-    "21": 'Offer Letter',
-    "15": 'Client Letter',
-    "24": 'Consultadd W2',
-    "16": 'Vendor Letter',
-    "18": 'Insurance Cards',
-    "2": 'Degree Certificate',
-    "13": 'Experience Letter',
-    "3": 'Academic Transcripts',
-    "23": 'Employment Agreement',
-    "19": 'Social Security Card',
-    "11": 'Detailed Job Description',
-    "7": 'Previous Approval Notices',
-    "14": 'Performance Review Sheet ',
-    "12": 'Employment Authorization Card',
-}
-
-
 # Api for Legal Team
 class PetitionViewSets(viewsets.ModelViewSet):
     queryset = Petition.objects.all()
@@ -230,7 +203,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
             queryset = Petition.objects.filter(is_active=True)
             if filter_for == 'my':
                 queryset = queryset.filter(
-                    Q(created_by=request.user) |
                     Q(assigned_to=request.user)
                 )
             if query:
@@ -276,10 +248,169 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         try:
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
-            serializer = self.serializer_class(petition, data=request.data)
+            serializer = PetitionUpdateSerializer(petition, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            serializer = self.serializer_class(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='lca')
+    def lca(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            petition = get_object_or_404(Petition, id=petition_id)
+            lca_no = request.data.get('lca_no', None)
+            file = request.FILES.get('file', None)
+            if petition.status == 'doc_request_sent' and lca_no:
+                petition.status = 'lca_filed'
+                petition.lca_no = lca_no
+
+            elif petition.status == 'lca_filed' and file:
+                Document.objects.create(
+                    file=file,
+                    verified=True,
+                    doc_type_id='25',
+                    creator=request.user,
+                    petition_id=petition_id,
+                )
+                petition.status = 'lca_approved'
+            else:
+                return Response({'error': 'Data is missing'}, status=status.HTTP_400_BAD_REQUEST)
+
+            petition.save()
+            serializer = PetitionGetSerializer(petition)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='petition_file')
+    def final_petition_file(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            file = request.FILES.get('file')
+            request_status = request.data.get('status')
+            petition = get_object_or_404(Petition, id=petition_id)
+
+            if petition.status != 'print':
+                if file:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='26',
+                        petition_id=petition_id,
+                    )
+                    if petition.status == 'lca_approved':
+                        petition.status = 'under_review'
+
+                if request_status == 'reviewed' or request_status == 'print':
+                    document = Document.objects.filter(petition=petition_id, doc_type_id='26').first()
+                    if not document:
+                        return Response({"error": "Please upload document before moving further"},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                petition.status = request_status
+
+            else:
+                return Response({"error": "Changes can't be done at this stage"}, status=status.HTTP_400_BAD_REQUEST)
+
+            petition.save()
+            serializer = PetitionGetSerializer(petition)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='petition_status')
+    def petition_shipping_status(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            fedex_no = request.data.get('fedex_no')
+            receipt_no = request.data.get('receipt_no')
+            file = request.FILES.get('file')
+            rfe_doc = request.FILES.get('rfe_doc')
+            approved_doc = request.FILES.get('approved_doc')  # optional
+            denied_doc = request.FILES.get('denied_doc')  # optional
+            request_status = request.data.get('status')
+            petition = get_object_or_404(Petition, id=petition_id)
+            if petition.status == 'print' and request_status == 'shipped':
+                if fedex_no:
+                    petition.fedex_no = fedex_no
+                else:
+                    return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+            elif petition.status == 'shipped' and request_status == 'doc_acknowledged':
+                if file and receipt_no:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='27',
+                        petition_id=petition_id,
+                    )
+                    petition.uscis_no = receipt_no
+                else:
+                    return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+            elif rfe_doc:
+                Document.objects.create(
+                    file=rfe_doc,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id='28',
+                    petition_id=petition_id,
+                )
+
+            elif petition.status == 'rfe' and request_status == 'rfe_responded':
+                if file:
+                    Document.objects.create(
+                        file=file,
+                        verified=True,
+                        creator=request.user,
+                        doc_type_id='29',
+                        petition_id=petition_id,
+                    )
+                else:
+                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+            elif denied_doc:
+                Document.objects.create(
+                    file=denied_doc,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id='30',
+                    petition_id=petition_id,
+                )
+
+            elif approved_doc:
+                Document.objects.create(
+                    file=approved_doc,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id='31',
+                    petition_id=petition_id,
+                )
+
+            petition.status = request_status
+            petition.save()
+            serializer = PetitionGetSerializer(petition)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['delete'], detail=True, url_path='document')
+    def document(self, request, *args, **kwargs):
+        try:
+            petition_id = kwargs.get('pk')
+            doc_id = request.query_params.get('doc_id', None)
+            if doc_id:
+                petition = get_object_or_404(Petition, id=petition_id)
+                doc = get_object_or_404(Document, id=doc_id)
+                doc.delete()
+                serializer = PetitionGetSerializer(petition)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": "document id is missing"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -396,8 +527,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             documents = Document.objects.filter(petition=petition_id)
             petition = get_object_or_404(Petition, id=petition_id)
 
-            if file_type in DOCUMENT_TYPE.keys():
-                title = f"{DOCUMENT_TYPE[file_type]} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})"
+            doc_type = Types.objects.filter(id=file_type).first()
+            if doc_type:
+                title = f"{doc_type.display_name} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})"
                 data = {
                     "title": title,
                     "category": "alert",
@@ -416,10 +548,11 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     "title": title,
                     "category": "alert",
                     "show_in_foreground": True,
-                    "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                    "click_action": "https://log1.app",
                     "data": {
                         'is_read': False,
                         'is_deleted': False,
+                        'target': 'petition',
                         'target_id': petition_id,
                         'timestamp': str(timezone.now()),
                     },

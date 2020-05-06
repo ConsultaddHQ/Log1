@@ -15,29 +15,26 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def mail_to_scrum(yesterday, this_week, scrum_master, path, offers):
+def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
     try:
         path = [path]
-        to = [scrum_master.email]
         mail_data = {
-            'to': to,
+            'to': [scrum_masters],
             'cc': [],
             'bcc': [],
-            'subject': 'Scrum Report of {} from {} to {}'.format(scrum_master.team.name, this_week, yesterday),
+            'subject': 'Scrum Report of {} from {} to {}'.format(team_name, this_week, yesterday),
             'template': '../templates/scrum_report.html',
             'context': {
                 'end': yesterday,
                 'offers': offers,
+                'team': team_name,
                 'start': this_week,
-                'team': scrum_master.team.name,
             },
             'attachments': path
         }
         res = send_email_attachment_multiple(mail_data, 'Log1')
-        logger.error("Weekly Report mail res for {}: {}".format(scrum_master.email, res))
         return res, "ok"
     except Exception as error:
-        logger.error("Weekly Report mail exception error for {}: {}".format(scrum_master.email, error))
         return error, "error"
 
 
@@ -64,13 +61,9 @@ class Command(BaseCommand):
 
             df.to_excel(writer, sheet_name='Sheet1')
             writer.save()
-            scrum_masters = User.objects.filter(team=team, role__name__in=['admin', 'proxy'])
+            scrum_masters = list(User.objects.filter(team=team, role__name__in=['admin', 'proxy']).values_list('email', flat=True))
             offers = Project.objects.filter(created__gte=today.replace(day=1), submission__created_by__team=team)
-            for user in scrum_masters:
-                yesterday = today - timedelta(days=1)
-                response, res = mail_to_scrum(yesterday, this_week, user, path, offers)
-                if res == 'ok' and os.path.exists(path):
-                    os.remove(path)
-
+            yesterday = today - timedelta(days=1)
+            response, res = mail_to_scrum(yesterday, this_week, scrum_masters, team.name,  path, offers)
             if os.path.exists(path):
                 os.remove(path)

@@ -80,6 +80,7 @@ class ConsultantManager(BaseUserManager):
 class Consultant(AbstractBaseUser, TimeStampedModel):
     is_active = models.BooleanField(default=False)
     first_login = models.BooleanField(default=True)
+    remote_only = models.BooleanField(default=False)
     email = models.EmailField(_('Email ID'), unique=True)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")
@@ -87,6 +88,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     ssn = models.CharField(_('SSN ID'), max_length=20, null=True, blank=True)
     date_of_birth = models.DateField(_('Date of birth'), blank=True, null=True)
     links = models.CharField(_('Links'), max_length=100, blank=True, null=True)
+    domain = models.CharField(_('Domain'), max_length=20, null=True, blank=True)
     skills = models.CharField(_('Skills'), max_length=100, null=True, blank=True)
     skype = models.CharField(_('Skype Id'), max_length=100, null=True, blank=True)
     phone_no = models.CharField(_('Phone Number'), max_length=20, null=True, blank=True)
@@ -107,6 +109,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         default='full_time'
     )
 
+    # fields for Legal
     p_is_active = models.BooleanField(default=False)
     visa_petition = models.BooleanField(_('Petition login'), default=False)
     pin = models.CharField(_('Pin'), max_length=10, blank=True, null=True)

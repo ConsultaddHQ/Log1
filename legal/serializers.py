@@ -38,6 +38,12 @@ class DocumentURLSerializer(serializers.ModelSerializer):
         fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file', 'verified', 'category', 'remark')
 
 
+class PetitionUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Petition
+        fields = '__all__'
+
+
 class PetitionSerializer(serializers.ModelSerializer):
     consultant = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
@@ -67,6 +73,7 @@ class PetitionSerializer(serializers.ModelSerializer):
 
 
 class PetitionGetSerializer(serializers.ModelSerializer):
+    rfe = serializers.SerializerMethodField()
     docs = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
@@ -74,7 +81,14 @@ class PetitionGetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Petition
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'docs', 'status',
-                  'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active')
+                  'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active', 'rfe')
+
+    def get_rfe(self, obj):
+        rfe_doc = obj.documents.filter(doc_type__name__iexact='rfe')
+        if rfe_doc:
+            return True
+        return False
+
 
     def get_docs(self, obj):
         return DocumentSerializer(obj.documents.all(), many=True).data

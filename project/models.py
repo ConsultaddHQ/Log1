@@ -59,6 +59,7 @@ class Project(TimeStampedModel):
     payment_term = models.IntegerField(_('Payment Term'), null=True, blank=True)
     client_address = models.TextField(_('Client Address'), null=True, blank=True)
     vendor_address = models.TextField(_('Vendor Address'), null=True, blank=True)
+    is_remote = models.BooleanField(_('Is Remote Project'), null=True, blank=True)
     city = models.CharField(_('Client City'), max_length=100, blank=True, null=True)
     duration = models.CharField(_('Duration'), max_length=50, null=True, blank=True)
     reporting_details = models.TextField(_('Reporting Details'), null=True, blank=True)
