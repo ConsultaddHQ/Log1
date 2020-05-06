@@ -39,6 +39,8 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet
 
+from activity.views import PetitionCommentViewSet
+
 SCHEMA_VIEW = get_swagger_view(title="New Log1 Documentation")
 
 router = DefaultRouter()
@@ -79,6 +81,8 @@ router.register(r'report', ScrumMeetingReport)
 router.register(r'impersonate', ImpersonateViewSets)
 
 router.register(r'ckiller_data', CkillerSubmissionView)
+
+router.register(r'petition_comments', PetitionCommentViewSet)
 
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)
