@@ -328,6 +328,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition_id = kwargs.get('pk')
             fedex_no = request.data.get('fedex_no')
             receipt_no = request.data.get('receipt_no')
+            reason = request.data.get('reason', None)
             file = request.FILES.get('file')
             rfe_doc = request.FILES.get('rfe_doc')
             approved_doc = request.FILES.get('approved_doc')  # optional
@@ -390,6 +391,14 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     creator=request.user,
                     doc_type_id='31',
                     petition_id=petition_id,
+                )
+
+            if reason:
+                Reason.objects.create(
+                    reason=reason,
+                    petition_status=request_status,
+                    petition_id=petition_id,
+                    created_by=request.user,
                 )
 
             petition.status = request_status
