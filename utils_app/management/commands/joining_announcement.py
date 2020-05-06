@@ -14,8 +14,10 @@ class Command(BaseCommand):
         month = date.today().month
         year = date.today().year
 
-        terminated = ["completed", "resigned-rate", "resigned-location", "resigned-full_time", "resigned-technology",
-                      "client-fired-budget", "client-fired-performance", "client-fired-security", "terminated"]
+        terminated = ['terminated', 'terminated-resigned', 'terminated-fired', 'terminated-resigned_rate_issue',
+                      'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
+                      'terminated-fired_security_issue', 'terminated-resigned_location_issue',
+                      'terminated-fired_performance_issue', 'terminated-resigned_full_time_offer']
 
         projects = Project.objects.filter(
             created__year=year,

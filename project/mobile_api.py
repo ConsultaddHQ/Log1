@@ -254,20 +254,24 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             if contact_type == 'finance':
                 to = ['finance@consultadd.com']
+                bcc = ['sarang.m@consultadd.com']
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
-                to = ['aditi.so@consultadd.in']
+                to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.com']
+                bcc = []
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=status.HTTP_400_BAD_REQUEST)
 
             if os.environ.get('ENV', 'local') != 'prod':
                 to = ['sarang.m@consultadd.com', 'aditi.so@consultadd.in']
+                bcc = []
+                subject += "Development server"
 
             mail_data = {
                 'to': to,
                 'cc': [],
-                'bcc': ['sarang.m@consultadd.com'],
+                'bcc': bcc,
                 'subject': subject,
                 'template': '../templates/timesheet_contact_us.html',
                 'context': {
