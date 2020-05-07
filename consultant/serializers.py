@@ -33,29 +33,20 @@ class ConsultantLoginSerializer(UserSerializer):
 class ConsultantPetitionLoginSerializer(UserSerializer):
     token = serializers.SerializerMethodField()
     petition = serializers.SerializerMethodField()
-    petition_status = serializers.SerializerMethodField()
-    legal_poc = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
-        fields = ('id', 'token', 'email', 'name', 'petition', 'petition_status', 'legal_poc')
+        fields = ('id', 'token', 'email', 'name', 'petition')
 
     def get_petition(self, obj):
         petitions = obj.petitions.filter(is_active=True)
         if petitions:
-            return petitions.first().id
-        return None
-
-    def get_petition_status(self, obj):
-        petitions = obj.petitions.filter(is_active=True)
-        if petitions:
-            return petitions.first().status
-        return None
-
-    def get_legal_poc(self, obj):
-        petitions = obj.petitions.filter(is_active=True)
-        if petitions:
-            return UserSerializer(petitions.first().assigned_to).data
+            petition = petitions.first()
+            return {
+                "id": petition.id,
+                "status": petition.status,
+                "assigned_to": UserSerializer(petition.assigned_to).data
+            }
         return None
 
     def get_token(self, obj):

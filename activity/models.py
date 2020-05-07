@@ -4,8 +4,6 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
-from utils_app.models import TimeStampedModel
-
 from employee.models import User
 
 
@@ -45,7 +43,7 @@ class Activity(models.Model):
         verbose_name_plural = 'activities'
 
 
-class Comment(TimeStampedModel):
+class Comment(models.Model):
     comment_text = models.TextField(_('Comment Text'))
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,

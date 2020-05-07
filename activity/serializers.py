@@ -44,17 +44,17 @@ class ConsultantCommentSerializer(serializers.ModelSerializer):
         return obj.created_by_content_type.model
 
     def get_user(self, obj):
-        if obj.created_by_content_type.model == 'user':
+        content_type = obj.created_by_content_type.model
+        if content_type == 'user':
             name = obj.created_by_content_object.employee_name
-        elif obj.created_by_content_type.model == 'consultant':
+        elif content_type == 'consultant':
             name = obj.created_by_content_object.name
         else:
             return None
 
         result = {
             "employee_name": name,
-            "id": obj.created_by_content_object.id,
-            "email": obj.created_by_content_object.email
+            "id": obj.created_by_id,
         }
         return result
 
@@ -75,16 +75,16 @@ class ConsultantCommentGetSerializer(serializers.ModelSerializer):
         return obj.created_by_content_type.model
 
     def get_user(self, obj):
-        if obj.created_by_content_type.model == 'user':
+        content_type = obj.created_by_content_type.model
+        if content_type == 'user':
             name = obj.created_by_content_object.employee_name
-        elif obj.created_by_content_type.model == 'consultant':
+        elif content_type == 'consultant':
             name = obj.created_by_content_object.name
         else:
             return None
 
         result = {
             "employee_name": name,
-            "id": obj.created_by_content_object.id,
-            "email": obj.created_by_content_object.email
+            "id": obj.created_by_id,
         }
         return result

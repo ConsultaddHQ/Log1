@@ -7,12 +7,12 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
 
-from activity.models import Comment, ConsultantComment
 from employee.models import User, Team
 from utils_app.mailing import send_email
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
+from activity.models import Comment, ConsultantComment
 from notification.models import FCMDevice, Notification
 
 CONSULTANT_STATUS_CHOICE = (
@@ -84,7 +84,6 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     email = models.EmailField(_('Email ID'), unique=True)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")
-    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     attachments = GenericRelation(Attachment, verbose_name="Documents")
     ssn = models.CharField(_('SSN ID'), max_length=20, null=True, blank=True)
     date_of_birth = models.DateField(_('Date of birth'), blank=True, null=True)
@@ -94,6 +93,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     skype = models.CharField(_('Skype Id'), max_length=100, null=True, blank=True)
     phone_no = models.CharField(_('Phone Number'), max_length=20, null=True, blank=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
+    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     gender = models.CharField(
         _('Gender'), max_length=10,
         choices=GENDER_CHOICE,
