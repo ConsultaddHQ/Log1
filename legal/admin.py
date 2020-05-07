@@ -1,7 +1,7 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
-from .models import Petition, Document, Types, DocumentList
+from .models import Petition, Document, Types, DocumentList, Reason
 
 
 @admin.register(Types)
@@ -30,3 +30,9 @@ class DocumentAdmin(ExportActionModelAdmin):
     list_filter = ('doc_type__name', 'verified')
     list_display = ('id', 'petition', 'doc_type', 'creator', 'verified')
     search_fields = ('id', 'petition__id', 'petition__beneficiary__name', 'doc_type__name', 'creator__employee_name')
+
+
+@admin.register(Reason)
+class ReasonsAdmin(ExportActionModelAdmin):
+    list_display = ('id', 'petition', 'petition_status', 'reason', 'created_by')
+    search_fields = ('id', 'petition__id', 'status', 'created_by__employee_name')

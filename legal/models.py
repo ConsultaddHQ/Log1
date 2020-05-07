@@ -103,6 +103,34 @@ class Petition(TimeStampedModel):
         return super(Petition, self).save(*args, **kwargs)
 
 
+class Reason(TimeStampedModel):
+    created = models.DateTimeField(_('Created'), default=timezone.now)
+    petition_status = models.CharField(_('Petition Status'), choices=PETITION_STATUSES, max_length=20)
+    reason = models.TextField(_('Reason for Status'), null=True, blank=True)
+    petition = models.ForeignKey(
+        Petition, on_delete=models.CASCADE,
+        related_name='reasons',
+        verbose_name='Petition',
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Created By',
+        related_name='reason',
+        default=None, null=True,
+    )
+
+    def __str__(self):
+        return f'{self.petition.id} :: {self.petition.status} :: {self.reason}'
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        return super(Reason, self).save(*args, **kwargs)
+
+
 class DocumentList(models.Model):
     created = models.DateTimeField(_('Created'), default=timezone.now)
     to_show = models.BooleanField(_('Show to Consultant'), default=True)
