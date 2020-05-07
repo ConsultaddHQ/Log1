@@ -227,8 +227,7 @@ NOTIFICATIONS_CHANNELS = {
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
-    ('TUTORIAL_VIDEO', ('http://bit.ly/38VJ19o', 'Tutorial video Link')),
-    ('CONSULTANT_PASSWORD', ('Consultadd@12345', 'Consultant login password')),
+    ('APP_URL', ('https://app.log1.com/', 'Log1 URL')),
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728',
                          'Iphone App Link')),
     ('ANDROID_APP_LINK', ("https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app",
@@ -267,7 +266,7 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'TUTORIAL_VIDEO'),
+    'constants': ('APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'),
     'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN',
                   'BOOKING_ADMIN'),
     'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url',

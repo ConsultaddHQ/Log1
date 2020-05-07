@@ -534,7 +534,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     "title": title,
                     "category": "alert",
                     "description": title,
-                    "target_type": "consultant",
+                    "target_type": "petition",
                     "target_id": request.user.id,
                     "sender_id": request.user.id,
                     "recipient_user_type": "user",

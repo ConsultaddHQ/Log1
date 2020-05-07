@@ -163,9 +163,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
         """
         uuid = request.META.get('HTTP_UUID', b'')
         token = get_object_or_404(ConsultantToken, key=request.auth, uuid=uuid)
-        fcm_token = FCMDevice.objects.filter(content_type__model='consultanttoken', object_id=token.key)
         token.delete()
-        fcm_token.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

@@ -45,7 +45,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'context': {
                     'iphone_link': link,
                     'password': password,
-                    'tutorial_video': config.TUTORIAL_VIDEO,
                     'android_link': config.ANDROID_APP_LINK,
                     'consultant_name': project.consultant.name,
                     'consultant_email': project.consultant.email,
@@ -638,40 +637,40 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.joined_url, data)
 
                     consultant = project.consultant
-                    if not consultant.work_type == 'w2':
-                        # Creating first week Timesheet on project status change to joined
-                        start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
-                        week_day = start_date.weekday()
-                        if week_day == 6:
-                            end_date = start_date + timedelta(days=6)
-                        else:
-                            end_date = start_date + timedelta(days=5 - week_day)
 
-                        TimeSheet.objects.get_or_create(
-                            hours=0,
-                            end=end_date,
-                            status='draft',
-                            project=project,
-                            start=start_date,
-                        )
+                    # Creating first week Timesheet on project status change to joined
+                    start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
+                    week_day = start_date.weekday()
+                    if week_day == 6:
+                        end_date = start_date + timedelta(days=6)
+                    else:
+                        end_date = start_date + timedelta(days=5 - week_day)
 
-                        if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
-                            password = password_generator(password_length=10, strength=3)
-                            consultant.set_password(password)
-                            consultant.is_active = True
-                            consultant.save()
+                    TimeSheet.objects.get_or_create(
+                        hours=0,
+                        end=end_date,
+                        status='draft',
+                        project=project,
+                        start=start_date,
+                    )
 
-                            if os.environ.get('ENV', 'local') == 'prod':
-                                links = IphoneAppLink.objects.filter(is_sent=False)
-                                if links:
-                                    link = links.first()
-                                    iphone_link = config.IPHONE_APP_LINK
-                                    resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
-                                    if err == 'ok':
-                                        link.is_sent = True
-                                        link.sent_on = datetime.now()
-                                        link.consultant = consultant
-                                        link.save()
+                    if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
+                        password = password_generator(password_length=10, strength=3)
+                        consultant.set_password(password)
+                        consultant.is_active = True
+                        consultant.save()
+
+                        if os.environ.get('ENV', 'local') == 'prod':
+                            links = IphoneAppLink.objects.filter(is_sent=False)
+                            if links:
+                                link = links.first()
+                                iphone_link = config.IPHONE_APP_LINK
+                                resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                                if err == 'ok':
+                                    link.is_sent = True
+                                    link.sent_on = datetime.now()
+                                    link.consultant = consultant
+                                    link.save()
 
                 # Discord message for PO , Status Received
                 if new_status == 'received' and not project.is_msg_sent:
@@ -859,8 +858,13 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 statuses__is_current=True, consultant_id=kwargs.get('pk', None), statuses__status='joined'
             )
             if not projects:
-                projects = Project.objects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
-                                                  statuses__status__istartswith='terminated')
+                projects = Project.objects.filter(
+                    Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
+                        Q(statuses__status__istartswith='terminated') |
+                        Q(statuses__status='complete')
+                    )
+                )
+
             if projects:
                 ids = list(projects.values_list('id', flat=True))
                 if start:
@@ -891,7 +895,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             project_status = ['joined', 'terminated-resigned', 'terminated', 'terminated-resigned_location_issue',
                               'terminated-resigned_location_issue', 'terminated-resigned_full_time_offer',
                               'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
-                              'terminated-fired_performance_issue', 'terminated-fired_security_issue']
+                              'terminated-fired_performance_issue', 'terminated-fired_security_issue', 'complete']
 
             if consultant_id:
                 consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
