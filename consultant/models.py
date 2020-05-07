@@ -7,7 +7,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
 
-from activity.models import Comment
+from activity.models import Comment, ConsultantComment
 from employee.models import User, Team
 from utils_app.mailing import send_email
 from attachment.models import Attachment
@@ -84,6 +84,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     email = models.EmailField(_('Email ID'), unique=True)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")
+    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     attachments = GenericRelation(Attachment, verbose_name="Documents")
     ssn = models.CharField(_('SSN ID'), max_length=20, null=True, blank=True)
     date_of_birth = models.DateField(_('Date of birth'), blank=True, null=True)

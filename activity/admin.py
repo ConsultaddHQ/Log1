@@ -1,5 +1,5 @@
 from django.contrib import admin
-from activity.models import Activity, Comment
+from activity.models import Activity, Comment, ConsultantComment
 from import_export.admin import ExportActionModelAdmin
 
 
@@ -15,3 +15,10 @@ class CommentAdmin(ExportActionModelAdmin):
     list_filter = ('content_type',)
     search_fields = ('user__employee_name', 'content_type__model')
     list_display = ('id', 'user', 'object_id', 'content_type', 'parent_comment')
+
+
+@admin.register(ConsultantComment)
+class ConsultantCommentAdmin(ExportActionModelAdmin):
+    list_filter = ('content_type',)
+    search_fields = ['content_type__model']
+    list_display = ('id', 'object_id', 'content_type', 'parent_comment')

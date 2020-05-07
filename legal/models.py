@@ -6,7 +6,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
 from employee.models import User
-from activity.models import Comment
+from activity.models import Comment, ConsultantComment
 from consultant.models import Consultant
 from utils_app.models import TimeStampedModel
 
@@ -64,6 +64,7 @@ class Petition(TimeStampedModel):
     lca_no = models.CharField(_('LCA No.'), max_length=40, null=True, blank=True)
     employer = models.CharField(_('Employer'), max_length=20, default='Consultadd')
     comments = GenericRelation(Comment, verbose_name="comments")
+    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     status = models.CharField(_('Status'), choices=PETITION_STATUSES, max_length=20)
     uscis_no = models.CharField(_('USCIS No.'), max_length=40, null=True, blank=True)
     fedex_no = models.CharField(_('Fedex No.'), max_length=40, null=True, blank=True)

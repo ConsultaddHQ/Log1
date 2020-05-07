@@ -483,34 +483,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         else:
             return Response({"error": 'Method not allowed'}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get', 'post'], detail=True, url_path='comments')
-    def comments(self, request, *args, **kwargs):
-        consultant_id = kwargs.get('pk')
-        if request.method == 'GET':
-            try:
-                consultant = get_object_or_404(Consultant, id=consultant_id)
-                queryset = consultant.comments.filter(parent_comment=None)
-                serializer = CommentGetSerializer(queryset, many=True)
-                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        elif request.method == 'POST':
-            try:
-                content_type = ContentType.objects.get(model='consultant')
-                comment = Comment.objects.create(
-                    user=request.user,
-                    object_id=consultant_id,
-                    content_type=content_type,
-                    comment_text=request.data['comment_text'],
-                    parent_comment_id=request.data['parent_comment'],
-                )
-                serializer = CommentGetSerializer(comment)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, *args, **kwargs):
         try:
