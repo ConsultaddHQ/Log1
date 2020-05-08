@@ -113,27 +113,18 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
 
 class ConsultantCommentViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMixin):
     queryset = Activity.objects.all()
-    permission_classes = (ConsultantPetitionIsAuthenticated,)
     serializer_class = ActivitySerializer,
+    permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
 
     def retrieve(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
-        model = request.query_params.get('model')
         try:
-            models = {
-                "project": Project,
-                "petition": Petition,
-                "interview": Interview,
-                "timesheet": TimeSheet,
-                "submission": Submission,
-                "consultant": Consultant,
-            }
-            if not models[model]:
-                return Response({"error": "Selected Model is not valid"}, status=status.HTTP_400_BAD_REQUEST)
+            petition = get_object_or_404(Petition, id=object_id)
+            if petition.beneficiary != request.user:
+                return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
 
-            instance = get_object_or_404(models[model], id=object_id)
-            comments = instance.consultant_comments.filter(parent_comment=None)
+            comments = petition.consultant_comments.filter(parent_comment=None)
             serializer = ConsultantCommentGetSerializer(comments, many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -141,12 +132,14 @@ class ConsultantCommentViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMi
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
-        model = request.data['model']
         object_id = request.data['id']
-        user_type = request.data['user_type']
         try:
-            content_type = ContentType.objects.get(model=model)
-            created_by_content_type = ContentType.objects.get(model=user_type)
+            petition = get_object_or_404(Petition, id=object_id)
+            if petition.beneficiary != request.user:
+                return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
+
+            content_type = ContentType.objects.get(model='petition')
+            created_by_content_type = ContentType.objects.get(model='consultant')
             comment = ConsultantComment.objects.create(
                 object_id=object_id,
                 content_type=content_type,

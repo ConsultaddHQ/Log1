@@ -16,11 +16,11 @@ from impersonate.views import ImpersonateViewSets
 
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 
-from legal.views import PetitionViewSets, PetitionDocsViewSets
-
 from attachment.views import AttachmentView, AttachmentGetView
 
 from report.views import ScrumMeetingReport, SlashCommandViewSets
+
+from legal.views import PetitionViewSets, PetitionDocsViewSets, PetitionCommentViewSet
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
@@ -80,6 +80,7 @@ router.register(r'report', ScrumMeetingReport)
 
 router.register(r'comment', CommentViewSet)
 router.register(r'con_comment', ConsultantCommentViewSet)
+router.register(r'petition_comment', PetitionCommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
 

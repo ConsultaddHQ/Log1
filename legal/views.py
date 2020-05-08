@@ -8,8 +8,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
@@ -20,6 +21,7 @@ from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from employee.token import get_token_generator
 from attachment.views import presigned_post_url, get_s3_object
+from activity.serializers import ConsultantCommentGetSerializer
 from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
@@ -584,4 +586,47 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             document.delete()
             return Response({"result": "File deleted"}, status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PetitionCommentViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMixin):
+    queryset = Petition.objects.all()
+    serializer_class = PetitionSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def retrieve(self, request, *args, **kwargs):
+        object_id = kwargs.get('pk')
+        try:
+            if not ('legal' in request.user.roles):
+                return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
+
+            petition = get_object_or_404(Petition, id=object_id)
+            comments = petition.consultant_comments.filter(parent_comment=None)
+            serializer = ConsultantCommentGetSerializer(comments, many=True)
+            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        object_id = request.data['id']
+        try:
+            if not ('legal' in request.user.roles):
+                return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
+
+            content_type = ContentType.objects.get(model='petition')
+            created_by_content_type = ContentType.objects.get(model='user')
+            comment = ConsultantComment.objects.create(
+                object_id=object_id,
+                content_type=content_type,
+                created_by_id=request.user.id,
+                created_by_content_type=created_by_content_type,
+                comment_text=request.data['comment_text'],
+                parent_comment_id=request.data['parent_comment'],
+            )
+            serializer = ConsultantCommentGetSerializer(comment)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
