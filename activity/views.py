@@ -141,12 +141,14 @@ class ConsultantCommentViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMi
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
-        model = request.dzata['model']
+        model = request.data['model']
         object_id = request.data['id']
         user_type = request.data['user_type']
         try:
             content_type = ContentType.objects.get(model=model)
+            print("a")
             created_by_content_type = ContentType.objects.get(model=user_type)
+            print("b")
             comment = ConsultantComment.objects.create(
                 object_id=object_id,
                 content_type=content_type,
@@ -155,7 +157,9 @@ class ConsultantCommentViewSet(GenericViewSet, RetrieveModelMixin, CreateModelMi
                 comment_text=request.data['comment_text'],
                 parent_comment_id=request.data['parent_comment'],
             )
+            print("c")
             serializer = ConsultantCommentGetSerializer(comment)
+            print("d")
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)
