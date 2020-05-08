@@ -531,3 +531,34 @@ class ConsultantFeedback(TimeStampedModel):
 
     def __str__(self):
         return f'{self.id}:{self.consultant.name} {self.feedback_type} of {self.rating}'
+
+
+class Terminate(TimeStampedModel):
+    reason = models.TextField(_('Termination Reason'))
+    last_date = models.DateField(_('Termination Date'))
+    rehire = models.BooleanField(_('Fit to rehire'), default=False)
+    resign_date = models.DateField(_('Resignation Date'), blank=True, null=True)
+    notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
+    exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)
+    consultant = models.ForeignKey(
+        Consultant, on_delete=models.CASCADE,
+        related_name='Terminate',
+        verbose_name='Consultant'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='termination_created',
+        verbose_name='Termination added by'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Terminate, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.consultant.name} {self.reason}'
