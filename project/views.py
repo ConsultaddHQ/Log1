@@ -372,6 +372,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', None)
         filter_by_time = request.query_params.get('filter_by_time', None)
+        filter_by_lead = request.query_params.get('filter_by_lead', None)
         filter_by_status = request.query_params.get('filter_by_status', None)
 
         page = int(request.query_params.get("page", 1))
@@ -386,6 +387,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = Project.objects.filter(submission__created_by__team=request.user.team)
             else:
                 projects = Project.objects.all()
+
+            if filter_by_lead == 'w2':
+                projects = projects.filter(submission__lead__is_w2=True)
 
             if query:
                 projects = projects.filter(
