@@ -846,6 +846,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     authentication_classes = (TokenAuthentication,)
 
     def retrieve(self, request, *args, **kwargs):
+        query = request.query_params.get('query', None)
         start = request.query_params.get('start', None)
         end = request.query_params.get('end', date.today())
 
@@ -854,29 +855,22 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            projects = Project.objects.filter(
-                statuses__is_current=True, consultant_id=kwargs.get('pk', None), statuses__status='joined'
-            )
-            if not projects:
-                projects = Project.objects.filter(
-                    Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
-                        Q(statuses__status__istartswith='terminated') |
-                        Q(statuses__status='complete')
-                    )
+            queryset = TimeSheet.objects.filter(
+                Q(project__consultant_id=kwargs.get('pk', None)) & (
+                        Q(status='submitted') |
+                        Q(status='rejected', is_active=False)
                 )
-
-            if projects:
-                ids = list(projects.values_list('id', flat=True))
-                if start:
-                    queryset = TimeSheet.objects.filter(
-                        project__in=ids, start__range=[start, end]
-                    ).exclude(status='draft')
-                else:
-                    queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
-                total = queryset.count()
-                serializer = self.serializer_class(queryset[first:last], many=True)
-                return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
-            return Response({"error": "No Project Found"}, status=status.HTTP_400_BAD_REQUEST)
+            )
+            if start:
+                queryset = queryset.filter(project__start_date__range=[start, end])
+            if query:
+                queryset = queryset.filter(
+                    Q(project__submission__client__istartswith=query) |
+                    Q(project__submission__lead__vendor_company__name__istartswith=query)
+                )
+            total = queryset.count()
+            serializer = self.serializer_class(queryset[first:last], many=True)
+            return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

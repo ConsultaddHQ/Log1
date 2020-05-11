@@ -13,8 +13,8 @@ from consultant.serializers import *
 from consultant.auth import consultant_authenticate
 from consultant.permissions import ConsultantIsAuthenticated
 from employee.models import get_password_reset_token_expiry_time
+from consultant.authentication import ConsultantTokenAuthentication
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
-from consultant.authentication import ConsultantTokenAuthentication, get_consultant
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     def change_password(self, request):
         first_login = request.query_params.get('first_login', None)
         new_password = request.data.get('new_password', None)
-        consultant = get_consultant(request)
+        consultant = request.user
         if first_login and new_password:
             if consultant.check_password(new_password):
                 return Response({"error": "Please use new password", "error_in": "new"},
