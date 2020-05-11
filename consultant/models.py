@@ -19,6 +19,7 @@ CONSULTANT_STATUS_CHOICE = (
     ('on_bench', 'On Bench'),
     ('archived', 'Archived'),
     ('on_project', 'On Project'),
+    ('terminate', 'Terminate')
 )
 
 MARKETING_STATUS_CHOICE = (
@@ -534,15 +535,15 @@ class ConsultantFeedback(TimeStampedModel):
 
 
 class Terminate(TimeStampedModel):
-    reason = models.TextField(_('Termination Reason'))
-    last_date = models.DateField(_('Termination Date'))
+    resign_date = models.DateField(_('Resignation Date'))
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
-    resign_date = models.DateField(_('Resignation Date'), blank=True, null=True)
+    reason = models.CharField(_('Termination Reason'), max_length=50)
+    last_date = models.DateField(_('Termination Date'), blank=True, null=True)
     notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
     exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)
     consultant = models.ForeignKey(
         Consultant, on_delete=models.CASCADE,
-        related_name='Terminate',
+        related_name='terminate',
         verbose_name='Consultant'
     )
     created_by = models.ForeignKey(
@@ -561,4 +562,4 @@ class Terminate(TimeStampedModel):
         return super(Terminate, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.id}:{self.consultant.name} {self.reason}'
+        return f'{self.id}:{self.consultant.name}:{self.reason}'

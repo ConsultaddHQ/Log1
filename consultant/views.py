@@ -8,15 +8,16 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin
 
+from constance import config
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
-from activity.serializers import CommentGetSerializer
+from utils_app.utils import post_msg_using_webhook
 from attachment.serializers import AttachmentSerializer
+from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -35,6 +36,65 @@ def start_marketing():
     try:
         queryset = ConsultantMarketing.objects.filter(start__lte=date.today(), status='close', end=None)
         queryset.update(status='open')
+        return None
+    except Exception as error:
+        return error
+
+
+def terminate_consultant():
+    try:
+        data = Terminate.objects.filter(last_date__lte=date.today())
+        for queryset in data:
+            consultant = Consultant.objects.get(id=queryset.consultant.id)
+            consultant.status = 'terminate'
+            consultant.save()
+
+            # Mattermost message for Interview
+            text = "#### Exit interview for {} \n Reason for leaving :{} \n " \
+                   "Exit Interview Details : {} \n Termination Date: {}".format(
+                    consultant.name, queryset.reason, queryset.exit_details, queryset.last_date
+                    )
+            data = {
+                "response_type": "in_channel",
+                "username": "Log1 Updates",
+                "text": text,
+            }
+            post_msg_using_webhook(config.consultant_termination_url, data)
+
+            # notification
+            notification_data = {
+                'category': 'info',
+                'description': queryset.reason,
+                'target_id': queryset.id,
+                'target_type': 'termination',
+                'sender_user_type': 'user',
+                'sender_id': queryset.created_by,
+                'recipient_user_type': 'user',
+                'title': 'Consultant Termination',
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "terminated",
+                "show_in_foreground": True,
+                "title": f"Consultant {consultant.name} Terminated",
+                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "body": f"Consultant {consultant.name} Terminated",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'timesheet',
+                    'target_id': queryset.id,
+                    'timestamp': str(timezone.now()),
+                },
+            }
+            object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='consultanttoken'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
         return None
     except Exception as error:
         return error
@@ -165,7 +225,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             close_marketing()
             start_marketing()
-            consultants = Consultant.objects.filter(marketing__status='open')
+            consultants = Consultant.objects.filter(marketing__status='open').exclude(status='terminate')
             roles = request.user.roles
 
             if 'marketer' in request.user.roles:
@@ -552,7 +612,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.exclude(status='archived')
+            consultants = Consultant.objects.exclude(status='archived').exclude(status='terminate')
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
@@ -1040,3 +1100,46 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         logger.error("Incorrect Email Id OR Password")
         return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TerminateConsultantViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin):
+    queryset = Terminate.objects.all()
+    serializer_class = ConsultantBenchSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+
+            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
+            Terminate.objects.create(
+                consultant=consultant,
+                created_by=request.user,
+                reason=request.data.get('reason'),
+                rehire=request.data.get('rehire', False),
+                resign_date=request.data.get('resign_date', None),
+                last_date=request.data.get('last_date', None),
+                exit_details=request.data.get('exit_details', None),
+                notice_period=request.data.get('notice_period', None),
+            )
+            serializer = self.serializer_class(consultant)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+
+            terminate = get_object_or_404(Terminate, id=kwargs.get('pk'))
+            serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except KeyError as err:
+            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
