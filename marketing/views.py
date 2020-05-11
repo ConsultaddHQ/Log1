@@ -163,13 +163,13 @@ class LeadViewSets(viewsets.ModelViewSet):
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
                 ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                         'company_name', 'status', 'created', 'modified', 'submission_count')
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
                 ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                         'company_name', 'status', 'created', 'modified', 'submission_count')
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
         except Exception as error:
@@ -228,7 +228,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset.annotate(submission_count=Count('submission')) \
                     .annotate(company_name=F('vendor_company__name'),
                               company_id=F('vendor_company__id'),
-                              ).values('id', 'job_desc', 'city', 'job_title', 'w2', 'primary_skill', 'status', 'created',
+                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
                                        'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
