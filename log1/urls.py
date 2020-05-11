@@ -20,7 +20,7 @@ from attachment.views import AttachmentView, AttachmentGetView
 
 from report.views import ScrumMeetingReport, SlashCommandViewSets
 
-from legal.views import PetitionViewSets, PetitionDocsViewSets, PetitionCommentViewSet
+from legal.views import PetitionViewSets, PetitionDocsViewSets
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
@@ -39,7 +39,7 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, TerminateConsultantViewSet
 
-from activity.views import CommentViewSet, ConsultantCommentViewSet
+from activity.views import CommentViewSet
 
 SCHEMA_VIEW = get_swagger_view(title="New Log1 Documentation")
 
@@ -80,8 +80,6 @@ router.register(r'cmd', SlashCommandViewSets)
 router.register(r'report', ScrumMeetingReport)
 
 router.register(r'comment', CommentViewSet)
-router.register(r'con_comment', ConsultantCommentViewSet)
-router.register(r'petition_comment', PetitionCommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
 

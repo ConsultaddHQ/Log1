@@ -79,6 +79,7 @@ class ConsultantManager(BaseUserManager):
 
 
 class Consultant(AbstractBaseUser, TimeStampedModel):
+    is_w2 = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     first_login = models.BooleanField(default=True)
     remote_only = models.BooleanField(default=False)

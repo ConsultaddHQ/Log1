@@ -280,6 +280,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 ssn=data['ssn'],
                 name=data['name'],
                 email=data['email'],
+                is_w2=data['is_w2'],
                 skills=data['skills'],
                 gender=data['gender'],
                 phone_no=data['phone_no'],
