@@ -179,7 +179,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'reporting_details' 'is_remote')
+                  'start_date', 'end_date', 'reporting_details', 'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
