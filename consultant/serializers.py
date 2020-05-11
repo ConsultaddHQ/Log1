@@ -224,7 +224,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
+                  'date_of_birth', 'work_type', 'current_city', 'w2', 'work_auth', 'recruiter', 'relation', 'support',
                   'profiles', 'education', 'experience', 'rate', 'marketing')
 
     def get_work_auth(self, obj):
