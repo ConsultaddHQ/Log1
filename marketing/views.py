@@ -163,13 +163,13 @@ class LeadViewSets(viewsets.ModelViewSet):
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
                 ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                         'company_name', 'status', 'created', 'modified', 'submission_count')
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
                 ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                         'company_name', 'status', 'created', 'modified', 'submission_count')
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
         except Exception as error:
