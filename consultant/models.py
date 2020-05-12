@@ -27,6 +27,13 @@ MARKETING_STATUS_CHOICE = (
     ('close', 'Close'),
 )
 
+TERMINATION_REASON_CHOICE = (
+    ('fired', 'Fired'),
+    ('location_change', 'Change of Location'),
+    ('other_offer', 'Got Other Offer'),
+)
+
+
 VISA_CHOICES = (
     ('j1', 'J-1'),
     ('tps', 'TPS'),
@@ -538,10 +545,14 @@ class ConsultantFeedback(TimeStampedModel):
 class Terminate(TimeStampedModel):
     resign_date = models.DateField(_('Resignation Date'))
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
-    reason = models.CharField(_('Termination Reason'), max_length=50)
     last_date = models.DateField(_('Termination Date'), blank=True, null=True)
     notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
     exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)
+    reason = models.CharField(
+        _('Termination Reason'),
+        max_length=30,
+        choices=TERMINATION_REASON_CHOICE,
+    )
     consultant = models.ForeignKey(
         Consultant, on_delete=models.CASCADE,
         related_name='terminate',

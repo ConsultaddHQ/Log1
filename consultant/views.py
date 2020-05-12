@@ -9,14 +9,14 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
 from constance import config
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
-from utils_app.utils import post_msg_using_webhook
 from attachment.serializers import AttachmentSerializer
+from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
@@ -43,17 +43,19 @@ def start_marketing():
 
 def terminate_consultant():
     try:
-        data = Terminate.objects.filter(last_date__lte=date.today())
-        for queryset in data:
-            consultant = Consultant.objects.get(id=queryset.consultant.id)
+        queryset = Terminate.objects.filter(last_date=date.today())
+        for terminate in queryset:
+            consultant = terminate.consultant
             consultant.status = 'terminate'
             consultant.save()
 
-            # Mattermost message for Interview
-            text = "#### Exit interview for {} \n Reason for leaving :{} \n " \
-                   "Exit Interview Details : {} \n Termination Date: {}".format(
-                    consultant.name, queryset.reason, queryset.exit_details, queryset.last_date
-                    )
+            marketing = consultant.marketing.filter(status='open')
+            marketing.update(status='close')
+
+            # Mattermost message for Exit Interview
+            exit_details = html_to_text(terminate.exit_details)
+            text = f"#### Exit interview for {consultant.name} \n Reason for leaving :{terminate.reason} \n " \
+                   f"Exit Interview Details : {exit_details} \n Termination Date: {terminate.last_date}"
             data = {
                 "response_type": "in_channel",
                 "username": "Log1 Updates",
@@ -61,14 +63,19 @@ def terminate_consultant():
             }
             post_msg_using_webhook(config.consultant_termination_url, data)
 
-            # notification
+            #App Notification
+            recruiter = consultant.recruiter
+            user_list = [recruiter]
+            scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+            for user in scrum_masters:
+                user_list.append(user)
             notification_data = {
                 'category': 'info',
-                'description': queryset.reason,
-                'target_id': queryset.id,
-                'target_type': 'termination',
+                'description': terminate.reason,
+                'target_id': terminate.consultant.id,
+                'target_type': 'consultant',
                 'sender_user_type': 'user',
-                'sender_id': queryset.created_by,
+                'sender_id': terminate.created_by,
                 'recipient_user_type': 'user',
                 'title': 'Consultant Termination',
             }
@@ -76,25 +83,26 @@ def terminate_consultant():
 
             # Push Notification
             message_body = {
-                "category": "terminated",
+                "category": "alert",
                 "show_in_foreground": True,
                 "title": f"Consultant {consultant.name} Terminated",
-                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "click_action": "https://app.log1.com",
                 "body": f"Consultant {consultant.name} Terminated",
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'timesheet',
-                    'target_id': queryset.id,
+                    'target': 'consultant',
+                    'target_id': terminate.consultant.id,
                     'timestamp': str(timezone.now()),
                 },
             }
-            object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
+            object_ids = []
+            for user in user_list:
+                object_ids.append(user.id)
             registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='consultanttoken'
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
                                          ).values_list('device_id', flat=True))
             push_notification(registration_ids, message_body)
-
         return None
     except Exception as error:
         return error
@@ -588,6 +596,36 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post', 'put'], detail=True, url_path='terminate')
+    def terminate(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+            if request.method == 'POST':
+                Terminate.objects.create(
+                    consultant=consultant,
+                    created_by=request.user,
+                    reason=request.data.get('reason'),
+                    rehire=request.data.get('rehire', False),
+                    resign_date=request.data.get('resign_date', None),
+                    last_date=request.data.get('last_date', None),
+                    exit_details=request.data.get('exit_details', None),
+                    notice_period=request.data.get('notice_period', None),
+                )
+                serializer = self.serializer_class(consultant)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            elif request.method == 'PUT':
+                terminate = consultant.terminate.all().order_by('-resign_date').first()
+                serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
@@ -1102,45 +1140,3 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
         logger.error("Incorrect Email Id OR Password")
         return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
 
-
-class TerminateConsultantViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin):
-    queryset = Terminate.objects.all()
-    serializer_class = ConsultantBenchSerializer
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
-
-    def create(self, request, *args, **kwargs):
-        try:
-            roles = request.user.roles
-            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
-
-            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
-            Terminate.objects.create(
-                consultant=consultant,
-                created_by=request.user,
-                reason=request.data.get('reason'),
-                rehire=request.data.get('rehire', False),
-                resign_date=request.data.get('resign_date', None),
-                last_date=request.data.get('last_date', None),
-                exit_details=request.data.get('exit_details', None),
-                notice_period=request.data.get('notice_period', None),
-            )
-            serializer = self.serializer_class(consultant)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-        except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-    def update(self, request, *args, **kwargs):
-        try:
-            roles = request.user.roles
-            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
-
-            terminate = get_object_or_404(Terminate, id=kwargs.get('pk'))
-            serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-        except KeyError as err:
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)

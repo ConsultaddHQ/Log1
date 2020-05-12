@@ -27,7 +27,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_crontab',
 ]
 
 THIRD_PARTY_APPS = [
@@ -38,6 +37,7 @@ THIRD_PARTY_APPS = [
     'constance',
     'corsheaders',
     'import_export',
+    'django_crontab',
     'rest_framework_swagger',
     'constance.backends.database',
 ]
@@ -265,8 +265,6 @@ CONSTANCE_CONFIG = OrderedDict([
                                  "Project Terminations Channel")),
     ('interview_feedback_url', ('https://mm.consultadd.com/hooks/e15z9x3xspgsbcxei84tqf919r',
                                 "InterviewFeedback Channel")),
-    ('consultant_termination_url', ('https://mm.consultadd.com/hooks/e15z9x3xspgsbcxei84tqf919r',
-                                    "Exit Interviews Channel")),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -275,10 +273,9 @@ CONSTANCE_CONFIG_FIELDSETS = {
                   'BOOKING_ADMIN'),
     'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url',
                   'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url',
-                  'offer_failure_url', 'interview_feedback_url', 'project_termination_url',
-                  'consultant_termination_url'),
+                  'offer_failure_url', 'interview_feedback_url', 'project_termination_url'),
 }
 
 CRONJOBS = [
-    ('* * * * *', 'consultant.views.terminate_consultant')
+    ('00 06 * * *', 'consultant.views.terminate_consultant')
 ]
