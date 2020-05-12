@@ -104,7 +104,6 @@ class Petition(TimeStampedModel):
 
 
 class Reason(TimeStampedModel):
-    created = models.DateTimeField(_('Created'), default=timezone.now)
     petition_status = models.CharField(_('Petition Status'), choices=PETITION_STATUSES, max_length=20)
     reason = models.TextField(_('Reason for Status'), null=True, blank=True)
     petition = models.ForeignKey(
