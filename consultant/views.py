@@ -49,8 +49,11 @@ def terminate_consultant():
             consultant.status = 'terminate'
             consultant.save()
 
-            marketing = consultant.marketing.filter(status='open')
-            marketing.update(status='close')
+            marketing = consultant.marketing.filter(status='open').first()
+            marketer = marketing.marketer.all()
+            marketing.status = 'close'
+            marketing.end = date.today()
+            marketing.save()
 
             # Mattermost message for Exit Interview
             exit_details = html_to_text(terminate.exit_details)
@@ -68,6 +71,8 @@ def terminate_consultant():
             user_list = [recruiter]
             scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
             for user in scrum_masters:
+                user_list.append(user)
+            for user in marketer:
                 user_list.append(user)
             notification_data = {
                 'category': 'info',
@@ -615,6 +620,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     exit_details=request.data.get('exit_details', None),
                     notice_period=request.data.get('notice_period', None),
                 )
+                print(terminate_consultant())
                 serializer = self.serializer_class(consultant)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             elif request.method == 'PUT':
