@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, ConsultantPOC, \
-    Education, Experience, WorkAuth, ConsultantToken, ConsultantPetitionToken
+    Education, Experience, WorkAuth, ConsultantToken, ConsultantPetitionToken, Terminate
 
 
 @admin.register(Consultant)
@@ -85,3 +85,9 @@ class ConsultantPOCAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_display = ('id', 'consultant', 'poc_type', 'poc', 'start', 'end')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'poc__employee_name')
+
+@admin.register(Terminate)
+class TerminateAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
+    search_fields = ('id', 'consultant__name', 'consultant__email', 'reason', 'resign_date', 'last_date')
+    list_display = ('id', 'consultant', 'reason', 'resign_date', 'last_date', 'notice_period', 'exit_details')

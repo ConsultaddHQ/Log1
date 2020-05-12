@@ -37,6 +37,7 @@ THIRD_PARTY_APPS = [
     'constance',
     'corsheaders',
     'import_export',
+    'django_crontab',
     'rest_framework_swagger',
     'constance.backends.database',
 ]
@@ -274,3 +275,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
                   'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url',
                   'offer_failure_url', 'interview_feedback_url', 'project_termination_url'),
 }
+
+CRONJOBS = [
+    ('00 06 * * *', 'consultant.views.terminate_consultant')
+]

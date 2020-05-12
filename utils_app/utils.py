@@ -2,6 +2,7 @@ import json
 import random
 import requests
 from datetime import date, timedelta
+from bs4 import BeautifulSoup
 
 
 def get_time_filter(queryset, filter_by):
@@ -99,3 +100,8 @@ def password_generator(password_length=10, strength=3):
         for i in range(0, password_length):
             password = password + random.choice(digits)
         return password
+
+
+def html_to_text(html):
+    soup = BeautifulSoup(html, features="html.parser")
+    return soup.get_text('\n')

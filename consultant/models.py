@@ -19,12 +19,20 @@ CONSULTANT_STATUS_CHOICE = (
     ('on_bench', 'On Bench'),
     ('archived', 'Archived'),
     ('on_project', 'On Project'),
+    ('terminate', 'Terminate')
 )
 
 MARKETING_STATUS_CHOICE = (
     ('open', 'Open'),
     ('close', 'Close'),
 )
+
+TERMINATION_REASON_CHOICE = (
+    ('fired', 'Fired'),
+    ('location_change', 'Change of Location'),
+    ('other_offer', 'Got Other Offer'),
+)
+
 
 VISA_CHOICES = (
     ('j1', 'J-1'),
@@ -532,3 +540,38 @@ class ConsultantFeedback(TimeStampedModel):
 
     def __str__(self):
         return f'{self.id}:{self.consultant.name} {self.feedback_type} of {self.rating}'
+
+
+class Terminate(TimeStampedModel):
+    resign_date = models.DateField(_('Resignation Date'))
+    rehire = models.BooleanField(_('Fit to rehire'), default=False)
+    last_date = models.DateField(_('Termination Date'), blank=True, null=True)
+    notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
+    exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)
+    reason = models.CharField(
+        _('Termination Reason'),
+        max_length=30,
+        choices=TERMINATION_REASON_CHOICE,
+    )
+    consultant = models.ForeignKey(
+        Consultant, on_delete=models.CASCADE,
+        related_name='terminate',
+        verbose_name='Consultant'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='termination_created',
+        verbose_name='Termination added by'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Terminate, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.consultant.name}:{self.reason}'
