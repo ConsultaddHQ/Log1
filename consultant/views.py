@@ -46,8 +46,9 @@ def terminate_consultant():
         queryset = Terminate.objects.filter(last_date=date.today())
         for terminate in queryset:
             consultant = terminate.consultant
-            consultant.status = 'terminate'
-            consultant.save()
+            if consultant.status != 'terminate':
+                consultant.status = 'terminate'
+                consultant.save()
 
             marketing = consultant.marketing.filter(status='open').first()
             marketer = marketing.marketer.all()
@@ -238,7 +239,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             close_marketing()
             start_marketing()
-            consultants = Consultant.objects.filter(marketing__status='open').exclude(status='terminate')
+            consultants = Consultant.objects.filter(marketing__status='open')
             roles = request.user.roles
 
             if 'marketer' in request.user.roles:
@@ -602,34 +603,107 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['post', 'put'], detail=True, url_path='terminate')
+    @action(methods=['post'], detail=True, url_path='terminate')
     def terminate(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
-            if request.method == 'POST':
-                Terminate.objects.create(
-                    consultant=consultant,
-                    created_by=request.user,
-                    reason=request.data.get('reason'),
-                    rehire=request.data.get('rehire', False),
-                    resign_date=request.data.get('resign_date', None),
-                    last_date=request.data.get('last_date', None),
-                    exit_details=request.data.get('exit_details', None),
-                    notice_period=request.data.get('notice_period', None),
-                )
-                serializer = self.serializer_class(consultant)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            elif request.method == 'PUT':
-                terminate = consultant.terminate.all().order_by('-resign_date').first()
-                serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-
+            Terminate.objects.create(
+                consultant=consultant,
+                created_by=request.user,
+                reason=request.data.get('reason'),
+                rehire=request.data.get('rehire', False),
+                resign_date=request.data.get('resign_date', None),
+                last_date=request.data.get('last_date', None),
+                exit_details=request.data.get('exit_details', None),
+                notice_period=request.data.get('notice_period', None),
+            )
+            serializer = self.serializer_class(consultant)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='edit_terminate')
+    def update_terminate(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            terminate = get_object_or_404(Terminate, id=kwargs.get('pk'))
+            serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='left')
+    def left_employees(self, request):
+            query = request.query_params.get('query', None)
+            con_status = request.query_params.get('status', 'fired')
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+            last, first = page * page_size, page * page_size - page_size
+
+            try:
+                consultants = Consultant.objects.filter(status='terminate')
+
+                # Consultants search based on name, email, recruiter and location
+                if query:
+                    consultants = consultants.filter(
+                        Q(email__iexact=query) |
+                        Q(name__icontains=query) |
+                        Q(skills__istartswith=query) |
+                        Q(current_city__istartswith=query)
+                    )
+
+                consultants = consultants.order_by('id').distinct('id')
+
+                fired = consultants.filter(terminate__reason='fired')
+
+                location_change = consultants.filter(terminate__reason='location_change')
+
+                other_offer = consultants.filter(terminate__reason='other_offer')
+
+                count = {
+                    "fired": fired.count(),
+                    "location_change": location_change.count(),
+                    "other_offer": other_offer.count(),
+                }
+
+                # Filter Consultant by status and In pool
+                if con_status == 'fired':
+                    consultants = fired
+                elif con_status == 'location_change':
+                    consultants = location_change
+                elif con_status == 'other_offer':
+                    consultants = other_offer
+
+                terminate = Terminate.objects.filter(
+                    consultant=OuterRef("pk"))
+
+                data = consultants[first:last].annotate(
+                    reason=Subquery(terminate.values('reason')[:1]),
+                    last_date=Subquery(terminate.values('last_date')[:1]),
+                    rehire=Subquery(terminate.values('rehire')[:1]),
+                    resign_date=Subquery(terminate.values('reason')[:1]),
+                ).values('id', 'name', 'skills', 'reason', 'last_date', 'rehire')
+                return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, url_path='left_details')
+    def left_consultant(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+            serializer = self.serializer_class(consultant)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
