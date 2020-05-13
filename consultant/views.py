@@ -620,9 +620,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     exit_details=request.data.get('exit_details', None),
                     notice_period=request.data.get('notice_period', None),
                 )
-                print(terminate_consultant())
                 serializer = self.serializer_class(consultant)
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             elif request.method == 'PUT':
                 terminate = consultant.terminate.all().order_by('-resign_date').first()
                 serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
