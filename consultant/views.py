@@ -46,8 +46,9 @@ def terminate_consultant():
         queryset = Terminate.objects.filter(last_date=date.today())
         for terminate in queryset:
             consultant = terminate.consultant
-            consultant.status = 'terminate'
-            consultant.save()
+            if consultant.status != 'terminate':
+                consultant.status = 'terminate'
+                consultant.save()
 
             marketing = consultant.marketing.filter(status='open').first()
             marketer = marketing.marketer.all()
@@ -238,7 +239,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             close_marketing()
             start_marketing()
-            consultants = Consultant.objects.filter(marketing__status='open').exclude(status='terminate')
+            consultants = Consultant.objects.filter(marketing__status='open')
             roles = request.user.roles
 
             if 'marketer' in request.user.roles:
@@ -622,7 +623,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 )
                 print(terminate_consultant())
                 serializer = self.serializer_class(consultant)
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             elif request.method == 'PUT':
                 terminate = consultant.terminate.all().order_by('-resign_date').first()
                 serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
@@ -632,6 +633,73 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='left_employees')
+    def left_employees(self, request):
+            query = request.query_params.get('query', None)
+            con_status = request.query_params.get('status', 'fired')
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+            last, first = page * page_size, page * page_size - page_size
+
+            try:
+                consultants = Consultant.objects.filter(status='terminate')
+
+                # Consultants search based on name, email, recruiter and location
+                if query:
+                    consultants = consultants.filter(
+                        Q(email__iexact=query) |
+                        Q(name__icontains=query) |
+                        Q(skills__istartswith=query) |
+                        Q(current_city__istartswith=query) |
+                        Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
+                    )
+
+                consultants = consultants.order_by('id').distinct('id')
+
+                fired = consultants.filter(terminate__reason='fired')
+
+                location_change = consultants.filter(terminate__reason='location_change')
+
+                other_offer = consultants.filter(terminate__reason='other_offer')
+
+                count = {
+                    "fired": fired.count(),
+                    "location_change": location_change.count(),
+                    "other_offer": other_offer.count(),
+                }
+
+                # Filter Consultant by status and In pool
+                if con_status == 'fired':
+                    consultants = fired
+                elif con_status == 'location_change':
+                    consultants = location_change
+                elif con_status == 'other_offer':
+                    consultants = other_offer
+
+                poc = ConsultantPOC.objects.filter(
+                    consultant=OuterRef("pk"), end=None, poc_type='recruiter')
+
+                rate = ConsultantRateRevision.objects.filter(
+                    consultant=OuterRef("pk"), end=None)
+
+                marketing = ConsultantMarketing.objects.filter(
+                    consultant=OuterRef("pk"), status='open')
+
+                data = consultants[first:last].annotate(
+                    rate=Subquery(rate.values('rate')[:1]),
+                    rtg=Subquery(marketing.values('rtg')[:1]),
+                    in_pool=Subquery(marketing.values('in_pool')[:1]),
+                    marketing_start=Subquery(marketing.values('start')[:1]),
+                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
+                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
+                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
+                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
+                         'marketing_start', 'previous_marketing_days')
+                return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
+            except Exception as error:
+                logger.error(error)
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
