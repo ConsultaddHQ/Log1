@@ -26,7 +26,7 @@ class CommentGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ('id', 'comment_text', 'user', 'parent_comment', 'object_id', 'child_comment')
+        fields = ('id', 'comment_text', 'user', 'parent_comment', 'object_id', 'child_comment', 'created')
 
     def get_child_comment(self, obj):
         return CommentSerializer(obj.child_comments.all(), many=True).data
@@ -38,7 +38,7 @@ class ConsultantCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantComment
-        fields = ('id', 'comment_text', 'parent_comment', 'object_id', 'user_type', 'user')
+        fields = ('id', 'comment_text', 'parent_comment', 'object_id', 'user_type', 'user', 'created')
 
     def get_user_type(self, obj):
         return obj.created_by_content_type.model
@@ -66,7 +66,7 @@ class ConsultantCommentGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantComment
-        fields = ('id', 'comment_text', 'parent_comment', 'object_id', 'user_type', 'user', 'child_comment')
+        fields = ('id', 'comment_text', 'parent_comment', 'object_id', 'user_type', 'user', 'child_comment', 'created')
 
     def get_child_comment(self, obj):
         return ConsultantCommentSerializer(obj.child_comments.all(), many=True).data

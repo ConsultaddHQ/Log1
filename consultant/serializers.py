@@ -238,7 +238,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return EducationSerializer(obj.academics.all(), many=True).data
 
     def get_terminate(self, obj):
-        return TerminateConsultantSerializer(obj.terminate.all(), many=True).data
+        return TerminateConsultantSerializer(obj.terminate.all().order_by('-last_date'), many=True).data
 
     def get_experience(self, obj):
         return ExperienceSerializer(obj.experiences.all(), many=True).data

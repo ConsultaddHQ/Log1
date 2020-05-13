@@ -603,37 +603,43 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['post', 'put'], detail=True, url_path='terminate')
+    @action(methods=['post'], detail=True, url_path='terminate')
     def terminate(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
-            if request.method == 'POST':
-                Terminate.objects.create(
-                    consultant=consultant,
-                    created_by=request.user,
-                    reason=request.data.get('reason'),
-                    rehire=request.data.get('rehire', False),
-                    resign_date=request.data.get('resign_date', None),
-                    last_date=request.data.get('last_date', None),
-                    exit_details=request.data.get('exit_details', None),
-                    notice_period=request.data.get('notice_period', None),
-                )
-                serializer = self.serializer_class(consultant)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            elif request.method == 'PUT':
-                terminate = consultant.terminate.all().order_by('-resign_date').first()
-                serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-
+            Terminate.objects.create(
+                consultant=consultant,
+                created_by=request.user,
+                reason=request.data.get('reason'),
+                rehire=request.data.get('rehire', False),
+                resign_date=request.data.get('resign_date', None),
+                last_date=request.data.get('last_date', None),
+                exit_details=request.data.get('exit_details', None),
+                notice_period=request.data.get('notice_period', None),
+            )
+            serializer = self.serializer_class(consultant)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get'], detail=False, url_path='left_employees')
+    @action(methods=['put'], detail=True, url_path='edit_terminate')
+    def update_terminate(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            terminate = get_object_or_404(Terminate, id=kwargs.get('pk'))
+            serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='left')
     def left_employees(self, request):
             query = request.query_params.get('query', None)
             con_status = request.query_params.get('status', 'fired')
@@ -650,8 +656,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                         Q(email__iexact=query) |
                         Q(name__icontains=query) |
                         Q(skills__istartswith=query) |
-                        Q(current_city__istartswith=query) |
-                        Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
+                        Q(current_city__istartswith=query)
                     )
 
                 consultants = consultants.order_by('id').distinct('id')
@@ -676,29 +681,30 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 elif con_status == 'other_offer':
                     consultants = other_offer
 
-                poc = ConsultantPOC.objects.filter(
-                    consultant=OuterRef("pk"), end=None, poc_type='recruiter')
-
-                rate = ConsultantRateRevision.objects.filter(
-                    consultant=OuterRef("pk"), end=None)
-
-                marketing = ConsultantMarketing.objects.filter(
-                    consultant=OuterRef("pk"), status='open')
+                terminate = Terminate.objects.filter(
+                    consultant=OuterRef("pk"))
 
                 data = consultants[first:last].annotate(
-                    rate=Subquery(rate.values('rate')[:1]),
-                    rtg=Subquery(marketing.values('rtg')[:1]),
-                    in_pool=Subquery(marketing.values('in_pool')[:1]),
-                    marketing_start=Subquery(marketing.values('start')[:1]),
-                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
-                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
-                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
-                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
-                         'marketing_start', 'previous_marketing_days')
+                    reason=Subquery(terminate.values('reason')[:1]),
+                    last_date=Subquery(terminate.values('last_date')[:1]),
+                    rehire=Subquery(terminate.values('rehire')[:1]),
+                    resign_date=Subquery(terminate.values('reason')[:1]),
+                ).values('id', 'name', 'skills', 'reason', 'last_date', 'rehire')
                 return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, url_path='left_details')
+    def left_consultant(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('pk')
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+            serializer = self.serializer_class(consultant)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
