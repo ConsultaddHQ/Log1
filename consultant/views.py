@@ -46,7 +46,7 @@ def terminate_consultant():
         queryset = Terminate.objects.filter(last_date__lte=date.today(), is_complete=False)
         for terminate in queryset:
             consultant = terminate.consultant
-            consultant.status = 'terminate'
+            consultant.status = 'terminated'
             consultant.save()
 
             marketings = consultant.marketing.filter(status='open')
@@ -584,7 +584,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.exclude(status='archived').exclude(status='terminate')
+            consultants = Consultant.objects.exclude(status='archived').exclude(status='terminated')
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
@@ -690,7 +690,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 latest_marketing_cycle = None
 
-            if consultant.status == 'terminate':
+            if consultant.status == 'terminated':
                 consultant.status = 'on_bench'
                 consultant.save()
 
@@ -1060,7 +1060,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.filter(status='terminate')
+            consultants = Consultant.objects.filter(status='terminated')
 
             # Consultants search based on name, email, recruiter and location
             if query:
@@ -1070,11 +1070,11 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                     Q(skills__istartswith=query)
                 )
 
-            fired = consultants.filter(terminate__reason='fired')
-            other = consultants.filter(terminate__reason='other')
-            absconded = consultants.filter(terminate__reason='candidate_absconded')
-            location_change = consultants.filter(terminate__reason='location_change')
-            full_time_offer = consultants.filter(terminate__reason='full_time_offer')
+            fired = consultants.filter(terminate__reason='fired').order_by('id').distinct('id')
+            other = consultants.filter(terminate__reason='other').order_by('id').distinct('id')
+            absconded = consultants.filter(terminate__reason='candidate_absconded').order_by('id').distinct('id')
+            location_change = consultants.filter(terminate__reason='location_change').order_by('id').distinct('id')
+            full_time_offer = consultants.filter(terminate__reason='full_time_offer').order_by('id').distinct('id')
 
             count = {
                 "fired": fired.count(),
@@ -1084,9 +1084,11 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                 "full_time_offer": full_time_offer.count(),
             }
 
-            # Filter Consultant by status and In pool
+            # Filter Consultant by status
             if con_status:
-                consultants = consultants.filter(status=con_status)
+                consultants = consultants.filter(terminate__reason=con_status)
+
+            consultants = consultants.order_by('id').distinct('id')
 
             terminate = Terminate.objects.filter(consultant=OuterRef("pk"))
 
@@ -1107,20 +1109,19 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
-            if request.method == 'POST':
-                consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
-                Terminate.objects.create(
-                    consultant=consultant,
-                    created_by=request.user,
-                    reason=request.data.get('reason'),
-                    rehire=request.data.get('rehire', False),
-                    last_date=request.data.get('last_date', None),
-                    resign_date=request.data.get('resign_date', None),
-                    exit_details=request.data.get('exit_details', None),
-                    notice_period=request.data.get('notice_period', None),
-                )
-                serializer = ConsultantBenchSerializer(consultant)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
+            Terminate.objects.create(
+                consultant=consultant,
+                created_by=request.user,
+                reason=request.data.get('reason'),
+                rehire=request.data.get('rehire', False),
+                last_date=request.data.get('last_date', None),
+                resign_date=request.data.get('resign_date', None),
+                exit_details=request.data.get('exit_details', None),
+                notice_period=request.data.get('notice_period', None),
+            )
+            serializer = ConsultantBenchSerializer(consultant)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
 
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

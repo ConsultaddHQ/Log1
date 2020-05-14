@@ -19,7 +19,7 @@ CONSULTANT_STATUS_CHOICE = (
     ('on_bench', 'On Bench'),
     ('archived', 'Archived'),
     ('on_project', 'On Project'),
-    ('terminate', 'Terminate')
+    ('terminated', 'Terminated')
 )
 
 MARKETING_STATUS_CHOICE = (
