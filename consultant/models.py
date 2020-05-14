@@ -30,7 +30,9 @@ MARKETING_STATUS_CHOICE = (
 TERMINATION_REASON_CHOICE = (
     ('fired', 'Fired'),
     ('location_change', 'Change of Location'),
-    ('other_offer', 'Got Other Offer'),
+    ('candidate_absconded', 'Candidate Absconded'),
+    ('full_time_offer', 'Got Full Time Offer'),
+    ('other', 'Other'),
 )
 
 
@@ -545,6 +547,7 @@ class ConsultantFeedback(TimeStampedModel):
 class Terminate(TimeStampedModel):
     resign_date = models.DateField(_('Resignation Date'))
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
+    is_complete = models.BooleanField(_('Termination Complete'), default=False)
     last_date = models.DateField(_('Termination Date'), blank=True, null=True)
     notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
     exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)

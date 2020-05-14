@@ -277,5 +277,5 @@ CONSTANCE_CONFIG_FIELDSETS = {
 }
 
 CRONJOBS = [
-    ('00 06 * * *', 'consultant.views.terminate_consultant')
+    ('00 23 * * *', 'consultant.views.terminate_consultant')
 ]

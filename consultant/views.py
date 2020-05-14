@@ -43,7 +43,7 @@ def start_marketing():
 
 def terminate_consultant():
     try:
-        queryset = Terminate.objects.filter(last_date=date.today())
+        queryset = Terminate.objects.filter(last_date__lte=date.today(), is_complete=False)
         for terminate in queryset:
             consultant = terminate.consultant
             if consultant.status != 'terminate':
@@ -51,10 +51,14 @@ def terminate_consultant():
                 consultant.save()
 
             marketing = consultant.marketing.filter(status='open').first()
-            marketer = marketing.marketer.all()
             marketing.status = 'close'
             marketing.end = date.today()
             marketing.save()
+
+            terminate.is_complete = True
+            terminate.save()
+
+            marketer = marketing.marketer.all()
 
             # Mattermost message for Exit Interview
             exit_details = html_to_text(terminate.exit_details)
@@ -65,7 +69,7 @@ def terminate_consultant():
                 "username": "Log1 Updates",
                 "text": text,
             }
-            post_msg_using_webhook(config.consultant_termination_url, data)
+            # post_msg_using_webhook(config.consultant_termination_url, data)
 
             #App Notification
             recruiter = consultant.recruiter
@@ -81,7 +85,7 @@ def terminate_consultant():
                 'target_id': terminate.consultant.id,
                 'target_type': 'consultant',
                 'sender_user_type': 'user',
-                'sender_id': terminate.created_by,
+                'sender_id': terminate.created_by.id,
                 'recipient_user_type': 'user',
                 'title': 'Consultant Termination',
             }
@@ -609,6 +613,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             Terminate.objects.create(
                 consultant=consultant,
@@ -631,6 +636,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+
             terminate = get_object_or_404(Terminate, id=kwargs.get('pk'))
             serializer = TerminateConsultantSerializer(terminate, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
@@ -655,51 +661,60 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     consultants = consultants.filter(
                         Q(email__iexact=query) |
                         Q(name__icontains=query) |
-                        Q(skills__istartswith=query) |
-                        Q(current_city__istartswith=query)
+                        Q(skills__istartswith=query)
                     )
 
                 consultants = consultants.order_by('id').distinct('id')
 
                 fired = consultants.filter(terminate__reason='fired')
 
+                other = consultants.filter(terminate__reason='other')
+
+                absconded = consultants.filter(terminate__reason='candidate_absconded')
+
                 location_change = consultants.filter(terminate__reason='location_change')
 
-                other_offer = consultants.filter(terminate__reason='other_offer')
+                full_time_offer = consultants.filter(terminate__reason='full_time_offer')
 
                 count = {
                     "fired": fired.count(),
+                    "other": other.count(),
+                    "absconded": absconded.count(),
                     "location_change": location_change.count(),
-                    "other_offer": other_offer.count(),
+                    "full_time_offer": full_time_offer.count(),
                 }
 
                 # Filter Consultant by status and In pool
                 if con_status == 'fired':
                     consultants = fired
+                elif con_status == 'other':
+                    consultants = other
+                elif con_status == 'absconded':
+                    consultants = absconded
                 elif con_status == 'location_change':
                     consultants = location_change
-                elif con_status == 'other_offer':
-                    consultants = other_offer
+                elif con_status == 'full_time_offer':
+                    consultants = full_time_offer
 
                 terminate = Terminate.objects.filter(
                     consultant=OuterRef("pk"))
 
                 data = consultants[first:last].annotate(
                     reason=Subquery(terminate.values('reason')[:1]),
-                    last_date=Subquery(terminate.values('last_date')[:1]),
                     rehire=Subquery(terminate.values('rehire')[:1]),
                     resign_date=Subquery(terminate.values('reason')[:1]),
+                    last_date=Subquery(terminate.values('last_date')[:1]),
                 ).values('id', 'name', 'skills', 'reason', 'last_date', 'rehire')
                 return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get'], detail=True, url_path='left_details')
-    def left_consultant(self, request, *args, **kwargs):
+    @action(methods=['get'], detail=True, url_path='left_detail')
+    def left_employee_detail(self, request, *args, **kwargs):
         try:
             consultant_id = kwargs.get('pk')
-            consultant = get_object_or_404(Consultant, id=consultant_id)
+            consultant = get_object_or_404(Consultant, id=consultant_id, status='terminate')
             serializer = self.serializer_class(consultant)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -829,11 +844,16 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     def create(self, request, *args, **kwargs):
         try:
-            queryset = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'], status='close')
+            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
+            queryset = consultant.marketing.filter(status='close')
             if queryset:
                 latest_marketing_cycle = queryset.latest('end')
             else:
                 latest_marketing_cycle = None
+
+            if consultant.status == 'terminate':
+                consultant.status = 'on_bench'
+                consultant.save()
 
             reset_days = request.data.get('reset_days', 'true')
             if reset_days == 'true':
