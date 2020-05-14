@@ -41,7 +41,12 @@ class ConsultantPetitionLoginSerializer(UserSerializer):
     def get_petition(self, obj):
         petitions = obj.petitions.filter(is_active=True)
         if petitions:
-            return petitions.first().id
+            petition = petitions.first()
+            return {
+                "id": petition.id,
+                "status": petition.status,
+                "assigned_to": UserSerializer(petition.assigned_to).data
+            }
         return None
 
     def get_token(self, obj):
@@ -153,19 +158,9 @@ class ExperienceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class FeedbackDetailsSerializer(serializers.ModelSerializer):
+class TerminateConsultantSerializer(serializers.ModelSerializer):
     class Meta:
-        model = FeedbackDetail
-        fields = '__all__'
-
-
-class ConsultantFeedbackSerializer(serializers.ModelSerializer):
-    feedback = FeedbackDetailsSerializer()
-    given_by = POCSerializer()
-    created_by = POCSerializer()
-
-    class Meta:
-        model = ConsultantFeedback
+        model = Terminate
         fields = '__all__'
 
 
@@ -213,14 +208,15 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     recruiter = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
     education = serializers.SerializerMethodField()
+    terminate = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
-                  'profiles', 'education', 'experience', 'rate', 'marketing')
+                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation', 'support',
+                  'profiles', 'education', 'terminate', 'experience', 'rate', 'marketing')
 
     def get_work_auth(self, obj):
         return WorkAuthSerializer(obj.work_auth.all(), many=True).data
@@ -230,6 +226,9 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 
     def get_education(self, obj):
         return EducationSerializer(obj.academics.all(), many=True).data
+
+    def get_terminate(self, obj):
+        return TerminateConsultantSerializer(obj.terminate.all().order_by('-last_date'), many=True).data
 
     def get_experience(self, obj):
         return ExperienceSerializer(obj.experiences.all(), many=True).data
