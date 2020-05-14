@@ -58,18 +58,18 @@ def terminate_consultant():
             terminate.is_complete = True
             terminate.save()
 
-            marketer = marketing.marketer.all()
-
             # Mattermost message for Exit Interview
             exit_details = html_to_text(terminate.exit_details)
-            text = f"#### Exit interview for {consultant.name} \n Reason for leaving :{terminate.reason} \n " \
-                   f"Exit Interview Details : {exit_details} \n Termination Date: {terminate.last_date}"
+            text = f"#### Exit interview for {consultant.name}\n" \
+                   f"**Reason for leaving** : {terminate.reason.upper()}\n" \
+                   f"**Termination Date** : {terminate.last_date}\n" \
+                   f"**Exit Interview Details** : {exit_details} \n"
             data = {
                 "response_type": "in_channel",
                 "username": "Log1 Updates",
                 "text": text,
             }
-            # post_msg_using_webhook(config.consultant_termination_url, data)
+            post_msg_using_webhook(config.exit_interview_url, data)
 
             #App Notification
             recruiter = consultant.recruiter
@@ -77,6 +77,8 @@ def terminate_consultant():
             scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
             for user in scrum_masters:
                 user_list.append(user)
+
+            marketer = marketing.marketer.all()
             for user in marketer:
                 user_list.append(user)
             notification_data = {
