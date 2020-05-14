@@ -1,8 +1,8 @@
 import json
 import random
 import requests
-from datetime import date, timedelta
 from bs4 import BeautifulSoup
+from datetime import date, timedelta
 
 
 def get_time_filter(queryset, filter_by):

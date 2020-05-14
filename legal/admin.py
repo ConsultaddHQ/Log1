@@ -34,5 +34,6 @@ class DocumentAdmin(ExportActionModelAdmin):
 
 @admin.register(Reason)
 class ReasonsAdmin(ExportActionModelAdmin):
+    list_filter = ('reason', 'petition_status')
     list_display = ('id', 'petition', 'petition_status', 'reason', 'created_by')
     search_fields = ('id', 'petition__id', 'status', 'created_by__employee_name')

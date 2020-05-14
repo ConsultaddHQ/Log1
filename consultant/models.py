@@ -27,15 +27,6 @@ MARKETING_STATUS_CHOICE = (
     ('close', 'Close'),
 )
 
-TERMINATION_REASON_CHOICE = (
-    ('fired', 'Fired'),
-    ('location_change', 'Change of Location'),
-    ('candidate_absconded', 'Candidate Absconded'),
-    ('full_time_offer', 'Got Full Time Offer'),
-    ('other', 'Other'),
-)
-
-
 VISA_CHOICES = (
     ('j1', 'J-1'),
     ('tps', 'TPS'),
@@ -58,23 +49,22 @@ EDUCATION_CHOICES = (
     ('certification', 'Certification'),
 )
 
-FEEDBACK_CHOICES = (
-    ('training', 'Training'),
-    ('screening', 'Screening'),
-    ('pre_joining', 'Pre Joining'),
-    ('re_marketing', 'Re Marketing'),
-    ('rate_revision', 'Rate Revision'),
-)
-
 GENDER_CHOICE = (
     ('male', 'Male'),
     ('female', 'Female'),
 )
 
 WORK_TYPE_CHOICE = (
-    ('w2', 'W2'),
     ('c2c', 'C2C'),
     ('full_time', 'Full Time'),
+)
+
+TERMINATION_REASON_CHOICE = (
+    ('other', 'Other'),
+    ('fired', 'Fired'),
+    ('location_change', 'Change of Location'),
+    ('full_time_offer', 'Got Full Time Offer'),
+    ('candidate_absconded', 'Candidate Absconded'),
 )
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
@@ -489,66 +479,11 @@ class ConsultantPOC(TimeStampedModel):
         return f'{self.id}-{self.poc.employee_name} {self.poc_type} of {self.consultant.name}'
 
 
-class FeedbackDetail(models.Model):
-    experience = models.TextField(_('Experience'), blank=True, null=True)
-    role_knowledge = models.TextField(_('Role Knowledge'), blank=True, null=True)
-    programming = models.TextField(_('Programming Skill'), blank=True, null=True)
-    communication = models.TextField(_('Communication Skills'), blank=True, null=True)
-    problem_solving = models.TextField(_('Problem Solving Skill'), blank=True, null=True)
-    organizational = models.TextField(_('Organizational Knowledge'), blank=True, null=True)
-
-    def __str__(self):
-        return self.id
-
-
-class ConsultantFeedback(TimeStampedModel):
-    remark = models.TextField(_('Remark'), null=True, blank=True)
-    feedback_type = models.CharField(
-        _('Feedback Type'), max_length=20,
-        choices=FEEDBACK_CHOICES,
-    )
-    rating = models.IntegerField(
-        _('Consultant Rating'),
-        help_text=_('Rating 1 being worst and 5 being best')
-    )
-    feedback = models.ForeignKey(
-        FeedbackDetail, on_delete=models.CASCADE,
-        related_name='consultant',
-        verbose_name='Consultant Feedback')
-    consultant = models.ForeignKey(
-        Consultant, on_delete=models.CASCADE,
-        related_name='feedback',
-        verbose_name='Consultant'
-    )
-    given_by = models.ForeignKey(
-        User, on_delete=models.PROTECT,
-        related_name='feedback_given',
-        verbose_name='Feedback given by'
-    )
-    created_by = models.ForeignKey(
-        User, on_delete=models.PROTECT,
-        related_name='feedback_created',
-        verbose_name='Feedback added by'
-    )
-
-    def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
-        if not self.id:
-            self.created = timezone.now()
-        self.modified = timezone.now()
-        return super(ConsultantFeedback, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.id}:{self.consultant.name} {self.feedback_type} of {self.rating}'
-
-
 class Terminate(TimeStampedModel):
     resign_date = models.DateField(_('Resignation Date'))
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
-    is_complete = models.BooleanField(_('Termination Complete'), default=False)
     last_date = models.DateField(_('Termination Date'), blank=True, null=True)
+    is_complete = models.BooleanField(_('Termination Complete'), default=False)
     notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
     exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)
     reason = models.CharField(

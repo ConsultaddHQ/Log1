@@ -158,19 +158,9 @@ class ExperienceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class FeedbackDetailsSerializer(serializers.ModelSerializer):
+class TerminateConsultantSerializer(serializers.ModelSerializer):
     class Meta:
-        model = FeedbackDetail
-        fields = '__all__'
-
-
-class ConsultantFeedbackSerializer(serializers.ModelSerializer):
-    feedback = FeedbackDetailsSerializer()
-    given_by = POCSerializer()
-    created_by = POCSerializer()
-
-    class Meta:
-        model = ConsultantFeedback
+        model = Terminate
         fields = '__all__'
 
 
@@ -308,9 +298,3 @@ class ConsultantListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'profiles')
-
-
-class TerminateConsultantSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Terminate
-        fields = '__all__'

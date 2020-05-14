@@ -52,11 +52,10 @@ class ConsultantCommentSerializer(serializers.ModelSerializer):
         else:
             return None
 
-        result = {
+        return {
             "employee_name": name,
             "id": obj.created_by_id,
         }
-        return result
 
 
 class ConsultantCommentGetSerializer(serializers.ModelSerializer):
@@ -83,8 +82,7 @@ class ConsultantCommentGetSerializer(serializers.ModelSerializer):
         else:
             return None
 
-        result = {
+        return {
             "employee_name": name,
             "id": obj.created_by_id,
         }
-        return result

@@ -6,9 +6,9 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
 from employee.models import User
-from activity.models import Comment, ConsultantComment
 from consultant.models import Consultant
 from utils_app.models import TimeStampedModel
+from activity.models import Comment, ConsultantComment
 
 
 PETITION_TYPES = (
@@ -60,15 +60,15 @@ class Types(models.Model):
 
 
 class Petition(TimeStampedModel):
+    comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is Petition Active'), default=True)
     lca_no = models.CharField(_('LCA No.'), max_length=40, null=True, blank=True)
     employer = models.CharField(_('Employer'), max_length=20, default='Consultadd')
-    comments = GenericRelation(Comment, verbose_name="comments")
-    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     status = models.CharField(_('Status'), choices=PETITION_STATUSES, max_length=20)
     uscis_no = models.CharField(_('USCIS No.'), max_length=40, null=True, blank=True)
     fedex_no = models.CharField(_('Fedex No.'), max_length=40, null=True, blank=True)
     premium_processing = models.BooleanField(_('Premium Processing'), default=None, null=True)
+    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     petition_type = models.CharField(_('Petition Type'), choices=PETITION_TYPES, max_length=20, blank=True, null=True)
     beneficiary_type = models.BooleanField(
         _('Beneficiary Type'), default=True,
@@ -127,6 +127,7 @@ class Reason(TimeStampedModel):
         """
         if not self.id:
             self.created = timezone.now()
+        self.modified = timezone.now()
         return super(Reason, self).save(*args, **kwargs)
 
 

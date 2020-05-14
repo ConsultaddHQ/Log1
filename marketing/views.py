@@ -228,7 +228,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset.annotate(submission_count=Count('submission')) \
                     .annotate(company_name=F('vendor_company__name'),
                               company_id=F('vendor_company__id'),
-                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created', 'is_w2',
                                        'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
@@ -254,7 +254,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
                            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'status'
-                                    , 'company_id', 'company_name', 'modified', 'submission_count')
+                                    , 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
                 return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)

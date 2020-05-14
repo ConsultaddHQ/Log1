@@ -14,11 +14,12 @@ class ActivityAdmin(ExportActionModelAdmin):
 class CommentAdmin(ExportActionModelAdmin):
     list_filter = ('content_type__model',)
     search_fields = ('user__employee_name', 'content_type__model')
-    list_display = ('id', 'user', 'object_id', 'content_type', 'parent_comment')
+    list_display = ('id', 'user', 'comment_text', 'object_id', 'content_type', 'parent_comment')
 
 
 @admin.register(ConsultantComment)
 class ConsultantCommentAdmin(ExportActionModelAdmin):
-    list_filter = ('content_type__model',)
-    search_fields = ['id', 'object_id', 'content_type__model']
-    list_display = ('id', 'object_id', 'content_type', 'parent_comment')
+    list_filter = ('content_type__model', 'created_by_content_type__model')
+    search_fields = ('id', 'object_id', 'content_type__model', 'created_by_content_type__model')
+    list_display = ('id', 'comment_text', 'object_id', 'content_type', 'parent_comment', 'created_by_id',
+                    'created_by_content_type', 'created')

@@ -14,7 +14,7 @@ class ConsultantAdmin(ExportActionModelAdmin):
                     'links', 'gender', 'work_type', 'remote_only', 'password', 'is_active', 'first_login', 'pin')
 
     class Media(object):
-        css = {'all': ('no-more-warnings.css', )}
+        css = {'all': ('no-more-warnings.css',)}
 
 
 @admin.register(ConsultantToken)
@@ -85,6 +85,7 @@ class ConsultantPOCAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_display = ('id', 'consultant', 'poc_type', 'poc', 'start', 'end')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'poc__employee_name')
+
 
 @admin.register(Terminate)
 class TerminateAdmin(ExportActionModelAdmin):
