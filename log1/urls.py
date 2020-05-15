@@ -37,7 +37,8 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
     InterviewViewSets, VendorLayerViewSets
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
-    ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, TerminationViewSets
+    ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, TerminationViewSets,\
+    FeedbackViewSet
 
 from activity.views import CommentViewSet
 
@@ -54,6 +55,7 @@ router.register(r'password', ResetPasswordViewSets)
 router.register(r'attachment', AttachmentView)
 router.register(r'get_attachment', AttachmentGetView)
 
+router.register(r'feedback', FeedbackViewSet)
 router.register(r'consultant', ConsultantViewSets)
 router.register(r'terminate', TerminationViewSets)
 router.register(r'consultant_poc', ConsultantPOCViewSets)
