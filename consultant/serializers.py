@@ -301,12 +301,6 @@ class ConsultantListSerializer(serializers.ModelSerializer):
 
 
 class ConsultantFeedbackSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Feedback
-        fields = '__all__'
-
-
-class ConsultantGetFeedbackSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
 
     class Meta:
