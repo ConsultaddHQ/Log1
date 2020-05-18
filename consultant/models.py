@@ -54,6 +54,15 @@ GENDER_CHOICE = (
     ('female', 'Female'),
 )
 
+FEEDBACK_CHOICES = (
+    ('cfr', 'CFR'),
+    ('training', 'Training'),
+    ('screening', 'Screening'),
+    ('marketing', 'Marketing'),
+    ('engineering', 'Engineering'),
+    ('recruitment', 'Recruitment'),
+)
+
 WORK_TYPE_CHOICE = (
     ('c2c', 'C2C'),
     ('full_time', 'Full Time'),
@@ -513,3 +522,37 @@ class Terminate(TimeStampedModel):
 
     def __str__(self):
         return f'{self.id}:{self.consultant.name}:{self.reason}'
+
+
+class Feedback(TimeStampedModel):
+    feedback_text = models.TextField(_('Feedback'))
+    feedback_type = models.CharField(
+        _('Feedback Type'), max_length=20,
+        choices=FEEDBACK_CHOICES,
+    )
+    rating = models.IntegerField(
+        _('Consultant Rating'),
+        help_text=_('Rating 1 being worst and 5 being best')
+    )
+    consultant = models.ForeignKey(
+        Consultant, on_delete=models.CASCADE,
+        related_name='feedback',
+        verbose_name='Consultant'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='feedback_created',
+        verbose_name='Termination added by'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Feedback, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.consultant.name}:{self.feedback_type}'

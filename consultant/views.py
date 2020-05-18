@@ -505,7 +505,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.exclude(status='archived').exclude(status='terminated')
+            consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
@@ -1055,6 +1055,48 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
 
             terminate = get_object_or_404(Terminate, id=kwargs.get('pk'))
             serializer = self.serializer_class(terminate, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    queryset = Feedback.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ConsultantFeedbackSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            feedback = Feedback.objects.create(
+                created_by=request.user,
+                rating=request.data.get('rating'),
+                consultant_id=request.data.get('consultant'),
+                feedback_type=request.data.get('feedback_type'),
+                feedback_text=request.data.get('feedback_text'),
+            )
+            serializer = self.serializer_class(feedback)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            feedback_type = request.query_params.get('type', None)
+            feedback = Feedback.objects.filter(consultant_id=kwargs.get('pk')).order_by('-created')
+            if feedback_type:
+                feedback = feedback.filter(feedback_type=feedback_type)
+            serializer = self.serializer_class(feedback, many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            feedback = get_object_or_404(Feedback, id=kwargs.get('pk'))
+            serializer = self.serializer_class(feedback, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
