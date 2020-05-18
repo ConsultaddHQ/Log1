@@ -145,7 +145,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
             )
         )
         if project:
-            project = project.latest('-id')
+            project = project.latest('-start_date')
             return {
                 'id': project.id,
                 'start_date': project.start_date,
@@ -156,17 +156,10 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         return None
 
     def get_ts_status(self, obj):
-        projects = Project.objects.filter(
-            Q(consultant=obj, statuses__is_current=True) & (
-                    Q(statuses__status__istartswith='terminated') |
-                    Q(statuses__status__in=['joined', 'complete', 'extended'])
-            )
-        )
-        project_ids = list(projects.values_list('id', flat=True))
-        queryset = TimeSheet.objects.filter(project_id__in=project_ids)
-        sub_ts = True if queryset.filter(status='submitted') else False
-        rej_ts = True if queryset.filter(status='rejected', is_active=False) else False
-        return {'rejected': rej_ts, 'submitted': sub_ts}
+        queryset = TimeSheet.objects.filter(project__consultant=obj)
+        submitted_ts = True if queryset.filter(status='submitted') else False
+        rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
+        return {'submitted': submitted_ts, 'rejected': rejected_ts}
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
@@ -179,7 +172,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'reporting_details' 'is_remote')
+                  'start_date', 'end_date', 'reporting_details', 'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)

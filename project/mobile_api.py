@@ -131,6 +131,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            timesheet.submitted_at = datetime.now()
             timesheet.save()
             user_list = User.objects.filter(Q(role__name='finance'))
             title = f"{request.user.name} submitted timesheet for the week end {str(timesheet.end)}"
@@ -356,7 +357,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             screenshot = False
             zero_hours = request.query_params.get('zero_hours', None)
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), status__in=['draft', 'rejected'],
-                                          is_active=True)
+                                          is_active=True, project__consultant=request.user)
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
             timesheet.status = 'submitted'
@@ -395,6 +396,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     return Response({"error": "Attachment is required"}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as error:
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            timesheet.submitted_at = datetime.now()
             timesheet.save()
 
             user_list = User.objects.filter(Q(role__name='finance'))
@@ -417,7 +419,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
-                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "click_action": "https://app.log1.com/",
                 "data": {
                     'is_read': False,
                     'is_deleted': False,

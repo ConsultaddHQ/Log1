@@ -151,6 +151,7 @@ class TimeSheet(TimeStampedModel):
     project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name='timesheets', verbose_name='Project')
     is_active = models.BooleanField(_('Is Active'), default=True)
     remark = models.TextField(_("Remark"), null=True, blank=True)
+    submitted_at = models.DateTimeField(_('Submitted at'), null=True, blank=True)
     con_comment = models.TextField(_("Consultant Comment"), null=True, blank=True)
     status_updated_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
     additional_hours = models.FloatField(max_length=20, null=True, blank=True, default=0)

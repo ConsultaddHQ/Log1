@@ -99,6 +99,7 @@ class VendorContact(TimeStampedModel):
 
 
 class Lead(TimeStampedModel):
+    is_w2 = models.BooleanField(default=False)
     job_desc = models.TextField(_('Job Description'))
     city = models.CharField(_('City'), max_length=50, blank=True, null=True)
     job_title = models.CharField(_('Job Title'), max_length=100, blank=True, null=True)

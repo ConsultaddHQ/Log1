@@ -45,7 +45,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'context': {
                     'iphone_link': link,
                     'password': password,
-                    'tutorial_video': config.TUTORIAL_VIDEO,
                     'android_link': config.ANDROID_APP_LINK,
                     'consultant_name': project.consultant.name,
                     'consultant_email': project.consultant.email,
@@ -372,6 +371,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', None)
         filter_by_time = request.query_params.get('filter_by_time', None)
+        filter_by_lead = request.query_params.get('filter_by_lead', None)
         filter_by_status = request.query_params.get('filter_by_status', None)
 
         page = int(request.query_params.get("page", 1))
@@ -386,6 +386,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = Project.objects.filter(submission__created_by__team=request.user.team)
             else:
                 projects = Project.objects.all()
+
+            if filter_by_lead == 'w2':
+                projects = projects.filter(submission__lead__is_w2=True)
 
             if query:
                 projects = projects.filter(
@@ -638,40 +641,40 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.joined_url, data)
 
                     consultant = project.consultant
-                    if not consultant.work_type == 'w2':
-                        # Creating first week Timesheet on project status change to joined
-                        start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
-                        week_day = start_date.weekday()
-                        if week_day == 6:
-                            end_date = start_date + timedelta(days=6)
-                        else:
-                            end_date = start_date + timedelta(days=5 - week_day)
 
-                        TimeSheet.objects.get_or_create(
-                            hours=0,
-                            end=end_date,
-                            status='draft',
-                            project=project,
-                            start=start_date,
-                        )
+                    # Creating first week Timesheet on project status change to joined
+                    start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d')
+                    week_day = start_date.weekday()
+                    if week_day == 6:
+                        end_date = start_date + timedelta(days=6)
+                    else:
+                        end_date = start_date + timedelta(days=5 - week_day)
 
-                        if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
-                            password = password_generator(password_length=10, strength=3)
-                            consultant.set_password(password)
-                            consultant.is_active = True
-                            consultant.save()
+                    TimeSheet.objects.get_or_create(
+                        hours=0,
+                        end=end_date,
+                        status='draft',
+                        project=project,
+                        start=start_date,
+                    )
 
-                            if os.environ.get('ENV', 'local') == 'prod':
-                                links = IphoneAppLink.objects.filter(is_sent=False)
-                                if links:
-                                    link = links.first()
-                                    iphone_link = config.IPHONE_APP_LINK
-                                    resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
-                                    if err == 'ok':
-                                        link.is_sent = True
-                                        link.sent_on = datetime.now()
-                                        link.consultant = consultant
-                                        link.save()
+                    if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
+                        password = password_generator(password_length=10, strength=3)
+                        consultant.set_password(password)
+                        consultant.is_active = True
+                        consultant.save()
+
+                        if os.environ.get('ENV', 'local') == 'prod':
+                            links = IphoneAppLink.objects.filter(is_sent=False)
+                            if links:
+                                link = links.first()
+                                iphone_link = config.IPHONE_APP_LINK
+                                resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
+                                if err == 'ok':
+                                    link.is_sent = True
+                                    link.sent_on = datetime.now()
+                                    link.consultant = consultant
+                                    link.save()
 
                 # Discord message for PO , Status Received
                 if new_status == 'received' and not project.is_msg_sent:
@@ -847,6 +850,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     authentication_classes = (TokenAuthentication,)
 
     def retrieve(self, request, *args, **kwargs):
+        query = request.query_params.get('query', None)
         start = request.query_params.get('start', None)
         end = request.query_params.get('end', date.today())
 
@@ -855,24 +859,22 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            projects = Project.objects.filter(
-                statuses__is_current=True, consultant_id=kwargs.get('pk', None), statuses__status='joined'
+            queryset = TimeSheet.objects.filter(
+                Q(project__consultant_id=kwargs.get('pk', None)) & (
+                        Q(status='submitted') |
+                        Q(status='rejected', is_active=False)
+                )
             )
-            if not projects:
-                projects = Project.objects.filter(statuses__is_current=True, consultant_id=kwargs.get('pk', None),
-                                                  statuses__status__istartswith='terminated')
-            if projects:
-                ids = list(projects.values_list('id', flat=True))
-                if start:
-                    queryset = TimeSheet.objects.filter(
-                        project__in=ids, start__range=[start, end]
-                    ).exclude(status='draft')
-                else:
-                    queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
-                total = queryset.count()
-                serializer = self.serializer_class(queryset[first:last], many=True)
-                return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
-            return Response({"error": "No Project Found"}, status=status.HTTP_400_BAD_REQUEST)
+            if start:
+                queryset = queryset.filter(project__start_date__range=[start, end])
+            if query:
+                queryset = queryset.filter(
+                    Q(project__submission__client__istartswith=query) |
+                    Q(project__submission__lead__vendor_company__name__istartswith=query)
+                )
+            total = queryset.count()
+            serializer = self.serializer_class(queryset[first:last], many=True)
+            return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -891,7 +893,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             project_status = ['joined', 'terminated-resigned', 'terminated', 'terminated-resigned_location_issue',
                               'terminated-resigned_location_issue', 'terminated-resigned_full_time_offer',
                               'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
-                              'terminated-fired_performance_issue', 'terminated-fired_security_issue']
+                              'terminated-fired_performance_issue', 'terminated-fired_security_issue', 'complete']
 
             if consultant_id:
                 consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')

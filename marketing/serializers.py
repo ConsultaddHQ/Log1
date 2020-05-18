@@ -38,7 +38,7 @@ class LeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = ('id', 'job_desc', 'job_title', 'primary_skill', 'city', 'vendor_company_id', 'vendor_company_name',
-                  'owner', 'status', 'created', 'modified')
+                  'owner', 'status', 'created', 'modified', 'is_w2')
 
 
 class SubmissionCreateSerializer(serializers.ModelSerializer):

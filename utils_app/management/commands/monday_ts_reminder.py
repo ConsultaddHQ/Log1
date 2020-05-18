@@ -2,9 +2,8 @@ from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 from django.core.management import BaseCommand
 
-from datetime import date
+from datetime import date, timedelta
 from project.models import TimeSheet
-from consultant.models import Consultant
 from notification.views import push_notification
 from notification.models import Notification, FCMDevice
 
@@ -15,10 +14,9 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        timesheets = TimeSheet.objects.filter(status='draft', end__lte=date.today())
+        timesheets = TimeSheet.objects.filter(status='draft', end__lte=date.today() - timedelta(days=2))
         for timesheet in timesheets:
-            # consultant = timesheet.project.consultant
-            consultant = Consultant.objects.get(id=90)
+            consultant = timesheet.project.consultant
             title = f"Reminder: Please submit timesheet for the week {str(timesheet.start)} - {str(timesheet.end)}"
             message_body = {
                 "body": title,

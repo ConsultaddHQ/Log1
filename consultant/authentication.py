@@ -3,8 +3,6 @@ from rest_framework import exceptions
 from django.utils.translation import ugettext_lazy as _
 from rest_framework.authentication import get_authorization_header
 
-from consultant.models import ConsultantToken
-
 
 class ConsultantTokenAuthentication(object):
     """
@@ -63,7 +61,7 @@ class ConsultantTokenAuthentication(object):
         if not token.consultant.is_active:
             raise exceptions.AuthenticationFailed(_('Consultant is inactive or deleted.'))
 
-        return (token.consultant, token)
+        return token.consultant, token
 
     def authenticate_header(self, request):
         return self.keyword
@@ -126,18 +124,81 @@ class ConsultantPetitionTokenAuthentication(object):
         if not token.consultant.p_is_active:
             raise exceptions.AuthenticationFailed(_('Consultant is inactive or deleted.'))
 
-        return (token.consultant, token)
+        return token.consultant, token
 
     def authenticate_header(self, request):
         return self.keyword
 
 
-def get_consultant(request):
-    auth = get_authorization_header(request).split()
-    key = auth[1].decode()
-    try:
-        consultant_token = ConsultantToken.objects.select_related('consultant').get(key=key)
-    except ConsultantToken.DoesNotExist:
-        raise exceptions.AuthenticationFailed('Invalid token.')
-    if consultant_token.consultant and consultant_token.consultant.is_authenticated:
-        return consultant_token.consultant
+class CustomTokenAuthentication(object):
+    keyword = 'Token'
+    model = None
+
+    def authenticate(self, request):
+        auth = get_authorization_header(request).split()
+        model_type = request.META.get('HTTP_MODEL', None)
+
+        if not auth or auth[0].lower() != self.keyword.lower().encode():
+            return None
+
+        if len(auth) == 1:
+            msg = _('Invalid token header. No credentials provided.')
+            raise exceptions.AuthenticationFailed(msg)
+        elif len(auth) > 2:
+            msg = _('Invalid token header. Token string should not contain spaces.')
+            raise exceptions.AuthenticationFailed(msg)
+
+        try:
+            token = auth[1].decode()
+        except UnicodeError:
+            msg = _('Invalid token header. Token string should not contain invalid characters.')
+            raise exceptions.AuthenticationFailed(msg)
+
+        return self.authenticate_credentials(token, model_type)
+
+    def authenticate_credentials(self, key, model_type):
+
+        if model_type == 'user':
+
+            from rest_framework.authtoken.models import Token
+            try:
+                token = Token.objects.select_related('user').get(key=key)
+            except Token.DoesNotExist:
+                raise exceptions.AuthenticationFailed(_('Invalid token.'))
+
+            if not token.user.is_active:
+                raise exceptions.AuthenticationFailed(_('Consultant is inactive or deleted.'))
+
+            return token.user, token
+
+        elif model_type == 'consultant':
+
+            from consultant.models import ConsultantToken
+            try:
+                token = ConsultantToken.objects.select_related('consultant').get(key=key)
+            except ConsultantToken.DoesNotExist:
+                raise exceptions.AuthenticationFailed(_('Invalid token.'))
+
+            if not token.consultant.is_active:
+                raise exceptions.AuthenticationFailed(_('Consultant is inactive or deleted.'))
+
+            return token.consultant, token
+
+        elif model_type == 'petition':
+
+            from consultant.models import ConsultantPetitionToken
+            try:
+                token = ConsultantPetitionToken.objects.select_related('consultant').get(key=key)
+            except ConsultantPetitionToken.DoesNotExist:
+                raise exceptions.AuthenticationFailed(_('Invalid token.'))
+
+            if not token.consultant.p_is_active:
+                raise exceptions.AuthenticationFailed(_('Consultant is inactive or deleted.'))
+
+            return token.consultant, token
+
+        else:
+            raise exceptions.AuthenticationFailed(_('Invalid model.'))
+
+    def authenticate_header(self, request):
+        return self.keyword
