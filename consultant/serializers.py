@@ -298,3 +298,14 @@ class ConsultantListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'profiles')
+
+
+class ConsultantFeedbackSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Feedback
+        fields = ('id', 'created', 'feedback_text', 'feedback_type', 'rating', 'consultant', 'created_by')
+
+    def get_created_by(self, obj):
+        return obj.created_by.employee_name

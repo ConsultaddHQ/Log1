@@ -107,7 +107,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimeSheet
-        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'status_updated_at', 'status_updated_by',
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at', 'status_updated_by',
                   'modified', 'attachments', 'remark', 'project', 'con_comment')
 
     def get_start(self, obj):
