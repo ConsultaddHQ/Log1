@@ -88,7 +88,7 @@ class ConsultantPOCAdmin(ExportActionModelAdmin):
 
 
 @admin.register(Feedback)
-class TerminateAdmin(ExportActionModelAdmin):
+class FeedbackAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     search_fields = ('id', 'consultant__name', 'consultant__email', 'feedback_type', 'rating', 'created')
     list_display = ('id', 'consultant', 'feedback_type', 'rating', 'created')
