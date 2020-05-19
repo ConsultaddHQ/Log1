@@ -334,7 +334,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             timesheet.additional_hours = 0
             timesheet.save()
             serializer = self.serializer_class(timesheet)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
