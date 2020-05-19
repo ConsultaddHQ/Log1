@@ -40,80 +40,81 @@ def start_marketing():
     except Exception as error:
         return error
 
-def terminate_consultant():
+
+def terminate_consultant(terminate):
     try:
-        queryset = Terminate.objects.filter(last_date__lte=date.today(), is_complete=False)
-        for terminate in queryset:
-            consultant = terminate.consultant
-            consultant.status = 'terminated'
-            consultant.save()
+        consultant = terminate.consultant
+        consultant.status = 'terminated'
+        consultant.save()
 
-            marketings = consultant.marketing.filter(status='open')
-            for marketing in marketings:
-                marketing.status = 'close'
-                marketing.end = date.today()
-                marketing.save()
+        marketings = consultant.marketing.filter(status='open')
+        for marketing in marketings:
+            marketing.status = 'close'
+            marketing.end = date.today()
+            marketing.save()
 
-            terminate.is_complete = True
-            terminate.save()
+        terminate.is_complete = True
+        terminate.save()
 
-            # Mattermost message for Exit Interview
-            exit_details = html_to_text(terminate.exit_details)
-            text = f"#### Exit interview for {consultant.name}\n" \
-                   f"**Reason for leaving** : {terminate.reason.upper()}\n" \
-                   f"**Termination Date** : {terminate.last_date}\n" \
-                   f"**Exit Interview Details** : {exit_details} \n"
+        # Mattermost message for Exit Interview
+        exit_details = html_to_text(terminate.exit_details)
+        text = f"#### Exit interview for {consultant.name}\n" \
+               f"**Reason for leaving** : {terminate.reason.upper()}\n" \
+               f"**Termination Date** : {terminate.last_date}\n" \
+               f"**Exit Interview Details** : {exit_details} \n"
 
-            data = {
-                "response_type": "in_channel",
-                "username": "Log1 Updates",
-                "text": text,
-            }
-            post_msg_using_webhook(config.exit_interview_url, data)
+        data = {
+            "response_type": "in_channel",
+            "username": "Log1 Updates",
+            "text": text,
+        }
+        post_msg_using_webhook(config.exit_interview_url, data)
 
-            # App Notification
-            recruiter = consultant.recruiter
-            user_list = [recruiter]
-            scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
-            for user in scrum_masters:
-                user_list.append(user)
+        # App Notification
+        recruiter = consultant.recruiter
+        user_list = [recruiter]
+        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+        for user in scrum_masters:
+            user_list.append(user)
 
-            notification_data = {
-                'category': 'info',
-                'sender_user_type': 'user',
-                'target_type': 'consultant',
-                'recipient_user_type': 'user',
-                'description': terminate.reason,
-                'title': 'Consultant Termination',
-                'sender_id': terminate.created_by.id,
+        title = f"{consultant.name} got terminated on {terminate.last_date}"
+
+        notification_data = {
+            'category': 'info',
+            'sender_user_type': 'user',
+            'target_type': 'consultant',
+            'recipient_user_type': 'user',
+            'description': terminate.reason,
+            'title': title,
+            'sender_id': terminate.created_by.id,
+            'target_id': terminate.consultant.id,
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "body": title,
+            "title": title,
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target': 'consultant',
+                'timestamp': str(timezone.now()),
                 'target_id': terminate.consultant.id,
-            }
-            create_notification(user_list, notification_data)
+            },
+        }
 
-            # Push Notification
-            message_body = {
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "body": f"{consultant.name} got terminated today",
-                "title": f"{consultant.name} got terminated today",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'consultant',
-                    'timestamp': str(timezone.now()),
-                    'target_id': terminate.consultant.id,
-                },
-            }
+        object_ids = []
+        for user in user_list:
+            object_ids.append(user.id)
 
-            object_ids = []
-            for user in user_list:
-                object_ids.append(user.id)
-
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+        registration_ids = list(
+            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                     ).values_list('device_id', flat=True))
+        push_notification(registration_ids, message_body)
         return None
     except Exception as error:
         return error
@@ -630,10 +631,10 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             }
 
             # Filter Consultant by status and In pool
-            if con_status == 'in_marketing':
-                consultants = in_marketing
-            elif con_status == 'all':
+            if con_status == 'all':
                 consultants = total
+            elif con_status == 'in_marketing':
+                consultants = in_marketing
             elif con_status == 'in_pool':
                 consultants = in_pool
             elif con_status == 'candidate':
@@ -1096,7 +1097,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             else:
                 consultants = consultants.filter(terminate__reason=con_status)
 
-            consultants = consultants.order_by('id').distinct('id')
+            consultants = consultants.order_by('id', '-terminate__modified').distinct('id')
 
             terminate = Terminate.objects.filter(consultant=OuterRef("pk"))
 
@@ -1118,7 +1119,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
-            Terminate.objects.create(
+            terminate = Terminate.objects.create(
                 consultant=consultant,
                 created_by=request.user,
                 reason=request.data.get('reason'),
@@ -1129,7 +1130,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                 notice_period=request.data.get('notice_period', None),
             )
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
-                terminate_consultant()
+                terminate_consultant(terminate)
             serializer = ConsultantBenchSerializer(consultant)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -1146,7 +1147,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             serializer.is_valid(raise_exception=True)
             serializer.save()
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
-                terminate_consultant()
+                terminate_consultant(terminate)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
