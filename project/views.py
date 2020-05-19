@@ -323,7 +323,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.submission.consultant_marketing.status = 'close'
                     project.submission.consultant_marketing.end = project.start_date
                     project.submission.consultant_marketing.save()
-                    if prev_status.status == 'received':
+                    if prev_status.status == 'received' or prev_status.status == 'new':
                         new_status, created = ProjectStatus.objects.get_or_create(
                             project=project,
                             is_current=True,

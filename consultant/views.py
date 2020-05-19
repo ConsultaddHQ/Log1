@@ -245,6 +245,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             close_marketing()
             start_marketing()
+            query = request.query_params.get('query', None)
             consultants = Consultant.objects.filter(marketing__status='open')
             roles = request.user.roles
 
@@ -263,6 +264,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.filter(
                     pocs__poc=request.user
                 )
+
+            if query:
+                consultants = consultants.filter(name__istartswith=query)
 
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
@@ -289,7 +293,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
@@ -359,29 +363,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             obj = get_object_or_404(Consultant, id=kwargs.get('pk'))
             serializer = ConsultantUpdateSerializer(obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-        except KeyError as err:
-            logger.error(err)
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, *args, **kwargs):
-        roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
-        try:
-            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
-            consultant.status = 'archived'
-            consultant.save()
-            profiles = consultant.marketing.filter(end=None)
-            profiles.update(end=date.today(), status='close')
-            serializer = ConsultantUpdateSerializer(consultant)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -416,7 +404,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
@@ -452,7 +440,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['post', 'put'], detail=True, url_path='experience')
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
@@ -952,16 +940,6 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, *args, **kwargs):
-        try:
-            consultant_profile_id = kwargs.get('pk')
-            consultant_profile = get_object_or_404(ConsultantProfile, id=consultant_profile_id)
-            consultant_profile.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
 
 class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
@@ -971,7 +949,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = ConsultantPOC.objects.filter(poc_type=request.data['poc_type'],
@@ -994,7 +972,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
@@ -1015,7 +993,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
@@ -1038,7 +1016,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
