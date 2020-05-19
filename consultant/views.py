@@ -1053,7 +1053,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
-        con_status = request.query_params.get('status', 'fired')
+        con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
@@ -1069,6 +1069,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                     Q(skills__istartswith=query)
                 )
 
+            total = consultants.all()
             fired = consultants.filter(terminate__reason='fired').order_by('id').distinct('id')
             other = consultants.filter(terminate__reason='other').order_by('id').distinct('id')
             absconded = consultants.filter(terminate__reason='candidate_absconded').order_by('id').distinct('id')
@@ -1076,6 +1077,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             full_time_offer = consultants.filter(terminate__reason='full_time_offer').order_by('id').distinct('id')
 
             count = {
+                "total": total.count(),
                 "fired": fired.count(),
                 "other": other.count(),
                 "absconded": absconded.count(),
@@ -1084,7 +1086,9 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             }
 
             # Filter Consultant by status
-            if con_status:
+            if con_status == 'all':
+                consultants = consultants.all()
+            else:
                 consultants = consultants.filter(terminate__reason=con_status)
 
             consultants = consultants.order_by('id').distinct('id')
