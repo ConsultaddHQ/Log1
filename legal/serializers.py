@@ -1,7 +1,7 @@
 import os
 from rest_framework import serializers
 
-from legal.models import Petition, Document, DocumentList
+from legal.models import Petition, Document, DocumentList, Reason
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -23,6 +23,12 @@ class DocumentSerializer(serializers.ModelSerializer):
         fields = ('id', 'petition', 'doc_type_name', 'doc_type', 'file_name', 'verified', 'category', 'remark')
 
 
+class ReasonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reason
+        fields = ('id', 'created', 'petition', 'petition_status', 'reason', 'created_by')
+
+
 class DocumentURLSerializer(serializers.ModelSerializer):
     doc_type_name = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
@@ -36,6 +42,12 @@ class DocumentURLSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = ('id', 'petition', 'creator', 'doc_type_name', 'doc_type', 'file', 'verified', 'category', 'remark')
+
+
+class PetitionUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Petition
+        fields = '__all__'
 
 
 class PetitionSerializer(serializers.ModelSerializer):
@@ -67,17 +79,28 @@ class PetitionSerializer(serializers.ModelSerializer):
 
 
 class PetitionGetSerializer(serializers.ModelSerializer):
+    rfe = serializers.SerializerMethodField()
     docs = serializers.SerializerMethodField()
+    reasons = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
 
     class Meta:
         model = Petition
-        fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'docs', 'status',
-                  'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active')
+        fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'docs', 'reasons',
+                  'status', 'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active', 'rfe')
+
+    def get_rfe(self, obj):
+        rfe_doc = obj.documents.filter(doc_type__name__iexact='rfe')
+        if rfe_doc:
+            return True
+        return False
 
     def get_docs(self, obj):
         return DocumentSerializer(obj.documents.all(), many=True).data
+
+    def get_reasons(self, obj):
+        return ReasonSerializer(obj.reasons.all(), many=True).data
 
     def get_consultant(self, obj):
         return {

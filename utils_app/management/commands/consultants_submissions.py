@@ -15,7 +15,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        consultants = Consultant.objects.filter(marketing__status='open')
+        consultants = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
         submission_data = []
         today = datetime.today()
         if today.weekday() == 0:

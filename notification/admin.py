@@ -1,4 +1,5 @@
 from django.contrib import admin
+from import_export.admin import ExportActionModelAdmin
 from notification.models import Notification, FCMDevice
 
 
@@ -11,6 +12,6 @@ class NotificationAdmin(admin.ModelAdmin):
 
 
 @admin.register(FCMDevice)
-class FCMDeviceAdmin(admin.ModelAdmin):
+class FCMDeviceAdmin(ExportActionModelAdmin):
     list_display = ('type', 'active', 'date_created', 'device_id')
     search_fields = ('name', 'device_id', 'type')

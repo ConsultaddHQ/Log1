@@ -7,18 +7,19 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
 
-from activity.models import Comment
 from employee.models import User, Team
 from utils_app.mailing import send_email
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
+from activity.models import Comment, ConsultantComment
 from notification.models import FCMDevice, Notification
 
 CONSULTANT_STATUS_CHOICE = (
     ('on_bench', 'On Bench'),
     ('archived', 'Archived'),
     ('on_project', 'On Project'),
+    ('terminated', 'Terminated')
 )
 
 MARKETING_STATUS_CHOICE = (
@@ -48,23 +49,31 @@ EDUCATION_CHOICES = (
     ('certification', 'Certification'),
 )
 
-FEEDBACK_CHOICES = (
-    ('training', 'Training'),
-    ('screening', 'Screening'),
-    ('pre_joining', 'Pre Joining'),
-    ('re_marketing', 'Re Marketing'),
-    ('rate_revision', 'Rate Revision'),
-)
-
 GENDER_CHOICE = (
     ('male', 'Male'),
     ('female', 'Female'),
 )
 
+FEEDBACK_CHOICES = (
+    ('cfr', 'CFR'),
+    ('training', 'Training'),
+    ('screening', 'Screening'),
+    ('marketing', 'Marketing'),
+    ('engineering', 'Engineering'),
+    ('recruitment', 'Recruitment'),
+)
+
 WORK_TYPE_CHOICE = (
-    ('w2', 'W2'),
     ('c2c', 'C2C'),
     ('full_time', 'Full Time'),
+)
+
+TERMINATION_REASON_CHOICE = (
+    ('other', 'Other'),
+    ('fired', 'Fired'),
+    ('location_change', 'Change of Location'),
+    ('full_time_offer', 'Got Full Time Offer'),
+    ('candidate_absconded', 'Candidate Absconded'),
 )
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
@@ -78,8 +87,10 @@ class ConsultantManager(BaseUserManager):
 
 
 class Consultant(AbstractBaseUser, TimeStampedModel):
+    is_w2 = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     first_login = models.BooleanField(default=True)
+    remote_only = models.BooleanField(default=False)
     email = models.EmailField(_('Email ID'), unique=True)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")
@@ -87,10 +98,12 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     ssn = models.CharField(_('SSN ID'), max_length=20, null=True, blank=True)
     date_of_birth = models.DateField(_('Date of birth'), blank=True, null=True)
     links = models.CharField(_('Links'), max_length=100, blank=True, null=True)
+    domain = models.CharField(_('Domain'), max_length=20, null=True, blank=True)
     skills = models.CharField(_('Skills'), max_length=100, null=True, blank=True)
     skype = models.CharField(_('Skype Id'), max_length=100, null=True, blank=True)
     phone_no = models.CharField(_('Phone Number'), max_length=20, null=True, blank=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
+    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     gender = models.CharField(
         _('Gender'), max_length=10,
         choices=GENDER_CHOICE,
@@ -107,6 +120,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         default='full_time'
     )
 
+    # fields for Legal
     p_is_active = models.BooleanField(default=False)
     visa_petition = models.BooleanField(_('Petition login'), default=False)
     pin = models.CharField(_('Pin'), max_length=10, blank=True, null=True)
@@ -474,46 +488,27 @@ class ConsultantPOC(TimeStampedModel):
         return f'{self.id}-{self.poc.employee_name} {self.poc_type} of {self.consultant.name}'
 
 
-class FeedbackDetail(models.Model):
-    experience = models.TextField(_('Experience'), blank=True, null=True)
-    role_knowledge = models.TextField(_('Role Knowledge'), blank=True, null=True)
-    programming = models.TextField(_('Programming Skill'), blank=True, null=True)
-    communication = models.TextField(_('Communication Skills'), blank=True, null=True)
-    problem_solving = models.TextField(_('Problem Solving Skill'), blank=True, null=True)
-    organizational = models.TextField(_('Organizational Knowledge'), blank=True, null=True)
-
-    def __str__(self):
-        return self.id
-
-
-class ConsultantFeedback(TimeStampedModel):
-    remark = models.TextField(_('Remark'), null=True, blank=True)
-    feedback_type = models.CharField(
-        _('Feedback Type'), max_length=20,
-        choices=FEEDBACK_CHOICES,
+class Terminate(TimeStampedModel):
+    resign_date = models.DateField(_('Resignation Date'))
+    rehire = models.BooleanField(_('Fit to rehire'), default=False)
+    last_date = models.DateField(_('Termination Date'), blank=True, null=True)
+    is_complete = models.BooleanField(_('Termination Complete'), default=False)
+    notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
+    exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)
+    reason = models.CharField(
+        _('Termination Reason'),
+        max_length=30,
+        choices=TERMINATION_REASON_CHOICE,
     )
-    rating = models.IntegerField(
-        _('Consultant Rating'),
-        help_text=_('Rating 1 being worst and 5 being best')
-    )
-    feedback = models.ForeignKey(
-        FeedbackDetail, on_delete=models.CASCADE,
-        related_name='consultant',
-        verbose_name='Consultant Feedback')
     consultant = models.ForeignKey(
         Consultant, on_delete=models.CASCADE,
-        related_name='feedback',
+        related_name='terminate',
         verbose_name='Consultant'
-    )
-    given_by = models.ForeignKey(
-        User, on_delete=models.PROTECT,
-        related_name='feedback_given',
-        verbose_name='Feedback given by'
     )
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
-        related_name='feedback_created',
-        verbose_name='Feedback added by'
+        related_name='termination_created',
+        verbose_name='Termination added by'
     )
 
     def save(self, *args, **kwargs):
@@ -523,7 +518,41 @@ class ConsultantFeedback(TimeStampedModel):
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
-        return super(ConsultantFeedback, self).save(*args, **kwargs)
+        return super(Terminate, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.id}:{self.consultant.name} {self.feedback_type} of {self.rating}'
+        return f'{self.id}:{self.consultant.name}:{self.reason}'
+
+
+class Feedback(TimeStampedModel):
+    feedback_text = models.TextField(_('Feedback'))
+    feedback_type = models.CharField(
+        _('Feedback Type'), max_length=20,
+        choices=FEEDBACK_CHOICES,
+    )
+    rating = models.IntegerField(
+        _('Consultant Rating'),
+        help_text=_('Rating 1 being worst and 5 being best')
+    )
+    consultant = models.ForeignKey(
+        Consultant, on_delete=models.CASCADE,
+        related_name='feedback',
+        verbose_name='Consultant'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='feedback_created',
+        verbose_name='Termination added by'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Feedback, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.consultant.name}:{self.feedback_type}'

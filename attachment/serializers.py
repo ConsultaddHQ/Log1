@@ -16,7 +16,12 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 
 class AttachmentURLSerializer(serializers.ModelSerializer):
+    file_type = serializers.SerializerMethodField()
+
+    def get_file_type(self, obj):
+        return os.path.split(obj.attachment_file.name)[1].split('.')[1]
 
     class Meta:
         model = Attachment
-        fields = ('id', 'object_id', 'creator', 'attachment_type', 'attachment_file')
+        fields = ('id', 'object_id', 'creator', 'attachment_type', 'attachment_file', 'file_type')
+

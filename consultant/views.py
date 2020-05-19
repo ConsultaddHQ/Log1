@@ -8,15 +8,16 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
+from constance import config
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
-from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentSerializer
+from utils_app.utils import post_msg_using_webhook, html_to_text
+from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -220,11 +221,12 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 ssn=data['ssn'],
                 name=data['name'],
                 email=data['email'],
+                is_w2=data['is_w2'],
                 skills=data['skills'],
                 gender=data['gender'],
-                date_of_birth=data['dob'],
                 phone_no=data['phone_no'],
                 current_city=data['current_city'],
+                date_of_birth=data['date_of_birth'],
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
@@ -236,12 +238,12 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 title="Original",
                 links=data['links'],
                 consultant=consultant,
-                date_of_birth=data['dob'],
                 visa_end=data['visa_end'],
                 profile_owner=request.user,
                 visa_type=data['visa_type'],
                 visa_start=data['visa_start'],
                 current_city=data['current_city'],
+                date_of_birth=data['date_of_birth'],
             )
 
             # Creating Recruiter of Consultant
@@ -434,83 +436,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get', 'post'], detail=True, url_path='feedback')
-    def feedback(self, request, *args, **kwargs):
-        if request.method == 'GET':
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
-            last, first = page * page_size, page * page_size - page_size
-            try:
-                consultant_id = kwargs.get('pk')
-                feedback_type = request.query_params.get("feedback_type", None)
-                if feedback_type:
-                    queryset = ConsultantFeedback.objects.filter(
-                        consultant_id=consultant_id, feedback_type=feedback_type
-                    )
-                else:
-                    queryset = ConsultantFeedback.objects.filter(consultant_id=consultant_id)
-                serializer = ConsultantFeedbackSerializer(queryset[first:last], many=True)
-                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        elif request.method == 'POST':
-            try:
-                consultant_id = kwargs.get('pk')
-                data = request.data
-                feedback_details = FeedbackDetail.objects.create(
-                    role_knowledge=data['role'],
-                    experience=data['experience'],
-                    programming=data['programming'],
-                    communication=data['communication'],
-                    organizational=data['organizational'],
-                    problem_solving=data['problem_solving'],
-                )
-                feedback = ConsultantFeedback.objects.create(
-                    remark=data['remark'],
-                    rating=data['rating'],
-                    created_by=request.user,
-                    feedback=feedback_details,
-                    consultant_id=consultant_id,
-                    given_by_id=data['given_by'],
-                    feedback_type=data['feedback_type'],
-                )
-                serializer = ConsultantFeedbackSerializer(feedback)
-                return Response({'result': serializer.data}, status=status.HTTP_201_CREATED)
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response({"error": 'Method not allowed'}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(methods=['get', 'post'], detail=True, url_path='comments')
-    def comments(self, request, *args, **kwargs):
-        consultant_id = kwargs.get('pk')
-        if request.method == 'GET':
-            try:
-                consultant = get_object_or_404(Consultant, id=consultant_id)
-                queryset = consultant.comments.filter(parent_comment=None)
-                serializer = CommentGetSerializer(queryset, many=True)
-                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        elif request.method == 'POST':
-            try:
-                content_type = ContentType.objects.get(model='consultant')
-                comment = Comment.objects.create(
-                    user=request.user,
-                    object_id=consultant_id,
-                    content_type=content_type,
-                    comment_text=request.data['comment_text'],
-                    parent_comment_id=request.data['parent_comment'],
-                )
-                serializer = CommentGetSerializer(comment)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, *args, **kwargs):
         try:
@@ -580,7 +505,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.exclude(status='archived')
+            consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
@@ -679,11 +604,16 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     def create(self, request, *args, **kwargs):
         try:
-            queryset = ConsultantMarketing.objects.filter(consultant_id=request.data['consultant'], status='close')
+            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
+            queryset = consultant.marketing.filter(status='close')
             if queryset:
                 latest_marketing_cycle = queryset.latest('end')
             else:
                 latest_marketing_cycle = None
+
+            if consultant.status == 'terminated':
+                consultant.status = 'on_bench'
+                consultant.save()
 
             reset_days = request.data.get('reset_days', 'true')
             if reset_days == 'true':
@@ -1037,6 +967,143 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
+    permission_classes = (IsAuthenticated,)
+    queryset = Terminate.objects.all()
+    serializer_class = TerminateConsultantSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        query = request.query_params.get('query', None)
+        con_status = request.query_params.get('status', 'fired')
+        page = int(request.query_params.get("page", 1))
+        page_size = int(request.query_params.get("page_size", 10))
+        last, first = page * page_size, page * page_size - page_size
+
+        try:
+            consultants = Consultant.objects.filter(status='terminated')
+
+            # Consultants search based on name, email, recruiter and location
+            if query:
+                consultants = consultants.filter(
+                    Q(email__iexact=query) |
+                    Q(name__icontains=query) |
+                    Q(skills__istartswith=query)
+                )
+
+            fired = consultants.filter(terminate__reason='fired').order_by('id').distinct('id')
+            other = consultants.filter(terminate__reason='other').order_by('id').distinct('id')
+            absconded = consultants.filter(terminate__reason='candidate_absconded').order_by('id').distinct('id')
+            location_change = consultants.filter(terminate__reason='location_change').order_by('id').distinct('id')
+            full_time_offer = consultants.filter(terminate__reason='full_time_offer').order_by('id').distinct('id')
+
+            count = {
+                "fired": fired.count(),
+                "other": other.count(),
+                "absconded": absconded.count(),
+                "location_change": location_change.count(),
+                "full_time_offer": full_time_offer.count(),
+            }
+
+            # Filter Consultant by status
+            if con_status:
+                consultants = consultants.filter(terminate__reason=con_status)
+
+            consultants = consultants.order_by('id').distinct('id')
+
+            terminate = Terminate.objects.filter(consultant=OuterRef("pk"))
+
+            data = consultants[first:last].annotate(
+                reason=Subquery(terminate.values('reason')[:1]),
+                rehire=Subquery(terminate.values('rehire')[:1]),
+                resign_date=Subquery(terminate.values('reason')[:1]),
+                last_date=Subquery(terminate.values('last_date')[:1]),
+            ).values('id', 'name', 'skills', 'reason', 'last_date', 'rehire')
+            return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+
+            consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
+            Terminate.objects.create(
+                consultant=consultant,
+                created_by=request.user,
+                reason=request.data.get('reason'),
+                rehire=request.data.get('rehire', False),
+                last_date=request.data.get('last_date', None),
+                resign_date=request.data.get('resign_date', None),
+                exit_details=request.data.get('exit_details', None),
+                notice_period=request.data.get('notice_period', None),
+            )
+            serializer = ConsultantBenchSerializer(consultant)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+
+            terminate = get_object_or_404(Terminate, id=kwargs.get('pk'))
+            serializer = self.serializer_class(terminate, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    queryset = Feedback.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ConsultantFeedbackSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            feedback = Feedback.objects.create(
+                created_by=request.user,
+                rating=request.data.get('rating'),
+                consultant_id=request.data.get('consultant'),
+                feedback_type=request.data.get('feedback_type'),
+                feedback_text=request.data.get('feedback_text'),
+            )
+            serializer = self.serializer_class(feedback)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            feedback_type = request.query_params.get('type', None)
+            feedback = Feedback.objects.filter(consultant_id=kwargs.get('pk')).order_by('-created')
+            if feedback_type:
+                feedback = feedback.filter(feedback_type=feedback_type)
+            serializer = self.serializer_class(feedback, many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            feedback = get_object_or_404(Feedback, id=kwargs.get('pk'))
+            serializer = self.serializer_class(feedback, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 # API for Petition Web App
 class ConsultantPetitionAuthViewSet(GenericViewSet):
     permission_classes = ()
@@ -1068,3 +1135,4 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         logger.error("Incorrect Email Id OR Password")
         return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
+

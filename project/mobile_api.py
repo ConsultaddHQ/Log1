@@ -1,7 +1,9 @@
+import os
 import logging
 from datetime import datetime
-from django.db.models import Q, F
+from django.db.models import F
 from django.shortcuts import get_object_or_404
+from django.db.models import Subquery, OuterRef
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -63,9 +65,18 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
         try:
+            project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
+                              'terminated-resigned_rate_issue', 'terminated-resigned_location_issue',
+                              'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
+                              'terminated-fired_budget_issue', 'terminated-fired_performance_issue',
+                              'terminated-fired_security_issue']
             projects = request.user.get_project().filter(
                 Q(statuses__status='joined', statuses__is_current=True)
             ).order_by('-id')
+            if not projects:
+                projects = request.user.get_project().filter(
+                    Q(statuses__status__in=project_status, statuses__is_current=True)
+                ).order_by('-id')
             if projects:
                 project = projects.first()
                 queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'],
@@ -120,6 +131,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             except Exception as error:
                 logger.error(error)
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            timesheet.submitted_at = datetime.now()
             timesheet.save()
             user_list = User.objects.filter(Q(role__name='finance'))
             title = f"{request.user.name} submitted timesheet for the week end {str(timesheet.end)}"
@@ -127,7 +139,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 "title": title,
                 "category": "alert",
                 "description": title,
-                "target_type": "consultant",
+                "target_type": "timesheet",
                 "target_id": request.user.id,
                 "sender_id": request.user.id,
                 "recipient_user_type": "user",
@@ -141,10 +153,11 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
-                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "click_action": "https://log1.app/",
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
+                    'target': 'timesheet',
                     'target_id': request.user.id,
                     'timestamp': str(timezone.now()),
                 },
@@ -196,12 +209,13 @@ class Test(GenericViewSet, ListModelMixin):
         message_body = {
             "category": "rejected",
             "show_in_foreground": True,
+            "click_action": "https://log1.app",
             "title": f"Timesheet rejected for week end {str(timesheet)}",
-            "click_action": "FLUTTER_NOTIFICATION_CLICK",
             "body": f"Timesheet rejected for week end {str(timesheet)}",
             "data": {
                 'is_read': False,
                 'is_deleted': False,
+                'target': 'timesheet',
                 'target_id': timesheet,
                 'timestamp': str(timezone.now()),
             },
@@ -237,21 +251,28 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     def contact_us(self, request):
         message = request.data.get('message')
         contact_type = request.data.get('type')
-        phone_type = request.data.get('phone_type', None)
+        phone_type = request.data.get('device_type', None)
         try:
             if contact_type == 'finance':
-                to = ['aditi.so@consultadd.in']
+                to = ['finance@consultadd.com']
+                bcc = ['sarang.m@consultadd.com']
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
-                to = ['aditi.so@consultadd.in']
+                to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.com']
+                bcc = []
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=status.HTTP_400_BAD_REQUEST)
 
+            if os.environ.get('ENV', 'local') != 'prod':
+                to = ['sarang.m@consultadd.com', 'aditi.so@consultadd.in']
+                bcc = []
+                subject += "Development server"
+
             mail_data = {
                 'to': to,
                 'cc': [],
-                'bcc': ['sarang.m@consultadd.com'],
+                'bcc': bcc,
                 'subject': subject,
                 'template': '../templates/timesheet_contact_us.html',
                 'context': {
@@ -261,6 +282,41 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 },
             }
             send_email(mail_data, 'log1@consultadd.com')
+
+            user_list = User.objects.filter(role__name='finance')
+            title = f"{request.user.name} has Timesheet issue, please check mail."
+            data = {
+                "title": title,
+                "category": "alert",
+                "description": title,
+                "target_type": "consultant",
+                "target_id": request.user.id,
+                "sender_id": request.user.id,
+                "recipient_user_type": "user",
+                "sender_user_type": "consultant",
+            }
+            create_notification(user_list, data)
+
+            # Push Notification
+            message_body = {
+                "body": title,
+                "title": title,
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://log1.app/",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'app_issue',
+                    'timestamp': str(timezone.now()),
+                },
+            }
+            user_ids = list(user_list.values_list('id', flat=True))
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=user_ids, content_type__model='user').values_list(
+                    'device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -268,11 +324,18 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
     def list(self, request, *args, **kwargs):
         try:
+            project_status = ProjectStatus.objects.filter(project=OuterRef('pk'), is_current=True)
             result = Project.objects.filter(
-                consultant=request.user, statuses__status='joined', statuses__is_current=True).annotate(
+                Q(consultant=request.user, statuses__is_current=True) & (
+                        Q(statuses__status='joined') |
+                        Q(statuses__status__istartswith='terminated') |
+                        Q(statuses__status__in=['complete', 'extended'])
+                )
+            ).annotate(
                 client=F('submission__client'),
-                employer=F('submission__employer', )
-            ).values('id', 'start_date', 'client', 'employer')
+                employer=F('submission__employer'),
+                status=Subquery(project_status.values('status')[:1]),
+            ).order_by('-start_date').values('id', 'start_date', 'client', 'employer', 'status')
             return Response({'result': result}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -294,7 +357,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             screenshot = False
             zero_hours = request.query_params.get('zero_hours', None)
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), status__in=['draft', 'rejected'],
-                                          is_active=True)
+                                          is_active=True, project__consultant=request.user)
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
             timesheet.status = 'submitted'
@@ -333,6 +396,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     return Response({"error": "Attachment is required"}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as error:
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            timesheet.submitted_at = datetime.now()
             timesheet.save()
 
             user_list = User.objects.filter(Q(role__name='finance'))
@@ -341,7 +405,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 "title": title,
                 "category": "alert",
                 "description": title,
-                "target_type": "consultant",
+                "target_type": "timesheet",
                 "target_id": request.user.id,
                 "sender_id": request.user.id,
                 "recipient_user_type": "user",
@@ -355,10 +419,11 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
-                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "click_action": "https://app.log1.com/",
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
+                    'target': 'timesheet',
                     'target_id': request.user.id,
                     'timestamp': str(timezone.now()),
                 },

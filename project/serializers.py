@@ -18,7 +18,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
-                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name')
+                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
+                  'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -36,7 +37,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.submission.client
 
     def get_consultant_name(self, obj):
-        return obj.submission.consultant.name
+        if obj.consultant:
+            return obj.consultant.name
+        return None
 
     def get_company_name(self, obj):
         return obj.submission.lead.vendor_company.name
@@ -104,7 +107,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimeSheet
-        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'status_updated_at', 'status_updated_by',
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at', 'status_updated_by',
                   'modified', 'attachments', 'remark', 'project', 'con_comment')
 
     def get_start(self, obj):
@@ -137,30 +140,26 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     def get_project(self, obj):
         project = Project.objects.filter(
             Q(consultant=obj, statuses__is_current=True) & (
-              Q(statuses__status='joined') |
-              Q(statuses__status__istartswith='terminated')
+                    Q(statuses__status__istartswith='terminated') |
+                    Q(statuses__status__in=['joined', 'complete', 'extended'])
             )
         )
         if project:
-            project = project.latest('-id')
+            project = project.latest('-start_date')
             return {
                 'id': project.id,
                 'start_date': project.start_date,
-                'team': project.submission.employer,
                 'client': project.submission.client,
+                'team': project.submission.employer.title(),
                 'vendor': project.submission.lead.vendor_company.name,
             }
         return None
 
     def get_ts_status(self, obj):
-        project = Project.objects.filter(consultant=obj, statuses__status='joined', statuses__is_current=True)
-        if project:
-            project = project.latest('-id')
-            queryset = TimeSheet.objects.filter(project=project)
-            sub_ts = True if queryset.filter(status='submitted') else False
-            rej_ts = True if queryset.filter(status='rejected', is_active=False) else False
-            return {'rejected': rej_ts, 'submitted': sub_ts}
-        return {'rejected': False, 'submitted': False}
+        queryset = TimeSheet.objects.filter(project__consultant=obj)
+        submitted_ts = True if queryset.filter(status='submitted') else False
+        rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
+        return {'submitted': submitted_ts, 'rejected': rejected_ts}
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
@@ -173,7 +172,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'reporting_details')
+                  'start_date', 'end_date', 'reporting_details', 'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)

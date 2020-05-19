@@ -3,10 +3,12 @@ from django.db import models
 from django.utils import timezone
 from django.dispatch import receiver
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.fields import GenericRelation
 
 from employee.models import User
 from consultant.models import Consultant
 from utils_app.models import TimeStampedModel
+from activity.models import Comment, ConsultantComment
 
 
 PETITION_TYPES = (
@@ -58,6 +60,7 @@ class Types(models.Model):
 
 
 class Petition(TimeStampedModel):
+    comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is Petition Active'), default=True)
     lca_no = models.CharField(_('LCA No.'), max_length=40, null=True, blank=True)
     employer = models.CharField(_('Employer'), max_length=20, default='Consultadd')
@@ -65,6 +68,7 @@ class Petition(TimeStampedModel):
     uscis_no = models.CharField(_('USCIS No.'), max_length=40, null=True, blank=True)
     fedex_no = models.CharField(_('Fedex No.'), max_length=40, null=True, blank=True)
     premium_processing = models.BooleanField(_('Premium Processing'), default=None, null=True)
+    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     petition_type = models.CharField(_('Petition Type'), choices=PETITION_TYPES, max_length=20, blank=True, null=True)
     beneficiary_type = models.BooleanField(
         _('Beneficiary Type'), default=True,
@@ -97,6 +101,34 @@ class Petition(TimeStampedModel):
             self.created = timezone.now()
         self.modified = timezone.now()
         return super(Petition, self).save(*args, **kwargs)
+
+
+class Reason(TimeStampedModel):
+    petition_status = models.CharField(_('Petition Status'), choices=PETITION_STATUSES, max_length=20)
+    reason = models.TextField(_('Reason for Status'), null=True, blank=True)
+    petition = models.ForeignKey(
+        Petition, on_delete=models.CASCADE,
+        related_name='reasons',
+        verbose_name='Petition',
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Created By',
+        related_name='reason',
+        default=None, null=True,
+    )
+
+    def __str__(self):
+        return f'{self.petition.id} :: {self.petition.status} :: {self.reason}'
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Reason, self).save(*args, **kwargs)
 
 
 class DocumentList(models.Model):
