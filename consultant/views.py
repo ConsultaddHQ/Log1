@@ -577,7 +577,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         query = request.query_params.get('query', None)
         team_name = request.query_params.get('team', None)
         location = request.query_params.get('location', None)
-        con_status = request.query_params.get('status', 'in_marketing')
+        con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
@@ -607,6 +607,8 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             consultants = consultants.order_by('id').distinct('id')
 
+            total = consultants.all()
+
             on_project = consultants.filter(status='on_project')
 
             open_candidates = list(ConsultantMarketing.objects.filter(
@@ -620,6 +622,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False)
 
             count = {
+                "total": total.count(),
                 "in_pool": in_pool.count(),
                 "on_project": on_project.count(),
                 "in_marketing": in_marketing.count(),
@@ -629,6 +632,8 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             # Filter Consultant by status and In pool
             if con_status == 'in_marketing':
                 consultants = in_marketing
+            elif con_status == 'all':
+                consultants = total
             elif con_status == 'in_pool':
                 consultants = in_pool
             elif con_status == 'candidate':
