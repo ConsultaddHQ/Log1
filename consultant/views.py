@@ -41,6 +41,85 @@ def start_marketing():
         return error
 
 
+def terminate_consultant(terminate):
+    try:
+        consultant = terminate.consultant
+        consultant.status = 'terminated'
+        consultant.save()
+
+        marketings = consultant.marketing.filter(status='open')
+        for marketing in marketings:
+            marketing.status = 'close'
+            marketing.end = date.today()
+            marketing.save()
+
+        terminate.is_complete = True
+        terminate.save()
+
+        # Mattermost message for Exit Interview
+        exit_details = html_to_text(terminate.exit_details)
+        text = f"#### Exit interview for {consultant.name}\n" \
+               f"**Reason for leaving** : {terminate.reason.upper()}\n" \
+               f"**Termination Date** : {terminate.last_date}\n" \
+               f"**Exit Interview Details** : {exit_details} \n"
+
+        data = {
+            "response_type": "in_channel",
+            "username": "Log1 Updates",
+            "text": text,
+        }
+        post_msg_using_webhook(config.exit_interview_url, data)
+
+        # App Notification
+        recruiter = consultant.recruiter
+        user_list = [recruiter]
+        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+        for user in scrum_masters:
+            user_list.append(user)
+
+        title = f"{consultant.name} got terminated on {terminate.last_date}"
+
+        notification_data = {
+            'category': 'info',
+            'sender_user_type': 'user',
+            'target_type': 'consultant',
+            'recipient_user_type': 'user',
+            'description': terminate.reason,
+            'title': title,
+            'sender_id': terminate.created_by.id,
+            'target_id': terminate.consultant.id,
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "body": title,
+            "title": title,
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target': 'consultant',
+                'timestamp': str(timezone.now()),
+                'target_id': terminate.consultant.id,
+            },
+        }
+
+        object_ids = []
+        for user in user_list:
+            object_ids.append(user.id)
+
+        registration_ids = list(
+            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                     ).values_list('device_id', flat=True))
+        push_notification(registration_ids, message_body)
+        return None
+    except Exception as error:
+        return error
+
+
 class ConsultantViewSets(viewsets.ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -166,6 +245,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             close_marketing()
             start_marketing()
+            query = request.query_params.get('query', None)
             consultants = Consultant.objects.filter(marketing__status='open')
             roles = request.user.roles
 
@@ -184,6 +264,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.filter(
                     pocs__poc=request.user
                 )
+
+            if query:
+                consultants = consultants.filter(name__istartswith=query)
 
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
@@ -210,7 +293,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
@@ -280,29 +363,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             obj = get_object_or_404(Consultant, id=kwargs.get('pk'))
             serializer = ConsultantUpdateSerializer(obj, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-        except KeyError as err:
-            logger.error(err)
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
-
-    def destroy(self, request, *args, **kwargs):
-        roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
-        try:
-            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
-            consultant.status = 'archived'
-            consultant.save()
-            profiles = consultant.marketing.filter(end=None)
-            profiles.update(end=date.today(), status='close')
-            serializer = ConsultantUpdateSerializer(consultant)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -337,7 +404,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
@@ -373,7 +440,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['post', 'put'], detail=True, url_path='experience')
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
@@ -499,7 +566,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         query = request.query_params.get('query', None)
         team_name = request.query_params.get('team', None)
         location = request.query_params.get('location', None)
-        con_status = request.query_params.get('status', 'in_marketing')
+        con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
@@ -529,6 +596,8 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             consultants = consultants.order_by('id').distinct('id')
 
+            total = consultants.all()
+
             on_project = consultants.filter(status='on_project')
 
             open_candidates = list(ConsultantMarketing.objects.filter(
@@ -542,6 +611,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False)
 
             count = {
+                "total": total.count(),
                 "in_pool": in_pool.count(),
                 "on_project": on_project.count(),
                 "in_marketing": in_marketing.count(),
@@ -549,7 +619,9 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             }
 
             # Filter Consultant by status and In pool
-            if con_status == 'in_marketing':
+            if con_status == 'all':
+                consultants = total
+            elif con_status == 'in_marketing':
                 consultants = in_marketing
             elif con_status == 'in_pool':
                 consultants = in_pool
@@ -868,16 +940,6 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    def destroy(self, request, *args, **kwargs):
-        try:
-            consultant_profile_id = kwargs.get('pk')
-            consultant_profile = get_object_or_404(ConsultantProfile, id=consultant_profile_id)
-            consultant_profile.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
 
 class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
@@ -887,7 +949,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = ConsultantPOC.objects.filter(poc_type=request.data['poc_type'],
@@ -910,7 +972,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
@@ -931,7 +993,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
@@ -954,7 +1016,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
@@ -975,7 +1037,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
-        con_status = request.query_params.get('status', 'fired')
+        con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
@@ -991,6 +1053,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                     Q(skills__istartswith=query)
                 )
 
+            total = consultants.all()
             fired = consultants.filter(terminate__reason='fired').order_by('id').distinct('id')
             other = consultants.filter(terminate__reason='other').order_by('id').distinct('id')
             absconded = consultants.filter(terminate__reason='candidate_absconded').order_by('id').distinct('id')
@@ -998,6 +1061,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             full_time_offer = consultants.filter(terminate__reason='full_time_offer').order_by('id').distinct('id')
 
             count = {
+                "total": total.count(),
                 "fired": fired.count(),
                 "other": other.count(),
                 "absconded": absconded.count(),
@@ -1006,10 +1070,12 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             }
 
             # Filter Consultant by status
-            if con_status:
+            if con_status == 'all':
+                consultants = consultants.all()
+            else:
                 consultants = consultants.filter(terminate__reason=con_status)
 
-            consultants = consultants.order_by('id').distinct('id')
+            consultants = consultants.order_by('id', '-terminate__modified').distinct('id')
 
             terminate = Terminate.objects.filter(consultant=OuterRef("pk"))
 
@@ -1031,7 +1097,7 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
-            Terminate.objects.create(
+            terminate = Terminate.objects.create(
                 consultant=consultant,
                 created_by=request.user,
                 reason=request.data.get('reason'),
@@ -1041,9 +1107,10 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
                 exit_details=request.data.get('exit_details', None),
                 notice_period=request.data.get('notice_period', None),
             )
+            if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
+                terminate_consultant(terminate)
             serializer = ConsultantBenchSerializer(consultant)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1057,6 +1124,8 @@ class TerminationViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, 
             serializer = self.serializer_class(terminate, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
+                terminate_consultant(terminate)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

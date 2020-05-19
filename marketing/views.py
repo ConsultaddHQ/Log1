@@ -278,9 +278,8 @@ class LeadViewSets(viewsets.ModelViewSet):
             page = int(request.query_params.get("page", 1))
             page_size = int(request.query_params.get("page_size", 10))
             last, first = page * page_size, page * page_size - page_size
-            leads = Lead.objects.filter(owner=request.user)
-            filter_by_status = 'archived'
-            data, data_counts = self.get_lead_data(leads, filter_by_status, first, last)
+            leads = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
+            data, data_counts = self.get_lead_data(leads, 'archived', first, last)
             if data_counts == 'error':
                 return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
             return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
