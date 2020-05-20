@@ -15,6 +15,7 @@ from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModel
 from project.serializers import *
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
+from attachment.views import get_s3_object
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.views import create_notification, push_notification
@@ -322,19 +323,24 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['PUT'], detail=True, url_path='cancel')
-    def cancel_timesheet(self, request, *args, **kwargs):
+    @action(methods=['GET'], detail=True, url_path='attachments')
+    def attachments(self, request, *args, **kwargs):
         try:
-            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status='submitted',
-                                          project__consultant=request.user)
-            timesheet.hours = 0
-            timesheet.status = 'draft'
-            timesheet.con_comment = None
-            timesheet.submitted_at = None
-            timesheet.additional_hours = 0
-            timesheet.save()
-            serializer = self.serializer_class(timesheet)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), project__consultant=request.user)
+            attachments = timesheet.attachments.all()
+            data = []
+            for attachment in attachments:
+                url = get_s3_object(attachment.attachment_file.name)
+                extension = attachment.attachment_file.name.split(".")[-1]
+                data.append({
+                    "id": attachment.id,
+                    "file_path": url,
+                    "extension": extension,
+                    "created": attachment.created,
+                    "file_name": attachment.filename,
+                })
+
+            return Response({"result": data}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 

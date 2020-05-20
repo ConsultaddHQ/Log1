@@ -317,13 +317,16 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
                     path.append(download_s3_object(i.attachment_file.name))
 
-                res, error = self.po_mail(project, path, scrum_masters, po_type)
+                res, error = 'development server', 'development server'
+                if os.environ.get('ENV', 'local') == 'prod':
+                    res, error = self.po_mail(project, path, scrum_masters, po_type)
+
                 if not error == 'error':
                     delete_temp_file(path)
                     project.submission.consultant_marketing.status = 'close'
                     project.submission.consultant_marketing.end = project.start_date
                     project.submission.consultant_marketing.save()
-                    if prev_status.status == 'received':
+                    if prev_status.status == 'received' or prev_status.status == 'new':
                         new_status, created = ProjectStatus.objects.get_or_create(
                             project=project,
                             is_current=True,
@@ -845,7 +848,7 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
 
 class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = TimeSheet.objects.all()
-    serializer_class = TimeSheetSerializer
+    serializer_class = FinanceSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
