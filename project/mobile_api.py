@@ -323,6 +323,21 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['PUT'], detail=True, url_path='cancel')
+    def cancel_timesheet(self, request, *args, **kwargs):
+        try:
+            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status='submitted',
+                                          project__consultant=request.user)
+            timesheet.hours = 0
+            timesheet.status = 'draft'
+            timesheet.con_comment = None
+            timesheet.additional_hours = 0
+            timesheet.save()
+            serializer = self.serializer_class(timesheet)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['GET'], detail=True, url_path='attachments')
     def attachments(self, request, *args, **kwargs):
         try:
