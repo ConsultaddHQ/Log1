@@ -1,7 +1,7 @@
 import os
 import logging
-from datetime import datetime
-from django.db.models import F
+from django.db.models import F, Max
+from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef
 
@@ -82,7 +82,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 project = projects.first()
                 queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'],
                                                     is_active=True).order_by('end')
-                serializer = self.serializer_class(queryset[first:last], many=True)
+                serializer = self.serializer_class(queryset, many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             return Response({"result": "No Weeks"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as error:
@@ -241,8 +241,14 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         last, first = page * page_size, page * page_size - page_size
         try:
             project_id = kwargs.get('pk')
-            queryset = TimeSheet.objects.filter(project_id=project_id, is_active=True).order_by('project')
-            serializer = self.serializer_class(queryset[first:last], many=True)
+            pending = TimeSheet.objects.filter(project_id=project_id, is_active=True, status='draft').order_by('start')
+            data = [i for i in pending]
+
+            submitted = TimeSheet.objects.filter(project_id=project_id, is_active=True,
+                                                 status__in=['submitted', 'rejected', 'approved']).order_by('-start')
+            for i in submitted:
+                data.append(i)
+            serializer = self.serializer_class(data, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -383,8 +389,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         last, first = page * page_size, page * page_size - page_size
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
-            queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True)
-            serializer = self.serializer_class(queryset[first:last], many=True)
+            queryset = TimeSheet.objects.filter(
+                project=project, status__in=['draft', 'rejected'], is_active=True
+            ).order_by('end')
+            serializer = self.serializer_class(queryset, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -393,8 +401,12 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             screenshot = False
             zero_hours = request.query_params.get('zero_hours', None)
-            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), status__in=['draft', 'rejected'],
-                                          is_active=True, project__consultant=request.user)
+            timesheet = get_object_or_404(
+                TimeSheet, id=kwargs.get('pk', None),
+                project__consultant=request.user,
+                status__in=['draft', 'rejected'],
+                is_active=True,
+            )
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
             timesheet.status = 'submitted'
@@ -433,6 +445,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     return Response({"error": "Attachment is required"}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as error:
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
             timesheet.submitted_at = datetime.now()
             timesheet.save()
 

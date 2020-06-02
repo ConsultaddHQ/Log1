@@ -148,7 +148,11 @@ class TimeSheet(TimeStampedModel):
     start = models.DateField(_('Start'), null=True, blank=True)
     end = models.DateField(_('End'), null=True, blank=True)
     hours = models.FloatField(max_length=20, null=True, blank=True)
-    project = models.ForeignKey(Project, on_delete=models.PROTECT, related_name='timesheets', verbose_name='Project')
+    project = models.ForeignKey(
+        Project, on_delete=models.PROTECT,
+        related_name='timesheets',
+        verbose_name='Project'
+    )
     is_active = models.BooleanField(_('Is Active'), default=True)
     remark = models.TextField(_("Remark"), null=True, blank=True)
     submitted_at = models.DateTimeField(_('Submitted at'), null=True, blank=True)
