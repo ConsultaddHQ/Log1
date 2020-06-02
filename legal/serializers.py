@@ -91,8 +91,8 @@ class PetitionGetSerializer(serializers.ModelSerializer):
                   'status', 'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active', 'rfe')
 
     def get_rfe(self, obj):
-        rfe_doc = obj.documents.filter(doc_type__name__iexact='rfe')
-        if rfe_doc:
+        rfe = obj.reasons.filter(petition_status='rfe')
+        if rfe:
             return True
         return False
 
