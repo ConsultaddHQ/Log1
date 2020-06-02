@@ -68,12 +68,16 @@ WORK_TYPE_CHOICE = (
     ('full_time', 'Full Time'),
 )
 
-TERMINATION_REASON_CHOICE = (
-    ('other', 'Other'),
-    ('fired', 'Fired'),
-    ('location_change', 'Change of Location'),
-    ('full_time_offer', 'Got Full Time Offer'),
-    ('candidate_absconded', 'Candidate Absconded'),
+EXIT_STATUS_CHOICE = (
+    ('complete', 'Consultant Exit Complete'),
+    ('cancelled', 'Consultant Exit Cancelled'),
+    ('in_process', 'Consultant Exit in Process'),
+)
+
+EXIT_TYPE_CHOICE = (
+    ('fired', 'Employee Fired'),
+    ('resigned', 'Employee Resigned'),
+    ('absconded', 'Employee Absconded'),
 )
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
@@ -488,27 +492,46 @@ class ConsultantPOC(TimeStampedModel):
         return f'{self.id}-{self.poc.employee_name} {self.poc_type} of {self.consultant.name}'
 
 
-class Terminate(TimeStampedModel):
-    resign_date = models.DateField(_('Resignation Date'))
+class ExitReason(models.Model):
+    name = models.CharField(_('Reason'), max_length=50)
+
+    def __str__(self):
+        return self.name
+
+
+class ConsultantExit(TimeStampedModel):
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
-    last_date = models.DateField(_('Termination Date'), blank=True, null=True)
-    is_complete = models.BooleanField(_('Termination Complete'), default=False)
+    legal_action = models.BooleanField(_('Legal Actions'), default=False)
+    last_date = models.DateField(_('Relieving Date'), blank=True, null=True)
+    resign_date = models.DateField(_('Resignation Date'), blank=True, null=True)
     notice_period = models.IntegerField(_('Notice Period'), blank=True, null=True)
+    cancel_reason = models.TextField(_('Cancellation Reason'), blank=True, null=True)
     exit_details = models.TextField(_('Exit Interview Details'), blank=True, null=True)
-    reason = models.CharField(
-        _('Termination Reason'),
+    reasons = models.ManyToManyField(
+        ExitReason,
+        blank=True,
+        related_name='reasons',
+        verbose_name='Exit Reason'
+    )
+    status = models.CharField(
+        _('Consultant Exit Status'),
         max_length=30,
-        choices=TERMINATION_REASON_CHOICE,
+        choices=EXIT_STATUS_CHOICE,
+    )
+    type = models.CharField(
+        _('Consultant Exit Type'),
+        max_length=30,
+        choices=EXIT_TYPE_CHOICE,
     )
     consultant = models.ForeignKey(
         Consultant, on_delete=models.CASCADE,
-        related_name='terminate',
+        related_name='exit',
         verbose_name='Consultant'
     )
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
-        related_name='termination_created',
-        verbose_name='Termination added by'
+        related_name='exit_created',
+        verbose_name='Consultant Exit added by'
     )
 
     def save(self, *args, **kwargs):
@@ -518,10 +541,10 @@ class Terminate(TimeStampedModel):
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
-        return super(Terminate, self).save(*args, **kwargs)
+        return super(ConsultantExit, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.id}:{self.consultant.name}:{self.reason}'
+        return f'{self.id}:{self.consultant.name}:{self.type}'
 
 
 class Feedback(TimeStampedModel):

@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from constance import config
 from employee.models import User
-from consultant.models import Terminate
+from consultant.models import ConsultantExit
 from notification.models import FCMDevice
 from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import push_notification, create_notification
@@ -15,7 +15,7 @@ class Command(BaseCommand):
     help = "this command is for posting your payload to MatterMost app"
 
     def handle(self, *args, **options):
-        queryset = Terminate.objects.filter(last_date__lte=date.today(), is_complete=False)
+        queryset = ConsultantExit.objects.filter(last_date__lte=date.today(), status='in_process')
         for terminate in queryset:
             consultant = terminate.consultant
             consultant.status = 'terminated'
@@ -27,22 +27,8 @@ class Command(BaseCommand):
                 marketing.end = date.today()
                 marketing.save()
 
-            terminate.is_complete = True
+            terminate.status = 'complete'
             terminate.save()
-
-            # Mattermost message for Exit Interview
-            exit_details = html_to_text(terminate.exit_details)
-            text = f"#### Exit interview for {consultant.name}\n" \
-                   f"**Reason for leaving** : {terminate.reason.upper()}\n" \
-                   f"**Termination Date** : {terminate.last_date}\n" \
-                   f"**Exit Interview Details** : {exit_details} \n"
-
-            data = {
-                "response_type": "in_channel",
-                "username": "Log1 Updates",
-                "text": text,
-            }
-            post_msg_using_webhook(config.exit_interview_url, data)
 
             # App Notification
             recruiter = consultant.recruiter
@@ -51,13 +37,15 @@ class Command(BaseCommand):
             for user in scrum_masters:
                 user_list.append(user)
 
+            title = f"{consultant.name} got terminated on {terminate.last_date}"
+
             notification_data = {
                 'category': 'info',
                 'sender_user_type': 'user',
                 'target_type': 'consultant',
                 'recipient_user_type': 'user',
-                'description': terminate.reason,
-                'title': 'Consultant Termination',
+                'description': terminate.type,
+                'title': title,
                 'sender_id': terminate.created_by.id,
                 'target_id': terminate.consultant.id,
             }
@@ -68,8 +56,8 @@ class Command(BaseCommand):
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": f"{consultant.name} got terminated today",
-                "title": f"{consultant.name} got terminated today",
+                "body": title,
+                "title": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,

@@ -158,9 +158,21 @@ class ExperienceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class TerminateConsultantSerializer(serializers.ModelSerializer):
+class ExitDetailConsultantSerializer(serializers.ModelSerializer):
+    reasons = serializers.SerializerMethodField()
+
     class Meta:
-        model = Terminate
+        model = ConsultantExit
+        fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date',  'exit_details',
+                  'reasons', 'notice_period', 'legal_action', 'cancel_reason')
+
+    def get_reasons(self, obj):
+        return obj.reasons.all().values('id', 'name')
+
+
+class ExitConsultantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConsultantExit
         fields = '__all__'
 
 
@@ -228,7 +240,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return EducationSerializer(obj.academics.all(), many=True).data
 
     def get_terminate(self, obj):
-        return TerminateConsultantSerializer(obj.terminate.all().order_by('-last_date'), many=True).data
+        return ExitDetailConsultantSerializer(obj.exit.all().order_by('-created'), many=True).data
 
     def get_experience(self, obj):
         return ExperienceSerializer(obj.experiences.all(), many=True).data
