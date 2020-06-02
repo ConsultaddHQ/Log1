@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, ConsultantPOC, \
-    Education, Experience, WorkAuth, ConsultantToken, ConsultantPetitionToken, Terminate, Feedback
+    Education, Experience, WorkAuth, ConsultantToken, ConsultantPetitionToken, ConsultantExit, Feedback, ExitReason
 
 
 @admin.register(Consultant)
@@ -94,8 +94,22 @@ class FeedbackAdmin(ExportActionModelAdmin):
     list_display = ('id', 'consultant', 'feedback_type', 'rating', 'created')
 
 
-@admin.register(Terminate)
-class TerminateAdmin(ExportActionModelAdmin):
+@admin.register(ConsultantExit)
+class ConsultantExitAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'consultant__name', 'consultant__email', 'reason', 'resign_date', 'last_date')
-    list_display = ('id', 'consultant', 'reason', 'resign_date', 'last_date', 'notice_period', 'exit_details')
+    search_fields = ('id', 'consultant__name',  'consultant__email', 'type', 'resign_date', 'last_date')
+    list_display = ('id', 'consultant', 'type', 'resign_date', 'last_date', 'notice_period', 'legal_action',
+                    'exit_details', 'reasons_display')
+
+    def reasons_display(self, obj):
+        return ", ".join([
+            reasons.name for reasons in obj.reasons.all()
+        ])
+
+    reasons_display.short_description = "Reasons"
+
+
+@admin.register(ExitReason)
+class ExitReasonAdmin(ExportActionModelAdmin):
+    search_fields = ('name',)
+    list_display = ('id', 'name')
