@@ -80,7 +80,7 @@ def terminate_consultant(terminate):
 
         # Email for Exit Process Cancelled
         res = "Development Server"
-        if os.environ.get('ENV', 'local') == 'local':
+        if os.environ.get('ENV', 'local') == 'prod':
             res, error = send_exit_process_mail(terminate, 'complete')
             if error == 'error':
                 logger.error(res)
@@ -175,7 +175,6 @@ def send_exit_process_mail(terminate, status):
             title = "Exit Process Complete, Employee Terminated"
 
         exit_details = html_to_text(terminate.exit_details)
-
         mail_data = {
             'to': to,
             'cc': cc,
@@ -1206,7 +1205,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             # Email for starting Exit Process
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'local':
+            if os.environ.get('ENV', 'local') == 'prod':
                 res, error = send_exit_process_mail(con_exit, 'start')
                 if error == 'error':
                     logger.error(res)
@@ -1255,7 +1254,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     con_exit.save()
                     # Email for Exit Process Cancelled
                     res = "Development Server"
-                    if os.environ.get('ENV', 'local') == 'local':
+                    if os.environ.get('ENV', 'local') == 'prod':
                         res, error = send_exit_process_mail(con_exit, 'cancel')
                         if error == 'error':
                             logger.error(res)
