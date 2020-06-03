@@ -1,12 +1,12 @@
+import os
 from datetime import date
 from django.core.management import BaseCommand
 from django.utils import timezone
 
-from constance import config
 from employee.models import User
-from consultant.models import ConsultantExit
 from notification.models import FCMDevice
-from utils_app.utils import post_msg_using_webhook, html_to_text
+from consultant.models import ConsultantExit
+from consultant.views import send_exit_process_mail
 from notification.views import push_notification, create_notification
 
 
@@ -29,6 +29,10 @@ class Command(BaseCommand):
 
             terminate.status = 'complete'
             terminate.save()
+
+            # Email for Exit Process Cancelled
+            res, error = send_exit_process_mail(terminate, 'complete')
+            print(res)
 
             # App Notification
             recruiter = consultant.recruiter

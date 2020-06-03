@@ -78,6 +78,13 @@ def terminate_consultant(terminate):
         terminate.status = 'complete'
         terminate.save()
 
+        # Email for Exit Process Cancelled
+        res = "Development Server"
+        if os.environ.get('ENV', 'local') == 'local':
+            res, error = send_exit_process_mail(terminate, 'complete')
+            if error == 'error':
+                logger.error(res)
+
         # App Notification
         recruiter = consultant.recruiter
         user_list = [recruiter]
@@ -126,6 +133,76 @@ def terminate_consultant(terminate):
         return None
     except Exception as error:
         return error
+
+
+def send_exit_process_mail(terminate, status):
+    try:
+        consultant = terminate.consultant
+        recruiter = consultant.recruiter
+        if consultant.relation:
+            poc = consultant.relation
+        else:
+            poc = consultant.recruiter
+
+        to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
+        cc = [poc.email, config.SUPERADMIN]
+
+        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+        for user in scrum_masters:
+            cc.append(user.email)
+
+        marketings = consultant.marketing.filter(status='open')
+        for marketing in marketings:
+            cc.append(marketing.primary_marketer.email)
+
+        types = dict(EXIT_TYPE_CHOICE)
+
+        if terminate.reasons.all():
+            reason = ", ".join(reason.name for reason in terminate.reasons.all())
+        else:
+            reason = 'NA'
+
+        if status == 'start':
+            subject = f'Exit Process Initiated for {consultant.name}'
+            title = "Exit Process Initiated"
+
+        elif status == 'cancel':
+            subject = f'Exit Process Cancelled for {consultant.name}'
+            title = "Exit Process Cancelled"
+
+        elif status == 'complete':
+            subject = f'{consultant.name} Terminated'
+            title = "Exit Process Complete, Employee Terminated"
+
+        exit_details = html_to_text(terminate.exit_details)
+
+        mail_data = {
+            'to': to,
+            'cc': cc,
+            'bcc': [],
+            'subject': subject,
+            'template': '../templates/exit_process.html',
+            'context': {
+                'title': title,
+                'reason': reason,
+                'type': types[terminate.type],
+                'consultant': consultant.name,
+                'consultant_email': consultant.email,
+                'recruiter': recruiter.employee_name,
+                'rehire': 'Yes' if terminate.rehire else 'No',
+                'legal': 'Yes' if terminate.legal_action else 'No',
+                'exit_details': exit_details if terminate.exit_details else 'NA',
+                'last_date': terminate.last_date if terminate.last_date else 'NA',
+                'resign_date': terminate.resign_date if terminate.resign_date else 'NA',
+                'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
+                'notice_period': terminate.notice_period if terminate.legal_action else 'NA',
+            },
+        }
+        res = send_email(mail_data, terminate.created_by.email)
+        return res, "ok"
+    except Exception as error:
+        logger.error(error)
+        return error, "error"
 
 
 class ConsultantViewSets(viewsets.ModelViewSet):
@@ -1043,63 +1120,6 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     serializer_class = ExitDetailConsultantSerializer
     authentication_classes = (TokenAuthentication,)
 
-    def send_exit_process_mail(self, terminate, status):
-        try:
-            consultant = terminate.consultant
-            recruiter = consultant.recruiter
-            if consultant.relation:
-                poc = consultant.relation
-            else:
-                poc = consultant.recruiter
-            to = [poc.email]
-            scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
-            for user in scrum_masters:
-                to.append(user.email)
-
-            marketings = consultant.marketing.filter(status='open')
-            for marketing in marketings:
-                to.append(marketing.primary_marketer.email)
-
-            reason = ", ".join(reason.name for reason in terminate.reasons.all())
-            if status == 'start':
-                mail_data = {
-                    'to': to,
-                    'cc': [],
-                    'bcc': [],
-                    'subject': f'Exit Process Initiated for {consultant.name}',
-                    'template': '../templates/exit_start.html',
-                    'context': {
-                        'type': terminate.type,
-                        'reason': reason,
-                        'consultant': consultant.name,
-                        'recruiter': consultant.recruiter.employee_name,
-                        'resign_date': terminate.resign_date,
-                    },
-                }
-                res = send_email(mail_data, terminate.created_by.email)
-                return res, "ok"
-            elif status == 'cancel':
-                mail_data = {
-                    'to': to,
-                    'cc': [],
-                    'bcc': [],
-                    'subject': f'Exit Process Cancelled for {consultant.name} ',
-                    'template': '../templates/exit_cancel.html',
-                    'context': {
-                        'type': terminate.type,
-                        'consultant': consultant.name,
-                        'recruiter': consultant.recruiter.employee_name,
-                        'resign_date': terminate.resign_date,
-                        'cancel_reason': terminate.cancel_reason,
-                    },
-                }
-                res = send_email(mail_data, terminate.created_by.email)
-                return res, "ok"
-            return "Not Valid", "error"
-        except Exception as error:
-            logger.error(error)
-            return error, "error"
-
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
         con_status = request.query_params.get('status', 'all')
@@ -1186,9 +1206,8 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             # Email for starting Exit Process
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_exit_process_mail(con_exit, 'start')
-                print(res, error)
+            if os.environ.get('ENV', 'local') == 'local':
+                res, error = send_exit_process_mail(con_exit, 'start')
                 if error == 'error':
                     logger.error(res)
                     return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1236,8 +1255,8 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     con_exit.save()
                     # Email for Exit Process Cancelled
                     res = "Development Server"
-                    if os.environ.get('ENV', 'local') == 'prod':
-                        res, error = self.send_exit_process_mail(con_exit, 'cancel')
+                    if os.environ.get('ENV', 'local') == 'local':
+                        res, error = send_exit_process_mail(con_exit, 'cancel')
                         if error == 'error':
                             logger.error(res)
                             return Response({"error": "error", "exit_mail_error": str(res)},
