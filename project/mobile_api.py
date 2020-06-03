@@ -1,7 +1,7 @@
 import os
 import logging
-from datetime import datetime
-from django.db.models import F
+from django.db.models import F, Max
+from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef
 
@@ -15,6 +15,7 @@ from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModel
 from project.serializers import *
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
+from attachment.views import get_s3_object
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.views import create_notification, push_notification
@@ -81,7 +82,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 project = projects.first()
                 queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'],
                                                     is_active=True).order_by('end')
-                serializer = self.serializer_class(queryset[first:last], many=True)
+                serializer = self.serializer_class(queryset, many=True)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             return Response({"result": "No Weeks"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as error:
@@ -240,8 +241,14 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         last, first = page * page_size, page * page_size - page_size
         try:
             project_id = kwargs.get('pk')
-            queryset = TimeSheet.objects.filter(project_id=project_id, is_active=True).order_by('project')
-            serializer = self.serializer_class(queryset[first:last], many=True)
+            pending = TimeSheet.objects.filter(project_id=project_id, is_active=True, status='draft').order_by('start')
+            data = [i for i in pending]
+
+            submitted = TimeSheet.objects.filter(project_id=project_id, is_active=True,
+                                                 status__in=['submitted', 'rejected', 'approved']).order_by('-start')
+            for i in submitted:
+                data.append(i)
+            serializer = self.serializer_class(data, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -322,6 +329,42 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['PUT'], detail=True, url_path='cancel')
+    def cancel_timesheet(self, request, *args, **kwargs):
+        try:
+            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status='submitted',
+                                          project__consultant=request.user)
+            timesheet.hours = 0
+            timesheet.status = 'draft'
+            timesheet.con_comment = None
+            timesheet.additional_hours = 0
+            timesheet.save()
+            serializer = self.serializer_class(timesheet)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['GET'], detail=True, url_path='attachments')
+    def attachments(self, request, *args, **kwargs):
+        try:
+            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), project__consultant=request.user)
+            attachments = timesheet.attachments.all()
+            data = []
+            for attachment in attachments:
+                url = get_s3_object(attachment.attachment_file.name)
+                extension = attachment.attachment_file.name.split(".")[-1]
+                data.append({
+                    "id": attachment.id,
+                    "file_path": url,
+                    "extension": extension,
+                    "created": attachment.created,
+                    "file_name": attachment.filename,
+                })
+
+            return Response({"result": data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def list(self, request, *args, **kwargs):
         try:
             project_status = ProjectStatus.objects.filter(project=OuterRef('pk'), is_current=True)
@@ -346,8 +389,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         last, first = page * page_size, page * page_size - page_size
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
-            queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'], is_active=True)
-            serializer = self.serializer_class(queryset[first:last], many=True)
+            queryset = TimeSheet.objects.filter(
+                project=project, status__in=['draft', 'rejected'], is_active=True
+            ).order_by('end')
+            serializer = self.serializer_class(queryset, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -356,8 +401,12 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             screenshot = False
             zero_hours = request.query_params.get('zero_hours', None)
-            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk', None), status__in=['draft', 'rejected'],
-                                          is_active=True, project__consultant=request.user)
+            timesheet = get_object_or_404(
+                TimeSheet, id=kwargs.get('pk', None),
+                project__consultant=request.user,
+                status__in=['draft', 'rejected'],
+                is_active=True,
+            )
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
             timesheet.status = 'submitted'
@@ -396,6 +445,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     return Response({"error": "Attachment is required"}, status=status.HTTP_400_BAD_REQUEST)
             except Exception as error:
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
             timesheet.submitted_at = datetime.now()
             timesheet.save()
 
@@ -440,3 +490,4 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+

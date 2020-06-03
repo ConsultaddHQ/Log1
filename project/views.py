@@ -34,7 +34,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    def consultant_mail_on_joining(self, project, password, link):
+    def consultant_mail_on_joining(self, project, password, new_user):
         try:
             mail_data = {
                 'to': [project.consultant.email],
@@ -43,10 +43,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'context': {
-                    'iphone_link': link,
                     'password': password,
+                    'new_user': new_user,
+                    'iphone_link': config.IPHONE_APP_LINK,
                     'android_link': config.ANDROID_APP_LINK,
                     'consultant_name': project.consultant.name,
+                    'client': project.submission.client.title(),
                     'consultant_email': project.consultant.email,
                 },
             }
@@ -317,7 +319,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
                     path.append(download_s3_object(i.attachment_file.name))
 
-                res, error = self.po_mail(project, path, scrum_masters, po_type)
+                res, error = 'development server', 'development server'
+                if os.environ.get('ENV', 'local') == 'prod':
+                    res, error = self.po_mail(project, path, scrum_masters, po_type)
+
                 if not error == 'error':
                     delete_temp_file(path)
                     project.submission.consultant_marketing.status = 'close'
@@ -649,32 +654,27 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         end_date = start_date + timedelta(days=6)
                     else:
                         end_date = start_date + timedelta(days=5 - week_day)
+                    for i in range(2):
+                        TimeSheet.objects.get_or_create(
+                            hours=0,
+                            end=end_date,
+                            status='draft',
+                            project=project,
+                            start=start_date,
+                        )
+                        start_date = end_date + timedelta(days=1)
+                        end_date = end_date + timedelta(days=7)
 
-                    TimeSheet.objects.get_or_create(
-                        hours=0,
-                        end=end_date,
-                        status='draft',
-                        project=project,
-                        start=start_date,
-                    )
+                    if os.environ.get('ENV', 'local') == 'prod':
+                        if not consultant.is_active:
+                            password = password_generator(password_length=10, strength=3)
+                            consultant.set_password(password)
+                            consultant.is_active = True
+                            consultant.save()
 
-                    if not IphoneAppLink.objects.filter(is_sent=True, consultant=consultant):
-                        password = password_generator(password_length=10, strength=3)
-                        consultant.set_password(password)
-                        consultant.is_active = True
-                        consultant.save()
-
-                        if os.environ.get('ENV', 'local') == 'prod':
-                            links = IphoneAppLink.objects.filter(is_sent=False)
-                            if links:
-                                link = links.first()
-                                iphone_link = config.IPHONE_APP_LINK
-                                resp, err = self.consultant_mail_on_joining(project, password, iphone_link)
-                                if err == 'ok':
-                                    link.is_sent = True
-                                    link.sent_on = datetime.now()
-                                    link.consultant = consultant
-                                    link.save()
+                            resp, err = self.consultant_mail_on_joining(project, password, True)
+                        else:
+                            resp, err = self.consultant_mail_on_joining(project, "password", False)
 
                 # Discord message for PO , Status Received
                 if new_status == 'received' and not project.is_msg_sent:
@@ -845,7 +845,7 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
 
 class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = TimeSheet.objects.all()
-    serializer_class = TimeSheetSerializer
+    serializer_class = FinanceSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
@@ -859,22 +859,31 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            queryset = TimeSheet.objects.filter(
-                Q(project__consultant_id=kwargs.get('pk', None)) & (
-                        Q(status='submitted') |
-                        Q(status='rejected', is_active=False)
+            projects = Project.objects.filter(
+                Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
+                        Q(statuses__status__istartswith='terminated') |
+                        Q(statuses__status='complete') |
+                        Q(statuses__status='joined')
                 )
             )
-            if start:
-                queryset = queryset.filter(project__start_date__range=[start, end])
             if query:
-                queryset = queryset.filter(
-                    Q(project__submission__client__istartswith=query) |
-                    Q(project__submission__lead__vendor_company__name__istartswith=query)
+                projects = projects.filter(
+                    Q(submission__client__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query)
                 )
-            total = queryset.count()
-            serializer = self.serializer_class(queryset[first:last], many=True)
-            return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
+            if projects:
+                ids = list(projects.values_list('id', flat=True))
+                if start:
+                    queryset = TimeSheet.objects.filter(
+                        project__in=ids, start__range=[start, end]
+                    ).exclude(status='draft')
+                else:
+                    queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
+
+                total = queryset.count()
+                serializer = self.serializer_class(queryset[first:last], many=True)
+                return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
+            return Response({"error": "No Project Found"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -941,7 +950,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
                     timesheet = TimeSheet.objects.create(
                         hours=0,
-                        status='draft',
+                        status='rejected',
                         end=timesheet.end,
                         start=timesheet.start,
                         remark=timesheet.remark,
@@ -951,8 +960,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     sender_content_type = ContentType.objects.get(model='user')
                     target_content_type = ContentType.objects.get(model='timesheet')
 
+                    if timesheet.remark or len(timesheet.remark) != 0:
+                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
+                                f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
+                    else:
+                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client" \
+                                f"{timesheet.project.submission.client}"
+
                     Notification.objects.create(
-                        title=f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
+                        title=title,
+                        description=title,
                         category="rejected",
                         target_object_id=timesheet.id,
                         sender_object_id=request.user.id,
@@ -960,16 +977,15 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         target_content_type=target_content_type,
                         recipient_content_type=recipient_content_type,
                         recipient_object_id=timesheet.project.consultant.id,
-                        description=f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                     )
 
                     # Push Notification
                     message_body = {
+                        "body": title,
+                        "title": title,
                         "category": "rejected",
                         "show_in_foreground": True,
-                        "title": f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         "click_action": "FLUTTER_NOTIFICATION_CLICK",
-                        "body": f"Timesheet rejected for week end {str(timesheet.end)} \n Remark: {timesheet.remark}",
                         "data": {
                             'is_read': False,
                             'is_deleted': False,

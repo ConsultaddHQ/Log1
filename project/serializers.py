@@ -107,8 +107,38 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TimeSheet
-        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at', 'status_updated_by',
-                  'modified', 'attachments', 'remark', 'project', 'con_comment')
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
+                  'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
+
+    def get_start(self, obj):
+        return obj.start.strftime("%m/%d/%Y")
+
+    def get_end(self, obj):
+        return obj.end.strftime("%m/%d/%Y")
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
+
+    def get_project(self, obj):
+        return {
+            'id': obj.project.id,
+            'start_date': obj.project.start_date,
+            'client': obj.project.submission.client,
+            'employer': obj.project.submission.employer.title(),
+            'vendor': obj.project.submission.lead.vendor_company.name,
+        }
+
+
+class FinanceSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimeSheet
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
+                  'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
 
     def get_start(self, obj):
         return obj.start.strftime("%m/%d/%Y")
