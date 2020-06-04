@@ -135,7 +135,7 @@ def terminate_consultant(terminate):
         return error
 
 
-def send_exit_process_mail(terminate, status):
+def send_exit_process_mail(terminate, exit_status):
     try:
         consultant = terminate.consultant
         recruiter = consultant.recruiter
@@ -162,15 +162,14 @@ def send_exit_process_mail(terminate, status):
         else:
             reason = 'NA'
 
-        if status == 'start':
-            subject = f'Exit Process Initiated for {consultant.name}'
-            title = "Exit Process Initiated"
+        subject = f'Exit Process Initiated for {consultant.name}'
+        title = "Exit Process Initiated"
 
-        elif status == 'cancel':
+        if exit_status == 'cancel':
             subject = f'Exit Process Cancelled for {consultant.name}'
             title = "Exit Process Cancelled"
 
-        elif status == 'complete':
+        elif exit_status == 'complete':
             subject = f'{consultant.name} Terminated'
             title = "Exit Process Complete, Employee Terminated"
 
@@ -184,6 +183,7 @@ def send_exit_process_mail(terminate, status):
             'context': {
                 'title': title,
                 'reason': reason,
+                'exit_status': exit_status,
                 'type': types[terminate.type],
                 'consultant': consultant.name,
                 'consultant_email': consultant.email,
@@ -1157,13 +1157,13 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             consultants = consultants.order_by('id', '-exit__modified').distinct('id')
 
-            exit = ConsultantExit.objects.filter(consultant=OuterRef("pk"))
+            exit_obj = ConsultantExit.objects.filter(consultant=OuterRef("pk"))
 
             data = consultants[first:last].annotate(
-                type=Subquery(exit.values('type')[:1]),
-                rehire=Subquery(exit.values('rehire')[:1]),
-                last_date=Subquery(exit.values('last_date')[:1]),
-                resign_date=Subquery(exit.values('resign_date')[:1]),
+                type=Subquery(exit_obj.values('type')[:1]),
+                rehire=Subquery(exit_obj.values('rehire')[:1]),
+                last_date=Subquery(exit_obj.values('last_date')[:1]),
+                resign_date=Subquery(exit_obj.values('resign_date')[:1]),
             ).values('id', 'name', 'skills', 'type', 'last_date', 'rehire')
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
         except Exception as error:

@@ -103,9 +103,6 @@ def password_generator(password_length=10, strength=3):
 
 
 def html_to_text(html):
-    html = html.replace('<strong>', '**')
-    html = html.replace('</strong>', '**')
-    html = html.replace('<em>', '_')
-    html = html.replace('</em>', '_')
+    html = html.replace('<strong>', '**').replace('</strong>', '**').replace('<em>', '_').replace('</em>', '_')
     soup = BeautifulSoup(html, features="html.parser")
     return soup.get_text('\n')
