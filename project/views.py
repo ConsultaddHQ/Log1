@@ -654,6 +654,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         end_date = start_date + timedelta(days=6)
                     else:
                         end_date = start_date + timedelta(days=5 - week_day)
+
                     for i in range(2):
                         TimeSheet.objects.get_or_create(
                             hours=0,

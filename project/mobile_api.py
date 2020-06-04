@@ -449,6 +449,17 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             timesheet.submitted_at = datetime.now()
             timesheet.save()
 
+            last_timesheet = TimeSheet.objects.filter(project=timesheet.project).aggregate(Max('end'))
+            end_date = last_timesheet['end__max']
+            new_ts, created = TimeSheet.objects.get_or_create(
+                project=timesheet.project,
+                start=end_date + timedelta(days=1),
+                end=end_date + timedelta(days=7),
+            )
+            if created:
+                new_ts.hours = 0
+                new_ts.save()
+
             user_list = User.objects.filter(Q(role__name='finance'))
             title = f"{request.user.name} submitted timesheet for the week end {str(timesheet.end)}"
             data = {
