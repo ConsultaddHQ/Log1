@@ -8,7 +8,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_swagger.views import get_swagger_view
 from rest_framework.documentation import include_docs_urls
 
-from utils_app.views import CityViewSets
+from utils_app.views import CityViewSets, WebHookViewSet
 
 from ckiller.views import CkillerSubmissionView
 
@@ -76,6 +76,7 @@ router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
+router.register(r'hook', WebHookViewSet)
 
 router.register(r'cmd', SlashCommandViewSets)
 
