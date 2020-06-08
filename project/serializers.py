@@ -1,8 +1,9 @@
+from django.db.models import Q
 from rest_framework import serializers
 
 from project.models import *
-from marketing.serializers import InterviewGetSerializer, SubmissionSerializer
-from attachment.serializers import AttachmentSerializer
+from marketing.serializers import SubmissionSerializer
+from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -17,7 +18,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
-                  'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name')
+                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
+                  'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -35,7 +37,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.submission.client
 
     def get_consultant_name(self, obj):
-        return obj.submission.consultant.name
+        if obj.consultant:
+            return obj.consultant.name
+        return None
 
     def get_company_name(self, obj):
         return obj.submission.lead.vendor_company.name
@@ -98,20 +102,60 @@ class PayrollScheduleSerializer(serializers.ModelSerializer):
 class TimeSheetSerializer(serializers.ModelSerializer):
     attachments = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
 
     class Meta:
         model = TimeSheet
-        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'status_updated_at', 'status_updated_by',
-                  'modified', 'attachments', 'project')
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
+                  'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
 
-    def get_attachments(self, obj: Attachment) -> dict:
+    def get_start(self, obj):
+        return obj.start.strftime("%m/%d/%Y")
+
+    def get_end(self, obj):
+        return obj.end.strftime("%m/%d/%Y")
+
+    def get_attachments(self, obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data
 
     def get_project(self, obj):
         return {
             'id': obj.project.id,
             'start_date': obj.project.start_date,
-            'client': obj.project.submission.client
+            'client': obj.project.submission.client,
+            'employer': obj.project.submission.employer.title(),
+            'vendor': obj.project.submission.lead.vendor_company.name,
+        }
+
+
+class FinanceSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimeSheet
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
+                  'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
+
+    def get_start(self, obj):
+        return obj.start.strftime("%m/%d/%Y")
+
+    def get_end(self, obj):
+        return obj.end.strftime("%m/%d/%Y")
+
+    def get_attachments(self, obj):
+        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
+
+    def get_project(self, obj):
+        return {
+            'id': obj.project.id,
+            'start_date': obj.project.start_date,
+            'client': obj.project.submission.client,
+            'employer': obj.project.submission.employer.title(),
+            'vendor': obj.project.submission.lead.vendor_company.name,
         }
 
 
@@ -124,27 +168,28 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'email', 'ts_status', 'project')
 
     def get_project(self, obj):
-        project = Project.objects.filter(consultant=obj)
+        project = Project.objects.filter(
+            Q(consultant=obj, statuses__is_current=True) & (
+                    Q(statuses__status__istartswith='terminated') |
+                    Q(statuses__status__in=['joined', 'complete', 'extended'])
+            )
+        )
         if project:
-            project = project.latest('id')
+            project = project.latest('-start_date')
             return {
                 'id': project.id,
                 'start_date': project.start_date,
-                'team': project.submission.employer,
                 'client': project.submission.client,
+                'team': project.submission.employer.title(),
                 'vendor': project.submission.lead.vendor_company.name,
             }
         return None
 
     def get_ts_status(self, obj):
         queryset = TimeSheet.objects.filter(project__consultant=obj)
-        sub_ts = True if queryset.filter(status='submitted') else False
-        rej_ts = True if queryset.filter(status='rejected', is_active=True) else False
-        data = {
-            'rejected': rej_ts,
-            'submitted': sub_ts,
-        }
-        return data
+        submitted_ts = True if queryset.filter(status='submitted') else False
+        rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
+        return {'submitted': submitted_ts, 'rejected': rejected_ts}
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
@@ -155,9 +200,9 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created',
+        fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'reporting_details')
+                  'start_date', 'end_date', 'reporting_details', 'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)

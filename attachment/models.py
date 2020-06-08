@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 ATTACHMENT_TYPE = (
     ('ssn', 'SSN'),
+    ('other', 'Other'),
     ('resume', 'Resume'),
     ('visa', 'Visa Docs'),
     ('msa', 'MSA/Agreement'),
@@ -33,12 +34,14 @@ ATTACHMENT_TYPE = (
 
 def attachment_upload(instance, filename):
     """Stores the attachment in a "per module/appname/primary key" folder"""
-    return 'attachments/{app}_{model}/{pk}/{filename}'.format(
-        app=instance.content_object._meta.app_label,
-        model=instance.content_object._meta.object_name.lower(),
-        pk=instance.content_object.pk,
-        filename=filename,
-    )
+    if instance.content_object:
+        return 'attachments/{app}_{model}/{pk}/{filename}'.format(
+            app=instance.content_object._meta.app_label,
+            model=instance.content_object._meta.object_name.lower(),
+            pk=instance.content_object.pk,
+            filename=filename,
+        )
+    return None
 
 
 def create_attachment(data):
@@ -68,7 +71,7 @@ class Attachment(TimeStampedModel):
 
     object_id = models.PositiveIntegerField()
     attachment_file = models.FileField(_('attachment'), upload_to=attachment_upload)
-    attachment_type = models.CharField(choices=ATTACHMENT_TYPE, blank=True, null=True, max_length=500)
+    attachment_type = models.CharField(choices=ATTACHMENT_TYPE, blank=True, null=True, max_length=50)
     content_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE,
         verbose_name='Model Name'
@@ -111,5 +114,4 @@ def auto_delete_file_on_delete(sender, instance, **kwargs):
     when corresponding `MediaFile` object is deleted.
     """
     if instance.attachment_file:
-        if os.path.isfile(instance.attachment_file.path):
-            os.remove(instance.attachment_file.path)
+        instance.attachment_file.storage.delete(instance.attachment_file.name)

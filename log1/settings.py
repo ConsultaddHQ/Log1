@@ -1,17 +1,20 @@
 import os
 import logging.config
-from dotenv import load_dotenv
 from collections import OrderedDict
+
+from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
 # Reading env file
-project_folder = os.path.expanduser(BASE_DIR)
-load_dotenv(os.path.join(project_folder, '.env'))
+PROJECT_FOLDER = os.path.expanduser(BASE_DIR)
+load_dotenv(os.path.join(PROJECT_FOLDER, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', False)
+DEBUG = False
+if os.environ.get('DEBUG', False) == 'True':
+    DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -29,12 +32,11 @@ INSTALLED_APPS = [
 THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
-
     'storages',
     'explorer',
     'constance',
     'corsheaders',
-    'notification',
+    'import_export',
     'rest_framework_swagger',
     'constance.backends.database',
 ]
@@ -50,7 +52,11 @@ PROJECT_APPS = [
     'jd_parser.apps.JdParserConfig',
     'activity.apps.ActivityConfig',
     'ckiller.apps.CkillerConfig',
-    'report.apps.ReportConfig'
+    'report.apps.ReportConfig',
+    'legal.apps.LegalConfig',
+    'notification.apps.NotificationConfig',
+    'impersonate.apps.ImpersonateConfig',
+    'messaging.apps.MessagingConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -112,6 +118,18 @@ REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSc
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
 
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'uuid',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
 # Send Grid Configuration
 
 EMAIL_USE_TLS = True
@@ -143,23 +161,19 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 
 # Media files Storage location (Documents)
-if os.environ.get('ENV') == 'prod' or os.environ.get('ENV') == 'dev':
-    AWS_DEFAULT_ACL = None
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
-    AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
-    }
-    AWS_LOCATION = 'media'
+AWS_DEFAULT_ACL = None
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_CUSTOM_DOMAIN = '%s.s3.amazonaws.com' % AWS_STORAGE_BUCKET_NAME
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',
+}
+AWS_LOCATION = 'media'
 
-    PUBLIC_MEDIA_LOCATION = 'media'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
-    DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
-else:
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+PUBLIC_MEDIA_LOCATION = 'media'
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
+DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 
 MODELS_PATH = os.path.join(BASE_DIR, 'models')
 
@@ -213,21 +227,37 @@ NOTIFICATIONS_CHANNELS = {
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
+    ('APP_URL', ('https://app.log1.com/', 'Log1 URL')),
+    ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
+    ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
+                          'Android App Download Link')),
+
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
+    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
     ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
+    ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin email id')),
     ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
-    ('SUPERADMIN', ('sudeep.b@consultadd.com', "Sudeep's email id")),
-    ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "MatterMost")),
-    ('offer_failure', ('https://mm.consultadd.com/hooks/n1j5juob5ffnfj93kehbzapeih', "MatterMost")),
-    ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "MatterMost")),
-    ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "MatterMost")),
-    ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "MatterMost")),
-    ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "MatterMost")),
+
+    ('general_url', ('https://mm.consultadd.com/hooks/sih91mde8inq5roz3fejoefs5c', 'General Channel')),
+    ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', 'Recruitment Channel')),
+    ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', '45dayslimit Channel')),
+    ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', 'Offer Announcement Channel')),
+    ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', 'Loudspeaker Channel')),
+    ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', 'Announcement Channel')),
+    ('marketing_report_url', ('https://mm.consultadd.com/hooks/8iedae1ytffjmxpkd6cgry5hth', 'Marketing Report')),
+    ('joined_url', ('https://mm.consultadd.com/hooks/ixfc4oeeofb53d149dc3cq5ddy', 'Joining Announcement Channel')),
+    ('offer_failure_url', ('https://mm.consultadd.com/hooks/3mtmostff3fx8pfyyf1odph93h', 'Offer Failure Channel')),
+    ('interview_feedback_url', ('https://mm.consultadd.com/hooks/e15z9x3xspgsbcxei84tqf919r', 'Interview Feedback')),
+    ('exit_interview_url', ('https://mm.consultadd.com/hooks/ug59nby147f4ij9qobk5rzaqnh', 'Exit Interview Channel')),
+    ('project_termination_url', ('https://mm.consultadd.com/hooks/d8j164agxb8djkczo6rjwat5wr', 'Project Terminations')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN'),
-    'Web Hooks': ('offer_url', 'offer_failure', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'loud_speakers_url'),
+    'constants': ('APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'),
+    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
+    'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url', 'exit_interview_url',
+                  'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
+                  'interview_feedback_url', 'project_termination_url'),
 }

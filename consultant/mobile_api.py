@@ -9,19 +9,18 @@ from rest_framework import status, exceptions
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 
-from project.models import Project
 from consultant.serializers import *
 from consultant.auth import consultant_authenticate
 from consultant.permissions import ConsultantIsAuthenticated
 from employee.models import get_password_reset_token_expiry_time
+from consultant.authentication import ConsultantTokenAuthentication
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
-from consultant.authentication import ConsultantTokenAuthentication, get_consultant
 
 logger = logging.getLogger(__name__)
 
 
 # API for Mobile App
-class ConsultantAuthViewSets(GenericViewSet):
+class ConsultantAuthViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
     queryset = Consultant.objects.all()
@@ -30,23 +29,44 @@ class ConsultantAuthViewSets(GenericViewSet):
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
-            User Register
-            :param request, email, password, employee_id, name, phone, gender, team, role
+            Consultant Register
+            :param request, email, name, company, website, designation
         """
         try:
-            email = request.data.get('email')
-            password = request.data.get('password').strip()
+            name = request.data.get('name')
+            company = request.data.get('company')
+            website = request.data.get('website')
+            email = request.data.get('email').strip()
+            designation = request.data.get('designation')
+            customer_mail_data = {
+                'to': [email],
+                'cc': [],
+                'bcc': ['aditi.so@consultadd.in'],
+                'subject': 'Signup on Consultadd Time Track App',
+                'template': '../templates/con_signup_mail.html',
+                'context': {
+                    'name': name
+                },
+            }
 
-            queryset = Consultant.objects.filter(email__exact=email)
-            if queryset:
-                consultant = queryset.first()
-                consultant.set_password(password)
-                consultant.is_active = True
-                consultant.save()
+            send_email(customer_mail_data, "log1@consultadd.com")
 
-                return Response({"result": "Success"}, status=status.HTTP_201_CREATED)
-            else:
-                return Response({"error": "Consultant Does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            mail_data = {
+                'to': ['aditi.so@consultadd.in'],
+                'cc': [],
+                'bcc': [],
+                'subject': f'{name} Signed up on Consultadd Time Track App',
+                'template': '../templates/signup_mail.html',
+                'context': {
+                    'name': name,
+                    'email': email,
+                    'website': website,
+                    'company': company,
+                    'designation': designation,
+                },
+            }
+            send_email(mail_data, "log1@consultadd.com")
+            return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -55,7 +75,7 @@ class ConsultantAuthViewSets(GenericViewSet):
     def login(self, request):
         """
             Normal Login
-            :param request, email, password
+            :param request, email, password, uuid, fcm_token, device_type
         """
         email = request.data.get('email').lower()
         if email:
@@ -77,11 +97,12 @@ class ConsultantAuthViewSets(GenericViewSet):
                 fcm_device.save()
                 project_data = Project.objects.filter(
                     consultant=consultant,
-                    statuses_status='joined'
+                    statuses__status='joined',
+                    statuses__is_current=True
                 ).annotate(
                     client=F('submission__client'),
                     employer=F('submission__employer')
-                ).values('id', 'start_date', 'client', 'employer')
+                ).order_by('-id').values('id', 'start_date', 'client', 'employer')
                 data = {
                     'token': token.key,
                     'id': consultant.id,
@@ -100,7 +121,7 @@ class ConsultantAuthViewSets(GenericViewSet):
 
 
 # API for Mobile App
-class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
+class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
     permission_classes = (ConsultantIsAuthenticated,)
@@ -115,20 +136,25 @@ class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
     def change_password(self, request):
         first_login = request.query_params.get('first_login', None)
         new_password = request.data.get('new_password', None)
-        consultant = get_consultant(request)
-        if consultant.check_password(new_password):
-            return Response({"error": "Please use new password"}, status=status.HTTP_400_BAD_REQUEST)
+        consultant = request.user
         if first_login and new_password:
+            if consultant.check_password(new_password):
+                return Response({"error": "Please use new password", "error_in": "new"},
+                                status=status.HTTP_400_BAD_REQUEST)
             consultant.set_password(new_password)
             consultant.first_login = False
         else:
             current_password = request.data.get('current_password', None)
-            if current_password:
+            if current_password and consultant.check_password(current_password):
+                if consultant.check_password(new_password):
+                    return Response({"error": "Please use new password", "error_in": "new"},
+                                    status=status.HTTP_400_BAD_REQUEST)
                 consultant.set_password(new_password)
             else:
-                return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Wrong Current Password", "error_in": "current"},
+                                status=status.HTTP_400_BAD_REQUEST)
         consultant.save()
-        return Response({"result": "password updated"}, status=status.HTTP_200_OK)
+        return Response({"result": "Password Updated"}, status=status.HTTP_200_OK)
 
     @action(methods=['delete'], detail=False, url_path='logout')
     def logout(self, request):
@@ -137,14 +163,12 @@ class ConsultantAppViewSets(ListModelMixin, GenericViewSet):
         """
         uuid = request.META.get('HTTP_UUID', b'')
         token = get_object_or_404(ConsultantToken, key=request.auth, uuid=uuid)
-        fcm_token = FCMDevice.objects.filter(content_type__model='consultanttoken', object_id=token.key)
         token.delete()
-        fcm_token.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # API for Mobile App
-class ConsultantResetPasswordViewSets(GenericViewSet):
+class ConsultantResetPasswordViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
     queryset = Consultant.objects.all()
@@ -188,8 +212,12 @@ class ConsultantResetPasswordViewSets(GenericViewSet):
                         user_agent=request.META['HTTP_USER_AGENT'],
                         ip_address=ip if ip else '127.0.0.1'
                     )
+                if os.environ.get('ENV', 'local') == 'prod':
+                    to = [consultant.email]
+                else:
+                    to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.in', 'anikesh.consultadd@gmail.com']
                 mail_data = {
-                    'to': ['aditi.so@consultadd.in'],
+                    'to': to,
                     'cc': [],
                     'bcc': [],
                     'subject': 'Reset Log1 Password',

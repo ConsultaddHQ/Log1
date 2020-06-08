@@ -43,10 +43,10 @@ SCREENING_STATUS_CHOICES = (
 INTERVIEW_MODE = (
     ('skype', 'Skype'),
     ('webex', 'Webex'),
+    ('dial_in', 'Dial In'),
     ('hangouts', 'Hangout'),
     ('video_call', 'Video Call'),
     ('voice_call', 'Voice Call'),
-    ('dial_in', 'Dial In'),
 )
 
 SCREENING_CHOICES = (
@@ -57,7 +57,7 @@ SCREENING_CHOICES = (
 
 
 class VendorCompany(models.Model):
-    name = models.CharField(_('Company'), max_length=50)
+    name = models.CharField(_('Company'), max_length=100)
     created_by = models.CharField(_('Created By'), max_length=50, null=True, blank=True)
 
     def __str__(self):
@@ -99,6 +99,7 @@ class VendorContact(TimeStampedModel):
 
 
 class Lead(TimeStampedModel):
+    is_w2 = models.BooleanField(default=False)
     job_desc = models.TextField(_('Job Description'))
     city = models.CharField(_('City'), max_length=50, blank=True, null=True)
     job_title = models.CharField(_('Job Title'), max_length=100, blank=True, null=True)
@@ -134,9 +135,9 @@ class Lead(TimeStampedModel):
         return super(Lead, self).save(*args, **kwargs)
 
     def __str__(self):
-        if self.owner:
+        if self.owner and self.vendor_company:
             return f'{self.id}:{self.vendor_company.name} - {self.owner.employee_name} - {self.city}'
-        return f'{self.id}:{self.vendor_company.name} - {self.city}'
+        return f'{self.id}- {self.city}'
 
 
 class Submission(TimeStampedModel):
@@ -146,7 +147,7 @@ class Submission(TimeStampedModel):
     comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is active'), default=False)
     email = models.EmailField(_('Marketing Email'), null=True, blank=True)
-    client = models.CharField(_('Client'), max_length=50, null=True, blank=True)
+    client = models.CharField(_('Client'), max_length=100, null=True, blank=True)
     phone = models.CharField(_('Marketing Phone'), max_length=20, null=True, blank=True)
     status = models.CharField(_('Status'), max_length=20, choices=SUB_CHOICES, default='sub')
 
@@ -240,6 +241,7 @@ class Interview(TimeStampedModel):
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
     end_time = models.DateTimeField(_('End Date'), null=True, blank=True)
+    notes = models.TextField(_('Interview Notes'), null=True, blank=True)
     description = models.TextField(_('Description'), null=True, blank=True)
     start_time = models.DateTimeField(_('Start Date'), null=True, blank=True)
     call_details = models.TextField(_('Call Details'), null=True, blank=True)

@@ -19,7 +19,7 @@ from consultant.authentication import ConsultantTokenAuthentication
 
 logger = logging.getLogger(__name__)
 
-push_service = FCMNotification(api_key=os.getenv('FCM_SERVER_KEY'))
+push_service = FCMNotification(api_key=os.environ.get('FCM_SERVER_KEY'))
 
 
 def create_notification(user_list, data):
@@ -40,17 +40,21 @@ def create_notification(user_list, data):
                 recipient_content_type=recipient_content_type,
             )
         return False
-    except Exception as err:
-        return err
+    except Exception as error:
+        return error
 
 
 def push_notification(registration_ids, message_body):
-    push_service.notify_multiple_devices(
-        registration_ids=registration_ids,
-        message_title=message_body['title'],
-        message_body=message_body['body'],
-        data_message=message_body,
-    )
+    try:
+        push_service.notify_multiple_devices(
+            registration_ids=registration_ids,
+            message_title=message_body['title'],
+            message_body=message_body['body'],
+            data_message=message_body,
+        )
+        return False
+    except Exception as error:
+        return error
 
 
 class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):

@@ -1,27 +1,29 @@
+import os
 import difflib
 import logging
 from datetime import date, datetime, timedelta
 
+from rest_framework.mixins import *
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import *
 
 from constance import config
 from django.db import transaction
-from django.db.models import Count, Q, F, Max
 from django.db.models.functions import Lower
+from django.db.models import Count, Q, F, Max
 from django.shortcuts import get_object_or_404
 
+from log1.settings import MEDIA_URL
 from marketing.serializers import *
-from utils_app.utils import get_time_filter
+from attachment.views import presigned_post_url
 from consultant.models import ConsultantProfile
 from utils_app.utils import post_msg_using_webhook
 from notification.views import create_notification
 from attachment.models import Attachment, create_attachment
-from utils_app.mailing import send_email_attachment_multiple
+from utils_app.utils import get_time_filter, get_time_filter_by_start
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
 
 logger = logging.getLogger(__name__)
@@ -146,10 +148,7 @@ class LeadViewSets(viewsets.ModelViewSet):
             archive = queryset.filter(status='archived').count()
 
             if filter_by_status:
-                if filter_by_status == 'archived':
-                    queryset = queryset.filter(status=filter_by_status).exclude(status='archived')
-                else:
-                    queryset = queryset.filter(status=filter_by_status)
+                queryset = queryset.filter(status=filter_by_status)
 
             data_counts = {
                 "new": new,
@@ -159,11 +158,18 @@ class LeadViewSets(viewsets.ModelViewSet):
                 "archive": archive,
             }
 
-            data = queryset.exclude(status='archived')[first:last].annotate(
-                company_name=F('vendor_company__name'),
-                company_id=F('vendor_company__id'),
-            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                     'company_name', 'status', 'created', 'modified', 'submission_count')
+            if filter_by_status == 'archived':
+                data = queryset[first:last].annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
+            else:
+                data = queryset.exclude(status='archived')[first:last].annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
         except Exception as error:
@@ -222,7 +228,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset.annotate(submission_count=Count('submission')) \
                     .annotate(company_name=F('vendor_company__name'),
                               company_id=F('vendor_company__id'),
-                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created', 'is_w2',
                                        'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
@@ -248,7 +254,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
                            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'status'
-                                    , 'company_id', 'company_name', 'modified', 'submission_count')
+                                    , 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
                 return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -266,10 +272,28 @@ class LeadViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=False, url_path='archived')
+    def archived(self, request):
+        try:
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+            last, first = page * page_size, page * page_size - page_size
+            leads = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
+            data, data_counts = self.get_lead_data(leads, 'archived', first, last)
+            if data_counts == 'error':
+                return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['get'], detail=False, url_path='map')
     def map(self, request):
         try:
-            leads = Lead.objects.filter(marketer=request.user).values('city'). \
+            leads = Lead.objects.filter(
+                Q(owner=request.user) |
+                Q(shared_to=request.user)
+            ).values('city'). \
                 annotate(total=Count('city')).order_by('city')
             return Response({"results": leads}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -305,7 +329,7 @@ def create_submission(request, lead_id):
         profile = get_object_or_404(ConsultantProfile, id=request.data['profile_id'])
         vendor_contact = request.data.get('vendor_contact', None)
         if vendor_contact:
-            sub = Submission.objects.create(
+            sub, created = Submission.objects.get_or_create(
                 status='sub',
                 lead_id=lead_id,
                 created_by=request.user,
@@ -327,7 +351,7 @@ def create_submission(request, lead_id):
                 date_of_birth=profile.date_of_birth,
             )
         else:
-            sub = Submission.objects.create(
+            sub, created = Submission.objects.get_or_create(
                 status='sub',
                 lead_id=lead_id,
                 created_by=request.user,
@@ -385,21 +409,23 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     @staticmethod
     def get_submission_data(sub, filter_by_status, first, last):
         try:
-            total = sub.count()
-            submission = sub.filter(status='sub').count()
-            project = sub.filter(status='project').count()
-            interview = sub.filter(status='interview').count()
+            data = {
+                "total": sub,
+                "sub": sub.filter(status='sub'),
+                "project": sub.filter(status='project'),
+                "interview": sub.filter(status='interview'),
+            }
 
             if filter_by_status:
-                sub = sub.filter(status=filter_by_status)
+                sub = data[filter_by_status]
 
             data_counts = {
-                'total': total,
-                'sub': submission,
-                'project': project,
-                'interview': interview
+                'total': data["total"].count(),
+                'sub': data["sub"].count(),
+                'project': data["project"].count(),
+                'interview': data["interview"].count()
             }
-            data = sub[first:last].annotate(
+            data = sub.order_by('-modified')[first:last].annotate(
                 city=F('lead__city'),
                 marketer_id=F('created_by'),
                 company_name=F('lead__vendor_company__name'),
@@ -415,8 +441,19 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            sub_id = kwargs.get('pk')
-            sub = get_object_or_404(Submission, id=sub_id)
+            calendar_id = request.query_params.get('calendar', 'false')
+            if calendar_id == 'true':
+                interview = get_object_or_404(Interview, calendar_id=kwargs.get('pk'))
+                sub = interview.submission
+            else:
+                sub_id = kwargs.get('pk')
+                sub = get_object_or_404(Submission, id=sub_id)
+
+            interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
+            if interviews:
+                serializer = SubmissionDetailSerializer(sub)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+
             if sub.created_by == request.user:
                 serializer = SubmissionDetailSerializer(sub)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
@@ -440,32 +477,47 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
         try:
             roles = request.user.roles
-            sub = Submission.objects.exclude(
-                Q(consultant_marketing__consultant__status='archived') |
-                Q(status='draft')
-            )
+            if query:
+                query = query.strip()
+                sub = Submission.objects.filter(
+                    Q(client__icontains=query) |
+                    Q(lead__city__icontains=query) |
+                    Q(lead__job_title__icontains=query) |
+                    Q(lead__vendor_company__name__icontains=query) |
+                    Q(created_by__employee_name__istartswith=query) |
+                    Q(vendors__vendor_company__name__icontains=query) |
+                    Q(consultant_marketing__consultant__name__icontains=query)
+                ).exclude(status='draft')
+            else:
+                sub = Submission.objects.exclude(
+                    Q(consultant_marketing__consultant__status='archived') |
+                    Q(status='draft')
+                )
 
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:
                 sub = sub.filter(
-                    (Q(created_by__team=request.user.team) |
-                     Q(consultant_marketing__consultant__in_pool=True) |
-                     Q(consultant_marketing__consultant__teams=request.user.team))
+                    Q(created_by__team=request.user.team) |
+                    Q(consultant_marketing__in_pool=True) |
+                    Q(consultant_marketing__teams=request.user.team)
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
+                consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
                 sub = sub.filter(
                     Q(created_by=request.user) |
-                    Q(consultant_marketing__marketer=request.user)
+                    Q(consultant_marketing__in_pool=True) |
+                    Q(consultant_marketing__consultant__in=consultant_ids)
                 )
 
             # Submissions of a Recruiters consultants (except those are on project)
             elif 'recruiter' in roles:
                 sub = Submission.objects.filter(
-                    Q(consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter',
-                      consultant_marketing__consultant___marketing__status='open')
+                    Q(consultant_marketing__status='open',
+                      consultant_marketing__consultant__pocs__poc=request.user,
+                      consultant_marketing__consultant__pocs__poc_type='recruiter'
+                      )
                 )
 
             if filter_for == 'my':
@@ -476,23 +528,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if consultant_id and consultant_id != 'null':
                 sub = sub.filter(consultant_marketing__consultant_id=consultant_id)
 
-            # Search submission by client, vendor and consultant
-            if query:
-                query = query.strip()
-                sub = sub.filter(
-                    Q(created_by=request.user) &
-                    (Q(client__istartswith=query) |
-                     Q(lead__city__istartswith=query) |
-                     Q(lead__job_title__istartswith=query) |
-                     Q(vendors__company__name__istartswith=query) |
-                     Q(created_by__employee_name__istartswith=query) |
-                     Q(lead__vendor_company__name__istartswith=query) |
-                     Q(consultant_marketing__consultant__name__istartswith=query)
-                     )
-                )
-
             # Submission filter by week, month and all
-            sub = get_time_filter(sub, filter_by_time).order_by('modified').distinct('modified')
+            sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct('modified')
 
             # Submission filter by status
             data, sub_data = self.get_submission_data(sub, filter_by_status, first, last)
@@ -529,7 +566,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 lead = get_object_or_404(Lead, id=lead_id)
 
             sub = create_submission(request, lead_id)
-
             data = {
                 "id": sub.id,
                 "status": sub.status,
@@ -736,7 +772,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
 
-            data = queryset[first:last].annotate(
+            data = queryset.order_by('-modified')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
@@ -794,17 +830,34 @@ class InterviewViewSets(viewsets.ModelViewSet):
             self.change_to_feedback_due()
 
             # Search Interview by Client, VendorContact and Consultant
-            queryset = Interview.objects.exclude(submission__consultant_marketing__consultant__status='archived')
+            roles = request.user.roles
+            if query:
+                query = query.strip()
+                queryset = Interview.objects.filter(
+                    Q(submission__client__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__icontains=query) |
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                )
+            else:
+                queryset = Interview.objects.exclude(submission__consultant_marketing__status='close')
             if filter_for == 'my':
-                queryset = queryset.filter(submission__created_by=request.user)
+                if 'interviewee' in roles:
+                    queryset = queryset.filter(
+                        Q(submission__created_by=request.user) |
+                        Q(supervisor=request.user)
+                    )
+                else:
+                    queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=request.user.team)
 
             # Interview List for Scrum Master and Proxy Scrum Master (team interviews) and marketer
-            roles = request.user.roles
+
             if 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
-                    Q(submission__consultant_marketing__consultant__teams=request.user.team,
+                    Q(submission__consultant_marketing__teams=request.user.team,
                       submission__consultant_marketing__in_pool=False) |
                     Q(submission__consultant_marketing__in_pool=True)
                 )
@@ -828,18 +881,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                       submission__consultant_marketing__consultant__pocs__poc_type='relation')
                 )
 
-            if query:
-                query = query.strip()
-                queryset = queryset.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(submission__lead__job_title__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                )
-
-            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
+            queryset = get_time_filter_by_start(queryset, filter_by_time).order_by('-modified').distinct('modified')
 
             data, screen_data = self.get_interview_data(queryset, filter_by_status, first, last)
 
@@ -904,7 +946,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 attendees = [
                                 {'email': supervisor},
                                 {'email': request.user.email},
-                                {"email": "bbookingg@gmail.com"},
+                                {"email": config.BOOKING_ADMIN},
                             ] + guest
                 user_list.append(interview.supervisor)
 
@@ -933,22 +975,23 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'id': 'error'
                 }
 
-                # try:
-                #     cal_res = book_calendar(event)
-                #     interview.calendar_id = cal_res['id']
-                #     interview.save()
-                # except Exception as error:
-                #     logger.error("Calendar booking failed")
-                #     logger.error(error)
-                #     logger.error(cal_res)
-                #     return Response({"result": "Calendar event creation failed", "error": str(error)},
-                #                     status=status.HTTP_400_BAD_REQUEST)
+                if os.environ.get('ENV', 'local') == 'prod':
+                    try:
+                        cal_res = book_calendar(event)
+                        interview.calendar_id = cal_res['id']
+                        interview.save()
+                    except Exception as error:
+                        logger.error("Calendar booking failed")
+                        logger.error(error)
+                        logger.error(cal_res)
+                        return Response({"result": "Calendar event creation failed", "error": str(error)},
+                                        status=status.HTTP_400_BAD_REQUEST)
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                    text = '#### :spiral_calendar: New Interview Scheduled \n **CTB:{} :: Round:{} :: {} :: {} :: {} ' \
-                           ':: {} :: {} **'.format(
-                        interview.supervisor.employee_name, interview.round, interview.get_screening_type_display(),
+                    text = "#### :spiral_calendar: New Interview Scheduled \n **CTB:{} :: Round:{} :: {} :: {} :: {} " \
+                           ":: {} :: {} **".format(
+                        interview.supervisor.employee_name, interview.round, interview.get_interview_mode_display(),
                         interview.start_time.strftime('%m/%d/%Y::%I:%M EST'), interview.consultant.name,
                         interview.submission.client, interview.marketer.employee_name
                     )
@@ -980,7 +1023,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'recipient_user_type': 'user',
                     'title': 'New Interview Created',
                 }
-                create_notification(user_list, notification_data)
+                # create_notification(user_list, notification_data)
                 return Response({"result": data[0], 'event_id': cal_res['id']}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -1011,6 +1054,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     interview.submission.is_active = False
                     interview.submission.status = 'in_offer'
                 interview.submission.save()
+
                 cal_res = {
                     'id': 'error'
                 }
@@ -1020,22 +1064,41 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 for user in scrum_masters:
                     user_list.append(user)
                 title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
-                        {interview.get_screening_type_display()} :: 
+                        {interview.get_interview_mode_display()} :: 
                         {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
                         {interview.submission.client} :: {interview.consultant.name} :: 
                         {interview.marketer.employee_name}"""
+
+                if status_change == "true" and interview.status not in ['cancelled']:
+                    if interview.status == 'next_round':
+                        interview_status = "Next Round"
+                        interview_status_emoji = ":+1: "
+                    elif interview.status == 'offer':
+                        interview_status = "Offer"
+                        interview_status_emoji = ":v: "
+                    else:
+                        interview_status = "Failed"
+                        interview_status_emoji = ":-1: "
+                    text = f"""#### {interview_status_emoji} Interview Feedback \n **CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status}) ** \n"""
+                    text += interview.feedback
+
+                    data = {
+                        "response_type": "in_channel",
+                        "username": "Log1 Updates",
+                        "text": text,
+                    }
+                    post_msg_using_webhook(config.interview_feedback_url, data)
 
                 if status_change == 'false':
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
                         interview.save()
-
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
                             text = "#### :stopwatch: Interview Rescheduled \n **CTB: {} :: Round:{} :: {} :: {} :: " \
                                    "{} :: {} :: {}**".format(
                                 interview.supervisor.employee_name, interview.round,
-                                interview.get_screening_type_display(),
+                                interview.get_interview_mode_display(),
                                 interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
                                 interview.submission.consultant.name,
                                 interview.submission.client, interview.marketer.employee_name)
@@ -1049,7 +1112,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     attendees = [
                         {'email': supervisor_email},
                         {'email': request.user.email},
-                        {'email': 'bbookingg@gmail.com'},
+                        {'email': config.BOOKING_ADMIN},
                     ]
 
                     for user in scrum_masters:
@@ -1059,7 +1122,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         attendees = attendees + guest
 
                     sub = interview.submission
-
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         start = serializer.data["start_time"].replace("Z", "")
                         end = serializer.data["end_time"].replace("Z", "")
@@ -1077,14 +1139,20 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         }
 
                         # Update interview on Google Calendar
-                        # event_id = interview.calendar_id
-                        # try:
-                        #     cal_res['id'] = update_calendar(event_id, event)
-                        # except Exception as error:
-                        #     logger.error(error)
-                        #     logger.error(cal_res)
-                        #     return Response({"result": "Calendar event update failed", "error": str(error)},
-                        #                     status=status.HTTP_400_BAD_REQUEST)
+                        if os.environ.get('ENV', 'local') == 'prod':
+                            event_id = interview.calendar_id
+                            if not event_id:
+                                cal_res = book_calendar(event)
+                                interview.calendar_id = cal_res['id']
+                                interview.save()
+                            else:
+                                try:
+                                    cal_res['id'] = update_calendar(event_id, event)
+                                except Exception as error:
+                                    logger.error(error)
+                                    logger.error(cal_res)
+                                    return Response({"result": "Calendar event update failed", "error": str(error)},
+                                                    status=status.HTTP_400_BAD_REQUEST)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1107,7 +1175,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'sender_id': request.user.id,
                     'recipient_user_type': 'user',
                 }
-                create_notification(user_list, notification_data)
+                # create_notification(user_list, notification_data)
                 return Response({"result": data[0], "event_id": cal_res['id']}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -1123,16 +1191,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
             # Delete from google calendar
-            try:
-                if interview.calendar_id:
-                    delete_calendar_booking(interview.calendar_id)
-                else:
-                    return Response({"result": "calendar id not found"}, status=status.HTTP_404_NOT_FOUND)
-            except Exception as error:
-                logger.error(error)
-                logger.error("Calendar event deletion failed")
-                return Response({"result": "Calendar event deletion failed", "error": str(error)},
-                                status=status.HTTP_400_BAD_REQUEST)
+            if os.environ.get('ENV', 'local') == 'prod':
+                try:
+                    if interview.calendar_id:
+                        delete_calendar_booking(interview.calendar_id)
+                    else:
+                        return Response({"result": "calendar id not found"}, status=status.HTTP_404_NOT_FOUND)
+                except Exception as error:
+                    logger.error(error)
+                    logger.error("Calendar event deletion failed")
+                    return Response({"result": "Calendar event deletion failed", "error": str(error)},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
             interview.status = 'cancelled'
             interview.save()
@@ -1161,8 +1230,64 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
             }
-            create_notification(user_list, notification_data)
+            # create_notification(user_list, notification_data)
             return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='update_notes')
+    def update_notes(self, request, *args, **kwargs):
+        try:
+            queryset = Interview.objects.filter(
+                Q(id=kwargs.get('pk')) &
+                (
+                        Q(submission__created_by=request.user) |
+                        Q(supervisor=request.user)
+                )
+            )
+            if queryset:
+                interview = queryset.first()
+                interview.notes = request.data.get('notes')
+                interview.save()
+                serializer = InterviewCreateSerializer(interview)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": "You are not allowed to upload"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put', 'delete'], detail=True, url_path='upload_recording')
+    def upload_recording(self, request, *args, **kwargs):
+        try:
+            if request.method == 'PUT':
+                file_name = request.data['file_name']
+                object_id = kwargs.get('pk')
+                object_name = f'media/attachments/recordings/{object_id}/{file_name}'
+                interview = get_object_or_404(Interview, id=object_id)
+                response = presigned_post_url(object_name=object_name)
+                interview.attachment_link = MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
+                interview.save()
+                return Response({"result": response}, status=status.HTTP_202_ACCEPTED)
+            else:
+                interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+                interview.attachment_link = None
+                interview.save()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=True, url_path='recording')
+    def recording(self, request, *args, **kwargs):
+        try:
+            from attachment.views import get_s3_object
+            object_id = kwargs.get('pk')
+            interview = get_object_or_404(Interview, id=object_id)
+            if interview.attachment_link:
+                url = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
+                return Response({"result": url}, status=status.HTTP_200_OK)
+            return Response({"error": "Recording not available"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1179,10 +1304,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
         try:
             if ctb:
                 queryset = Interview.objects.filter(
-                    Q(submission__consultant_marketing__consultant=sub.consultant_marketing.consultant,
-                      submission__client__contains=sub.client) |
-                    Q(submission__consultant_marketing__consultant=sub.consultant_marketing.consultant,
-                      submission__lead__vendor_company=sub.vendor) |
+                    Q(submission__client__contains=sub.client,
+                      submission__consultant_marketing__consultant=sub.consultant_marketing.consultant) |
+                    Q(submission__lead__vendor_company=sub.vendor,
+                      submission__consultant_marketing__consultant=sub.consultant_marketing.consultant) |
                     Q(submission__client__contains=sub.client) |
                     Q(submission__client__contains=sub.client, supervisor=ctb)
                 )

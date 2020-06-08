@@ -78,8 +78,7 @@ def book_calendar(data):
             'RRULE:FREQ=DAILY;COUNT=1'
         ],
 
-        # 'attendees': data["attendees"],
-        'attendees': [],
+        'attendees': data["attendees"],
 
         'reminders': {
             'useDefault': False,
@@ -89,7 +88,7 @@ def book_calendar(data):
             ],
         },
     }
-    event = service.events().insert(calendarId='admin@log1.com', body=event).execute()
+    event = service.events().insert(calendarId='admin@log1.com', body=event, sendUpdates='all').execute()
     return event
 
 
@@ -114,8 +113,7 @@ def update_calendar(event_id, data):
             'RRULE:FREQ=DAILY;COUNT=1'
         ],
 
-        # 'attendees': data["attendees"],
-        'attendees': [],
+        'attendees': data["attendees"],
 
         'reminders': {
             'useDefault': False,
@@ -125,7 +123,8 @@ def update_calendar(event_id, data):
             ],
         },
     }
-    updated_event = service.events().update(calendarId='admin@log1.com', eventId=event_id, body=event).execute()
+    updated_event = service.events().update(calendarId='admin@log1.com', eventId=event_id, body=event,
+                                            sendUpdates='all').execute()
     return updated_event['id']
 
 
@@ -149,19 +148,21 @@ def get_interviews(data):
                 visibility = False
                 data = {
                     "id": event["id"],
+                    "visibility": False,
                     "updated": event["updated"],
-                    "start": event["start"]["dateTime"],
-                    "end": event["end"]["dateTime"],
+                    "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
+                    "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"]["date"],
                 }
             else:
                 data = {
                     "id": event["id"],
-                    "title": event["summary"] if "summary" in event else "",
-                    "description": event["description"] if "description" in event else "",
+                    "visibility": True,
                     "created": event["created"],
                     "updated": event["updated"],
-                    "start": event["start"]["dateTime"],
-                    "end": event["end"]["dateTime"],
+                    "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
+                    "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"]["date"],
+                    "title": event["summary"] if "summary" in event else "",
+                    "description": event["description"] if "description" in event else "",
                     "attendees": [i["email"] for i in event["attendees"]] if "attendees" in event else [],
                     "attachments": [{"fileUrl": i["fileUrl"], "title": i["title"]} for i in
                                     event["attachments"]] if "attachments" in event else []
@@ -174,4 +175,4 @@ def get_interviews(data):
 
 def delete_calendar_booking(event_id):
     service = calendar_con()
-    service.events().delete(calendarId='admin@log1.com', eventId=event_id).execute()
+    service.events().delete(calendarId='admin@log1.com', eventId=event_id, sendUpdates='all').execute()

@@ -1,8 +1,8 @@
 from datetime import date
 from django.core.management import BaseCommand
 
-from constants import pool_channel_url
-from consultant.models import Consultant, ConsultantMarketing
+from constance import config
+from consultant.models import ConsultantMarketing
 from utils_app.utils import post_msg_using_webhook
 
 
@@ -14,28 +14,32 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         in_pool_con = ConsultantMarketing.objects.filter(
             in_pool=True,
-            end=None
-        ).order_by('-marketing_start')
+            status='open'
+        ).order_by('consultant_id', '-start').distinct('consultant_id')
 
         count = 1
         text = f"""
 #### Pool Candidates :beach_umbrella: \n
-| # | Consultant | Team   | Days | Skills | Recruiter | Marketer |
-|:--|:-----------|:-------|:-----|:-------|:----------|:---------|
+| # | Consultant | Team   | Days | Recruiter | Marketer |  Skills |Open Offer |
+|:--|:-----------|:-------|:-----|:----------|:---------|:--------|:-----------|
 """
         for con in in_pool_con:
-            days, marketer, recruiter = None, None, None
-            team = ", ".join(con.teams.all().values_list('name', flat=True))
-            if con.start:
-                days = (date.today() - con.start).days
-            if con.primary_marketer:
-                marketer = con.primary_marketer.employee_name
-            if con.recruiter:
-                recruiter = con.recruiter.employee_name
-            count += 1
+            if con.consultant.status != 'archived':
+                days, marketer, recruiter, open_offer = None, None, None, "NO"
+                team = ", ".join(con.teams.all().values_list('name', flat=True))
+                if con.start:
+                    days = (date.today() - con.start).days
+                if con.primary_marketer:
+                    marketer = con.primary_marketer.employee_name
+                if con.recruiter:
+                    recruiter = con.consultant.recruiter.employee_name
+                open_offer_count = con.consultant.projects.filter(
+                    statuses__is_current=True, statuses__status__in=['on_boarding', 'received']
+                ).count()
+                count += 1
 
-            text += \
-f"""| {count} | {con.consultant.name} | {team} | {days} | {con.consultant.skills} | {recruiter} | {marketer} |\n"""
+                text += \
+f"""| {count} | {con.consultant.name} | {team} | {days} | {recruiter} | {marketer} | {con.consultant.skills} | {open_offer_count}|\n"""
 
         data = {
             "response_type": "in_channel",
@@ -43,4 +47,4 @@ f"""| {count} | {con.consultant.name} | {team} | {days} | {con.consultant.skills
             "text": text
         }
 
-        post_msg_using_webhook(pool_channel_url, data)
+        post_msg_using_webhook(config.pool_channel_url, data)

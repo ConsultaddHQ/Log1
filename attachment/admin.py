@@ -1,11 +1,11 @@
 from django.contrib import admin
+from import_export.admin import ExportActionModelAdmin
 
 from .models import Attachment
-from utils_app.admin import ExportCsvMixin
 
 
 @admin.register(Attachment)
-class AttachmentAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_display = ('id', 'content_type', 'creator', 'attachment_type', 'content_type')
-    search_fields = ('id', 'content_type', 'creator__employee_name', 'attachment_type')
-    actions = ["export_as_csv"]
+class AttachmentAdmin(ExportActionModelAdmin):
+    list_filter = ('content_type',)
+    list_display = ('id', 'content_type', 'object_id', 'creator', 'attachment_type')
+    search_fields = ('id', 'content_type__model', 'object_id', 'creator__employee_name', 'attachment_type')
