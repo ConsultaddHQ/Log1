@@ -3,7 +3,8 @@ from rest_framework import serializers
 
 from consultant.models import *
 from employee.models import User
-from project.models import ProjectSupport
+from marketing.models import Interview
+from project.models import Project, ProjectSupport
 from employee.serializers import TeamSerializer, UserSerializer
 
 
@@ -16,18 +17,40 @@ class ConsultantLoginSerializer(UserSerializer):
         model = Consultant
         fields = ('id', 'token', 'email', 'name', 'is_active', 'project', 'first_login')
 
-    @staticmethod
-    def get_project(self):
-        if hasattr(self, 'projects'):
-            return self.projects.filter(end_date=None).annotate(
+    def get_project(self, obj):
+        if hasattr(obj, 'projects'):
+            return obj.projects.filter(end_date=None).annotate(
                 client=F('submission__client'),
                 employer=F('submission__employer')
             ).values('id', 'start_date', 'client', 'employer')
         return False
 
-    @staticmethod
-    def get_token(self):
-        token, created = ConsultantToken.objects.get_or_create(consultant=self)
+    def get_token(self, obj):
+        token, created = ConsultantToken.objects.get_or_create(consultant=obj)
+        return token.key
+
+
+class ConsultantPetitionLoginSerializer(UserSerializer):
+    token = serializers.SerializerMethodField()
+    petition = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'token', 'email', 'name', 'petition')
+
+    def get_petition(self, obj):
+        petitions = obj.petitions.filter(is_active=True)
+        if petitions:
+            petition = petitions.first()
+            return {
+                "id": petition.id,
+                "status": petition.status,
+                "assigned_to": UserSerializer(petition.assigned_to).data
+            }
+        return None
+
+    def get_token(self, obj):
+        token, created = ConsultantPetitionToken.objects.get_or_create(consultant=obj)
         return token.key
 
 
@@ -60,14 +83,49 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
     teams = TeamSerializer(many=True)
     marketer = serializers.SerializerMethodField()
 
-    @staticmethod
-    def get_marketer(self):
-        return self.marketer.all().annotate(name=F('employee_name')).values('id', 'name')
+    def get_marketer(self, obj):
+        return obj.marketer.all().annotate(name=F('employee_name')).values('id', 'name')
 
     class Meta:
         model = ConsultantMarketing
         fields = ('id', 'teams', 'marketer', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
                   'primary_marketer')
+
+
+class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
+    primary_marketer_team = serializers.SerializerMethodField()
+    primary_marketer = serializers.SerializerMethodField()
+    submission_count = serializers.SerializerMethodField()
+    interview_count = serializers.SerializerMethodField()
+    project_count = serializers.SerializerMethodField()
+    current_city = serializers.SerializerMethodField()
+    teams = TeamSerializer(many=True)
+
+    def get_primary_marketer(self, obj):
+        return obj.primary_marketer.employee_name if obj.primary_marketer else None
+
+    def get_primary_marketer_team(self, obj):
+        return obj.primary_marketer.team.name if obj.primary_marketer else None
+
+    def get_submission_count(self, obj):
+        return obj.submissions.count()
+
+    def get_current_city(self, obj):
+        return obj.consultant.current_city
+
+    def get_project_count(self, obj):
+        return Project.objects.filter(submission__consultant_marketing=obj).count()
+
+    def get_interview_count(self, obj):
+        return Interview.objects.filter(
+            submission__consultant_marketing=obj
+        ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+
+    class Meta:
+        model = ConsultantMarketing
+        fields = ('id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
+                  'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count',
+                  'project_count', 'current_city')
 
 
 class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
@@ -100,19 +158,21 @@ class ExperienceSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class FeedbackDetailsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = FeedbackDetail
-        fields = '__all__'
-
-
-class ConsultantFeedbackSerializer(serializers.ModelSerializer):
-    feedback = FeedbackDetailsSerializer()
-    given_by = POCSerializer()
-    created_by = POCSerializer()
+class ExitDetailConsultantSerializer(serializers.ModelSerializer):
+    reasons = serializers.SerializerMethodField()
 
     class Meta:
-        model = ConsultantFeedback
+        model = ConsultantExit
+        fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date',  'exit_details',
+                  'reasons', 'notice_period', 'legal_action', 'cancel_reason')
+
+    def get_reasons(self, obj):
+        return obj.reasons.all().values('id', 'name')
+
+
+class ExitConsultantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConsultantExit
         fields = '__all__'
 
 
@@ -153,56 +213,53 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
 
 
 class ConsultantBenchSerializer(serializers.ModelSerializer):
+    rate = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
     relation = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
     education = serializers.SerializerMethodField()
+    terminate = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
-    rate = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'work_auth', 'recruiter', 'relation', 'support',
-                  'profiles', 'education', 'experience', 'rate', 'marketing')
+                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation', 'support',
+                  'profiles', 'education', 'terminate', 'experience', 'rate', 'marketing')
 
-    @staticmethod
-    def get_work_auth(self):
-        return WorkAuthSerializer(self.work_auth.filter(is_current=True), many=True).data
+    def get_work_auth(self, obj):
+        return WorkAuthSerializer(obj.work_auth.all(), many=True).data
 
-    @staticmethod
-    def get_profiles(self):
-        return ConsultantProfileSerializer(self.profiles.all(), many=True).data
+    def get_profiles(self, obj):
+        return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
-    @staticmethod
-    def get_education(self):
-        return EducationSerializer(self.academics.all(), many=True).data
+    def get_education(self, obj):
+        return EducationSerializer(obj.academics.all(), many=True).data
 
-    @staticmethod
-    def get_experience(self):
-        return EducationSerializer(self.experiences.all(), many=True).data
+    def get_terminate(self, obj):
+        return ExitDetailConsultantSerializer(obj.exit.all().order_by('-created'), many=True).data
 
-    @staticmethod
-    def get_rate(self):
-        rate_revision = self.rates.filter(end=None)
+    def get_experience(self, obj):
+        return ExperienceSerializer(obj.experiences.all(), many=True).data
+
+    def get_rate(self, obj):
+        rate_revision = obj.rates.filter(end=None)
         if rate_revision:
             return rate_revision.first().rate
         return 0
 
-    @staticmethod
-    def get_marketing(self):
-        marketing = self.marketing.filter(status='open')
+    def get_marketing(self, obj):
+        marketing = obj.marketing.filter(status='open')
         if marketing:
             return ConsultantMarketingSerializer(marketing, many=True).data[0]
         else:
             return None
 
-    @staticmethod
-    def get_recruiter(self):
-        queryset = self.pocs.filter(end=None, poc_type='recruiter')
+    def get_recruiter(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='recruiter')
         if queryset:
             poc = queryset.first().poc
             data = {
@@ -215,9 +272,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return data
         return None
 
-    @staticmethod
-    def get_relation(self):
-        queryset = self.pocs.filter(end=None, poc_type='relation')
+    def get_relation(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='relation')
         if queryset:
             poc = queryset.first().poc
             data = {
@@ -230,9 +286,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return data
         return None
 
-    @staticmethod
-    def get_support(self):
-        queryset = ProjectSupport.objects.filter(project__consultant=self, end=None)
+    def get_support(self, obj):
+        queryset = ProjectSupport.objects.filter(project__consultant=obj, end=None)
         if queryset:
             poc = queryset.first().engineer
             data = {
@@ -249,10 +304,20 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 class ConsultantListSerializer(serializers.ModelSerializer):
     profiles = serializers.SerializerMethodField()
 
-    @staticmethod
-    def get_profiles(self):
-        return ConsultantProfileSerializer(self.profiles.all(), many=True).data
+    def get_profiles(self, obj):
+        return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'profiles')
+
+
+class ConsultantFeedbackSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Feedback
+        fields = ('id', 'created', 'feedback_text', 'feedback_type', 'rating', 'consultant', 'created_by')
+
+    def get_created_by(self, obj):
+        return obj.created_by.employee_name

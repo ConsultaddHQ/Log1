@@ -6,7 +6,7 @@ from django.contrib.contenttypes.fields import GenericRelation
 from employee.models import User
 from marketing.models import Submission
 from consultant.models import Consultant
-from attachment.models import Attachment, attachment_upload
+from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 
 PROJECT_STATUS_CHOICES = (
@@ -19,7 +19,7 @@ PROJECT_STATUS_CHOICES = (
     ("on_boarded", "On Boarded"),
     ("complete", "Project Completed"),
 
-    # offer cancelled
+    # Offer cancelled
     ("cancelled", "Cancelled"),
     ("cancelled-dual_offer", "Dual Offer"),
     ("cancelled-client_cancelled", "Client Cancelled"),
@@ -31,25 +31,23 @@ PROJECT_STATUS_CHOICES = (
     ("cancelled-candidate_denied_location", "Candidate Denied Joining - Location"),
 
     # PO terminated
+    ("terminated-fired", "Fired"),
     ("terminated-resigned", "Resigned"),
     ("terminated", "Project Terminated"),
+    ("terminated-fired_budget_issue", "Fired - Budget Issue"),
     ("terminated-resigned_rate_issue", "Resigned - Rate Issue"),
+    ("terminated-fired_security_issue", "Fired - Data Security Issue"),
     ("terminated-resigned_location_issue", "Resigned - Location Issue"),
+    ("terminated-fired_performance_issue", "Fired - Performance Issue"),
     ("terminated-resigned_full_time_offer", "Resigned - Full Time Offer"),
     ("terminated-resigned_technology_issue", "Resigned - Technology Issue"),
-    ("terminated-fired_budget_issue", "Fired - Budget Issue"),
-    ("terminated-fired_performance_issue", "Fired - Performance Issue"),
-    ("terminated-fired_security_issue", "Fired - Data Security Issue"),
 )
 
 TIMESHEET_STATUS = (
     ('draft', 'Draft'),
     ('rejected', 'Rejected'),
+    ('approved', 'Approved'),
     ('submitted', 'Submitted'),
-    ('pending_approval', 'Pending Approval'),
-    ('consultant_rejected', 'Consultant Rejected'),
-    ('consider_for_payroll', 'Consider for Payroll'),
-    ('consider_for_invoice', 'Consider for Invoice'),
 )
 
 
@@ -61,6 +59,7 @@ class Project(TimeStampedModel):
     payment_term = models.IntegerField(_('Payment Term'), null=True, blank=True)
     client_address = models.TextField(_('Client Address'), null=True, blank=True)
     vendor_address = models.TextField(_('Vendor Address'), null=True, blank=True)
+    is_remote = models.BooleanField(_('Is Remote Project'), null=True, blank=True)
     city = models.CharField(_('Client City'), max_length=100, blank=True, null=True)
     duration = models.CharField(_('Duration'), max_length=50, null=True, blank=True)
     reporting_details = models.TextField(_('Reporting Details'), null=True, blank=True)
@@ -107,7 +106,7 @@ class ProjectStatus(models.Model):
         choices=PROJECT_STATUS_CHOICES,
     )
     project = models.ForeignKey(
-        Project, on_delete=models.PROTECT,
+        Project, on_delete=models.CASCADE,
         related_name='statuses',
         verbose_name='Project'
     )
@@ -146,24 +145,26 @@ class ProjectSupport(TimeStampedModel):
 
 class TimeSheet(TimeStampedModel):
     attachments = GenericRelation(Attachment)
-    end = models.DateField(_('End'), null=True, blank=True)
     start = models.DateField(_('Start'), null=True, blank=True)
+    end = models.DateField(_('End'), null=True, blank=True)
+    hours = models.FloatField(max_length=20, null=True, blank=True)
+    project = models.ForeignKey(
+        Project, on_delete=models.PROTECT,
+        related_name='timesheets',
+        verbose_name='Project'
+    )
     is_active = models.BooleanField(_('Is Active'), default=True)
     remark = models.TextField(_("Remark"), null=True, blank=True)
-    hours = models.FloatField(max_length=20, null=True, blank=True)
+    submitted_at = models.DateTimeField(_('Submitted at'), null=True, blank=True)
+    con_comment = models.TextField(_("Consultant Comment"), null=True, blank=True)
+    status_updated_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
     additional_hours = models.FloatField(max_length=20, null=True, blank=True, default=0)
     status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS, default='draft')
-    status_updated_at = models.DateTimeField(_('Edited At'), null=True, blank=True)
     status_updated_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='timesheet_edits',
         verbose_name='Edited BY',
         null=True, blank=True
-    )
-    project = models.ForeignKey(
-        Project, on_delete=models.PROTECT,
-        related_name='timesheets',
-        verbose_name='Project'
     )
 
     def save(self, *args, **kwargs):
@@ -176,7 +177,7 @@ class TimeSheet(TimeStampedModel):
         return super(TimeSheet, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.id}:{self.project.consultant.name} - {self.hours}'
+        return f'{self.id}:{self.project.consultant.name} - {self.status}'
 
 
 class PayrollSchedule(models.Model):
@@ -188,3 +189,21 @@ class PayrollSchedule(models.Model):
 
     def __str__(self):
         return f'{self.processing_date} :: {self.pay_period_start} - {self.pay_period_end} :: {self.pay_date}'
+
+
+class IphoneAppLink(models.Model):
+    link = models.CharField(_('Link'), max_length=100)
+    code = models.CharField(_('Code'), max_length=50)
+    is_sent = models.BooleanField(_('Link sent'), default=False)
+    sent_on = models.DateTimeField(_('link sent on'), null=True, blank=True)
+    consultant = models.ForeignKey(
+        Consultant, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='app_links',
+        verbose_name='Consultant',
+    )
+
+    def __str__(self):
+        if self.consultant:
+            return f'{self.consultant.name} :: {self.code} :: {str(self.is_sent)}'
+        return f'{self.code} :: {str(self.is_sent)}'

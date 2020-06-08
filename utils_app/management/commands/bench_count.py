@@ -11,23 +11,29 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        queryset = Consultant.objects.filter(marketing__end=None)
-        in_offer_con = queryset.filter(status='in_offer').count()
-        on_project_con = queryset.filter(status='on_project').count()
-        in_pool_con = queryset.filter(status='in_marketing', marketing__in_pool=True, marketing__status='open').count()
-        on_bench_con = queryset.filter(status='in_marketing', marketing__in_pool=False, marketing__status='open').count()
+        queryset = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
+        on_bench_con = queryset.count()
+        in_pool_con = queryset.filter(marketing__in_pool=True).count()
+        on_boarded = Consultant.objects.filter(
+            projects__statuses__status='on_boarded',
+            projects__statuses__is_current=True
+        ).exclude(status='archived').distinct().count()
+        joined = Consultant.objects.filter(
+            projects__statuses__status='on_boarded',
+            projects__statuses__is_current=True
+        ).exclude(status='archived').distinct().count()
 
         data = {
             "response_type": "in_channel",
             "username": "Log1 Updates",
             "text": f"""
-#### Bench Status :memo: \n
-| Consultant Status | Count              |
-|:------------------|:-------------------|
-| In Marketing      | {on_bench_con} |
-| In Pool           | {in_pool_con}      | 
-| In Offer          | {in_offer_con}     | 
-| On Project        | {on_project_con}   | 
+#### Consultant Bench Status :memo: \n
+| Status     | Count          |
+|:-----------|:---------------|
+| Bench      | {on_bench_con} |
+| In Pool    | {in_pool_con}  | 
+| On boarded | {on_boarded}   |
+| Joined     | {joined}       |
 """
         }
 

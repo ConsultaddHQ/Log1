@@ -3,7 +3,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.views import mattermost_webhook
+from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -13,16 +13,21 @@ class Command(BaseCommand):
     # A command must define handle()
 
     def handle(self, *args, **options):
-        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
-                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
-        terminated = ["completed", "resigned-rate", "resigned-location", "resigned-full_time", "resigned-technology",
-                      "client-fired-budget", "client-fired-performance", "client-fired-security"]
+        cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled', 'cancelled-contract_conflicts',
+                     'cancelled-candidate_denied', 'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                     'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
+
+        terminated = ["completed", 'terminated', 'terminated-resigned', 'terminated-resigned_rate_issue',
+                      'terminated-resigned_technology_issue', 'terminated-fired_budget_issue', 'terminated-fired',
+                      'terminated-fired_security_issue', 'terminated-resigned_location_issue',
+                      'terminated-fired_performance_issue', 'terminated-resigned_full_time_offer']
+
         month = date.today().month
         new_offer = Project.objects.filter(statuses__status='new', statuses__is_current=True).count()
         received_projects = Project.objects.filter(statuses__status='received', statuses__is_current=True).count()
         on_boarded_projects = Project.objects.filter(statuses__status='on_boarded', statuses__is_current=True).count()
         joined_projects = Project.objects.filter(statuses__status='joined', statuses__is_current=True,
-                                                 created__month=month).count()
+                                                 statuses__created=month).count()
         cancelled_projects = Project.objects.filter(statuses__status__in=cancelled, statuses__is_current=True,
                                                     created__month=month).count()
         terminated_projects = Project.objects.filter(statuses__status__in=terminated, statuses__is_current=True,
@@ -42,7 +47,7 @@ class Command(BaseCommand):
 | On boarded | {on_boarded_projects} |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        post_msg_using_webhook(config.offer_url, data)
 
         data = {
             "response_type": "in_channel",
@@ -57,4 +62,4 @@ class Command(BaseCommand):
 | Total Offer  | {total_projects} |
 """
         }
-        mattermost_webhook(config.offer_url, data)
+        post_msg_using_webhook(config.offer_url, data)

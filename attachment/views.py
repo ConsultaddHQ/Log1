@@ -1,8 +1,10 @@
-import os
 import boto3
 import logging
-from django.contrib.contenttypes.models import ContentType
+from datetime import datetime
+from botocore.exceptions import ClientError
+from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -29,12 +31,49 @@ def get_s3_object(key):
             'Bucket': os.getenv('AWS_STORAGE_BUCKET_NAME'),
             'Key': f'media/{key}'
         },
-        ExpiresIn=60
+        ExpiresIn=3600
     )
     return url
 
 
-class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
+def download_s3_object(key):
+    file_name = key.split('/')[1] + "_" + str(datetime.now()) + "_" + key.split('/')[3]
+    s3 = boto3.client('s3',
+                      region_name=os.getenv('AWS_REGION_NAME'),
+                      aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                      aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+                      )
+    s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME'), f'media/{key}', f'media/{file_name}')
+    return f'media/{file_name}'
+
+
+def delete_temp_file(paths):
+    for path in paths:
+        if os.path.exists(path):
+            os.remove(path)
+        else:
+            logger.error(path, "The file does not exist")
+
+
+def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
+    bucket_name = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    s3 = boto3.client(
+            's3', region_name=os.getenv('AWS_REGION_NAME'),
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+        )
+    try:
+        response = s3.generate_presigned_post(
+            bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
+        )
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    return response
+
+
+class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, GenericViewSet):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
     permission_classes = (IsAuthenticated,)
@@ -44,7 +83,7 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
         try:
             content_type = ContentType.objects.get(model=request.data['obj_type'])
             object_id = request.data['object_id']
-            if content_type.model == 'submission':
+            if content_type.model == 'submission' and request.data['obj_type'] == 'resume':
                 resume = Attachment.objects.filter(object_id=object_id, content_type=content_type,
                                                    attachment_type='resume')
                 if resume:
@@ -52,10 +91,10 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
 
             attachment = Attachment.objects.create(
                 object_id=object_id,
+                creator=request.user,
                 content_type=content_type,
-                attachment_type=request.data['attachment_type'],
                 attachment_file=request.FILES.get('file'),
-                creator=request.user
+                attachment_type=request.data['attachment_type'],
             )
             serializer = self.serializer_class(attachment)
 
@@ -64,7 +103,8 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
             else:
                 project = get_object_or_404(Project, id=object_id)
 
-                msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0
+                msa, work_order, s_msa, s_work_order = 0, 0, 0, 0
+                client_address, vendor_address, reporting_details = 0, 0, 0
 
                 start_date = 1 if project.start_date else 0
 
@@ -95,10 +135,14 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
                 if project.reporting_details and len(project.reporting_details.strip()) > 0:
                     reporting_details = 1
 
+                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                                       + reporting_details) / 6 >= 1 else False
+
                 check_list = {
                     "total": 6,
                     "msa": msa,
                     "msa_signed": s_msa,
+                    "status": list_status,
                     "work_order": work_order,
                     "start_date": start_date,
                     "client_address": client_address,
@@ -115,7 +159,7 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
     def destroy(self, request, *args, **kwargs):
         try:
             attachment_id = self.request.query_params.get('attachment_id', None)
-            attachment = get_object_or_404(Attachment, id=attachment_id)
+            attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
             if attachment.content_type.model != 'project':
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
@@ -125,7 +169,8 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
 
-                msa, client_address, vendor_address, work_order, reporting_details = 0, 0, 0, 0, 0
+                client_address, vendor_address, reporting_details = 0, 0, 0
+                msa, work_order, s_msa, s_work_order = 0, 0, 0, 0
 
                 start_date = 1 if project.start_date else 0
 
@@ -138,6 +183,15 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
                 if project.attachments.filter(attachment_type='work_order_msa'):
                     msa, work_order = 1, 1
 
+                if project.attachments.filter(attachment_type='msa_signed'):
+                    s_msa = 1
+
+                if project.attachments.filter(attachment_type='work_order_signed'):
+                    s_work_order = 1
+
+                if project.attachments.filter(attachment_type='work_order_msa_signed'):
+                    s_msa, s_work_order = 1, 1
+
                 if project.client_address and len(project.client_address.strip()) > 0:
                     client_address = 1
 
@@ -147,9 +201,13 @@ class AttachmentView(CreateModelMixin, DestroyModelMixin, GenericViewSet):
                 if project.reporting_details and len(project.reporting_details.strip()) > 0:
                     reporting_details = 1
 
+                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                                       + reporting_details) / 6 >= 1 else False
+
                 check_list = {
                     "total": 6,
                     "msa": msa,
+                    "status": list_status,
                     "start_date": start_date,
                     "work_order": work_order,
                     "client_address": client_address,
@@ -171,8 +229,24 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            attachment = get_object_or_404(Attachment, id=kwargs.get('pk'), creator=request.user)
+            attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
             url = get_s3_object(attachment.attachment_file.name)
-            return Response({"result": url}, status=status.HTTP_200_OK)
+            extension = attachment.attachment_file.name.split(".")[-1]
+            return Response({"result": url, 'file_type': extension}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, url_path='upload')
+    def upload(self, request):
+        content_object = ContentType.objects.get(model=request.data['obj_type'])
+        file_name = request.data['file_name']
+        object_id = request.data['object_id']
+
+        object_name = 'media/attachments/{app}_{model}/{pk}/{filename}'.format(
+            app=content_object.app_label,
+            model=content_object.model.lower(),
+            pk=object_id,
+            filename=file_name,
+        )
+        response = presigned_post_url(object_name=object_name)
+        return Response({"result": response}, status=status.HTTP_200_OK)

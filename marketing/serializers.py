@@ -38,7 +38,7 @@ class LeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = ('id', 'job_desc', 'job_title', 'primary_skill', 'city', 'vendor_company_id', 'vendor_company_name',
-                  'owner', 'status', 'created', 'modified')
+                  'owner', 'status', 'created', 'modified', 'is_w2')
 
 
 class SubmissionCreateSerializer(serializers.ModelSerializer):
@@ -48,13 +48,22 @@ class SubmissionCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    check_list = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    check_list = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+    consultant_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ('id', 'status', 'created', 'duration', 'start_date', 'end_date', 'city', 'feedback', 'consultant',
-                  'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list')
+                  'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list',
+                  'reporting_details', 'attachments', 'is_remote', 'consultant_name')
+
+    def get_consultant_name(self, obj):
+        return obj.consultant.name
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -94,10 +103,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         if obj.reporting_details and len(obj.reporting_details.strip()) > 0:
             reporting_details = 1
 
+        list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
+                               + reporting_details) / 6 >= 1 else False
+
         return {
             "total": 6,
             "msa": msa,
             "msa_signed": s_msa,
+            "status": list_status,
             "work_order": work_order,
             "start_date": start_date,
             "client_address": client_address,

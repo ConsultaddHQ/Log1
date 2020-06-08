@@ -107,9 +107,10 @@ class User(AbstractUser, PermissionsMixin):
 
     class Meta:
         app_label = 'employee'
+        ordering = ('employee_name',)
 
     def __str__(self):
-        return f'{self.id}:{self.email}'
+        return f'{self.employee_name}-{self.email}'
 
     @property
     def roles(self):
@@ -172,16 +173,16 @@ def clear_expired(expiry_time):
 
 
 class Asset(TimeStampedModel):
-    username = models.CharField(_('Username'), max_length=30)
-    provider = models.CharField(_('Provider'), max_length=20)
-    password = models.CharField(_('Password'), max_length=40)
-    email = models.EmailField(_('Email'), null=True, blank=True)
+    username = models.CharField(_('Username'), max_length=50)
+    provider = models.CharField(_('Provider'), max_length=30)
+    password = models.CharField(_('Password'), max_length=50)
+    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
     is_deleted = models.BooleanField(_('Is Deleted'), default=False)
-    alter_email = models.EmailField(_('Alternate Email'), null=True, blank=True)
-    number = models.CharField(_('Number'), max_length=40, null=True, blank=True)
+    alter_email = models.EmailField(_('Alternate Email'), max_length=50, null=True, blank=True)
+    number = models.CharField(_('Number'), max_length=50, null=True, blank=True)
     tech = models.CharField(_('Technology'), max_length=40, null=True, blank=True)
     remarks = models.CharField(_('Remarks'), max_length=300, null=True, blank=True)
-    alter_number = models.CharField(_('Alternate Number'), max_length=20, null=True, blank=True)
+    alter_number = models.CharField(_('Alternate Number'), max_length=40, null=True, blank=True)
     asset_type = models.CharField(_('Asset Type'), choices=ASSET_TYPES, max_length=20, null=True, blank=True)
     owner = models.ForeignKey(
         User, on_delete=models.CASCADE,

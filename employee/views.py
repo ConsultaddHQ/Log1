@@ -1,10 +1,14 @@
 import logging
+from itertools import chain
+
 from django.utils import timezone
 from datetime import timedelta, datetime
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
+from django.db.models import F, Value, CharField
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -16,7 +20,9 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
 from employee.serializers import *
 from employee.models import Role, Team
+from consultant.models import Consultant
 from utils_app.mailing import send_email
+from notification.models import FCMDevice
 from activity.views import create_activity
 from employee.models import ResetPasswordToken, clear_expired, get_password_reset_token_expiry_time, Asset
 
@@ -75,6 +81,15 @@ class EmployeeAuthViewSets(GenericViewSet):
         if user:
             user.last_login = datetime.now()
             user.save()
+            fcm_token, created = FCMDevice.objects.get_or_create(
+                device_id=request.data.get("fcm_token"),
+                content_type=ContentType.objects.get(model='user')
+            )
+            fcm_token.type = 'web'
+            fcm_token.name = 'windows'
+            fcm_token.object_id = user.id
+            fcm_token.save()
+
             return Response({"result": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
         logger.error("Incorrect Employee Id/Password")
         return Response({"error": "Incorrect Employee Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
@@ -98,17 +113,27 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def list(self, request, *args, **kwargs):
         try:
             query = request.query_params.get('query', '')
+            teams = request.query_params.get('teams', None)
             user_type = request.query_params.get('type', None)
-            if user_type:
-                users = User.objects.filter(role__name=user_type)
+            users = User.objects.exclude(role__name='consultant').exclude(is_active=False)
+            if user_type == 'relation':
+                users = users.filter(team__name='Retention')
+            elif user_type:
+                users = users.filter(role__name__iexact=user_type)
+            elif teams:
+                teams = teams.split(",")
+                if 'Consultadd' in teams and 'superadmin' in request.user.roles:
+                    users = users.filter(role__name='marketer')
+                else:
+                    users = users.filter(team__name__in=teams)
             elif user_type == 'team':
                 if 'superadmin' in request.user.roles:
-                    users = User.objects.filter(role__name='marketer')
+                    users = users.filter(role__name='marketer')
                 else:
-                    users = User.objects.filter(team=request.user.team, role__name='marketer')
-            else:
-                users = User.objects.filter(employee_name__icontains=query).exclude(role__name='consultant')
-            users = users.annotate(name=Lower('employee_name')).order_by('name')
+                    users = users.filter(team=request.user.team, role__name='marketer')
+
+            users = users.filter(employee_name__istartswith=query)
+            users = users.annotate(name=F('employee_name')).order_by(Lower('name'))
             data = users.values('id', 'employee_id', 'email', 'name')
             return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -127,7 +152,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
-        current_password = request.data.get('current_password')
+        current_password = request.data.get('cur_password')
         new_password = request.data.get('new_password')
         if request.user.check_password(current_password):
             request.user.set_password(new_password)
@@ -135,13 +160,16 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"result": "password updated"}, status=status.HTTP_200_OK)
         return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['delete'], detail=False, url_path='logout')
+    @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request, *args, **kwargs):
         """
             Logout for authenticated user
         """
         token = get_object_or_404(Token, key=request.auth)
         token.delete()
+        fcm_token = FCMDevice.objects.filter(object_id=token.user.id, content_type__model='user')
+        if fcm_token:
+            fcm_token.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -199,7 +227,7 @@ class ResetPasswordViewSets(GenericViewSet):
                         'employee_id': user.employee_id,
                         'name': user.employee_name,
                         'email': user.email,
-                        'token': token,
+                        'token': token.key,
                     },
                 }
                 res, error = user.send_mail(mail_data)
@@ -265,7 +293,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
 
             email_asset = asset.filter(asset_type='email')
             social_asset = asset.filter(asset_type='social')
-            number_asset = asset.filter(asset_type='number')
+            number_asset = asset.filter(asset_type='number').exclude(provider='twilio')
             job_board_asset = asset.filter(asset_type='job_board')
 
             data = {
@@ -283,11 +311,11 @@ class AssetsViewSets(viewsets.ModelViewSet):
         try:
             data = request.data
             asset = Asset.objects.create(
+                owner=request.user,
+                email=data['email'],
                 username=data['username'],
                 password=data['password'],
-                email=data['email'],
                 provider=data['username'],
-                owner=request.user,
             )
             serializer = self.serializer_class(asset, data=request.data, partial=True)
             if serializer.is_valid():
@@ -309,9 +337,9 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 serializer.save()
                 pass_string, num_string = '', ''
                 if asset.password != password:
-                    pass_string = 'changed password from \"{}\" to \"{}\"'.format(password, asset.password)
+                    pass_string = f'changed password from \"{password}\" to \"{asset.password}\"'
                 if asset.alter_number != alter_num:
-                    num_string = 'changed Alternate number from \"{}\" to \"{}\"'.format(alter_num, asset.alter_number)
+                    num_string = f'changed Alternate number from \"{alter_num}\" to \"{asset.alter_number}\"'
                 if pass_string and num_string:
                     final_string = pass_string + " and " + num_string
                 else:
@@ -321,8 +349,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                         final_string = num_string
                     else:
                         final_string = "Nothing"
-                desc = "{} updated {} of {} asset".format(request.user.employee_name.title(), final_string,
-                                                          serializer.data['asset_type'])
+                desc = f"{request.user.employee_name.title()} updated {final_string} of {serializer.data['asset_type']} asset"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -344,8 +371,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
 
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
-        assets = request.data.get('assets')
         users = request.data.get('users')
+        assets = request.data.get('assets')
         try:
             for asset_id in assets:
                 asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
@@ -358,7 +385,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     asset.shared_to.add(user)
                 user_list = ", ".join(names[:len(names) - 1]) + " and " + names[-1] if len(names) > 1 else "".join(
                     names)
-                desc = "{} shared {} asset to {}".format(request.user.employee_name.title(), asset.asset_type, user_list)
+                desc = f"{request.user.employee_name.title()} shared {asset.asset_type} asset to {user_list}"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": "ok"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -373,7 +400,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             user = User.objects.get(id=user_id)
             asset.shared_to.remove(user)
-            desc = "{} Unshared {} from {} asset".format(request.user.employee_name, user.employee_name, asset.asset_type)
+            desc = f"{request.user.employee_name} Unshared {user.employee_name} from {asset.asset_type} asset"
             create_activity(asset.id, 'asset', request.user, desc, 'updated')
             serializer = self.serializer_class(asset)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
@@ -393,11 +420,13 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 df = pd.read_excel(file)
             else:
                 return Response({"error": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
-
-            if 'Username' not in df.columns:
-                return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
             if not df.empty:
                 created, updated, failed = 0, 0, 0
+                if not {'Username', 'Provider', 'Password', 'Asset Type', 'Email', 'Technology',
+                        'Remarks', 'Phone Number', 'Alternate Email', 'Alternate Number'
+                        }.issubset(set(df.columns)):
+                    return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
+
                 for index, row in df.iterrows():
                     if pd.isnull(row["Username"]):
                         break
@@ -447,8 +476,33 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     },
                 }
                 send_email(mail_data, "Log1")
-                return Response({"result": "Upload Complete"}, status=status.HTTP_201_CREATED)
+                return Response({"result": "Upload Complete", "count": mail_data['context']},
+                                status=status.HTTP_201_CREATED)
             return Response({"result": "Empty File"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AllUsersViewSet(GenericViewSet, ListModelMixin):
+    queryset = User.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            query = request.query_params.get('query', '')
+
+            users = self.queryset.filter(employee_name__istartswith=query, is_active=True).annotate(
+                name=F('employee_name'),
+                type=Value('user', CharField())
+            ).values('id', 'name', 'type')
+
+            consultants = Consultant.objects.filter(name__istartswith=query).exclude(status='archived').annotate(
+                type=Value('consultant', CharField())
+            ).values('id', 'name', 'type')
+
+            result_list = list(chain(consultants[:5], users[:5]))
+            return Response({"results": result_list}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)

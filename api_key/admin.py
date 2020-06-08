@@ -1,11 +1,11 @@
 import typing
-
 from django.contrib import admin, messages
+from import_export.admin import ExportActionModelAdmin
 
-from .models import APIKey
+from api_key.models import APIKey
 
 
-class APIKeyModelAdmin(admin.ModelAdmin):
+class APIKeyModelAdmin(ExportActionModelAdmin):
     list_display = (
         "prefix",
         "name",
