@@ -1,4 +1,3 @@
-import os
 from datetime import date
 from django.core.management import BaseCommand
 from django.utils import timezone
@@ -31,8 +30,7 @@ class Command(BaseCommand):
             terminate.save()
 
             # Email for Exit Process Cancelled
-            res, error = send_exit_process_mail(terminate, 'complete')
-            print(res)
+            send_exit_process_mail(terminate, 'complete')
 
             # App Notification
             recruiter = consultant.recruiter
@@ -57,11 +55,11 @@ class Command(BaseCommand):
 
             # Push Notification
             message_body = {
+                "body": None,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,

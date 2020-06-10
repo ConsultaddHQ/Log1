@@ -22,7 +22,7 @@ class Command(BaseCommand):
             consultant = timesheet.project.consultant
             title = f"Reminder: Please submit timesheet for the week {str(timesheet.start)} - {str(timesheet.end)}"
             message_body = {
-                "body": title,
+                "body": None,
                 "title": title,
                 "category": "pending",
                 "show_in_foreground": True,
@@ -41,8 +41,8 @@ class Command(BaseCommand):
             target_content_type = ContentType.objects.get(model="timesheet")
             Notification.objects.create(
                 title=title,
+                description=None,
                 category="pending",
-                description=title,
                 sender_object_id=1,
                 target_object_id=timesheet.id,
                 recipient_object_id=consultant.id,
