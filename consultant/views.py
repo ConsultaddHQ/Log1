@@ -16,7 +16,11 @@ from constance import config
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
+<<<<<<< HEAD
 from attachment.serializers import AttachmentURLSerializer
+=======
+from attachment.serializers import AttachmentSerializer
+>>>>>>> 5f1be0e4c93ae32686e550692d2c9e1981a81555
 from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import create_notification, push_notification
 
@@ -85,6 +89,7 @@ def terminate_consultant(terminate):
             if error == 'error':
                 logger.error(res)
 
+<<<<<<< HEAD
             # App Notification
             recruiter = consultant.recruiter
             user_list = [recruiter]
@@ -130,6 +135,53 @@ def terminate_consultant(terminate):
                 FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
                                          ).values_list('device_id', flat=True))
             push_notification(registration_ids, message_body)
+=======
+        # App Notification
+        recruiter = consultant.recruiter
+        user_list = [recruiter]
+        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+        for user in scrum_masters:
+            user_list.append(user)
+
+        title = f"{consultant.name} got terminated on {terminate.last_date}"
+
+        notification_data = {
+            'category': 'info',
+            'sender_user_type': 'user',
+            'target_type': 'consultant',
+            'recipient_user_type': 'user',
+            'description': terminate.type,
+            'title': title,
+            'sender_id': terminate.created_by.id,
+            'target_id': terminate.consultant.id,
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "body": title,
+            "title": title,
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target': 'consultant',
+                'timestamp': str(timezone.now()),
+                'target_id': terminate.consultant.id,
+            },
+        }
+
+        object_ids = []
+        for user in user_list:
+            object_ids.append(user.id)
+
+        registration_ids = list(
+            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                     ).values_list('device_id', flat=True))
+        push_notification(registration_ids, message_body)
+>>>>>>> 5f1be0e4c93ae32686e550692d2c9e1981a81555
         return None
     except Exception as error:
         return error
@@ -348,10 +400,17 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.filter(
                     pocs__poc=request.user
                 )
+<<<<<<< HEAD
 
             if query:
                 consultants = consultants.filter(name__istartswith=query)
 
+=======
+
+            if query:
+                consultants = consultants.filter(name__istartswith=query)
+
+>>>>>>> 5f1be0e4c93ae32686e550692d2c9e1981a81555
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
             return Response({"results": serializer.data}, status=status.HTTP_200_OK)

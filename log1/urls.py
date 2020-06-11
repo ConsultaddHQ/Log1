@@ -10,11 +10,11 @@ from rest_framework.documentation import include_docs_urls
 
 from utils_app.views import CityViewSets, WebHookViewSet
 
+from ckiller.views import CkillerSubmissionViewSet
+
 from impersonate.views import ImpersonateViewSets
 
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
-
-from ckiller.views import CkillerSubmissionViewSet
 
 from attachment.views import AttachmentView, AttachmentGetView
 

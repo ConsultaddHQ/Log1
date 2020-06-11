@@ -99,8 +99,8 @@ class ReceiveSMSViewSet(GenericViewSet):
                 to = request.data.get('To')
                 body = request.data.get('Body')
                 from_ = request.data.get('From')
-                user1 = Asset.objects.filter(number=to).first()
-                conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
+                user1 = Asset.objects.filter(number=to).first().id
+                conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=from_)
                 Message.objects.create(
                     text=body,
                     is_sent=False,
