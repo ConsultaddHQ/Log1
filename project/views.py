@@ -72,15 +72,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
+            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
                 'subject': f'Offer Received of {project.consultant.name} :: {submission.client} :: '
-                           f'{str(project.start_date.strftime("%m/%d/%Y"))} :: {submission.client} :: '
-                           f'{submission.vendor.name}',
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/offer.html',
                 'context': {
+                    'start': project_start_date,
                     'rate': int(submission.rate),
                     'employer': submission.employer,
                     'client_name': submission.client,
@@ -89,7 +91,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'vendor_company': submission.vendor.name,
                     'consultant_name': project.consultant.name,
                     'consultant_email': project.consultant.email,
-                    'start': project.start_date.strftime('%m/%d/%Y'),
                     'marketer_name': submission.created_by.employee_name,
                 },
             }
@@ -127,6 +128,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
+            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+
             consultant_name = project.consultant.name
             mail_data = {
                 'to': [config.ENGINEERING],
@@ -137,6 +140,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'context': {
                     'notes': notes,
                     'recordings': recordings,
+                    'start': project_start_date,
                     'employer': submission.employer,
                     'client_name': submission.client,
                     'location': submission.lead.city,
@@ -144,7 +148,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_name': consultant_name,
                     'job_title': submission.lead.job_title,
                     'consultant_email': project.consultant.email,
-                    'start': project.start_date.strftime("%m/%d/%Y"),
                     'consultant_phone_no': project.consultant.phone_no,
                     'marketer_name': submission.created_by.employee_name,
                     'consultant_location': project.consultant.current_city,
@@ -175,17 +178,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
+            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
             consultant_name = project.consultant.name
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
                 'subject': f'On Boarding of {consultant_name} :: {submission.employer.title()} :: '
-                           f'{str(project.start_date.strftime("%m/%d/%Y"))} :: {submission.client} :: {submission.vendor.name}',
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
                 'context': {
                     'type': po_type,
                     'rate': submission.rate,
+                    'start': project_start_date,
                     'client_name': submission.client,
                     'vendor_name': vendor_contact.name,
                     'consultant_name': consultant_name,
@@ -200,7 +205,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_email': project.consultant.email,
                     'invoicing_period': project.invoicing_period,
                     'reporting_details': project.reporting_details,
-                    'start': project.start_date.strftime("%m/%d/%Y"),
                     'marketer_name': submission.created_by.employee_name,
                     'vendor_company': submission.lead.vendor_company.name,
                 },
@@ -237,18 +241,22 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
+            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_end_date = datetime.strptime(project.end_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
                 'subject': f'{po_type} of {project.consultant.name} :: {submission.employer} :: '
-                           f'{str(project.start_date.strftime("%m/%d/%Y"))} :: {submission.client} :: '
-                           f'{submission.vendor.name}',
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination.html',
                 'context': {
                     'rate': submission.rate,
+                    'end': project_end_date,
                     'remark': project.feedback,
                     'vendor_name': vendor_name,
+                    'start': project_start_date,
                     'vendor_email': vendor_email,
                     'vendor_number': vendor_number,
                     'client_name': submission.client,
@@ -258,10 +266,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'vendor_address': project.vendor_address,
                     'client_address': project.client_address,
                     'consultant_name': project.consultant.name,
-                    'end': project.end_date.strftime("%m/%d/%Y"),
                     'consultant_email': project.consultant.email,
                     'reporting_details': project.reporting_details,
-                    'start': project.start_date.strftime("%m/%d/%Y"),
                     'vendor_company': submission.lead.vendor_company.name,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                 }
@@ -592,6 +598,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 recruiter = "NA"
 
             # For Status Change
+            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_end_date = datetime.strptime(project.end_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 p_status, p_s_created = ProjectStatus.objects.get_or_create(
@@ -641,7 +650,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {str(project.start_date.strftime('%m/%d/%Y'))}\n\n
+:spiral_calendar: Joining Date :   {project_start_date}\n\n
 `Project Joined count of {project.submission.employer} for this month - {team_joined_count} `
 `Total Project Joined count of this month - {total_joined_count}`
 """
@@ -693,7 +702,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         statuses__created__gte=day_one,
                         submission__employer__iexact=project.submission.employer,
                     ).count()
-
                     interviews = project.submission.screening.exclude(status='cancelled')
                     ctb_gender = interviews.last().supervisor.gender
                     supervisors = "\n".join(
@@ -714,11 +722,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {employer_emoji} Employer :   {project.submission.employer.title()}
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 {ctb_gender_emoji} CTB :
-{supervisors}
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {str(project.start_date.strftime('%m/%d/%Y'))}\n\n
+:spiral_calendar: Start Date :   {project_start_date}\n\n
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
 `Total offer count of this month - {total_offer_count}`
 """
@@ -755,8 +762,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {str(project.start_date.strftime('%m/%d/%Y'))}
-:spiral_calendar: End Date :   {str(project.end_date.strftime('%m/%d/%Y'))}
+:spiral_calendar: Start Date :   {project_start_date}
+:spiral_calendar: End Date :   {project_end_date}
 :x: Status :   {str(p_status.get_status_display())}
 \n\n"""
 
@@ -781,7 +788,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {str(project.start_date.strftime('%m/%d/%Y'))}\n\n"""
+:spiral_calendar: Joining Date :   {project_start_date}\n\n"""
 
                         text += "**Reason: **" + project.feedback if project.feedback else "None"
 

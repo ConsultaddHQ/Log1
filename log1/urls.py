@@ -10,7 +10,7 @@ from rest_framework.documentation import include_docs_urls
 
 from utils_app.views import CityViewSets, WebHookViewSet
 
-from ckiller.views import CkillerSubmissionView
+from ckiller.views import CkillerSubmissionViewSet
 
 from impersonate.views import ImpersonateViewSets
 
@@ -86,7 +86,7 @@ router.register(r'comment', CommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
 
-router.register(r'ckiller_data', CkillerSubmissionView)
+router.register(r'ckiller_data', CkillerSubmissionViewSet)
 
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)
