@@ -16,7 +16,7 @@ from constance import config
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
-from attachment.serializers import AttachmentSerializer
+from attachment.serializers import AttachmentURLSerializer
 from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import create_notification, push_notification
 
@@ -85,51 +85,51 @@ def terminate_consultant(terminate):
             if error == 'error':
                 logger.error(res)
 
-            # App Notification
-            recruiter = consultant.recruiter
-            user_list = [recruiter]
-            scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
-            for user in scrum_masters:
-                user_list.append(user)
+        # App Notification
+        recruiter = consultant.recruiter
+        user_list = [recruiter]
+        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+        for user in scrum_masters:
+            user_list.append(user)
 
-            title = f"{consultant.name} got terminated on {terminate.last_date}"
+        title = f"{consultant.name} got terminated on {terminate.last_date}"
 
-            notification_data = {
-                'category': 'info',
-                'sender_user_type': 'user',
-                'target_type': 'consultant',
-                'recipient_user_type': 'user',
-                'description': terminate.type,
-                'title': title,
-                'sender_id': terminate.created_by.id,
+        notification_data = {
+            'category': 'info',
+            'sender_user_type': 'user',
+            'target_type': 'consultant',
+            'recipient_user_type': 'user',
+            'description': terminate.type,
+            'title': title,
+            'sender_id': terminate.created_by.id,
+            'target_id': terminate.consultant.id,
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "body": title,
+            "title": title,
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target': 'consultant',
+                'timestamp': str(timezone.now()),
                 'target_id': terminate.consultant.id,
-            }
-            create_notification(user_list, notification_data)
+            },
+        }
 
-            # Push Notification
-            message_body = {
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'consultant',
-                    'timestamp': str(timezone.now()),
-                    'target_id': terminate.consultant.id,
-                },
-            }
+        object_ids = []
+        for user in user_list:
+            object_ids.append(user.id)
 
-            object_ids = []
-            for user in user_list:
-                object_ids.append(user.id)
-
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+        registration_ids = list(
+            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                     ).values_list('device_id', flat=True))
+        push_notification(registration_ids, message_body)
         return None
     except Exception as error:
         return error

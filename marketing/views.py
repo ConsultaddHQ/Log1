@@ -2,6 +2,7 @@ import os
 import difflib
 import logging
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from rest_framework.mixins import *
 from rest_framework import viewsets
@@ -29,6 +30,158 @@ from utils_app.calendar import get_interviews, book_calendar, update_calendar, d
 logger = logging.getLogger(__name__)
 
 dont_have_access = 'You don\'t have access'
+
+
+class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
+    queryset = Submission.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @action(methods=['get'], detail=False, url_path='performance')
+    def marketing_performance(self, request):
+        filter_for = request.query_params.get("filter_for", "")
+        filter_by = request.query_params.get("filter_by", "")
+        try:
+
+            if filter_by == 'last_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
+                first = last.replace(day=1)
+
+            elif filter_by == 'last_6_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
+                first = last + timedelta(days=1) + relativedelta(months=-6)
+            else:
+                # this_month
+                first = date.today().replace(day=1)
+                last = date.today()
+
+            projects = Project.objects.all()
+
+            if filter_for == 'my':
+                new_po = projects.filter(statuses__status='joined', created__range=[first, last],
+                                         submission__created_by=request.user).count()
+
+                offers_count = projects.filter(submission__created__range=[first, last],
+                                               submission__created_by=request.user).count()
+
+                submissions_count = Submission.objects.filter(created__range=[first, last],
+                                                              created_by=request.user).count()
+
+                interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1',
+                                                            submission__created_by=request.user).count()
+
+                joining_count = projects.filter(statuses__status='joined', submission__created__range=[first, last],
+                                                submission__created_by=request.user).count()
+
+            elif filter_for == 'team':
+                new_po = projects.filter(statuses__status='joined', created__range=[first, last],
+                                         submission__created_by__team=request.user.team).count()
+
+                offers_count = projects.filter(submission__created__range=[first, last],
+                                               submission__created_by__team=request.user.team).count()
+
+                submissions_count = Submission.objects.filter(created__range=[first, last],
+                                                              created_by__team=request.user.team).count()
+
+                interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1',
+                                                            submission__created_by__team=request.user.team).count()
+
+                joining_count = projects.filter(statuses__status='joined', submission__created__range=[first, last],
+                                                submission__created_by__team=request.user.team).count()
+
+            else:
+                new_po = projects.filter(statuses__status='joined', created__range=[first, last]).count()
+                offers_count = projects.filter(submission__created__range=[first, last]).count()
+                submissions_count = Submission.objects.filter(created__range=[first, last]).count()
+                interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1').count()
+                joining_count = projects.filter(statuses__status='joined',
+                                                submission__created__range=[first, last]).count()
+
+            if filter_by == 'last_month':
+                first = first + relativedelta(months=-1)
+                last = last + relativedelta(months=-1)
+                prev_po = projects.filter(statuses__status='joined', created__range=[first, last]).count()
+                percent = int(((new_po - prev_po)/prev_po)*100)
+
+            elif filter_by == 'last_6_month':
+                first = first + relativedelta(months=-6)
+                last = last + relativedelta(months=-6)
+                prev_po = projects.filter(statuses__status='joined', created__range=[first, last]).count()
+                percent = int(((new_po - prev_po)/prev_po)*100)
+            else:
+                percent = None
+
+            conversions = {
+                "interview": "",
+                "joining": "",
+                "offers": "",
+                "count": {
+                    "offer_count": offers_count,
+                    "joining_count": joining_count,
+                    "interview_count": interviews_count,
+                    "submission_count": submissions_count,
+                }
+            }
+            if submissions_count != 0:
+                conversions['interview'] = round((interviews_count / submissions_count) * 100, 2)
+                conversions['joining'] = round((joining_count / submissions_count) * 100, 2)
+                conversions['offers'] = round((offers_count / submissions_count) * 100, 2)
+
+            result = {
+                "joined_count": new_po,
+                "joined_percent": percent,
+                "conversions": conversions
+            }
+            return Response({"result": result}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='history')
+    def dashboard_history(self, request):
+        filter_for = request.query_params.get("filter_for", "")
+        filter_by = request.query_params.get("filter_by", "")
+        try:
+            if filter_for == 'my':
+                projects = Project.objects.filter(submission__created_by=request.user)
+            elif filter_for == 'team':
+                projects = Project.objects.filter(submission__created_by__team=request.user.team)
+            else:
+                projects = Project.objects.all()
+
+            result = []
+            if filter_by == 'last_12_month':
+                last = date.today().replace(day=1) + relativedelta(months=-11) - timedelta(days=1)
+                first = last.replace(day=1)
+                for i in range(12):
+                    data = {
+                        "month": "",
+                        "po": ""
+                    }
+                    projects_count = projects.filter(created__range=[first, last]).count()
+                    data["month"] = first.strftime('%b')
+                    data["po"] = projects_count
+                    result.append(data)
+                    first = first + relativedelta(months=1)
+                    last = last + relativedelta(months=1)
+
+            elif filter_by == 'last_6_month':
+                last = date.today().replace(day=1) + relativedelta(months=-5) - timedelta(days=1)
+                first = last.replace(day=1)
+                for i in range(6):
+                    data = {
+                        "month": "",
+                        "po": ""
+                    }
+                    projects_count = projects.filter(created__range=[first, last]).count()
+                    data["month"] = first.strftime('%b')
+                    data["po"] = projects_count
+                    result.append(data)
+                    first = first + relativedelta(months=1)
+                    last = last + relativedelta(months=1)
+
+            return Response({"result": result}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
