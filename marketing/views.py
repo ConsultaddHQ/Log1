@@ -68,7 +68,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'start_time', 'marketer_name', 'vendor', 'client', 'job_title')
+            ).values('id', 'start_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
 
             joining = projects.filter(statuses__status='on_boarded', statuses__is_current=True)\
                 .annotate(
@@ -85,7 +85,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 consultant_name=F('consultant__name'),
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'start_date', 'marketer_name', 'vendor', 'client', 'is_remote')
+            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
 
             data = {
                 "joining": joining[:5],
