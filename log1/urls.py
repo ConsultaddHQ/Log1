@@ -10,8 +10,6 @@ from rest_framework.documentation import include_docs_urls
 
 from utils_app.views import CityViewSets, WebHookViewSet
 
-from ckiller.views import CkillerSubmissionView
-
 from impersonate.views import ImpersonateViewSets
 
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
@@ -36,7 +34,7 @@ from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets
+    InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
@@ -70,6 +68,7 @@ router.register(r'lead', LeadViewSets)
 router.register(r'interview', InterviewViewSets)
 router.register(r'submission', SubmissionViewSets)
 router.register(r'vendor_layer', VendorLayerViewSets)
+router.register(r'dashboard', MarketingDashboardViewSet)
 router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
 
@@ -88,7 +87,7 @@ router.register(r'comment', CommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
 
-router.register(r'ckiller_data', CkillerSubmissionView)
+router.register(r'ckiller_data', CkillerSubmissionViewSet)
 
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)

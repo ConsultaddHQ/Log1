@@ -639,7 +639,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n
+:spiral_calendar: Joining Date :   {project.start_date.strftime('%m/%d/%Y')}\n\n
 `Project Joined count of {project.submission.employer} for this month - {team_joined_count} `
 `Total Project Joined count of this month - {total_joined_count}`
 """
@@ -716,7 +716,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {str(project.start_date)}\n\n
+:spiral_calendar: Start Date :   {project.start_date.strftime('%m/%d/%Y')}\n\n
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
 `Total offer count of this month - {total_offer_count}`
 """
@@ -753,8 +753,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {str(project.start_date)}
-:spiral_calendar: End Date :   {str(project.end_date)}
+:spiral_calendar: Start Date :   {project.start_date.strftime('%m/%d/%Y')}
+:spiral_calendar: End Date :   {project.end_date.strftime('%m/%d/%Y')}
 :x: Status :   {str(p_status.get_status_display())}
 \n\n"""
 
@@ -779,7 +779,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n"""
+:spiral_calendar: Joining Date :   {project.start_date.strftime('%m/%d/%Y')}\n\n"""
 
                         text += "**Reason: **" + project.feedback if project.feedback else "None"
 

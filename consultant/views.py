@@ -16,7 +16,7 @@ from constance import config
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
-from attachment.serializers import AttachmentSerializer
+from attachment.serializers import AttachmentURLSerializer
 from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import create_notification, push_notification
 
