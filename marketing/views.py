@@ -131,14 +131,14 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             }
 
             offer_count = [
-                {'status': 'total', 'count': total},
-                {'status': 'new', 'count': new.count()},
-                {'status': 'joined', 'count': joined.count()},
-                {'status': 'received', 'count': received.count()},
-                {'status': 'cancelled', 'count': cancelled.count()},
-                {'status': 'terminated', 'count': terminated.count()},
-                {'status': 'on_boarded', 'count': on_boarded.count()},
-                {'status': 'not_joined', 'count': not_joined.count()},
+                {'name': 'total', 'count': total},
+                {'name': 'new', 'count': new.count()},
+                {'name': 'joined', 'count': joined.count()},
+                {'name': 'received', 'count': received.count()},
+                {'name': 'cancelled', 'count': cancelled.count()},
+                {'name': 'terminated', 'count': terminated.count()},
+                {'name': 'on_boarded', 'count': on_boarded.count()},
+                {'name': 'not_joined', 'count': not_joined.count()},
             ]
             return Response({'result': data, 'count': count, 'offer_count': offer_count}, status=status.HTTP_200_OK)
         except Exception as error:
