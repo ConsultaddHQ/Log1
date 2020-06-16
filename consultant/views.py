@@ -16,7 +16,7 @@ from constance import config
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
-from attachment.serializers import AttachmentURLSerializer
+from attachment.serializers import AttachmentSerializer
 from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import create_notification, push_notification
 
@@ -145,7 +145,7 @@ def send_exit_process_mail(terminate, exit_status):
             poc = consultant.recruiter
 
         to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
-        cc = [poc.email, config.SUPERADMIN]
+        cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
 
         scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
         for user in scrum_masters:
@@ -592,7 +592,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
-            serializer = AttachmentURLSerializer(queryset, many=True)
+            serializer = AttachmentSerializer(queryset, many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
