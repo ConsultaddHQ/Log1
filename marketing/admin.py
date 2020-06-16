@@ -1,7 +1,7 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
-from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer
+from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, Test
 
 
 @admin.register(VendorCompany)
@@ -98,3 +98,13 @@ class InterviewAdmin(ExportActionModelAdmin):
         self.message_user(request, "%s successfully marked as Cancelled." % message_bit)
 
     make_status_feedback_due.short_description = "Mark selected Interview's status as Cancelled"
+
+
+@admin.register(Test)
+class TestAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_filter = ('status', 'title', 'type')
+    search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
+                     'submission__created_by__employee_name', 'type', 'title')
+    list_display = ('id', 'title', 'status', 'type', 'deadline', 'submission', 'submit_date', 'feedback')
+

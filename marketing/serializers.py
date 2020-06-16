@@ -238,3 +238,9 @@ class InterviewGetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
         fields = '__all__'
+
+
+class TestCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Test
+        fields = '__all__'

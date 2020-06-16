@@ -1618,3 +1618,31 @@ class InterviewViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    queryset = Test.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            submissions = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
+            if not submissions:
+                return Response({"error": 'This is not your submission'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # for file in request.FILES.getlist('file'):
+            test = Test.objects.create(
+                status='new',
+                submission=submissions,
+                type=request.data.get('type'),
+                link=request.data.get('link'),
+                title=request.data.get('title'),
+                deadline=request.data.get('deadline'),
+                additional_details=request.data.get('additional_details'),
+            )
+            serializer = TestCreateSerializer(test)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

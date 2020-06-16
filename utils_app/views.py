@@ -40,3 +40,8 @@ class WebHookViewSet(GenericViewSet):
         f.write("\n")
         f.write(str(request.method))
         return Response({"result": "ok"}, status=status.HTTP_200_OK)
+
+
+str = [{'objectId': 6401, 'propertyName': 'candidate_rate', 'propertyValue': '50', 'changeSource': 'CRM_UI',
+  'eventId': 3641899323, 'subscriptionId': 240950, 'portalId': 5573564, 'appId': 221149, 'occurredAt': 1591901997558,
+  'subscriptionType': 'contact.propertyChange', 'attemptNumber': 0}]
