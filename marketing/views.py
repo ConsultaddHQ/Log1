@@ -1440,23 +1440,18 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             on_boarded = projects.filter(statuses__status='on_boarded', statuses__is_current=True)
             not_joined = projects.filter(statuses__status='on_boarded', statuses__is_current=True,
                                          start_date__lt=date.today())
+            extended = projects.filter(statuses__status__istartswith='extended', statuses__is_current=True)
+            complete = projects.filter(statuses__status__istartswith='complete', statuses__is_current=True)
             cancelled = projects.filter(statuses__status__istartswith='cancelled', statuses__is_current=True)
             terminated = projects.filter(statuses__status__istartswith='terminate', statuses__is_current=True)
 
-            sub = sub.filter(created__range=[first, last])
-            projects = projects.filter(created__range=[first, last])
-            interviews = interviews.filter(created__range=[first, last])
-            on_project = Consultant.objects.filter(status='on_project')
-            ba_bench = Consultant.objects.filter(skills__contains='BA', status='on_bench')
-            dev_bench = Consultant.objects.filter(status='on_bench').exclude(skills__exact='BA')
-
             count = {
-                'offer': projects.count(),
-                'submission': sub.count(),
-                'ba_bench': ba_bench.count(),
-                'dev_bench': dev_bench.count(),
-                'interview': interviews.count(),
-                'on_project': on_project.count(),
+                'offer': projects.filter(created__range=[first, last]).count(),
+                'submission': sub.filter(created__range=[first, last]).count(),
+                'interview': interviews.filter(created__range=[first, last]).count(),
+                'on_project': Consultant.objects.filter(status='on_project').count(),
+                'ba_bench': Consultant.objects.filter(skills__contains='BA', status='on_bench').count(),
+                'dev_bench': Consultant.objects.filter(status='on_bench').exclude(skills__exact='BA').count(),
             }
 
             offer_count = [
@@ -1464,6 +1459,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 {'name': 'new', 'count': new.count()},
                 {'name': 'joined', 'count': joined.count()},
                 {'name': 'received', 'count': received.count()},
+                {'name': 'extended', 'count': extended.count()},
+                {'name': 'complete', 'count': complete.count()},
                 {'name': 'cancelled', 'count': cancelled.count()},
                 {'name': 'terminated', 'count': terminated.count()},
                 {'name': 'on_boarded', 'count': on_boarded.count()},
@@ -1586,33 +1583,24 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 projects = Project.objects.all()
 
             result = []
+            diff = 0
             if filter_by_time == 'last_12_month':
-                last = date.today().replace(day=1) + relativedelta(months=-11) - timedelta(days=1)
-                first = last.replace(day=1)
-                for i in range(12):
-                    data = {
-                        "month": "",
-                        "po": ""
-                    }
-                    projects_count = projects.filter(created__range=[first, last]).count()
-                    data["month"] = first.strftime('%b')
-                    data["po"] = projects_count
-                    result.append(data)
-                    first = first + relativedelta(months=1)
-                    last = last + relativedelta(months=1)
+                diff = 12
 
             elif filter_by_time == 'last_6_month':
-                last = date.today().replace(day=1) + relativedelta(months=-5) - timedelta(days=1)
-                first = last.replace(day=1)
-                for i in range(6):
-                    projects_count = projects.filter(created__range=[first, last]).count()
-                    data = {
-                        "month": first.strftime('%b'),
-                        "po": projects_count
-                    }
-                    result.append(data)
-                    first = first + relativedelta(months=1)
-                    last = last + relativedelta(months=1)
+                diff = 6
+
+            last = date.today().replace(day=1) - timedelta(days=1) + relativedelta(months=-(diff-1))
+            first = last.replace(day=1)
+            for i in range(diff):
+                projects_count = projects.filter(created__range=[first, last]).count()
+                data = {
+                    "month": first.strftime('%b'),
+                    "po": projects_count
+                }
+                result.append(data)
+                first = first + relativedelta(months=1)
+                last = last.replace(day=1) + relativedelta(months=2) - timedelta(days=1)
             return Response({"result": result}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
