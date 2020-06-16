@@ -225,12 +225,11 @@ class LeadViewSets(viewsets.ModelViewSet):
                 lead = queryset.first()
                 lead.owner = request.user
                 lead.save()
-                data = queryset.annotate(submission_count=Count('submission')) \
-                    .annotate(company_name=F('vendor_company__name'),
-                              company_id=F('vendor_company__id'),
-                              ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
-                                       'is_w2',
-                                       'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+                data = queryset.annotate(submission_count=Count('submission')).annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+                         'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -1434,16 +1433,17 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 last = date.today()
 
             total = projects.count()
-            new = projects.filter(statuses__status='new', statuses__is_current=True)
-            joined = projects.filter(statuses__status='joined', statuses__is_current=True)
-            received = projects.filter(statuses__status='received', statuses__is_current=True)
-            on_boarded = projects.filter(statuses__status='on_boarded', statuses__is_current=True)
-            not_joined = projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                         start_date__lt=date.today())
-            extended = projects.filter(statuses__status__istartswith='extended', statuses__is_current=True)
-            complete = projects.filter(statuses__status__istartswith='complete', statuses__is_current=True)
-            cancelled = projects.filter(statuses__status__istartswith='cancelled', statuses__is_current=True)
-            terminated = projects.filter(statuses__status__istartswith='terminate', statuses__is_current=True)
+            new = projects.filter(statuses__status='new', statuses__is_current=True).count()
+            joined = projects.filter(statuses__status='joined', statuses__is_current=True).count()
+            received = projects.filter(statuses__status='received', statuses__is_current=True).count()
+            on_boarded = projects.filter(statuses__status='on_boarded', statuses__is_current=True).count()
+            extended = projects.filter(statuses__status__istartswith='extended', statuses__is_current=True).count()
+            complete = projects.filter(statuses__status__istartswith='complete', statuses__is_current=True).count()
+            cancelled = projects.filter(statuses__status__istartswith='cancelled', statuses__is_current=True).count()
+            terminated = projects.filter(statuses__status__istartswith='terminate', statuses__is_current=True).count()
+            not_joined = projects.filter(
+                statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
+            ).count()
 
             count = {
                 'offer': projects.filter(created__range=[first, last]).count(),
@@ -1455,16 +1455,16 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             }
 
             offer_count = [
+                {'name': 'new', 'count': new},
                 {'name': 'total', 'count': total},
-                {'name': 'new', 'count': new.count()},
-                {'name': 'joined', 'count': joined.count()},
-                {'name': 'received', 'count': received.count()},
-                {'name': 'extended', 'count': extended.count()},
-                {'name': 'complete', 'count': complete.count()},
-                {'name': 'cancelled', 'count': cancelled.count()},
-                {'name': 'terminated', 'count': terminated.count()},
-                {'name': 'on_boarded', 'count': on_boarded.count()},
-                {'name': 'not_joined', 'count': not_joined.count()},
+                {'name': 'joined', 'count': joined},
+                {'name': 'received', 'count': received},
+                {'name': 'extended', 'count': extended},
+                {'name': 'complete', 'count': complete},
+                {'name': 'cancelled', 'count': cancelled},
+                {'name': 'terminated', 'count': terminated},
+                {'name': 'on_boarded', 'count': on_boarded},
+                {'name': 'not_joined', 'count': not_joined},
             ]
             return Response({'result': data, 'count': count, 'offer_count': offer_count}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -1590,7 +1590,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_by_time == 'last_6_month':
                 diff = 6
 
-            last = date.today().replace(day=1) - timedelta(days=1) + relativedelta(months=-(diff-1))
+            last = date.today().replace(day=1) - timedelta(days=1) + relativedelta(months=-(diff - 1))
             first = last.replace(day=1)
             for i in range(diff):
                 projects_count = projects.filter(created__range=[first, last]).count()
