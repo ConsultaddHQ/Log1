@@ -650,15 +650,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-<<<<<<< HEAD
-<<<<<<< HEAD
-:spiral_calendar: Joining Date :   {project.start_date.strftime('%m/%d/%Y')}\n\n
-=======
-:spiral_calendar: Joining Date :   {str(project.start_date.strftime('%m/%d/%Y'))}\n\n
->>>>>>> 5f1be0e4c93ae32686e550692d2c9e1981a81555
-=======
 :spiral_calendar: Joining Date :   {project_start_date}\n\n
->>>>>>> 403842ab3e4065578bf733cb78ef9fd0c6e37fa1
 `Project Joined count of {project.submission.employer} for this month - {team_joined_count} `
 `Total Project Joined count of this month - {total_joined_count}`
 """
@@ -733,15 +725,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-<<<<<<< HEAD
-<<<<<<< HEAD
-:spiral_calendar: Start Date :   {project.start_date.strftime('%m/%d/%Y')}\n\n
-=======
-:spiral_calendar: Start Date :   {str(project.start_date.strftime('%m/%d/%Y'))}\n\n
->>>>>>> 5f1be0e4c93ae32686e550692d2c9e1981a81555
-=======
 :spiral_calendar: Start Date :   {project_start_date}\n\n
->>>>>>> 403842ab3e4065578bf733cb78ef9fd0c6e37fa1
 `Offer count of {project.submission.employer} for this month - {team_offer_count} `
 `Total offer count of this month - {total_offer_count}`
 """
@@ -778,18 +762,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
-<<<<<<< HEAD
-<<<<<<< HEAD
-:spiral_calendar: Start Date :   {project.start_date.strftime('%m/%d/%Y')}
-:spiral_calendar: End Date :   {project.end_date.strftime('%m/%d/%Y')}
-=======
-:spiral_calendar: Start Date :   {str(project.start_date.strftime('%m/%d/%Y'))}
-:spiral_calendar: End Date :   {str(project.end_date.strftime('%m/%d/%Y'))}
->>>>>>> 5f1be0e4c93ae32686e550692d2c9e1981a81555
-=======
 :spiral_calendar: Start Date :   {project_start_date}
 :spiral_calendar: End Date :   {project_end_date}
->>>>>>> 403842ab3e4065578bf733cb78ef9fd0c6e37fa1
 :x: Status :   {str(p_status.get_status_display())}
 \n\n"""
 
