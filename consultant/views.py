@@ -145,7 +145,7 @@ def send_exit_process_mail(terminate, exit_status):
             poc = consultant.recruiter
 
         to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
-        cc = [poc.email, config.SUPERADMIN]
+        cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
 
         scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
         for user in scrum_masters:

@@ -34,7 +34,7 @@ from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets
+    InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
@@ -68,6 +68,7 @@ router.register(r'lead', LeadViewSets)
 router.register(r'interview', InterviewViewSets)
 router.register(r'submission', SubmissionViewSets)
 router.register(r'vendor_layer', VendorLayerViewSets)
+router.register(r'dashboard', MarketingDashboardViewSet)
 router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
 
