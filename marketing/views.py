@@ -1635,12 +1635,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test = Test.objects.create(
                 status='new',
                 submission=submissions,
-                type=request.data.get('type'),
-                link=request.data.get('link'),
-                title=request.data.get('title'),
-                deadline=request.data.get('deadline'),
+                link=request.data.get('link', None),
+                skills=request.data.get('skills', []),
+                deadline=request.data.get('deadline', None),
+                is_offline=request.data.get('is_offline'),
                 additional_details=request.data.get('additional_details'),
             )
+            # test email
+            # document upload
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:

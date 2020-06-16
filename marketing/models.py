@@ -277,7 +277,7 @@ class Test(TimeStampedModel):
         return super(Test, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'''{self.submission.consultant.name} :: {self.submission.created_by.employee_name} :: {self.title} ::'''
+        return f'''{self.submission.consultant.name} :: {self.submission.created_by.employee_name}'''
 
 
 class Interview(TimeStampedModel):
