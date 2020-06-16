@@ -79,6 +79,24 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    def retrieve(self, request, *args, **kwargs):
+        obj_type = request.query_params.get("obj_type", None)
+        object_id = request.query_params.get('object_id', None)
+        attachment_type = request.query_params.get("type", None)
+        try:
+            obj_content_type = ContentType.objects.get(model=obj_type)
+            if attachment_type:
+                queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type,
+                                                     attachment_type=attachment_type).order_by('-created')
+            else:
+                queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type
+                                                     ).order_by('-created')
+            serializer = self.serializer_class(queryset, many=True)
+            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def create(self, request, *args, **kwargs):
         try:
             content_type = ContentType.objects.get(model=request.data['obj_type'])
