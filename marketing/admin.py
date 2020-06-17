@@ -103,7 +103,7 @@ class InterviewAdmin(ExportActionModelAdmin):
 @admin.register(Test)
 class TestAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
-    list_filter = ('status', 'skills')
+    list_filter = ('status',)
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
                      'submission__created_by__employee_name', 'is_offline')
     list_display = ('id', 'status', 'skills', 'deadline', 'submission', 'submit_date', 'feedback')

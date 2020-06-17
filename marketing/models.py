@@ -245,11 +245,11 @@ class VendorLayer(TimeStampedModel):
 
 
 class Test(TimeStampedModel):
+    attachments = GenericRelation(Attachment)
     is_offline = models.BooleanField(_('Offline Test'), default=False)
     feedback = models.TextField(_('Test Feedback'), null=True, blank=True)
     deadline = models.DateTimeField(_('Test Deadline'), null=True, blank=True)
     link = models.CharField(_('Test Link'), max_length=70, null=True, blank=True)
-    attachment_links = models.TextField(_('Attachment Links'), null=True, blank=True)
     status = models.CharField(_('Status'), max_length=20, choices=TEST_STATUS_CHOICES)
     additional_details = models.TextField(_('Additional Details'), null=True, blank=True)
     submit_date = models.DateTimeField(_('Test Submission Date'), null=True, blank=True)
@@ -266,6 +266,13 @@ class Test(TimeStampedModel):
         related_name='test',
         verbose_name='Submission'
     )
+    submitted_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='test_submissions',
+        verbose_name='Submission done by'
+    )
+
 
     def save(self, *args, **kwargs):
         """
