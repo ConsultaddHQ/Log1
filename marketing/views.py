@@ -1446,6 +1446,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).count()
 
             count = {
+                'total_offers': total,
                 'offer': projects.filter(created__range=[first, last]).count(),
                 'submission': sub.filter(created__range=[first, last]).count(),
                 'interview': interviews.filter(created__range=[first, last]).count(),
@@ -1456,7 +1457,6 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             offer_count = [
                 {'name': 'new', 'count': new},
-                {'name': 'total', 'count': total},
                 {'name': 'joined', 'count': joined},
                 {'name': 'received', 'count': received},
                 {'name': 'extended', 'count': extended},
