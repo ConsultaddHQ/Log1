@@ -252,6 +252,21 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
 
 class TestCreateSerializer(serializers.ModelSerializer):
+    engineer = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+    submitted_by_name = serializers.SerializerMethodField()
+
     class Meta:
         model = Test
-        fields = '__all__'
+        fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
+                  'engineer_remarks', 'skills', 'engineer', 'submitted_by_name', 'attachments')
+
+    def get_engineer(self, obj):
+        return obj.engineer.all().values('id', 'employee_name')
+
+    def get_submitted_by_name(self, obj):
+        return obj.submitted_by.employee_name
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
+

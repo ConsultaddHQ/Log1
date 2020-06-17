@@ -1446,6 +1446,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).count()
 
             count = {
+                'total_offers': total,
                 'offer': projects.filter(created__range=[first, last]).count(),
                 'submission': sub.filter(created__range=[first, last]).count(),
                 'interview': interviews.filter(created__range=[first, last]).count(),
@@ -1456,7 +1457,6 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             offer_count = [
                 {'name': 'new', 'count': new},
-                {'name': 'total', 'count': total},
                 {'name': 'joined', 'count': joined},
                 {'name': 'received', 'count': received},
                 {'name': 'extended', 'count': extended},
@@ -1660,11 +1660,25 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 submission=submissions,
                 link=request.data.get('link', None),
                 skills=request.data.get('skills', []),
-                is_offline=request.data.get('is_offline'),
                 deadline=request.data.get('deadline', None),
+                is_offline=request.data.get('is_offline',False),
                 additional_details=request.data.get('additional_details'),
             )
             # test email
+
+            # upload attachments
+            for file in request.FILES.getlist('file'):
+                test_doc = file
+                file_data = {
+                    "file": test_doc,
+                    "type": 'test',
+                    "object_id": test.id,
+                    "model": "test",
+                    "creator": request.user,
+                }
+                if test_doc:
+                    create_attachment(file_data)
+
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -1743,3 +1757,39 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='submit')
+    def submit_test(self, request, *args, **kwargs):
+        try:
+            test = get_object_or_404(Test, id=kwargs.get('pk'))
+            if 'engineer' in request.user.roles:
+                engineers = request.data.get('engineer', [])
+                for engineer_id in engineers:
+                    engineer = get_object_or_404(User, id=engineer_id)
+                    test.engineer.add(engineer)
+
+                test.engineer_remarks = request.data.get('remarks')
+                test.status = 'feedback_due'
+                test.submit_date = datetime.now()
+                test.submitted_by = request.user
+                test.save()
+
+                # upload attachments
+                for file in request.FILES.getlist('file'):
+                    test_doc = file
+                    file_data = {
+                        "file": test_doc,
+                        "type": 'test_submit',
+                        "object_id": test.id,
+                        "model": "test",
+                        "creator": request.user,
+                    }
+                    if test_doc:
+                        create_attachment(file_data)
+                serializer = TestCreateSerializer(test)
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
