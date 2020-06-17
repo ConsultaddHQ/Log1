@@ -72,7 +72,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
 
             mail_data = {
                 'to': to,
@@ -128,7 +128,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
 
             consultant_name = project.consultant.name
             mail_data = {
@@ -178,7 +178,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
             consultant_name = project.consultant.name
             mail_data = {
                 'to': to,
@@ -241,8 +241,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
-            project_end_date = datetime.strptime(project.end_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m-%d-%Y')
 
             mail_data = {
                 'to': to,
@@ -598,8 +598,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 recruiter = "NA"
 
             # For Status Change
-            project_start_date = datetime.strptime(project.start_date, '%Y-%m-%d').strftime('%m-%d-%Y')
-            project_end_date = datetime.strptime(project.end_date, '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m-%d-%Y')
 
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -722,6 +722,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {employer_emoji} Employer :   {project.submission.employer.title()}
 {employer_emoji} Team :   {project.submission.created_by.team.name}
 {ctb_gender_emoji} CTB :
+{supervisors}
 :us: Location: {project.city}
 {client_emoji} Client :  {project.submission.client}
 {role_emoji} Role :  {project.submission.lead.job_title}
