@@ -1758,6 +1758,19 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    def update(self, request, *args, **kwargs):
+        try:
+            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            serializer = TestUpdateSerializer(test, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            else:
+                return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['put'], detail=True, url_path='submit')
     def submit_test(self, request, *args, **kwargs):
         try:
@@ -1767,7 +1780,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 for engineer_id in engineers:
                     engineer = get_object_or_404(User, id=engineer_id)
                     test.engineer.add(engineer)
-
+                if request.data.get('skills'):
+                    test.skills = request.data.get('skills')
                 test.engineer_remarks = request.data.get('remarks')
                 test.status = 'feedback_due'
                 test.submit_date = datetime.now()
@@ -1789,6 +1803,19 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 serializer = TestCreateSerializer(test)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='feedback')
+    def submit_test_feedback(self, request, *args, **kwargs):
+        try:
+            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            test.feedback = request.data.get('feedback')
+            test.status = request.data.get('status')
+            test.save()
+            serializer = TestCreateSerializer(test)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
