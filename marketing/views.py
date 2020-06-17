@@ -1611,6 +1611,43 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @staticmethod
+    def get_test_data(queryset, filter_by_status, first, last):
+        try:
+            # Interview counts by status
+            queryset = queryset.order_by('-modified').distinct('modified')
+            total = queryset.count()
+            new = queryset.filter(status='new').count()
+            failed = queryset.filter(status='failed').count()
+            passed = queryset.filter(status='passed').count()
+            feedback_due = queryset.filter(status='feedback_due').count()
+
+            data_counts = {
+                'total': total,
+                'new': new,
+                'failed': failed,
+                'passed': passed,
+                'feedback_due': feedback_due,
+            }
+
+            if filter_by_status:
+                queryset = queryset.filter(status=filter_by_status)
+
+            data = queryset.order_by('-modified')[first:last].annotate(
+                client=F('submission__client'),
+                project=F('submission__project'),
+                marketer_id=F('submission__created_by'),
+                job_title=F('submission__lead__job_title'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
+                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'modified')
+            return data, data_counts
+        except Exception as error:
+            logger.error(error)
+            return error, 'error'
+
     def create(self, request, *args, **kwargs):
         try:
             submissions = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
@@ -1623,14 +1660,86 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 submission=submissions,
                 link=request.data.get('link', None),
                 skills=request.data.get('skills', []),
-                deadline=request.data.get('deadline', None),
                 is_offline=request.data.get('is_offline'),
+                deadline=request.data.get('deadline', None),
                 additional_details=request.data.get('additional_details'),
             )
             # test email
-            # document upload
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def list(self, request, *args, **kwargs):
+        query = request.query_params.get('query', None)
+        filter_for = request.query_params.get('filter_for', 'all')
+        filter_by_time = request.query_params.get('filter_by_time', None)
+        filter_by_status = request.query_params.get('filter_by_status', None)
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 10))
+        last, first = page * page_size, page * page_size - page_size
+
+        try:
+            # Search Interview by Client, VendorContact and Consultant
+            roles = request.user.roles
+            if query:
+                query = query.strip()
+                queryset = Test.objects.filter(
+                    Q(submission__client__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__icontains=query) |
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                )
+            else:
+                queryset = Test.objects.exclude(submission__consultant_marketing__status='close')
+            if filter_for == 'my':
+                if 'engineer' in roles:
+                    queryset = queryset.filter(engineer=request.user)
+                else:
+                    queryset = queryset.filter(submission__created_by=request.user)
+            elif filter_for == 'team':
+                if 'engineer' in roles:
+                    queryset = queryset.filter(engineer__team=request.user.team)
+                else:
+                    queryset = queryset.filter(submission__created_by__team=request.user.team)
+
+            # Test List for Scrum Master and Proxy Scrum Master (team tests) and marketer
+
+            if 'admin' in roles or 'proxy' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__teams=request.user.team,
+                      submission__consultant_marketing__in_pool=False) |
+                    Q(submission__consultant_marketing__in_pool=True)
+                )
+
+            elif 'marketer' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__in_pool=True) |
+                    Q(submission__consultant_marketing__marketer=request.user) |
+                    Q(submission__created_by=request.user)
+                )
+
+            elif 'recruiter' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
+                      submission__consultant_marketing__consultant__pocs__poc_type='recruiter')
+                )
+
+            elif 'retention_manager' in roles:
+                queryset = queryset.filter(
+                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
+                      submission__consultant_marketing__consultant__pocs__poc_type='relation')
+                )
+
+            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
+            data, screen_data = self.get_test_data(queryset, filter_by_status, first, last)
+
+            if screen_data == 'error':
+                return Response({"error": data}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({"results": data, "counts": screen_data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
