@@ -1,6 +1,7 @@
 import os
 import difflib
 import logging
+import json
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
@@ -1749,9 +1750,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             data = {
                 "link": request.data.get('link', None),
-                "skills": request.data.get('skills', []),
                 "deadline": request.data.get('deadline', None),
                 "is_video": request.data.get('is_video', False),
+                "skills": json.loads(request.data.get('skills')),
                 "is_offline": request.data.get('is_offline', False),
                 "con_timezone": request.data.get('con_timezone', None),
                 "con_informed": request.data.get('con_informed', False),
@@ -1884,8 +1885,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             test = get_object_or_404(Test, id=kwargs.get('pk'))
             data = {
-                'engineer': request.data.get('engineer', []),
-                'skills': request.data.get('skills', None),
+                'engineer': json.loads(request.data.get('engineer')),
+                'skills': json.loads(request.data.get('skills')),
                 'remarks': request.data.get('remarks', None),
             }
             if 'engineer' in request.user.roles:
