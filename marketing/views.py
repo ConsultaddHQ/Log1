@@ -1371,6 +1371,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         result_count = request.query_params.get("result_count", 5)
         filter_for = request.query_params.get("filter_for", None)
         filter_by_time = request.query_params.get("filter_by", None)
+        team_name = request.query_params.get("team", None)
         try:
             if filter_for == 'my':
                 sub = Submission.objects.filter(created_by=request.user)
@@ -1381,9 +1382,11 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 projects = Project.objects.filter(submission__created_by=request.user)
 
             elif filter_for == 'team':
-                sub = Submission.objects.filter(created_by__team=request.user.team)
-                interviews = Interview.objects.filter(submission__created_by__team=request.user.team)
-                projects = Project.objects.filter(submission__created_by__team=request.user.team)
+                if not team_name:
+                    team_name = request.user.team.name
+                sub = Submission.objects.filter(created_by__team__name=team_name)
+                interviews = Interview.objects.filter(submission__created_by__team__name=team_name)
+                projects = Project.objects.filter(submission__created_by__team__name=team_name)
 
             else:
                 projects = Project.objects.all()
@@ -1476,6 +1479,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     def marketing_performance(self, request):
         filter_for = request.query_params.get("filter_for", None)
         filter_by_time = request.query_params.get("filter_by", None)
+        team_name = request.query_params.get("team", None)
+
         try:
             if filter_by_time == 'last_month':
                 last = date.today().replace(day=1) - timedelta(days=1)
@@ -1514,22 +1519,24 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                                                        submission__created_by=request.user).count()
 
             elif filter_for == 'team':
+                if not team_name:
+                    team_name = request.user.team.name
                 new_po = Project.objects.filter(statuses__status='joined', created__range=[first, last],
-                                                submission__created_by__team=request.user.team).count()
+                                                submission__created_by__team__name=team_name).count()
 
                 offers_count = Project.objects.filter(submission__created__range=[first, last],
-                                                      submission__created_by__team=request.user.team).count()
+                                                      submission__created_by__team__name=team_name).count()
 
                 submissions_count = Submission.objects.filter(created__range=[first, last],
-                                                              created_by__team=request.user.team).count()
+                                                              created_by__team__name=team_name).count()
 
                 interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1',
-                                                            submission__created_by__team=request.user.team).count()
+                                                            submission__created_by__team__name=team_name).count()
 
                 joining_count = Project.objects.filter(
                     statuses__status='joined',
                     submission__created__range=[first, last],
-                    submission__created_by__team=request.user.team
+                    submission__created_by__team__name=team_name
                 ).count()
 
             else:
@@ -1576,11 +1583,15 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     def dashboard_history(self, request):
         filter_for = request.query_params.get("filter_for", "")
         filter_by_time = request.query_params.get("filter_by", "")
+        team_name = request.query_params.get("team", None)
+
         try:
             if filter_for == 'my':
                 projects = Project.objects.filter(submission__created_by=request.user)
             elif filter_for == 'team':
-                projects = Project.objects.filter(submission__created_by__team=request.user.team)
+                if not team_name:
+                    team_name = request.user.team.name
+                projects = Project.objects.filter(submission__created_by__team__name=team_name)
             else:
                 projects = Project.objects.all()
 
