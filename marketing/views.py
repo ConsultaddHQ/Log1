@@ -1705,13 +1705,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'visa_start': test.submission.visa_start,
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
-                        'is_video': 'Yes' if data['is_video'] else 'No',
+                        'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
                         'additional_details': data['additional_details'],
                         'marketer_email': test.submission.created_by.email,
-                        'is_offline': 'Yes' if data['is_offline'] else 'No',
+                        'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
                         'test_link': data['link'] if data['link'] else 'NA',
                         'marketer': test.submission.created_by.employee_name,
-                        'con_informed': 'Yes' if data['con_informed'] else 'No',
+                        'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'deadline': data['deadline'] if data['deadline'] else 'NA',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
@@ -1769,7 +1769,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 "con_informed": request.data.get('con_informed', False),
                 "additional_details": request.data.get('additional_details', None),
             }
-
             test = Test.objects.create(
                 status='new',
                 link=data['link'],
