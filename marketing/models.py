@@ -17,6 +17,13 @@ STATUS_CHOICES = (
     ('archived', 'Archived'),
 )
 
+TEST_STATUS_CHOICES = (
+    ('new', 'New'),
+    ('passed', 'Passed'),
+    ('failed', 'Failed'),
+    ('feedback_due', 'Feedback Due'),
+)
+
 SUB_CHOICES = (
     ('draft', 'Draft'),
     ('sub', 'Submitted'),
@@ -235,6 +242,49 @@ class VendorLayer(TimeStampedModel):
 
     def __str__(self):
         return f'{self.id}:L{self.level} {self.vendor_company.name}'
+
+
+class Test(TimeStampedModel):
+    attachments = GenericRelation(Attachment)
+    is_offline = models.BooleanField(_('Offline Test'), default=False)
+    feedback = models.TextField(_('Test Feedback'), null=True, blank=True)
+    deadline = models.DateTimeField(_('Test Deadline'), null=True, blank=True)
+    link = models.CharField(_('Test Link'), max_length=70, null=True, blank=True)
+    status = models.CharField(_('Status'), max_length=20, choices=TEST_STATUS_CHOICES)
+    additional_details = models.TextField(_('Additional Details'), null=True, blank=True)
+    submit_date = models.DateTimeField(_('Test Submission Date'), null=True, blank=True)
+    engineer_remarks = models.TextField(_("Engineer Remarks"), null=True, blank=True)
+    skills = ArrayField(models.CharField(_('Skills'), max_length=30), blank=True, null=True)
+    engineer = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='engineer',
+        verbose_name='Engineer Associated'
+    )
+    submission = models.ForeignKey(
+        Submission, on_delete=models.CASCADE,
+        related_name='test',
+        verbose_name='Submission'
+    )
+    submitted_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='test_submissions',
+        verbose_name='Submission done by'
+    )
+
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Test, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'''{self.submission.consultant.name} :: {self.submission.created_by.employee_name}'''
 
 
 class Interview(TimeStampedModel):
