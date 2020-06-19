@@ -274,7 +274,6 @@ class Test(TimeStampedModel):
         verbose_name='Submission done by'
     )
 
-
     def save(self, *args, **kwargs):
         """
             On save timestamps
@@ -285,7 +284,7 @@ class Test(TimeStampedModel):
         return super(Test, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'''{self.submission.consultant.name} :: {self.submission.created_by.employee_name}'''
+        return f"{self.submission.consultant.name} :: {self.submission.created_by.employee_name}"
 
 
 class Interview(TimeStampedModel):
