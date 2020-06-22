@@ -626,17 +626,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         submission__employer__iexact=project.submission.employer,
                     ).count()
                     if project.is_remote:
-                        con_string = f"Remote Project \n{consultant_gender_emoji} Consultant :" \
-                                     f"  **{project.consultant.name}**"
+                        con_str = f"**Remote Project** \n"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined:  **{project.consultant.name}** \n"
+                        con_str += f"{consultant_gender_emoji} Submitted On:  **{project.submission.consultant.name}** \n"
                     else:
-                        con_string = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
+                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}** \n"
                         # Sending message on Mattermost on joined status
                     data = {
                         "response_type": "in_channel",
                         "username": "Log1 Updates",
                         "text": f"""
 #### Project Joined :metal: :smile: :metal:\n
-{con_string}
+{con_str}
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
