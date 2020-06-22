@@ -526,40 +526,30 @@ class ProjectViewSets(viewsets.ModelViewSet):
             prev_status_obj = project.statuses.get(is_current=True)
 
             data = {
-                "city": request.data.get('city', None),
-                "duration": request.data.get('duration', None),
-                "end_date": request.data.get('end_date', None),
-                "feedback": request.data.get('feedback', None),
-                "start_date": request.data.get('start_date', None),
-                "payment_term": request.data.get('payment_term', None),
-                "client_address": request.data.get('client_address', None),
-                "vendor_address": request.data.get('vendor_address', None),
-                "invoicing_period": request.data.get('invoicing_period', None),
-                "reporting_details": request.data.get('reporting_details', None),
+                "city": request.data.get('city', project.city),
+                "duration": request.data.get('duration', project.duration),
+                "end_date": request.data.get('end_date', project.end_date),
+                "feedback": request.data.get('feedback', project.feedback),
+                "start_date": request.data.get('start_date', project.start_date),
+                "payment_term": request.data.get('payment_term', project.payment_term),
+                "client_address": request.data.get('client_address', project.client_address),
+                "vendor_address": request.data.get('vendor_address', project.vendor_address),
+                "invoicing_period": request.data.get('invoicing_period', project.invoicing_period),
+                "reporting_details": request.data.get('reporting_details', project.reporting_details),
                 "remote_consultant_id": request.data.get('remote_consultant_id', None),
                 "remote_consultant_type": request.data.get('remote_consultant_type', None),
 
             }
-            if data["city"]:
-                project.city = data["city"]
-            if data["duration"]:
-                project.duration = data["duration"]
-            if data["end_date"]:
-                project.end_date = data["end_date"]
-            if data["feedback"]:
-                project.feedback = data["feedback"]
-            if data["start_date"]:
-                project.start_date = data["start_date"]
-            if data["payment_term"]:
-                project.payment_term = data["payment_term"]
-            if data["client_address"]:
-                project.client_address = data["client_address"]
-            if data["vendor_address"]:
-                project.vendor_address = data["vendor_address"]
-            if data["invoicing_period"]:
-                project.invoicing_period = data["invoicing_period"]
-            if data["reporting_details"]:
-                project.reporting_details = data["reporting_details"]
+            project.city = data["city"]
+            project.duration = data["duration"]
+            project.end_date = data["end_date"]
+            project.feedback = data["feedback"]
+            project.start_date = data["start_date"]
+            project.payment_term = data["payment_term"]
+            project.client_address = data["client_address"]
+            project.vendor_address = data["vendor_address"]
+            project.invoicing_period = data["invoicing_period"]
+            project.reporting_details = data["reporting_details"]
 
             if data["remote_consultant_id"]:
                 if data['remote_consultant_type'] == 'user':
@@ -635,14 +625,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         statuses__created__gte=day_one,
                         submission__employer__iexact=project.submission.employer,
                     ).count()
-
-                    # Sending message on Mattermost on joined status
+                    if project.is_remote:
+                        con_string = f"Remote Project \n{consultant_gender_emoji} Consultant :" \
+                                     f"  **{project.consultant.name}**"
+                    else:
+                        con_string = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
+                        # Sending message on Mattermost on joined status
                     data = {
                         "response_type": "in_channel",
                         "username": "Log1 Updates",
                         "text": f"""
 #### Project Joined :metal: :smile: :metal:\n
-{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+{con_string}
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
