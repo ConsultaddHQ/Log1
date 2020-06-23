@@ -1773,13 +1773,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 is_offline=data['is_offline'],
                 additional_details=data['additional_details'],
             )
-            # test email
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'new')
-                if error == 'error':
-                    logger.error(res)
-                    return Response({"error": "error", "test_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             # upload attachments
             for file in request.FILES.getlist('file'):
                 file_data = {
@@ -1790,6 +1783,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     "creator": request.user,
                 }
                 create_attachment(file_data)
+            # test email
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, error = self.send_test_mail(test, data, 'new')
+                if error == 'error':
+                    logger.error(res)
+                    return Response({"error": "error", "test_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data, "mail": res}, status=status.HTTP_201_CREATED)
         except Exception as error:
