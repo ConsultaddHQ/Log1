@@ -565,7 +565,7 @@ class Feedback(TimeStampedModel):
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='feedback_created',
-        verbose_name='Termination added by'
+        verbose_name='Feedback Created By'
     )
 
     def save(self, *args, **kwargs):

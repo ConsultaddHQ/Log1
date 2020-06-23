@@ -513,6 +513,45 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     comment_text=request.data['comment_text'],
                     parent_comment_id=request.data['parent_comment'],
                 )
+                # App Notification
+
+                user_list = [petition.created_by, petition.assigned_to]
+                title = f"{request.user.name} posted a new comment"
+
+                notification_data = {
+                    'category': 'alert',
+                    'sender_user_type': 'consultant',
+                    'target_type': 'user',
+                    'recipient_user_type': 'user',
+                    'description': title,
+                    'title': title,
+                    'sender_id': request.user.id,
+                    'target_id': petition.assigned_to.id,
+                }
+                create_notification(user_list, notification_data)
+
+                # Push Notification
+                message_body = {
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "https://app.log1.com",
+                    "body": title,
+                    "title": title,
+                    "data": {
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target': 'user',
+                        'timestamp': str(datetime.now()),
+                        'target_id': petition.assigned_to.id,
+                    },
+                }
+
+                object_ids = [petition.created_by.id, petition.assigned_to.id]
+                registration_ids = list(
+                    FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                             ).values_list('device_id', flat=True))
+                push_notification(registration_ids, message_body)
+
                 serializer = ConsultantCommentGetSerializer(comment)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
