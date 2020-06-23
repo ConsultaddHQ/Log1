@@ -1670,19 +1670,19 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 to = [config.ENGINEERING]
                 cc = [test.submission.created_by.email] + scrum_masters
                 skills = ", ".join(skill for skill in data['skills'])
-                resume = test.submission.attachments.filter(attachment_type='resume')
-                if resume:
-                    path.append(download_s3_object(resume.first().attachment_file.name))
+                # resume = test.submission.attachments.filter(attachment_type='resume')
+                # if resume:
+                #     path.append(download_s3_object(resume.first().attachment_file.name))
 
                 test_docs = test.attachments.all()
                 for doc in test_docs:
-                    path.append(download_s3_object(doc.first().attachment_file.name))
+                    path.append(download_s3_object(doc.attachment_file.name))
 
                 subject = f'Test Received for {consultant.name} | {test.submission.client}'
                 title = f"Test Received"
                 mail_data = {
-                    'to': to,
-                    'cc': cc,
+                    'to': ['devesh.n@consultadd.us'],
+                    'cc': [],
                     'bcc': [],
                     'subject': subject,
                     'template': '../templates/test_mail.html',
@@ -1729,8 +1729,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 subject = f'Test Received for {consultant.name} | {test.submission.client}'
                 title = f"Test for {consultant.name} | {test.submission.client} has been Submitted"
                 mail_data = {
-                    'to': to,
-                    'cc': cc,
+                    'to': [],
+                    'cc': [],
                     'bcc': [],
                     'subject': subject,
                     'template': '../templates/submit_test.html',
@@ -1785,7 +1785,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 create_attachment(file_data)
             # test email
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
+            if os.environ.get('ENV', 'local') == 'local':
                 res, error = self.send_test_mail(test, data, 'new')
                 if error == 'error':
                     logger.error(res)
