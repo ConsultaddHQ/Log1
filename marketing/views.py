@@ -1723,7 +1723,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')
                 for doc in test_docs:
-                    path.append(download_s3_object(doc.first().attachment_file.name))
+                    path.append(download_s3_object(doc.attachment_file.name))
                 to = [test.submission.created_by.email]
                 cc = scrum_masters + [config.ENGINEERING]
                 subject = f'Test Received for {consultant.name} | {test.submission.client}'
