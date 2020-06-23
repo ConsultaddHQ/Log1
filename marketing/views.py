@@ -216,9 +216,7 @@ class LeadViewSets(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            roles_have_access = {'superadmin', 'admin', 'proxy', 'marketer', 'interviewee'}
-            res = set(roles).issubset(roles_have_access)
-            if not res:
+            if 'marketer' not in roles:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             serializer = LeadCreateSerializer(data=request.data, partial=True)
             if serializer.is_valid():
@@ -548,9 +546,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            roles_have_access = {'superadmin', 'admin', 'proxy', 'marketer', 'interviewee'}
-            res = set(roles).issubset(roles_have_access)
-            if not res:
+            if 'marketer' not in roles:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             lead_id = request.data.get('lead', None)
 
