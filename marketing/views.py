@@ -1701,7 +1701,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
                         'is_video': 'Yes' if test.is_video else 'No',
-                        'additional_details': data['additional_details'],
                         'marketer_email': test.submission.created_by.email,
                         'is_offline': 'Yes' if test.is_offline else 'No',
                         'test_link': data['link'] if data['link'] else 'NA',
@@ -1710,6 +1709,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
+                        'additional_details': data['additional_details'] if data['additional_details'] else 'NA',
                     },
                     'attachments': path
                 }
@@ -1773,13 +1773,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 is_offline=data['is_offline'],
                 additional_details=data['additional_details'],
             )
-            # test email
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'new')
-                if error == 'error':
-                    logger.error(res)
-                    return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             # upload attachments
             for file in request.FILES.getlist('file'):
                 file_data = {
@@ -1790,6 +1783,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     "creator": request.user,
                 }
                 create_attachment(file_data)
+            # test email
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, error = self.send_test_mail(test, data, 'new')
+                if error == 'error':
+                    logger.error(res)
+                    return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data, "mail": res}, status=status.HTTP_201_CREATED)
         except Exception as error:
