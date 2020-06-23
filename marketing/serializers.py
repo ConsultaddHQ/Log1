@@ -159,7 +159,7 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
 
     def get_test(self, obj):
-        return TestCreateSerializer(obj.test.all(), many=True).data
+        return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
 
     def get_project(self, obj):
         if hasattr(obj, 'project'):
@@ -213,7 +213,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
         return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
 
     def get_test(self, obj):
-        return TestCreateSerializer(obj.test.all(), many=True).data
+        return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
 
 
 class VendorLayerSerializer(serializers.ModelSerializer):
