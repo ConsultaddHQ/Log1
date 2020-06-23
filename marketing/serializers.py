@@ -159,7 +159,7 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
 
     def get_test(self, obj):
-        return TestCreateSerializer(obj.test.all(), many=True).data
+        return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
 
     def get_project(self, obj):
         if hasattr(obj, 'project'):
@@ -213,7 +213,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
         return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
 
     def get_test(self, obj):
-        return TestCreateSerializer(obj.test.all(), many=True).data
+        return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
 
 
 class VendorLayerSerializer(serializers.ModelSerializer):
@@ -260,23 +260,23 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
 
 class TestCreateSerializer(serializers.ModelSerializer):
-    engineer = serializers.SerializerMethodField()
+    engineers = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
-    submitted_by_name = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
-                  'engineer_remarks', 'skills', 'engineer', 'submitted_by_name', 'attachments')
+                  'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'attachments')
 
-    def get_engineer(self, obj):
+    def get_engineers(self, obj):
         if obj.engineer.all():
             return obj.engineer.all().values('id', 'employee_name')
         return None
 
-    def get_submitted_by_name(self, obj):
+    def get_submitted_by(self, obj):
         if obj.submitted_by:
-            return obj.submitted_by.employee_name
+            return {"id": obj.submitted_by.id, "employee_name": obj.submitted_by.employee_name}
         return None
 
     def get_attachments(self, obj):

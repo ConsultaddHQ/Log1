@@ -21,10 +21,10 @@ from django.shortcuts import get_object_or_404
 from log1.settings import MEDIA_URL
 from marketing.serializers import *
 from utils_app.mailing import send_email
-from attachment.views import presigned_post_url, download_s3_object
 from utils_app.utils import post_msg_using_webhook
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
+from attachment.views import presigned_post_url, download_s3_object
 from utils_app.utils import get_time_filter, get_time_filter_by_start
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
 
@@ -216,9 +216,7 @@ class LeadViewSets(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            roles_have_access = {'superadmin', 'admin', 'proxy', 'marketer', 'interviewee'}
-            res = set(roles).issubset(roles_have_access)
-            if not res:
+            if 'marketer' not in roles:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             serializer = LeadCreateSerializer(data=request.data, partial=True)
             if serializer.is_valid():
@@ -548,9 +546,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            roles_have_access = {'superadmin', 'admin', 'proxy', 'marketer', 'interviewee'}
-            res = set(roles).issubset(roles_have_access)
-            if not res:
+            if 'marketer' not in roles:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
             lead_id = request.data.get('lead', None)
 
@@ -1368,10 +1364,11 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
+        filter_by_time = request.query_params.get("filter_by", None)
         result_count = request.query_params.get("result_count", 5)
         filter_for = request.query_params.get("filter_for", None)
-        filter_by_time = request.query_params.get("filter_by", None)
         team_name = request.query_params.get("team", None)
+
         try:
             if filter_for == 'my':
                 sub = Submission.objects.filter(created_by=request.user)
@@ -1636,8 +1633,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             feedback_due = queryset.filter(status='feedback_due').count()
 
             data_counts = {
-                'total': total,
                 'new': new,
+                'total': total,
                 'failed': failed,
                 'passed': passed,
                 'feedback_due': feedback_due,
@@ -1662,14 +1659,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return error, 'error'
 
     @staticmethod
-    def send_test_mail(test, data, status):
+    def send_test_mail(test, data, test_status):
         try:
             consultant = test.submission.consultant
             queryset = User.objects.filter(team=test.submission.created_by.team, role__name__in=['admin', 'proxy'],
                                            is_active=True)
             scrum_masters = [user.email for user in queryset]
             path = []
-            if status == 'new':
+            if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [test.submission.created_by.email] + scrum_masters
                 skills = ", ".join(skill for skill in data['skills'])
@@ -1677,10 +1674,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
 
-                test_docs = test.attachments.filter(attachment_type='test')
-                if test_docs:
-                    for doc in test_docs:
-                        path.append(download_s3_object(doc.first().attachment_file.name))
+                test_docs = test.attachments.all()
+                for doc in test_docs:
+                    path.append(download_s3_object(doc.first().attachment_file.name))
 
                 subject = f'Test Received for {consultant.name} | {test.submission.client}'
                 title = f"Test Received"
@@ -1693,7 +1689,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'context': {
                         'title': title,
                         'skills': skills,
-                        'ssn': consultant.ssn,
                         'consultant': consultant.name,
                         'client': test.submission.client,
                         'consultant_email': consultant.email,
@@ -1705,15 +1700,15 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'visa_start': test.submission.visa_start,
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
-                        'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
+                        'is_video': 'Yes' if test.is_video else 'No',
                         'additional_details': data['additional_details'],
                         'marketer_email': test.submission.created_by.email,
-                        'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
+                        'is_offline': 'Yes' if test.is_offline else 'No',
                         'test_link': data['link'] if data['link'] else 'NA',
                         'marketer': test.submission.created_by.employee_name,
-                        'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'deadline': data['deadline'] if data['deadline'] else 'NA',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
+                        'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
                     },
                     'attachments': path
@@ -1721,15 +1716,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 res = send_email(mail_data, test.submission.created_by.email)
                 return res, "ok"
 
-            elif status == 'submit':
+            elif test_status == 'submit':
                 if test.engineer.all():
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
                 else:
                     engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')
-                if test_docs:
-                    for doc in test_docs:
-                        path.append(download_s3_object(doc.first().attachment_file.name))
+                for doc in test_docs:
+                    path.append(download_s3_object(doc.first().attachment_file.name))
                 to = [test.submission.created_by.email]
                 cc = scrum_masters + [config.ENGINEERING]
                 subject = f'Test Received for {consultant.name} | {test.submission.client}'
@@ -1775,6 +1769,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 skills=data['skills'],
                 submission=submissions,
                 deadline=data['deadline'],
+                is_video=data['is_video'],
                 is_offline=data['is_offline'],
                 additional_details=data['additional_details'],
             )
@@ -1784,22 +1779,19 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 res, error = self.send_test_mail(test, data, 'new')
                 if error == 'error':
                     logger.error(res)
-                    return Response({"error": "error", "exit_mail_error": str(res)},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             # upload attachments
             for file in request.FILES.getlist('file'):
-                test_doc = file
                 file_data = {
-                    "file": test_doc,
+                    "file": file,
                     "type": 'test',
-                    "object_id": test.id,
                     "model": "test",
+                    "object_id": test.id,
                     "creator": request.user,
                 }
-                if test_doc:
-                    create_attachment(file_data)
+                create_attachment(file_data)
             serializer = TestCreateSerializer(test)
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data, "mail": res}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1814,7 +1806,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            # Search Interview by Client, VendorContact and Consultant
+            # Search Test by Client, VendorContact and Consultant
             roles = request.user.roles
             if query:
                 query = query.strip()
@@ -1896,43 +1888,37 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test = get_object_or_404(Test, id=kwargs.get('pk'))
             data = {
                 'engineer': json.loads(request.data.get('engineer')),
-                'skills': json.loads(request.data.get('skills')),
                 'remarks': request.data.get('remarks', None),
             }
-            if 'engineer' in request.user.roles:
-                engineers = data['engineer']
-                for engineer_id in engineers:
-                    engineer = get_object_or_404(User, id=engineer_id)
-                    test.engineer.add(engineer)
-                test.skills = data['skills']
-                test.engineer_remarks = data['remarks']
-                test.status = 'feedback_due'
-                test.submit_date = datetime.now()
-                test.submitted_by = request.user
-                test.save()
+            for engineer_id in data['engineer']:
+                engineer = get_object_or_404(User, id=engineer_id)
+                test.engineer.add(engineer)
 
-                # upload attachments
-                for file in request.FILES.getlist('file'):
-                    file_data = {
-                        "file": file,
-                        "type": 'test_submit',
-                        "object_id": test.id,
-                        "model": "test",
-                        "creator": request.user,
-                    }
-                    if file:
-                        create_attachment(file_data)
-                # test submit mail
-                res = "Development Server"
-                if os.environ.get('ENV', 'local') == 'prod':
-                    res, error = self.send_test_mail(test, data, 'submit')
-                    if error == 'error':
-                        logger.error(res)
-                        return Response({"error": "error", "exit_mail_error": str(res)},
-                                        status=status.HTTP_400_BAD_REQUEST)
-                serializer = TestCreateSerializer(test)
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-            return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+            test.status = 'feedback_due'
+            test.submitted_by = request.user
+            test.submit_date = datetime.now()
+            test.engineer_remarks = data['remarks']
+            test.save()
+
+            # upload attachments
+            for file in request.FILES.getlist('file'):
+                file_data = {
+                    "file": file,
+                    "type": 'test_submit',
+                    "object_id": test.id,
+                    "model": "test",
+                    "creator": request.user,
+                }
+                create_attachment(file_data)
+            # test submit mail
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, error = self.send_test_mail(test, data, 'submit')
+                if error == 'error':
+                    logger.error(res)
+                    return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = TestCreateSerializer(test)
+            return Response({"result": serializer.data, "mail": res}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

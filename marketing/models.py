@@ -246,19 +246,20 @@ class VendorLayer(TimeStampedModel):
 
 class Test(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    is_video = models.BooleanField(_('Video Test'), default=False)
     is_offline = models.BooleanField(_('Offline Test'), default=False)
     feedback = models.TextField(_('Test Feedback'), null=True, blank=True)
     deadline = models.DateTimeField(_('Test Deadline'), null=True, blank=True)
-    link = models.CharField(_('Test Link'), max_length=70, null=True, blank=True)
+    link = models.CharField(_('Test Link'), max_length=150, null=True, blank=True)
+    engineer_remarks = models.TextField(_("Engineer Remarks"), null=True, blank=True)
     status = models.CharField(_('Status'), max_length=20, choices=TEST_STATUS_CHOICES)
     additional_details = models.TextField(_('Additional Details'), null=True, blank=True)
     submit_date = models.DateTimeField(_('Test Submission Date'), null=True, blank=True)
-    engineer_remarks = models.TextField(_("Engineer Remarks"), null=True, blank=True)
     skills = ArrayField(models.CharField(_('Skills'), max_length=30), blank=True, null=True)
     engineer = models.ManyToManyField(
         User,
         blank=True,
-        related_name='engineer',
+        related_name='associated_tests',
         verbose_name='Engineer Associated'
     )
     submission = models.ForeignKey(
@@ -273,7 +274,6 @@ class Test(TimeStampedModel):
         verbose_name='Submission done by'
     )
 
-
     def save(self, *args, **kwargs):
         """
             On save timestamps
@@ -284,7 +284,7 @@ class Test(TimeStampedModel):
         return super(Test, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'''{self.submission.consultant.name} :: {self.submission.created_by.employee_name}'''
+        return f"{self.submission.consultant.name} :: {self.submission.created_by.employee_name}"
 
 
 class Interview(TimeStampedModel):

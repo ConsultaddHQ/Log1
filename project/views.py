@@ -64,8 +64,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             cc = [config.SUPERADMIN, submission.created_by.email] + scrum_masters
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            consultant = project.submission.consultant.name
+            recruiter = consultant.recruiter
+            retention = consultant.relation
             if recruiter:
                 cc.append(recruiter.email)
 
@@ -78,19 +79,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'Offer Received of {project.consultant.name} :: {submission.client} :: '
+                'subject': f'Offer Received of {consultant.name} :: {submission.client} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/offer.html',
                 'context': {
+                    'rate': submission.rate,
                     'start': project_start_date,
-                    'rate': int(submission.rate),
+                    'con_rate': consultant.rate,
                     'employer': submission.employer,
                     'client_name': submission.client,
-                    'con_rate': project.consultant.rate,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
                     'vendor_company': submission.vendor.name,
-                    'consultant_name': project.consultant.name,
-                    'consultant_email': project.consultant.email,
                     'marketer_name': submission.created_by.employee_name,
                 },
             }
@@ -116,8 +117,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if resume:
                 path.append(download_s3_object(resume.first().attachment_file.name))
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            consultant = project.submission.consultant.name
+            recruiter = consultant.recruiter
+            retention = consultant.relation
             cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
             cc = cc + scrum_masters
 
@@ -130,12 +132,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
 
-            consultant_name = project.consultant.name
             mail_data = {
                 'to': [config.ENGINEERING],
                 'cc': cc,
                 'bcc': [],
-                'subject': f'Support Initiation for {consultant_name} {submission.client} {submission.lead.city}',
+                'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'template': '../templates/support.html',
                 'context': {
                     'notes': notes,
@@ -145,12 +146,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'client_name': submission.client,
                     'location': submission.lead.city,
                     'recruiter_name': recruiter_name,
-                    'consultant_name': consultant_name,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
-                    'consultant_email': project.consultant.email,
-                    'consultant_phone_no': project.consultant.phone_no,
+                    'consultant_phone_no': consultant.phone_no,
+                    'consultant_location': consultant.current_city,
                     'marketer_name': submission.created_by.employee_name,
-                    'consultant_location': project.consultant.current_city,
                     'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
                 },
                 'attachments': path
@@ -164,13 +165,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def po_mail(self, project, path, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
+        consultant = project.submission.consultant.name
         try:
             vendor_contact = submission.vendor_contact
             if not vendor_contact:
                 return "Vendor is empty", 'error'
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            recruiter = consultant.recruiter
+            retention = consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
             cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
@@ -179,12 +181,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 cc.append(retention.email)
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
-            consultant_name = project.consultant.name
+
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'On Boarding of {consultant_name} :: {submission.employer.title()} :: '
+                'subject': f'On Boarding of {consultant.name} :: {submission.employer.title()} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
                 'context': {
@@ -192,17 +194,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'rate': submission.rate,
                     'start': project_start_date,
                     'client_name': submission.client,
+                    'con_rate': int(consultant.rate),
                     'vendor_name': vendor_contact.name,
-                    'consultant_name': consultant_name,
+                    'consultant_name': consultant.name,
                     'vendor_email': vendor_contact.email,
                     'payment_term': project.payment_term,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
                     'vendor_number': vendor_contact.number,
                     'employer': submission.employer.title(),
                     'client_address': project.client_address,
                     'vendor_address': project.vendor_address,
-                    'con_rate': int(project.consultant.rate),
-                    'consultant_email': project.consultant.email,
                     'invoicing_period': project.invoicing_period,
                     'reporting_details': project.reporting_details,
                     'marketer_name': submission.created_by.employee_name,
@@ -219,6 +221,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def po_termination_or_cancellation_mail(self, project, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
+        consultant = project.submission.consultant.name
         try:
             vendor = submission.vendor_contact
             if vendor:
@@ -232,8 +235,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            recruiter = consultant.recruiter
+            retention = consultant.relation
 
             cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
@@ -248,7 +251,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'{po_type} of {project.consultant.name} :: {submission.employer} :: '
+                'subject': f'{po_type} of {consultant.name} :: {submission.employer} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination.html',
                 'context': {
@@ -260,13 +263,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'vendor_email': vendor_email,
                     'vendor_number': vendor_number,
                     'client_name': submission.client,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
                     'employer': submission.employer.title(),
                     'marketer_name': marketer.employee_name,
                     'vendor_address': project.vendor_address,
                     'client_address': project.client_address,
-                    'consultant_name': project.consultant.name,
-                    'consultant_email': project.consultant.email,
                     'reporting_details': project.reporting_details,
                     'vendor_company': submission.lead.vendor_company.name,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
@@ -625,13 +628,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         statuses__created__gte=day_one,
                         submission__employer__iexact=project.submission.employer,
                     ).count()
-                    if project.is_remote:
+                    if project.is_remote and project.submission.lead.is_w2:
                         con_str = f"**Remote Project** \n"
-                        con_str += f"{consultant_gender_emoji} Consultant Joined:  **{project.consultant.name}** \n"
-                        con_str += f"{consultant_gender_emoji} Submitted On:  **{project.submission.consultant.name}** \n"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
                     else:
-                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}** \n"
-                        # Sending message on Mattermost on joined status
+                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
+
+                    # Sending message on Mattermost on joined status
                     data = {
                         "response_type": "in_channel",
                         "username": "Log1 Updates",
@@ -700,18 +704,22 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     interviews = project.submission.screening.exclude(status='cancelled')
                     ctb_gender = interviews.last().supervisor.gender
                     supervisors = "\n".join(
-                        [f"-    Round {interview.round} - {interview.supervisor.employee_name}\n" for
-                         interview in
-                         interviews if interview.supervisor])
+                        [f"-    Round {interview.round} - {interview.supervisor.employee_name}\n"
+                         for interview in interviews if interview.supervisor])
                     ctb_gender_emoji = ':raising_hand_woman: ' if ctb_gender == 'female' else ':raising_hand_man: '
-
+                    if project.is_remote and project.submission.lead.is_w2:
+                        con_str = f"**Remote Project** \n"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
+                    else:
+                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
                     # Sending message on Mattermost
                     data = {
                         "response_type": "in_channel",
                         "username": "Log1 Updates",
                         "text": f"""
 #### Offer :metal: :smile: :metal:\n
-{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+{con_str}
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
@@ -751,7 +759,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.save()
 
                         text = f"""#### Offer Termination Feedback \n"""
-                        text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+                        text += f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
@@ -763,7 +771,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 :x: Status :   {str(p_status.get_status_display())}
 \n\n"""
 
-                        text += "**Reason: **" + project.feedback if project.feedback else "None"
+                        text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
                             "response_type": "in_channel",
@@ -776,7 +784,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
 
                         text = f"""#### Offer Cancellation Feedback \n"""
-                        text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
+                        text += f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**
 {marketer_gender_emoji} Marketer :   {project.marketer_name}
 {recruiter_gender_emoji} Recruiter :   {recruiter}
 {employer_emoji} Employer :   {project.submission.employer.title()}
@@ -786,7 +794,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 {role_emoji} Role :  {project.submission.lead.job_title}
 :spiral_calendar: Joining Date :   {project_start_date}\n\n"""
 
-                        text += "**Reason: **" + project.feedback if project.feedback else "None"
+                        text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
                             "response_type": "in_channel",
