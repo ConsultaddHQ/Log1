@@ -267,7 +267,7 @@ class TestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
-                  'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'attachments')
+                  'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments')
 
     def get_engineers(self, obj):
         if obj.engineer.all():
