@@ -1652,7 +1652,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'modified')
+                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created', 'modified')
             return data, data_counts
         except Exception as error:
             logger.error(error)
