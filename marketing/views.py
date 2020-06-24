@@ -20,7 +20,7 @@ from django.shortcuts import get_object_or_404
 
 from log1.settings import MEDIA_URL
 from marketing.serializers import *
-from utils_app.mailing import send_email
+from utils_app.mailing import send_email_attachment_multiple
 from utils_app.utils import post_msg_using_webhook
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
@@ -1713,7 +1713,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email(mail_data, test.submission.created_by.email)
+                res = send_email_attachment_multiple(mail_data, test.submission.created_by.email)
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -1741,7 +1741,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email(mail_data, test.submitted_by.email)
+                res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
                 return res, "ok"
         except Exception as error:
             logger.error(error)
