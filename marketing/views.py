@@ -1726,7 +1726,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [test.submission.created_by.email]
                 cc = scrum_masters + [config.ENGINEERING]
-                subject = f'Test Received for {consultant.name} | {test.submission.client}'
+                subject = f'Test Submitted for {consultant.name} | {test.submission.client}'
                 title = f"Test for {consultant.name} | {test.submission.client} has been Submitted"
                 mail_data = {
                     'to': to,
