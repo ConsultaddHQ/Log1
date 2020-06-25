@@ -440,7 +440,7 @@ class ConsultantMarketing(TimeStampedModel):
 
 
 class ConsultantRateRevision(TimeStampedModel):
-    rate = models.IntegerField(_('Rate'))
+    rate = models.FloatField(_('Rate'))
     previous_rate = models.IntegerField(_('Previous Rate'), default=0)
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
     feedback = models.TextField(_('Revision Feedback'), blank=True, null=True)
@@ -565,7 +565,7 @@ class Feedback(TimeStampedModel):
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='feedback_created',
-        verbose_name='Termination added by'
+        verbose_name='Feedback Created By'
     )
 
     def save(self, *args, **kwargs):

@@ -3,6 +3,7 @@ from rest_framework import serializers
 from marketing.models import *
 from project.models import Project
 from employee.serializers import UserSerializer
+from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentSerializer
 from consultant.serializers import ConsultantSerializer
 
@@ -126,7 +127,9 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
     marketer_name = serializers.SerializerMethodField()
     marketer_id = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
+    test = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer()
     lead = LeadSerializer(read_only=True)
 
@@ -134,7 +137,8 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'interviews', 'project', 'marketer_name', 'marketer_id', 'consultant')
+                  'current_city', 'attachments', 'test', 'interviews', 'project', 'comments', 'marketer_name', 'marketer_id',
+                  'consultant')
 
     def get_marketer_name(self, obj):
         return obj.created_by.employee_name
@@ -148,8 +152,14 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
     def get_consultant(self, obj):
         return ConsultantSerializer(obj.consultant).data
 
+    def get_comments(self, obj):
+        return CommentGetSerializer(obj.comments.filter(parent_comment=None), many=True).data
+
     def get_interviews(self, obj):
         return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
+
+    def get_test(self, obj):
+        return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
 
     def get_project(self, obj):
         if hasattr(obj, 'project'):
@@ -163,15 +173,18 @@ class SubmissionSerializer(serializers.ModelSerializer):
     interviews = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     marketer_id = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
+    test = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'interviews', 'project', 'marketer_name', 'marketer_id', 'consultant')
+                  'current_city', 'attachments', 'interviews', 'test', 'project', 'comments', 'marketer_name', 'marketer_id',
+                  'consultant')
 
     def get_marketer_name(self, obj):
         return obj.created_by.employee_name
@@ -181,6 +194,9 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
     def get_consultant(self, obj):
         return ConsultantSerializer(obj.consultant).data
+
+    def get_comments(self, obj):
+        return CommentGetSerializer(obj.comments.filter(parent_comment=None), many=True).data
 
     def get_attachments(self, obj):
         return []
@@ -195,6 +211,9 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
     def get_interviews(self, obj):
         return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
+
+    def get_test(self, obj):
+        return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
 
 
 class VendorLayerSerializer(serializers.ModelSerializer):
@@ -237,4 +256,34 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
+        fields = '__all__'
+
+
+class TestCreateSerializer(serializers.ModelSerializer):
+    engineers = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Test
+        fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
+                  'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments')
+
+    def get_engineers(self, obj):
+        if obj.engineer.all():
+            return obj.engineer.all().values('id', 'employee_name')
+        return None
+
+    def get_submitted_by(self, obj):
+        if obj.submitted_by:
+            return {"id": obj.submitted_by.id, "employee_name": obj.submitted_by.employee_name}
+        return None
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data
+
+
+class TestUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Test
         fields = '__all__'
