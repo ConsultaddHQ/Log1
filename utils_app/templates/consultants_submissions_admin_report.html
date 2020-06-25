@@ -537,9 +537,6 @@
                                     <div class="f-fallback">
                                         <h1>Hello</h1><br>
                                         <h2>Submissions done from {{start}} to {{ end }}</h2>
-
-
-
                                             <table class="tableheading">
                                               <tr>
                                                 <th style="text-align:center;width: 24px;">Id</th>
@@ -550,7 +547,7 @@
                                                 {% for i in data %}
                                               <tr>
                                                 <td style="text-align:center;">{{i.consultant}}</td>
-                                                <td style="text-align:center;">{{i.consultant_name}}</td>
+                                                <td style="text-align:center;">{{i.consultant_name}} {{ i.consultant_email }}</td>
                                                 <td style="text-align:center;">{{i.mail_res}}</td>
                                                 <td style="text-align:center;">{{i.submissions}}</td>
                                               </tr>

@@ -64,7 +64,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             cc = [config.SUPERADMIN, submission.created_by.email] + scrum_masters
 
-            consultant = project.submission.consultant.name
+            consultant = project.submission.consultant
             recruiter = consultant.recruiter
             retention = consultant.relation
             if recruiter:
@@ -117,7 +117,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if resume:
                 path.append(download_s3_object(resume.first().attachment_file.name))
 
-            consultant = project.submission.consultant.name
+            consultant = project.submission.consultant
             recruiter = consultant.recruiter
             retention = consultant.relation
             cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
@@ -165,7 +165,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def po_mail(self, project, path, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
-        consultant = project.submission.consultant.name
+        consultant = project.submission.consultant
         try:
             vendor_contact = submission.vendor_contact
             if not vendor_contact:
@@ -185,7 +185,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': to,
                 'cc': cc,
-                'bcc': [],
+                'bcc': ['sarang.m@consultadd.com'],
                 'subject': f'On Boarding of {consultant.name} :: {submission.employer.title()} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
@@ -221,7 +221,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def po_termination_or_cancellation_mail(self, project, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
-        consultant = project.submission.consultant.name
+        consultant = project.submission.consultant
         try:
             vendor = submission.vendor_contact
             if vendor:
@@ -366,9 +366,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
             scrum_masters = [user.email for user in queryset]
             submission = project.submission
             support_mail_res, support_mail_error = self.support_mail(project, submission, scrum_masters)
+            offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, submission, scrum_masters)
 
-            if support_mail_error == 'error':
-                return Response({"error": str(support_mail_res)}, status=status.HTTP_400_BAD_REQUEST)
+            if support_mail_error == 'error' or offer_mail_error == "error":
+                return Response({"support": str(support_mail_res), "offer": str(offer_mail_res)}, status=400)
 
             return Response({"result": str(support_mail_res)}, status=status.HTTP_200_OK)
         except Exception as error:
