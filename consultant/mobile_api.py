@@ -215,7 +215,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 if os.environ.get('ENV', 'local') == 'prod':
                     to = [consultant.email]
                 else:
-                    to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.in', 'anikesh.consultadd@gmail.com']
+                    to = ['sarang.m@consultadd.com']
                 mail_data = {
                     'to': to,
                     'cc': [],

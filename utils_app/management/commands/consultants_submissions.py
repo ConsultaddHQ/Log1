@@ -60,16 +60,17 @@ class Command(BaseCommand):
                     'days': days,
                 },
             }
+
+            reply_to = [config.RELATIONS]
+            mail_res = send_email(mail_data, "log1@consultadd.com", reply_to)
             submission_data.append({
                 "scrum_masters": cc,
+                "mail_res": mail_res,
                 "consultant": consultant.id,
                 "submissions": submission_ids,
                 "consultant_name": consultant.name,
                 "consultant_email": consultant.email,
-
             })
-            reply_to = [config.RELATIONS]
-            send_email(mail_data, "log1@consultadd.com", reply_to)
 
         mail_data = {
             'cc': [],
