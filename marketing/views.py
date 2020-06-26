@@ -20,12 +20,14 @@ from django.shortcuts import get_object_or_404
 
 from log1.settings import MEDIA_URL
 from marketing.serializers import *
-from utils_app.mailing import send_email_attachment_multiple
+from notification.models import FCMDevice
 from utils_app.utils import post_msg_using_webhook
+from utils_app.mailing import send_email_attachment_multiple
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
 from attachment.views import presigned_post_url, download_s3_object
 from utils_app.utils import get_time_filter, get_time_filter_by_start
+from notification.views import create_notification, push_notification
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
 
 logger = logging.getLogger(__name__)
@@ -1628,7 +1630,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def get_test_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
-            queryset = queryset.order_by('-modified').distinct('modified')
+            queryset = queryset.order_by('-created').distinct('created')
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1645,7 +1647,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-
             data = queryset.order_by('-created')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
@@ -1655,7 +1656,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created', 'modified')
+                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -1671,10 +1672,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             path = []
             skills = ", ".join(skill for skill in test.skills)
             test_type = 'Online'
-            if data['is_offline'] == 'True':
+            if test.is_offline:
                 test_type = 'Offline'
-            if data['is_video'] == 'True':
-                test_type += " & Video"
+            if test.is_video:
+                test_type = "Video"
             subject = f'Test :: {consultant.name} :: {test_type} :: {skills}'
             if test_status == 'new':
                 to = [config.ENGINEERING]
@@ -1939,6 +1940,45 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.save()
+            # App Notification
+            user_list = [user for user in test.engineer.all()]
+            user_list.append(test.submitted_by)
+            title = f"Feedback Added for Test :: {test.submission.consultant.name}"
+
+            notification_data = {
+                'category': 'alert',
+                'sender_user_type': 'user',
+                'target_type': 'user',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': test.submitted_by.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': test.submitted_by.id,
+                },
+            }
+
+            object_ids = [user.id for user in user_list]
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
