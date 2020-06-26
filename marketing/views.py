@@ -20,12 +20,14 @@ from django.shortcuts import get_object_or_404
 
 from log1.settings import MEDIA_URL
 from marketing.serializers import *
-from utils_app.mailing import send_email_attachment_multiple
+from notification.models import FCMDevice
 from utils_app.utils import post_msg_using_webhook
+from utils_app.mailing import send_email_attachment_multiple
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
 from attachment.views import presigned_post_url, download_s3_object
 from utils_app.utils import get_time_filter, get_time_filter_by_start
+from notification.views import create_notification, push_notification
 from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
 
 logger = logging.getLogger(__name__)
@@ -1390,7 +1392,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 interviews = Interview.objects.all()
                 sub = Submission.objects.all()
 
-            upcoming_interviews = interviews.filter(status__in=['scheduled', 'rescheduled'])[:result_count].annotate(
+            upcoming_interviews = interviews.filter(status__in=['scheduled', 'rescheduled'],
+                                                    start_time__gte=datetime.today()
+                                                    ).order_by('-start_time')[:result_count].annotate(
                 client=F('submission__client'),
                 job_title=F('submission__lead__job_title'),
                 vendor=F('submission__lead__vendor_company__name'),
@@ -1399,8 +1403,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'start_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
 
             upcoming_joinings = projects.filter(
-                statuses__status='on_boarded', statuses__is_current=True
-            )[:result_count].annotate(
+                statuses__status='on_boarded', statuses__is_current=True, start_date__gte=datetime.today()
+            ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
                 vendor=F('submission__lead__vendor_company__name'),
                 consultant_name=F('consultant__name'),
@@ -1408,8 +1412,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
 
             new_offers = projects.filter(
-                statuses__status__in=['new', 'received', 'on_boarded'], statuses__is_current=True
-            )[:result_count].annotate(
+                statuses__status__in=['new', 'received', 'on_boarded'], statuses__is_current=True,
+                start_date__gte=datetime.today()
+            ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
                 consultant_name=F('consultant__name'),
                 vendor=F('submission__lead__vendor_company__name'),
@@ -1625,7 +1630,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def get_test_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
-            queryset = queryset.order_by('-modified').distinct('modified')
+            queryset = queryset.order_by('-created').distinct('created')
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1642,8 +1647,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-
-            data = queryset.order_by('-modified')[first:last].annotate(
+            data = queryset.order_by('-created')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
@@ -1652,7 +1656,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created', 'modified')
+                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -1666,19 +1670,23 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                                            is_active=True)
             scrum_masters = [user.email for user in queryset]
             path = []
+            skills = ", ".join(skill for skill in test.skills)
+            test_type = 'Online'
+            if test.is_offline:
+                test_type = 'Offline'
+            if test.is_video:
+                test_type = "Video"
+            subject = f'Test :: {consultant.name} :: {test_type} :: {skills}'
             if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [test.submission.created_by.email] + scrum_masters
-                skills = ", ".join(skill for skill in data['skills'])
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
-
                 test_docs = test.attachments.all()
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
 
-                subject = f'Test Received for {consultant.name} | {test.submission.client}'
                 title = f"Test Received"
                 mail_data = {
                     'to': to,
@@ -1700,12 +1708,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'visa_start': test.submission.visa_start,
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
-                        'is_video': 'Yes' if test.is_video else 'No',
                         'marketer_email': test.submission.created_by.email,
-                        'is_offline': 'Yes' if test.is_offline else 'No',
+                        'deadline': test.deadline if test.deadline else 'NA',
                         'test_link': data['link'] if data['link'] else 'NA',
                         'marketer': test.submission.created_by.employee_name,
-                        'deadline': data['deadline'] if data['deadline'] else 'NA',
+                        'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
+                        'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
@@ -1713,21 +1721,23 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, test.submission.created_by.email)
+                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
                 return res, "ok"
 
             elif test_status == 'submit':
+                engineers_email = [user.email for user in test.engineer.all()]
+                engineers_email.append(test.submitted_by.email)
                 if test.engineer.all():
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
+                    engineer += ", " + test.submitted_by.employee_name
                 else:
                     engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [test.submission.created_by.email]
-                cc = scrum_masters + [config.ENGINEERING]
-                subject = f'Test Submitted for {consultant.name} | {test.submission.client}'
-                title = f"Test for {consultant.name} | {test.submission.client} has been Submitted"
+                cc = scrum_masters + [config.ENGINEERING] + engineers_email
+                title = f"Test Submitted"
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -1741,7 +1751,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
+                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
                 return res, "ok"
         except Exception as error:
             logger.error(error)
@@ -1930,6 +1940,45 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.save()
+            # App Notification
+            user_list = [user for user in test.engineer.all()]
+            user_list.append(test.submitted_by)
+            title = f"Feedback Added for Test :: {test.submission.consultant.name}"
+
+            notification_data = {
+                'category': 'alert',
+                'sender_user_type': 'user',
+                'target_type': 'user',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': test.submitted_by.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': test.submitted_by.id,
+                },
+            }
+
+            object_ids = [user.id for user in user_list]
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
