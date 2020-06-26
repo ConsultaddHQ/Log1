@@ -1955,8 +1955,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'sender_id': request.user.id,
                 'target_id': test.submitted_by.id,
             }
-            print(notification_data)
-            print(user_list)
             create_notification(user_list, notification_data)
 
             # Push Notification
@@ -1976,12 +1974,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
 
             object_ids = [user.id for user in user_list]
-            print(message_body)
-            print(object_ids)
             registration_ids = list(
                 FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
                                          ).values_list('device_id', flat=True))
-            push_notificqation(registration_ids, message_body)
+            push_notification(registration_ids, message_body)
 
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
