@@ -1674,7 +1674,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if data['is_offline'] == 'True':
                 test_type = 'Offline'
             if data['is_video'] == 'True':
-                test_type += " & Video"
+                test_type = "Video"
             subject = f'Test :: {consultant.name} :: {test_type} :: {skills}'
             if test_status == 'new':
                 to = [config.ENGINEERING]
