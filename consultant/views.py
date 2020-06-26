@@ -450,10 +450,18 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
-            obj = get_object_or_404(Consultant, id=kwargs.get('pk'))
-            serializer = ConsultantUpdateSerializer(obj, data=request.data, partial=True)
+            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+            serializer = ConsultantUpdateSerializer(consultant, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            profiles = consultant.profiles.filter(title__iexact='Original')
+            if profiles:
+                profile = profiles.first()
+                profile.date_of_birth = consultant.date_of_birth
+                profile.current_city = consultant.current_city
+                profile.links = consultant.links
+                profile.save()
+
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -1092,6 +1100,14 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 visa_start=request.data['visa_start'],
                 consultant_id=request.data['consultant'],
             )
+            profiles = work_auth.consultant.profiles.filter(title__iexact='Original')
+            if profiles:
+                profile = profiles.first()
+                profile.visa_start = work_auth.visa_start
+                profile.visa_end = work_auth.visa_end
+                profile.visa_type = work_auth.visa_type
+                profile.save()
+
             serializer = self.serializer_class(work_auth)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except KeyError as err:
@@ -1107,6 +1123,16 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             serializer = self.serializer_class(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
+            profiles = ConsultantProfile.objects.filter(
+                title__iexact='Original', consultant_id=serializer.data['consultant'])
+            if profiles:
+                profile = profiles.first()
+                profile.visa_start = serializer.data['visa_start']
+                profile.visa_end = serializer.data['visa_end']
+                profile.visa_type = serializer.data['visa_type']
+                profile.save()
+
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
