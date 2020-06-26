@@ -476,7 +476,9 @@
                       <div class="f-fallback">
                         <h1>{{title}}</h1>
                           <h4>Test/Assessment Details</h4>
+                          {% if is_video == 'Yes' %}
                             <p><strong>Video Test ?:</strong> {{is_video}}</p>
+                          {% endif %}
                             <p><strong>Offline Test ?:</strong> {{is_offline}}</p>
                             <p><strong>Skills:</strong> {{skills}}</p>
                             <p><strong>Deadline:</strong> {{deadline}}</p>
