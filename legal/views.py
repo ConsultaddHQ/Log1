@@ -429,16 +429,18 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def comment(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
         try:
-            if not ('legal' in request.user.roles):
-                return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
 
             if request.method == 'GET':
+                if not ('legal' in request.user.roles or 'superadmin' in request.user.roles):
+                    return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
                 petition = get_object_or_404(Petition, id=object_id)
                 comments = petition.consultant_comments.filter(parent_comment=None)
                 serializer = ConsultantCommentGetSerializer(comments, many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
 
             elif request.method == 'POST':
+                if not ('legal' in request.user.roles):
+                    return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
                 content_type = ContentType.objects.get(model='petition')
                 created_by_content_type = ContentType.objects.get(model='user')
                 comment = ConsultantComment.objects.create(

@@ -1390,7 +1390,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 interviews = Interview.objects.all()
                 sub = Submission.objects.all()
 
-            upcoming_interviews = interviews.filter(status__in=['scheduled', 'rescheduled'])[:result_count].annotate(
+            upcoming_interviews = interviews.filter(status__in=['scheduled', 'rescheduled'],
+                                                    start_time__gte=datetime.today()
+                                                    ).order_by('-start_time')[:result_count].annotate(
                 client=F('submission__client'),
                 job_title=F('submission__lead__job_title'),
                 vendor=F('submission__lead__vendor_company__name'),
@@ -1399,8 +1401,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'start_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
 
             upcoming_joinings = projects.filter(
-                statuses__status='on_boarded', statuses__is_current=True
-            )[:result_count].annotate(
+                statuses__status='on_boarded', statuses__is_current=True, start_date__gte=datetime.today()
+            ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
                 vendor=F('submission__lead__vendor_company__name'),
                 consultant_name=F('consultant__name'),
@@ -1408,8 +1410,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
 
             new_offers = projects.filter(
-                statuses__status__in=['new', 'received', 'on_boarded'], statuses__is_current=True
-            )[:result_count].annotate(
+                statuses__status__in=['new', 'received', 'on_boarded'], statuses__is_current=True,
+                start_date__gte=datetime.today()
+            ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
                 consultant_name=F('consultant__name'),
                 vendor=F('submission__lead__vendor_company__name'),
@@ -1643,7 +1646,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
 
-            data = queryset.order_by('-modified')[first:last].annotate(
+            data = queryset.order_by('-created')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
@@ -1666,19 +1669,23 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                                            is_active=True)
             scrum_masters = [user.email for user in queryset]
             path = []
+            skills = ", ".join(skill for skill in test.skills)
+            test_type = 'Online'
+            if data['is_offline'] == 'True':
+                test_type = 'Offline'
+            if data['is_video'] == 'True':
+                test_type += " & Video"
+            subject = f'Test :: {consultant.name} :: {test_type} :: {skills}'
             if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [test.submission.created_by.email] + scrum_masters
-                skills = ", ".join(skill for skill in data['skills'])
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
-
                 test_docs = test.attachments.all()
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
 
-                subject = f'Test Received for {consultant.name} | {test.submission.client}'
                 title = f"Test Received"
                 mail_data = {
                     'to': to,
@@ -1700,12 +1707,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'visa_start': test.submission.visa_start,
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
-                        'is_video': 'Yes' if test.is_video else 'No',
                         'marketer_email': test.submission.created_by.email,
-                        'is_offline': 'Yes' if test.is_offline else 'No',
+                        'deadline': test.deadline if test.deadline else 'NA',
                         'test_link': data['link'] if data['link'] else 'NA',
                         'marketer': test.submission.created_by.employee_name,
-                        'deadline': data['deadline'] if data['deadline'] else 'NA',
+                        'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
+                        'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
@@ -1713,21 +1720,23 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, test.submission.created_by.email)
+                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
                 return res, "ok"
 
             elif test_status == 'submit':
+                engineers_email = [user.email for user in test.engineer.all()]
+                engineers_email.append(test.submitted_by.email)
                 if test.engineer.all():
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
+                    engineer += ", " + test.submitted_by.employee_name
                 else:
                     engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [test.submission.created_by.email]
-                cc = scrum_masters + [config.ENGINEERING]
-                subject = f'Test Submitted for {consultant.name} | {test.submission.client}'
-                title = f"Test for {consultant.name} | {test.submission.client} has been Submitted"
+                cc = scrum_masters + [config.ENGINEERING] + engineers_email
+                title = f"Test Submitted"
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -1741,7 +1750,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
+                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
                 return res, "ok"
         except Exception as error:
             logger.error(error)
