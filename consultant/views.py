@@ -47,15 +47,11 @@ def send_exit_interview_detail(terminate):
         # Mattermost message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
         reason = ", ".join(reason.name for reason in terminate.reasons.all())
-        text = f"#### Exit interview for {terminate.consultant.name}\n" \
-               f"**Reason for leaving** : {reason}\n" \
-               f"**Termination Date** : {terminate.last_date}\n" \
-               f"**Exit Interview Details** : {exit_details} \n"
-
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": text,
+            "title": f"Exit interview for {terminate.consultant.name}",
+            "text": f"**Reason for leaving** : {reason}<br>"
+                    f"**Termination Date** : {terminate.last_date}<br>"
+                    f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
         return None
@@ -79,7 +75,6 @@ def terminate_consultant(terminate):
         terminate.save()
 
         # Email for Exit Process Cancelled
-        res = "Development Server"
         if os.environ.get('ENV', 'local') == 'prod':
             res, error = send_exit_process_mail(terminate, 'complete')
             if error == 'error':
@@ -664,7 +659,18 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
+            # Consultants search based on name, email, recruiter and location
+            if query:
+                consultants = Consultant.objects.filter(
+                    Q(email__iexact=query) |
+                    Q(name__icontains=query) |
+                    Q(skills__istartswith=query) |
+                    Q(current_city__istartswith=query) |
+                    Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
+                )
+            else:
+                consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
+
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
@@ -674,16 +680,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 con_status = 'in_marketing'
                 consultants = consultants.filter(
                     current_city=location,
-                )
-
-            # Consultants search based on name, email, recruiter and location
-            elif query:
-                consultants = consultants.filter(
-                    Q(email__iexact=query) |
-                    Q(name__icontains=query) |
-                    Q(skills__istartswith=query) |
-                    Q(current_city__istartswith=query) |
-                    Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
 
             consultants = consultants.order_by('id').distinct('id')

@@ -45,16 +45,28 @@ class Command(BaseCommand):
         ).count()
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": f"""
-#### Projects joining status :memo: \n
-| Project Status                     | Count                    | 
-|:-----------------------------------|:-------------------------|
-| Joined Last Month                  | {joined_last_month}      |
-| Joined This Month | {joined_this_month_t}/{joined_this_month} |
-| Expected Joining this Month        | {expected_joining}       |
-| Joining Status Not updated in log1 | {offers_not_joined}      |
-"""
+            "title": "Projects joining status &#128221;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>
+                            <tr>
+                                <th style="padding:5px 8px 5px 8px;">Project Status</th>
+                                <th style="padding:5px 8px 5px 8px;">Count</th>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Joined Last Month</td>
+                                <td style="text-align: center;padding:5px 8px 5px 8px;">{joined_last_month}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Joined This Month</td>
+                                <td style="text-align: center;padding:5px 8px 5px 8px;">{joined_this_month_t}/{joined_this_month}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Expected Joining this Month</td>
+                                <td style="text-align: center;padding:5px 8px 5px 8px;">{expected_joining}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Joining Status Not Updated in Log1</td>
+                                <td style="text-align: center;padding:5px 8px 5px 8px;">{offers_not_joined}</td>
+                            </tr>
+                        </table>"""
         }
         post_msg_using_webhook(config.joined_url, data)

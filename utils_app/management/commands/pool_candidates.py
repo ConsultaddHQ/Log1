@@ -18,11 +18,18 @@ class Command(BaseCommand):
         ).order_by('consultant_id', '-start').distinct('consultant_id')
 
         count = 1
-        text = f"""
-#### Pool Candidates :beach_umbrella: \n
-| # | Consultant | Team   | Days | Recruiter | Marketer |  Skills |Open Offer |
-|:--|:-----------|:-------|:-----|:----------|:---------|:--------|:-----------|
-"""
+        text = f"""<tr>
+                    <th style="padding:5px 8px 5px 8px;">#</th>
+                    <th style="padding:5px 8px 5px 8px;">Consultant</th>
+                    <th style="padding:5px 8px 5px 8px;">Team</th>
+                    <th style="padding:5px 8px 5px 8px;">Days</th>
+                    <th style="padding:5px 8px 5px 8px;">Recruiter</th>
+                    <th style="padding:5px 8px 5px 8px;">Marketer</th>
+                    <th style="padding:5px 8px 5px 8px;">Skills</th>
+                    <th style="padding:5px 8px 5px 8px;">Open Offer</th>
+                    </tr>"""
+        total = in_pool_con.count()
+
         for con in in_pool_con:
             if con.consultant.status != 'archived':
                 days, marketer, recruiter, open_offer = None, None, None, "NO"
@@ -38,13 +45,37 @@ class Command(BaseCommand):
                 ).count()
                 count += 1
 
-                text += \
-f"""| {count} | {con.consultant.name} | {team} | {days} | {recruiter} | {marketer} | {con.consultant.skills} | {open_offer_count}|\n"""
+                text += f"""<tr>
+<td style="padding:5px 8px 5px 8px;text-align: center;">{count}</td>
+<td style="padding:5px 8px 5px 8px;">{con.consultant.name}</td>
+<td style="padding:5px 8px 5px 8px;">{team}</td>
+<td style="padding:5px 8px 5px 8px;text-align: center;">{days}</td>
+<td style="padding:5px 8px 5px 8px;">{recruiter}</td>
+<td style="padding:5px 8px 5px 8px;"> {marketer}</td>
+<td style="padding:5px 8px 5px 8px;">{con.consultant.skills}</td>
+<td style="padding:5px 8px 5px 8px;text-align: center;">{open_offer_count}</td>
+</tr>\n"""
 
+                if count % 35 == 0:
+                    data = {
+                        "title": "Pool Candidates &#127958;",
+                        "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+                    }
+
+                    post_msg_using_webhook(config.pool_channel_url, data)
+                    text = f"""<tr>
+                                <th style="padding:5px 8px 5px 8px;">#</th>
+                                <th style="padding:5px 8px 5px 8px;">Consultant</th>
+                                <th style="padding:5px 8px 5px 8px;">Team</th>
+                                <th style="padding:5px 8px 5px 8px;">Days</th>
+                                <th style="padding:5px 8px 5px 8px;">Recruiter</th>
+                                <th style="padding:5px 8px 5px 8px;">Marketer</th>
+                                <th style="padding:5px 8px 5px 8px;">Skills</th>
+                                <th style="padding:5px 8px 5px 8px;">Open Offer</th>
+                                </tr>"""
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": text
+            "title": "Pool Candidates &#127958;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
         }
 
         post_msg_using_webhook(config.pool_channel_url, data)
