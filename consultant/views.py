@@ -47,15 +47,11 @@ def send_exit_interview_detail(terminate):
         # Mattermost message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
         reason = ", ".join(reason.name for reason in terminate.reasons.all())
-        text = f"#### Exit interview for {terminate.consultant.name}\n" \
-               f"**Reason for leaving** : {reason}\n" \
-               f"**Termination Date** : {terminate.last_date}\n" \
-               f"**Exit Interview Details** : {exit_details} \n"
-
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": text,
+            "title": f"Exit interview for {terminate.consultant.name}",
+            "text": f"**Reason for leaving** : {reason}<br>"
+                    f"**Termination Date** : {terminate.last_date}<br>"
+                    f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
         return None
@@ -79,7 +75,6 @@ def terminate_consultant(terminate):
         terminate.save()
 
         # Email for Exit Process Cancelled
-        res = "Development Server"
         if os.environ.get('ENV', 'local') == 'prod':
             res, error = send_exit_process_mail(terminate, 'complete')
             if error == 'error':
@@ -450,10 +445,18 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
-            obj = get_object_or_404(Consultant, id=kwargs.get('pk'))
-            serializer = ConsultantUpdateSerializer(obj, data=request.data, partial=True)
+            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+            serializer = ConsultantUpdateSerializer(consultant, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            profiles = consultant.profiles.filter(title__iexact='Original')
+            if profiles:
+                profile = profiles.first()
+                profile.date_of_birth = consultant.date_of_birth
+                profile.current_city = consultant.current_city
+                profile.links = consultant.links
+                profile.save()
+
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -656,7 +659,18 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
+            # Consultants search based on name, email, recruiter and location
+            if query:
+                consultants = Consultant.objects.filter(
+                    Q(email__iexact=query) |
+                    Q(name__icontains=query) |
+                    Q(skills__istartswith=query) |
+                    Q(current_city__istartswith=query) |
+                    Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
+                )
+            else:
+                consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
+
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
@@ -666,16 +680,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 con_status = 'in_marketing'
                 consultants = consultants.filter(
                     current_city=location,
-                )
-
-            # Consultants search based on name, email, recruiter and location
-            elif query:
-                consultants = consultants.filter(
-                    Q(email__iexact=query) |
-                    Q(name__icontains=query) |
-                    Q(skills__istartswith=query) |
-                    Q(current_city__istartswith=query) |
-                    Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
 
             consultants = consultants.order_by('id').distinct('id')
@@ -1092,6 +1096,14 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 visa_start=request.data['visa_start'],
                 consultant_id=request.data['consultant'],
             )
+            profiles = work_auth.consultant.profiles.filter(title__iexact='Original')
+            if profiles:
+                profile = profiles.first()
+                profile.visa_start = work_auth.visa_start
+                profile.visa_end = work_auth.visa_end
+                profile.visa_type = work_auth.visa_type
+                profile.save()
+
             serializer = self.serializer_class(work_auth)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except KeyError as err:
@@ -1107,6 +1119,16 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             serializer = self.serializer_class(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
+            profiles = ConsultantProfile.objects.filter(
+                title__iexact='Original', consultant_id=serializer.data['consultant'])
+            if profiles:
+                profile = profiles.first()
+                profile.visa_start = serializer.data['visa_start']
+                profile.visa_end = serializer.data['visa_end']
+                profile.visa_type = serializer.data['visa_type']
+                profile.save()
+
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)

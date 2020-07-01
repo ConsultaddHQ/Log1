@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, F, Subquery, OuterRef
+from django.db.models import F, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status, viewsets
@@ -73,7 +73,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
                 'to': to,
@@ -130,7 +130,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
                 'to': [config.ENGINEERING],
@@ -180,7 +180,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
                 'to': to,
@@ -244,8 +244,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
-            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
                 'to': to,
@@ -576,15 +576,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             # Emoji for Mattermost update
             if project.consultant.recruiter:
-                recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
+                recruiter_gender_emoji = '&#128103;' if project.consultant.recruiter.gender == 'female' else '&#129490;'
             else:
-                recruiter_gender_emoji = ':man_office_worker: '
+                recruiter_gender_emoji = '&#129490; '
 
-            client_emoji = ':tophat: '
-            role_emoji = ':fist_oncoming: '
-            employer_emoji = ':briefcase: '
-            marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
-            consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
+            client_emoji = '&#127913;'
+            role_emoji = '&#128074;'
+            employer_emoji = '&#x1F4BC;'
+            marketer_gender_emoji = '&#128105;' if project.submission.created_by.gender == 'female' else '&#128104;'
+            consultant_gender_emoji = '&#128105;' if project.consultant.gender == 'female' else '&#128104;'
 
             if project.consultant.recruiter:
                 recruiter = project.consultant.recruiter.employee_name
@@ -592,8 +592,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 recruiter = "NA"
 
             # For Status Change
-            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m-%d-%Y')
-            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m-%d-%Y')
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -638,22 +638,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                     # Sending message on Mattermost on joined status
                     data = {
-                        "response_type": "in_channel",
-                        "username": "Log1 Updates",
-                        "text": f"""
-#### Project Joined :metal: :smile: :metal:\n
-{con_str}
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-:us: Location: {project.city}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {project_start_date}\n\n
-`Project Joined count of {project.submission.employer} for this month - {team_joined_count} `
-`Total Project Joined count of this month - {total_joined_count}`
-"""
+                        "title": "Project Joined  &#129304;&#128516;&#129304;",
+                        "text": f"""{con_str}<br>
+                    {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                    {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                    {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                    {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                    🇺🇸 Location :  {project.city}<br>
+                    {client_emoji} Client :  {project.submission.client}<br>
+                    {role_emoji} Role :  {project.submission.lead.job_title}<br>
+                    &#128221; Joining Date :  {project_start_date}<br><br>
+                    Project Joined count of {project.submission.employer} for this month - {team_joined_count}<br>
+                    Total Project Joined count of this month - {total_joined_count}"""
                     }
                     post_msg_using_webhook(config.joined_url, data)
 
@@ -705,9 +701,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     interviews = project.submission.screening.exclude(status='cancelled')
                     ctb_gender = interviews.last().supervisor.gender
                     supervisors = "\n".join(
-                        [f"-    Round {interview.round} - {interview.supervisor.employee_name}\n"
+                        [f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
                          for interview in interviews if interview.supervisor])
-                    ctb_gender_emoji = ':raising_hand_woman: ' if ctb_gender == 'female' else ':raising_hand_man: '
+                    ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else ':raising_hand_man: '
                     if project.is_remote and project.submission.lead.is_w2:
                         con_str = f"**Remote Project** \n"
                         con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
@@ -716,24 +712,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
                     # Sending message on Mattermost
                     data = {
-                        "response_type": "in_channel",
-                        "username": "Log1 Updates",
-                        "text": f"""
-#### Offer :metal: :smile: :metal:\n
-{con_str}
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-{ctb_gender_emoji} CTB :
-{supervisors}
-:us: Location: {project.city}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {project_start_date}\n\n
-`Offer count of {project.submission.employer} for this month - {team_offer_count} `
-`Total offer count of this month - {total_offer_count}`
-"""
+                        "title": "Offer  &#129304;&#128516;&#129304;",
+                        "text": f"""{con_str}<br>
+                        {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                        {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                        {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                        {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                        {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul>
+                        🇺🇸 Location :  {project.city}<br>
+                        {client_emoji} Client :  {project.submission.client}<br>
+                        {role_emoji} Role :  {project.submission.lead.job_title}<br>
+                        &#128221; Start Date :  {project_start_date}<br><br>
+                        Offer count of {project.submission.employer} for this month - {team_offer_count}<br>
+                        Total offer count of this month - {total_offer_count}"""
                     }
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
@@ -759,48 +750,43 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
 
-                        text = f"""#### Offer Termination Feedback \n"""
-                        text += f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {project_start_date}
-:spiral_calendar: End Date :   {project_end_date}
-:x: Status :   {str(p_status.get_status_display())}
-\n\n"""
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
+                        {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                        {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                        {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                        {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                        {client_emoji} Client :  {project.submission.client}<br>
+                        {role_emoji} Role :  {project.submission.lead.job_title}<br>
+                        &#128221; Start Date :  {project_start_date}<br>
+                        &#128221; End Date :  {project_end_date}<br>
+                        &#10060; Status :   {str(p_status.get_status_display())}<br>"""
 
                         text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
-                            "response_type": "in_channel",
-                            "username": "Log1 Updates",
-                            "text": text,
+                            "title": "Offer Termination Feedback ",
+                            "text": text
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
 
-                        text = f"""#### Offer Cancellation Feedback \n"""
-                        text += f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-:us: Location: {project.city}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {project_start_date}\n\n"""
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
+                        {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                        {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                        {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                        {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                         🇺🇸 Location :  {project.city}<br>
+                        {client_emoji} Client :  {project.submission.client}<br>
+                        {role_emoji} Role :  {project.submission.lead.job_title}<br>
+                        &#128221; Joining Date :  {project_start_date}<br>"""
 
                         text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
-                            "response_type": "in_channel",
-                            "username": "Log1 Updates",
-                            "text": text,
+                            "title": "Offer Cancellation Feedback ",
+                            "text": text
                         }
                         post_msg_using_webhook(config.offer_failure_url, data)
 

@@ -22,12 +22,12 @@ class Command(BaseCommand):
                       'terminated-fired_security_issue', 'terminated-resigned_location_issue',
                       'terminated-fired_performance_issue', 'terminated-resigned_full_time_offer']
 
-        month = date.today().month
+        month = str(date.today().month)
         new_offer = Project.objects.filter(statuses__status='new', statuses__is_current=True).count()
         received_projects = Project.objects.filter(statuses__status='received', statuses__is_current=True).count()
         on_boarded_projects = Project.objects.filter(statuses__status='on_boarded', statuses__is_current=True).count()
         joined_projects = Project.objects.filter(statuses__status='joined', statuses__is_current=True,
-                                                 statuses__created=month).count()
+                                                 statuses__created__month=month).count()
         cancelled_projects = Project.objects.filter(statuses__status__in=cancelled, statuses__is_current=True,
                                                     created__month=month).count()
         terminated_projects = Project.objects.filter(statuses__status__in=terminated, statuses__is_current=True,
@@ -36,30 +36,51 @@ class Command(BaseCommand):
             statuses__status__in=['new']).count()
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": f"""
-#### Project Details :memo: \n
-| Project Status     | Count   | 
-|:--------------------|:-----------|
-| New Offer | {new_offer} |
-| Paper Work Received | {received_projects} |
-| On boarded | {on_boarded_projects} |
-"""
+            "title": "Project Details &#128221;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>
+                            <tr>
+                                <th style="padding:5px 8px 5px 8px;">Project Status</th>
+                                <th style="padding:5px 8px 5px 8px;">Count</th>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">New Offer</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{new_offer}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Paper Work Received</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{received_projects}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">On-boarded</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{on_boarded_projects}</td>
+                            </tr>
+                        </table>"""
         }
         post_msg_using_webhook(config.offer_url, data)
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": f"""
-#### Business Health for this month :memo: \n
-| Project Status    |  Count  | 
-|:--------------------|:-----------|
-| Joined  | {joined_projects} |
-| Cancelled   | {cancelled_projects} |
-| Terminated   | {terminated_projects} |
-| Total Offer  | {total_projects} |
-"""
+            "title": "Business Health for this month &#128221;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>
+                            <tr>
+                                <th style="padding:5px 8px 5px 8px;">Project Status</th>
+                                <th style="padding:5px 8px 5px 8px;">Count</th>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Joined</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{joined_projects}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Cancelled</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{cancelled_projects}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Terminated</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{terminated_projects}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Total Offer</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{total_projects}</td>
+                            </tr>
+                        </table>"""
         }
         post_msg_using_webhook(config.offer_url, data)

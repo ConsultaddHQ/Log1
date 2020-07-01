@@ -27,16 +27,28 @@ class Command(BaseCommand):
         total = new + received + on_boarded
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": f"""
-#### Open Offer Status :memo: \n
-| PO Status  |     Count    | 
-|:-----------|:-------------|
-| new        |    {new}     |
-| Received   |  {received}  |
-| On-boarded | {on_boarded} |
-| Total      |   {total}    |
-"""
+            "title": "Open Offer Status &#128221;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>
+                            <tr>
+                                <th style="padding:5px 8px 5px 8px;">PO Status</th>
+                                <th style="padding:5px 8px 5px 8px;">Count</th>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">New</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{new}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Received</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{received}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">On-boarded</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{on_boarded}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Total</td>
+                                <td style="padding:5px 8px 5px 8px;text-align: center;">{total}</td>
+                            </tr>
+                        </table>"""
         }
         post_msg_using_webhook(config.marketing_report_url, data)

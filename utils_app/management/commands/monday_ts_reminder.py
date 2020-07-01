@@ -20,7 +20,8 @@ class Command(BaseCommand):
         ).order_by('project__consultant__id').distinct('project__consultant_id')
         for timesheet in timesheets:
             consultant = timesheet.project.consultant
-            title = f"Reminder: Please submit timesheet for the week {str(timesheet.start)} - {str(timesheet.end)}"
+            title = f"Reminder: Please submit timesheet for the week {str(timesheet.start.strftime('%m/%d/%Y'))} - " \
+                    f"{str(timesheet.end.strftime('%m/%d/%Y'))}"
             message_body = {
                 "body": None,
                 "title": title,
@@ -41,7 +42,7 @@ class Command(BaseCommand):
             target_content_type = ContentType.objects.get(model="timesheet")
             Notification.objects.create(
                 title=title,
-                description=None,
+                description=title,
                 category="pending",
                 sender_object_id=1,
                 target_object_id=timesheet.id,
