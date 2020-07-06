@@ -43,9 +43,11 @@ VISA_CHOICES = (
 )
 
 EDUCATION_CHOICES = (
+    ('phd', 'PhD'),
     ('diploma', 'Diploma'),
     ('masters', 'Masters'),
     ('bachelors', 'Bachelors'),
+    ('associate', 'Associate'),
     ('certification', 'Certification'),
 )
 
@@ -61,6 +63,7 @@ FEEDBACK_CHOICES = (
     ('marketing', 'Marketing'),
     ('engineering', 'Engineering'),
     ('recruitment', 'Recruitment'),
+    ('re_marketing', 'Re-marketing'),
 )
 
 WORK_TYPE_CHOICE = (
@@ -72,6 +75,13 @@ EXIT_STATUS_CHOICE = (
     ('complete', 'Consultant Exit Complete'),
     ('cancelled', 'Consultant Exit Cancelled'),
     ('in_process', 'Consultant Exit in Process'),
+)
+
+LEGAL_STATUS_CHOICE = (
+    ('solved', "Action Solved"),
+    ('in_process', "Action in Process"),
+    ('notice_sent', "Legal Notice Sent"),
+    ('finders_fee', "Taking Finder's Fee"),
 )
 
 EXIT_TYPE_CHOICE = (
@@ -517,6 +527,11 @@ class ConsultantExit(TimeStampedModel):
         _('Consultant Exit Status'),
         max_length=30,
         choices=EXIT_STATUS_CHOICE,
+    )
+    legal_status = models.CharField(
+        _('Legal Action Status'),
+        max_length=30, blank=True, null=True,
+        choices=LEGAL_STATUS_CHOICE,
     )
     type = models.CharField(
         _('Consultant Exit Type'),

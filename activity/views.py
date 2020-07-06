@@ -9,15 +9,13 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
-from consultant.permissions import ConsultantPetitionIsAuthenticated
-from consultant.authentication import ConsultantPetitionTokenAuthentication
-
 from legal.models import Petition
 from consultant.models import Consultant
 from project.models import Project, TimeSheet
+from consultant.views import send_notification
 from marketing.models import Submission, Interview
-from activity.models import Activity, Comment, ConsultantComment
-from activity.serializers import ActivitySerializer, ConsultantCommentGetSerializer, CommentGetSerializer
+from activity.models import Activity, Comment
+from activity.serializers import ActivitySerializer, CommentGetSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +103,10 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 parent_comment_id=request.data['parent_comment'],
             )
             serializer = CommentGetSerializer(comment)
+            if model == 'consultant':
+                consultant = Consultant.objects.get(id=request.data['id'])
+                title = f"Comments Added for {consultant.name}"
+                send_notification(consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)

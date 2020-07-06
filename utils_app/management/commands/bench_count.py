@@ -24,17 +24,29 @@ class Command(BaseCommand):
         ).exclude(status='archived').distinct().count()
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": f"""
-#### Consultant Bench Status :memo: \n
-| Status     | Count          |
-|:-----------|:---------------|
-| Bench      | {on_bench_con} |
-| In Pool    | {in_pool_con}  | 
-| On boarded | {on_boarded}   |
-| Joined     | {joined}       |
-"""
+            "title": "Consultant Bench Status &#128221;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>
+                            <tr>
+                                <th style="padding:5px 8px 5px 8px;">Status</th>
+                                <th style="padding:5px 8px 5px 8px;">Count</th>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Bench</td>
+                                <td style="padding:5px 8px 5px 8px; text-align: center;">{on_bench_con}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">In Pool</td>
+                                <td style="padding:5px 8px 5px 8px; text-align: center;">{in_pool_con}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;"> On Boarded </td>
+                                <td style="padding:5px 8px 5px 8px; text-align: center;">{on_boarded}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Joined</td>
+                                <td style="padding:5px 8px 5px 8px; text-align: center;">{joined}</td>
+                            </tr>
+                        </table>"""
         }
 
         post_msg_using_webhook(config.recruitment_url, data)

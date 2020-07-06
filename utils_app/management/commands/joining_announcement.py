@@ -33,15 +33,24 @@ class Command(BaseCommand):
         net_joined = joined - projects.filter(statuses__is_current=True, statuses__status__in=terminated).count()
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": f"""
-#### Monthly Project joining Report :memo: \n
-| Status      |      Count       | 
-|:------------|:-----------------|
-| Joined      | {joined}         |
-| Net Joined  | {net_joined}     |
-| Total Offer | {total_projects} |
-"""
+            "title": "Monthly Project joining Report &#128221;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>
+                            <tr>
+                                <th style="padding:5px 8px 5px 8px;">Status</th>
+                                <th style="padding:5px 8px 5px 8px;">Count</th>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Joined</td>
+                                <td style="padding:5px 8px 5px 8px; text-align: center;">{joined}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Net Joined</td>
+                                <td style="padding:5px 8px 5px 8px; text-align: center;">{net_joined}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 8px 5px 8px;">Total Offer</td>
+                                <td style="padding:5px 8px 5px 8px; text-align: center;">{total_projects}</td>
+                            </tr>
+                        </table>"""
         }
         post_msg_using_webhook(config.joined_url, data)

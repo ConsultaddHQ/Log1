@@ -21,17 +21,29 @@ class Command(BaseCommand):
             screening_type='interview',
         ).order_by('start_time')
 
-        text = f""" #### Interviews Scheduled for today :clipboard:\n
-| CTB | round | Type   | Start Time | Consultant | Client | Marketer |
-|:----|:------|:-------|:-----------|:-----------|:-------|:---------|
-"""
+        text = f""" <tr>
+            <th style="padding:5px 8px 5px 8px;">CTB</th>
+            <th style="padding:5px 8px 5px 8px;">Round</th>
+            <th style="padding:5px 8px 5px 8px;">Type</th>
+            <th style="padding:5px 8px 5px 8px;">Start Time</th>
+            <th style="padding:5px 8px 5px 8px;">Consultant</th>
+            <th style="padding:5px 8px 5px 8px;">Client</th>
+            <th style="padding:5px 8px 5px 8px;">Marketer</th>
+            </tr>"""
+
         for interview in interviews:
-            text += f"""| {interview.supervisor.employee_name} | {interview.round} | {interview.get_interview_mode_display()} | {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} | {interview.consultant.name} | {interview.submission.client} | {interview.marketer.employee_name} |\n"""
+            text += f"""<tr>
+                            <td style="padding:5px 8px 5px 8px;"> {interview.supervisor.employee_name} </td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;"> {interview.round} </td>
+                            <td style="padding:5px 8px 5px 8px;"> {interview.get_interview_mode_display()} </td>
+                            <td style="padding:5px 8px 5px 8px;"> {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} </td>
+                            <td style="padding:5px 8px 5px 8px;"> {interview.consultant.name} </td>
+                            <td style="padding:5px 8px 5px 8px;"> {interview.submission.client} </td>
+                            <td style="padding:5px 8px 5px 8px;"> {interview.marketer.employee_name} </td>
+                        </tr>"""
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": text
+            "title": "Interviews Scheduled for today &#128203;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
         }
-
         post_msg_using_webhook(config.announcement_url, data)

@@ -39,7 +39,7 @@ class Command(BaseCommand):
             for user in scrum_masters:
                 user_list.append(user)
 
-            title = f"{consultant.name} got terminated on {terminate.last_date}"
+            title = f"{consultant.name} got terminated on {terminate.last_date.strftime('%m/%d/%Y')}"
 
             notification_data = {
                 'category': 'info',
@@ -64,7 +64,7 @@ class Command(BaseCommand):
                     'is_read': False,
                     'is_deleted': False,
                     'target': 'consultant',
-                    'timestamp': str(timezone.now()),
+                    'timestamp': str(timezone.now().strftime('%m/%d/%Y')),
                     'target_id': terminate.consultant.id,
                 },
             }
