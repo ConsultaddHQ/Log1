@@ -62,6 +62,19 @@ SCREENING_CHOICES = (
     ('interview', 'Interview'),
 )
 
+FAILURE_CHOICES = (
+    ('resume_error', 'Error In Resume'),
+    ('hired_else', 'Hired Someone Else'),
+    ('internal_hiring', 'Internal Hiring'),
+    ('caught_mimicking', 'Caught us Mimicking'),
+    ('insufficient_skills', 'Insufficient Skills'),
+    ('test_failed', 'Test Failed during Interview'),
+    ('feedback_not_received', 'Never Received Feedback'),
+    ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
+    ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
+    ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
+)
+
 
 class VendorCompany(models.Model):
     name = models.CharField(_('Company'), max_length=100)
@@ -300,6 +313,11 @@ class Interview(TimeStampedModel):
     screening_type = models.CharField(_('Screening Type'), max_length=20, choices=SCREENING_CHOICES)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
     status = models.CharField(_('Status'), max_length=20, choices=SCREENING_STATUS_CHOICES, default='scheduled')
+    failure_reason = ArrayField(models.CharField(
+        _('Failure Reason'),
+        max_length=50, choices=FAILURE_CHOICES),
+        null=True, blank=True
+    )
     supervisor = models.ForeignKey(
         User, on_delete=models.PROTECT,
         null=True, blank=True,

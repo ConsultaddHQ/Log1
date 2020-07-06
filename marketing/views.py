@@ -989,16 +989,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                    text = "#### :spiral_calendar: New Interview Scheduled \n **CTB:{} :: Round:{} :: {} :: {} :: {} " \
-                           ":: {} :: {} **".format(
-                        interview.supervisor.employee_name, interview.round, interview.get_interview_mode_display(),
-                        interview.start_time.strftime('%m/%d/%Y::%I:%M EST'), interview.consultant.name,
-                        interview.submission.client, interview.marketer.employee_name
-                    )
+                    text = f"""**CTB:{interview.supervisor.employee_name} :: Round:{interview.round} :: 
+                    {interview.get_interview_mode_display()} :: 
+                    {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} :: {interview.consultant.name} :: 
+                    {interview.submission.client} :: {interview.marketer.employee_name}**"""
                     data = {
-                        "response_type": "in_channel",
-                        "username": "Log1 Updates",
-                        "text": text,
+                        "title": "&#128220; New Interview Scheduled",
+                        "text": text
                     }
                     post_msg_using_webhook(config.announcement_url, data)
 
@@ -1072,20 +1069,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 if status_change == "true" and interview.status not in ['cancelled']:
                     if interview.status == 'next_round':
                         interview_status = "Next Round"
-                        interview_status_emoji = ":+1: "
+                        interview_status_emoji = "&#128077;"
                     elif interview.status == 'offer':
                         interview_status = "Offer"
-                        interview_status_emoji = ":v: "
+                        interview_status_emoji = "&#9996; "
                     else:
                         interview_status = "Failed"
-                        interview_status_emoji = ":-1: "
-                    text = f"""#### {interview_status_emoji} Interview Feedback \n **CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status}) ** \n"""
+                        interview_status_emoji = "&#128078;"
+                    text = f"""**CTB:{interview.supervisor.employee_name} :: {interview.round}R :: 
+                    {interview.get_interview_mode_display()} :: 
+                    {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: 
+                    {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})**"""
                     text += interview.feedback
 
                     data = {
-                        "response_type": "in_channel",
-                        "username": "Log1 Updates",
-                        "text": text,
+                        "title": f"""{interview_status_emoji} Interview Feedback \n """,
+                        "text": text
                     }
                     post_msg_using_webhook(config.interview_feedback_url, data)
 
@@ -1095,17 +1094,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview.save()
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                            text = "#### :stopwatch: Interview Rescheduled \n **CTB: {} :: Round:{} :: {} :: {} :: " \
-                                   "{} :: {} :: {}**".format(
+                            text = "**CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {}**".format(
                                 interview.supervisor.employee_name, interview.round,
                                 interview.get_interview_mode_display(),
                                 interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
                                 interview.submission.consultant.name,
                                 interview.submission.client, interview.marketer.employee_name)
                             data = {
-                                "response_type": "in_channel",
-                                "username": "Log1 Updates",
-                                "text": text,
+                                "title": "&#9201; Interview Rescheduled",
+                                "text": text
                             }
                             post_msg_using_webhook(config.announcement_url, data)
                     supervisor_email = interview.supervisor.email
@@ -1164,7 +1161,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
                 ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'job_title', 'submission_id',
                          'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
-                         'screening_type', 'interview_mode')
+                         'screening_type', 'failure_reason', 'interview_mode')
                 notification_data = {
                     'category': 'info',
                     'description': title,
@@ -1394,16 +1391,16 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             upcoming_interviews = interviews.filter(status__in=['scheduled', 'rescheduled'],
                                                     start_time__gte=datetime.today()
-                                                    ).order_by('-start_time')[:result_count].annotate(
+                                                    ).order_by('start_time')[:result_count].annotate(
                 client=F('submission__client'),
                 job_title=F('submission__lead__job_title'),
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'start_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
+            ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
 
             upcoming_joinings = projects.filter(
-                statuses__status='on_boarded', statuses__is_current=True, start_date__gte=datetime.today()
+                statuses__status='on_boarded', statuses__is_current=True
             ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
                 vendor=F('submission__lead__vendor_company__name'),
@@ -1504,7 +1501,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 prev_first, prev_last = None, None
 
             if filter_for == 'my':
-                new_po = Project.objects.filter(statuses__status='joined', created__range=[first, last],
+                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
                                                 submission__created_by=request.user).count()
 
                 offers_count = Project.objects.filter(submission__created__range=[first, last],
@@ -1523,7 +1520,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
-                new_po = Project.objects.filter(statuses__status='joined', created__range=[first, last],
+                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
                                                 submission__created_by__team__name=team_name).count()
 
                 offers_count = Project.objects.filter(submission__created__range=[first, last],
@@ -1542,7 +1539,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).count()
 
             else:
-                new_po = Project.objects.filter(statuses__status='joined', created__range=[first, last]).count()
+                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last]).count()
                 offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
                 submissions_count = Submission.objects.filter(created__range=[first, last]).count()
                 interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1').count()
@@ -1551,7 +1548,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             percent = None
             if filter_by_time != 'this_month':
                 prev_po = Project.objects.filter(statuses__status='joined',
-                                                 created__range=[prev_first, prev_last]).count()
+                                                 statuses__created__range=[prev_first, prev_last]).count()
 
                 if prev_po != 0:
                     percent = int(((new_po - prev_po) / prev_po) * 100)
@@ -1676,10 +1673,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_type = 'Offline'
             if test.is_video:
                 test_type = "Video"
-            subject = f'Test :: {consultant.name} :: {test_type} :: {skills}'
+            created_by = test.submission.created_by
+            subject = f'Test :: {consultant.name} :: {created_by.employee_name} :: {test_type} :: {skills}'
             if test_status == 'new':
                 to = [config.ENGINEERING]
-                cc = [test.submission.created_by.email] + scrum_masters
+                cc = [created_by.email] + scrum_masters
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
@@ -1699,19 +1697,19 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'skills': skills,
                         'consultant': consultant.name,
                         'client': test.submission.client,
+                        'marketer_email': created_by.email,
                         'consultant_email': consultant.email,
                         'city': test.submission.current_city,
                         'visa_end': test.submission.visa_end,
                         'dob': test.submission.date_of_birth,
+                        'marketer': created_by.employee_name,
                         'visa_type': test.submission.visa_type,
                         'consultant_phone': consultant.phone_no,
                         'visa_start': test.submission.visa_start,
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
-                        'marketer_email': test.submission.created_by.email,
                         'deadline': test.deadline if test.deadline else 'NA',
                         'test_link': data['link'] if data['link'] else 'NA',
-                        'marketer': test.submission.created_by.employee_name,
                         'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
                         'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
@@ -1725,17 +1723,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return res, "ok"
 
             elif test_status == 'submit':
-                engineers_email = [user.email for user in test.engineer.all()]
-                engineers_email.append(test.submitted_by.email)
+                engineers_email = []
                 if test.engineer.all():
+                    engineers_email = engineers_email + [user.email for user in test.engineer.all()]
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
                     engineer += ", " + test.submitted_by.employee_name
                 else:
-                    engineer = 'NA'
+                    engineer = test.submitted_by.employee_name
+                engineers_email.append(test.submitted_by.email)
                 test_docs = test.attachments.filter(attachment_type='test_submit')
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
-                to = [test.submission.created_by.email]
+                to = [created_by.email]
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
                 title = f"Test Submitted"
                 mail_data = {

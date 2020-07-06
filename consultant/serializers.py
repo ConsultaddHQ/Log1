@@ -164,7 +164,7 @@ class ExitDetailConsultantSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantExit
         fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date',  'exit_details',
-                  'reasons', 'notice_period', 'legal_action', 'cancel_reason')
+                  'reasons', 'notice_period', 'legal_action', 'legal_status', 'cancel_reason')
 
     def get_reasons(self, obj):
         return obj.reasons.all().values('id', 'name')
