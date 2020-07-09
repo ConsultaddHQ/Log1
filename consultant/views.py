@@ -328,21 +328,25 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             consultants = Consultant.objects.filter(marketing__status='open')
             roles = request.user.roles
 
-            if 'marketer' in request.user.roles:
+            if 'admin' in roles or 'proxy' in roles:
+                consultants = consultants.filter(
+                    Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
+                    Q(marketing__marketer=request.user, marketing__status='open') |
+                    Q(marketing__in_pool=True, marketing__status='open') |
+                    Q(pocs__poc=request.user)
+                )
+
+            elif 'marketer' in request.user.roles:
                 consultants = consultants.filter(
                     Q(marketing__in_pool=True, marketing__status='open') |
                     Q(marketing__marketer=request.user, marketing__status='open')
                 )
-            elif 'admin' in roles or 'proxy' in roles:
-                consultants = consultants.filter(
-                    Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
-                    Q(marketing__in_pool=True, marketing__status='open')
-                )
 
-            elif 'recruiter' in roles:
-                consultants = consultants.filter(
+            if 'recruiter' in roles:
+                recruits = consultants.filter(
                     pocs__poc=request.user
                 )
+                consultants = consultants.union(recruits)
 
             if query:
                 consultants = consultants.filter(name__istartswith=query)
@@ -1149,7 +1153,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         last, first = page * page_size, page * page_size - page_size
 
         try:
-            consultants = Consultant.objects.filter(status='terminated')
+            consultants = Consultant.objects.filter(status__in=['terminated', 'archived'])
 
             # Consultants search based on name, email, recruiter and location
             if query:

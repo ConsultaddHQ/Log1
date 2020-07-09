@@ -245,7 +245,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 cc.append(retention.email)
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = None
+            if project.end_date:
+                project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
                 'to': to,
@@ -593,7 +595,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             # For Status Change
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-            project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = None
+            if project.end_date:
+                project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -718,13 +722,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
                         {employer_emoji} Employer :  {project.submission.employer.title()}<br>
                         {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
-                        {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul>
-                        🇺🇸 Location :  {project.city}<br>
-                        {client_emoji} Client :  {project.submission.client}<br>
-                        {role_emoji} Role :  {project.submission.lead.job_title}<br>
-                        &#128221; Start Date :  {project_start_date}<br><br>
-                        Offer count of {project.submission.employer} for this month - {team_offer_count}<br>
-                        Total offer count of this month - {total_offer_count}"""
+                        {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul> 🇺🇸 Location :  {project.city}
+                        <br> {client_emoji} Client :  {project.submission.client}
+                        <br> {role_emoji} Role :  {project.submission.lead.job_title}
+                        <br> &#128221; Start Date :  {project_start_date}
+                        <br> <br> Offer count of {project.submission.employer} for this month - {team_offer_count}
+                        <br> Total offer count of this month - {total_offer_count}"""
                     }
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
