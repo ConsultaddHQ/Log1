@@ -1081,11 +1081,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         interview_status = "Failed"
                         interview_status_emoji = "&#128078;"
-                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* \n"""
+                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
                     text += interview.feedback
 
                     data = {
-                        "title": f"""{interview_status_emoji} Interview Feedback \n """,
+                        "title": f"""{interview_status_emoji} Interview Feedback """,
                         "text": text
                     }
                     post_msg_using_webhook(config.interview_feedback_url, data)
@@ -1677,10 +1677,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if test.is_video:
                 test_type = "Video"
             created_by = test.submission.created_by
-            subject = f'Test :: {consultant.name} :: {created_by.employee_name} :: {test_type} :: {skills}'
             if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
+                subject = f'Test received for :: {consultant.name} :: {test_type} :: {skills}'
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
@@ -1740,6 +1740,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [created_by.email]
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
+                subject = f'Test submitted for :: {consultant.name} :: {test_type} :: {skills}'
                 title = f"Test Submitted"
                 mail_data = {
                     'to': to,
