@@ -1625,7 +1625,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def get_test_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
-            queryset = queryset.order_by('-created').distinct('created')
+            queryset = queryset.order_by('-modified').distinct('modified')
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1642,7 +1642,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = queryset.order_by('-created')[first:last].annotate(
+            data = queryset.order_by('-modified')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
@@ -1651,7 +1651,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created')
+                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created', 'modified')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -1709,15 +1709,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'deadline': test.deadline if test.deadline else 'NA',
                         'test_link': data['link'] if data['link'] else 'NA',
                         'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
+                        'vendor_company': test.submission.lead.vendor_company.name,
                         'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
-                        'additional_details': data['additional_details'] if data['additional_details'] else 'NA',
+                        'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data['additional_details'] else 'NA',
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
+                res = send_email_attachment_multiple(mail_data, created_by.email)
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -1747,7 +1748,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
+                res = send_email_attachment_multiple(mail_data, config.ENGINEERING)
                 return res, "ok"
         except Exception as error:
             logger.error(error)
