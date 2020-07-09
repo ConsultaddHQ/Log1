@@ -501,7 +501,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = sub.filter(
                     Q(created_by__team=request.user.team) |
                     Q(consultant_marketing__in_pool=True) |
-                    Q(consultant_marketing__teams=request.user.team)
+                    Q(consultant_marketing__teams=request.user.team) |
+                    Q(consultant_marketing__consultant__pocs__poc=request.user,
+                      consultant_marketing__consultant__pocs__poc_type='recruiter'
+                      )
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
@@ -989,11 +992,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                    text = "**CTB:{} :: Round:{} :: {} :: {} :: {} :: {} :: {} **".format(
-                        interview.supervisor.employee_name, interview.round, interview.get_interview_mode_display(),
-                        interview.start_time.strftime('%m/%d/%Y::%I:%M EST'), interview.consultant.name,
-                        interview.submission.client, interview.marketer.employee_name
-                    )
+                    text = f"""*CTB:{interview.supervisor.employee_name} :: Round:{interview.round} :: 
+                    {interview.get_interview_mode_display()} :: 
+                    {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} :: 
+                    {interview.consultant.name} :: {interview.submission.client} :: 
+                    {interview.marketer.employee_name}*"""
+
                     data = {
                         "title": "&#128220; New Interview Scheduled",
                         "text": text
@@ -1077,7 +1081,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         interview_status = "Failed"
                         interview_status_emoji = "&#128078;"
-                    text = f"""**CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status}) ** \n"""
+                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* \n"""
                     text += interview.feedback
 
                     data = {
@@ -1092,7 +1096,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview.save()
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                            text = "**CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {}**".format(
+                            text = "*CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {}*".format(
                                 interview.supervisor.employee_name, interview.round,
                                 interview.get_interview_mode_display(),
                                 interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
@@ -1499,7 +1503,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 prev_first, prev_last = None, None
 
             if filter_for == 'my':
-                new_po = Project.objects.filter(statuses__status='joined', created__range=[first, last],
+                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
                                                 submission__created_by=request.user).count()
 
                 offers_count = Project.objects.filter(submission__created__range=[first, last],
@@ -1518,7 +1522,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
-                new_po = Project.objects.filter(statuses__status='joined', created__range=[first, last],
+                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
                                                 submission__created_by__team__name=team_name).count()
 
                 offers_count = Project.objects.filter(submission__created__range=[first, last],
@@ -1537,7 +1541,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).count()
 
             else:
-                new_po = Project.objects.filter(statuses__status='joined', created__range=[first, last]).count()
+                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last]).count()
                 offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
                 submissions_count = Submission.objects.filter(created__range=[first, last]).count()
                 interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1').count()
@@ -1651,7 +1655,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created', 'modified')
+                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created',
+                     'modified')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -1714,7 +1719,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
-                        'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data['additional_details'] else 'NA',
+                        'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data[
+                            'additional_details'] else 'NA',
                     },
                     'attachments': path
                 }
@@ -1981,4 +1987,3 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
