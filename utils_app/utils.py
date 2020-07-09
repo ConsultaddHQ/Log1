@@ -50,9 +50,9 @@ def get_time_filter_by_start(queryset, filter_by):
         queryset = queryset.filter(start_time__date=last_day)
 
     elif filter_by == 'week':
-        today = date.today()
-        start_of_week = today - timedelta(today.weekday())
-        queryset = queryset.filter(start_time__gte=start_of_week)
+        last = date.today() - timedelta(days=1)
+        first = last - timedelta(days=7)
+        queryset = queryset.filter(created__range=[first, last])
 
     elif filter_by == 'last_month':
         last = date.today().replace(day=1) - timedelta(days=1)
