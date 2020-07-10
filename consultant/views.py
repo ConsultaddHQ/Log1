@@ -13,6 +13,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
 from constance import config
+from employee.models import tag_users
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
@@ -42,7 +43,7 @@ def start_marketing():
         return error
 
 
-def send_exit_interview_detail(terminate):
+def send_exit_interview_detail(terminate, request):
     try:
         # Mattermost message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
@@ -54,6 +55,52 @@ def send_exit_interview_detail(terminate):
                     f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
+        user_list = []
+        tags = request.data.get('tagged_user', [])
+        if len(tags) > 0:
+            for tag in tags:
+                user = get_object_or_404(User, id=tag)
+                user_list.append(user)
+            tag_data = {
+                "model": "consultantexit",
+                "object_id": terminate.id,
+                "tags": tags
+            }
+            tag_users(tag_data)
+        title = f"{request.user.employee_name} tagged you in a Exit Interview of {terminate.consultant.name}"
+        notification_data = {
+            'category': 'info',
+            'sender_user_type': 'user',
+            'target_type': 'consultant',
+            'recipient_user_type': 'user',
+            'description': title,
+            'title': title,
+            'sender_id': request.user.id,
+            'target_id': terminate.id,
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "body": title,
+            "title": title,
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target': 'user',
+                'timestamp': str(datetime.now()),
+                'target_id': terminate.id,
+            },
+        }
+        object_ids = [user.id for user in user_list]
+        registration_ids = list(
+            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                     ).values_list('device_id', flat=True))
+        push_notification(registration_ids, message_body)
+
         return None
     except Exception as error:
         return error
@@ -202,7 +249,16 @@ def send_exit_process_mail(terminate, exit_status):
 def send_notification(consultant, user, title):
     try:
         # App Notification
-        user_list = consultant.pocs.all()
+        user_list = []
+        pocs = consultant.pocs.all()
+        for user in pocs:
+            user_list.append(user.poc)
+        marketing = consultant.marketing.filter(status='open').first()
+        if marketing:
+            marketers = marketing.marketer.all()
+            for marketer in marketers:
+                user_list.append(marketer)
+            user_list.append(marketing.primary_marketer)
         notification_data = {
             'category': 'info',
             'sender_user_type': 'user',
@@ -371,21 +427,25 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             consultants = Consultant.objects.filter(marketing__status='open')
             roles = request.user.roles
 
-            if 'marketer' in request.user.roles:
+            if 'admin' in roles or 'proxy' in roles:
+                consultants = consultants.filter(
+                    Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
+                    Q(marketing__marketer=request.user, marketing__status='open') |
+                    Q(marketing__in_pool=True, marketing__status='open') |
+                    Q(pocs__poc=request.user)
+                )
+
+            elif 'marketer' in request.user.roles:
                 consultants = consultants.filter(
                     Q(marketing__in_pool=True, marketing__status='open') |
                     Q(marketing__marketer=request.user, marketing__status='open')
                 )
-            elif 'admin' in roles or 'proxy' in roles:
-                consultants = consultants.filter(
-                    Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
-                    Q(marketing__in_pool=True, marketing__status='open')
-                )
 
-            elif 'recruiter' in roles:
-                consultants = consultants.filter(
+            if 'recruiter' in roles:
+                recruits = consultants.filter(
                     pocs__poc=request.user
                 )
+                consultants = consultants.union(recruits)
 
             if query:
                 consultants = consultants.filter(name__istartswith=query)
@@ -1301,7 +1361,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             # Mattermost message for exit interview
             if request.data.get('exit_details', None):
-                send_exit_interview_detail(con_exit)
+                send_exit_interview_detail(con_exit, request)
 
             # Email for starting Exit Process
             res = "Development Server"
@@ -1331,7 +1391,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             # Mattermost message for exit interview
             if request.data.get('exit_details', None):
-                send_exit_interview_detail(con_exit)
+                send_exit_interview_detail(con_exit, request)
             serializer = self.serializer_class(con_exit)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -1390,9 +1450,59 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 feedback_type=request.data.get('feedback_type'),
                 feedback_text=request.data.get('feedback_text'),
             )
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                tag_data = {
+                    "model": "feedback",
+                    "object_id": feedback.id,
+                    "tags": tags
+                }
+                tag_users(tag_data)
+
+            title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s Feedback"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': 'consultant',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': feedback.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': feedback.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             serializer = self.serializer_class(feedback)
-            title = f"{serializer.data['feedback_type']} Feedback added for {feedback.consultant.name}"
-            send_notification(feedback.consultant, request.user, title)
+
+            # notification to poc
+            poc_title = f"{serializer.data['feedback_type']} Feedback added for {feedback.consultant.name}"
+            send_notification(feedback.consultant, request.user, poc_title)
+
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1414,6 +1524,48 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             serializer = self.serializer_class(feedback, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                user_tag = feedback.tagged_user.all().first()
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                    user_tag.tagged_user.add(user)
+            title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s Feedback"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': 'consultant',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': feedback.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': feedback.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             title = f"{serializer.data['feedback_type']} Feedback Updated for {feedback.consultant.name}"
             send_notification(feedback.consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)

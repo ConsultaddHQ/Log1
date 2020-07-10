@@ -7,7 +7,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
 
-from employee.models import User, Team
+from employee.models import User, Team, Tagging
 from utils_app.mailing import send_email
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
@@ -451,7 +451,7 @@ class ConsultantMarketing(TimeStampedModel):
 
 class ConsultantRateRevision(TimeStampedModel):
     rate = models.FloatField(_('Rate'))
-    previous_rate = models.IntegerField(_('Previous Rate'), default=0)
+    previous_rate = models.FloatField(_('Previous Rate'), default=0)
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
     feedback = models.TextField(_('Revision Feedback'), blank=True, null=True)
     end = models.DateField(_('Rate End Date'), default=None, blank=True, null=True)
@@ -510,6 +510,7 @@ class ExitReason(models.Model):
 
 
 class ConsultantExit(TimeStampedModel):
+    tagged_user = GenericRelation(Tagging)
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
     legal_action = models.BooleanField(_('Legal Actions'), default=False)
     last_date = models.DateField(_('Relieving Date'), blank=True, null=True)
@@ -563,6 +564,7 @@ class ConsultantExit(TimeStampedModel):
 
 
 class Feedback(TimeStampedModel):
+    tagged_user = GenericRelation(Tagging)
     feedback_text = models.TextField(_('Feedback'))
     feedback_type = models.CharField(
         _('Feedback Type'), max_length=20,

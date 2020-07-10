@@ -253,10 +253,16 @@ class InterviewCreateSerializer(serializers.ModelSerializer):
 class InterviewGetSerializer(serializers.ModelSerializer):
     guest = UserSerializer(many=True)
     supervisor = UserSerializer()
+    attachment_link = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
         fields = '__all__'
+
+    def get_attachment_link(self, obj):
+        if obj.attachment_link:
+            return obj.attachment_link.split('/')[-1]
+        return None
 
 
 class TestCreateSerializer(serializers.ModelSerializer):
