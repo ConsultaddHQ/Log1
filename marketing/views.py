@@ -501,7 +501,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = sub.filter(
                     Q(created_by__team=request.user.team) |
                     Q(consultant_marketing__in_pool=True) |
-                    Q(consultant_marketing__teams=request.user.team)
+                    Q(consultant_marketing__teams=request.user.team) |
+                    Q(consultant_marketing__consultant__pocs__poc=request.user,
+                      consultant_marketing__consultant__pocs__poc_type='recruiter'
+                      )
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
@@ -783,7 +786,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
                      'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'project', 'job_title', 'modified')
+                     'project', 'job_title', 'modified', 'feedback')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -989,10 +992,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                    text = f"""**CTB:{interview.supervisor.employee_name} :: Round:{interview.round} :: 
+                    text = f"""*CTB:{interview.supervisor.employee_name} :: Round:{interview.round} :: 
                     {interview.get_interview_mode_display()} :: 
-                    {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} :: {interview.consultant.name} :: 
-                    {interview.submission.client} :: {interview.marketer.employee_name}**"""
+                    {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} :: 
+                    {interview.consultant.name} :: {interview.submission.client} :: 
+                    {interview.marketer.employee_name}*"""
+
                     data = {
                         "title": "&#128220; New Interview Scheduled",
                         "text": text
@@ -1079,11 +1084,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     text = f"""**CTB:{interview.supervisor.employee_name} :: {interview.round}R :: 
                     {interview.get_interview_mode_display()} :: 
                     {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: 
-                    {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})**"""
+                    {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})**<br>"""
                     text += interview.feedback
 
                     data = {
-                        "title": f"""{interview_status_emoji} Interview Feedback \n """,
+                        "title": f"""{interview_status_emoji} Interview Feedback """,
                         "text": text
                     }
                     post_msg_using_webhook(config.interview_feedback_url, data)
@@ -1094,7 +1099,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview.save()
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                            text = "**CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {}**".format(
+                            text = "*CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {}*".format(
                                 interview.supervisor.employee_name, interview.round,
                                 interview.get_interview_mode_display(),
                                 interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
@@ -1627,7 +1632,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def get_test_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
-            queryset = queryset.order_by('-created').distinct('created')
+            queryset = queryset.order_by('-modified').distinct('modified')
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1644,7 +1649,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = queryset.order_by('-created')[first:last].annotate(
+            data = queryset.order_by('-modified')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
@@ -1653,7 +1658,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created')
+                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created',
+                     'modified')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -1674,10 +1680,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if test.is_video:
                 test_type = "Video"
             created_by = test.submission.created_by
-            subject = f'Test :: {consultant.name} :: {created_by.employee_name} :: {test_type} :: {skills}'
             if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
+                subject = f'Test received for :: {consultant.name} :: {test_type} :: {skills}'
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
@@ -1711,15 +1717,17 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'deadline': test.deadline if test.deadline else 'NA',
                         'test_link': data['link'] if data['link'] else 'NA',
                         'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
+                        'vendor_company': test.submission.lead.vendor_company.name,
                         'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
-                        'additional_details': data['additional_details'] if data['additional_details'] else 'NA',
+                        'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data[
+                            'additional_details'] else 'NA',
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
+                res = send_email_attachment_multiple(mail_data, created_by.email)
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -1736,6 +1744,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [created_by.email]
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
+                subject = f'Test submitted for :: {consultant.name} :: {test_type} :: {skills}'
                 title = f"Test Submitted"
                 mail_data = {
                     'to': to,
@@ -1750,7 +1759,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, 'admin@log1.com')
+                res = send_email_attachment_multiple(mail_data, config.ENGINEERING)
                 return res, "ok"
         except Exception as error:
             logger.error(error)
@@ -1983,4 +1992,3 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-

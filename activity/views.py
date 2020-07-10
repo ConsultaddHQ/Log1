@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
@@ -11,10 +12,13 @@ from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateMode
 
 from legal.models import Petition
 from consultant.models import Consultant
+from notification.models import FCMDevice
+from employee.models import User, tag_users
+from activity.models import Activity, Comment
 from project.models import Project, TimeSheet
 from consultant.views import send_notification
 from marketing.models import Submission, Interview
-from activity.models import Activity, Comment
+from notification.views import create_notification, push_notification
 from activity.serializers import ActivitySerializer, CommentGetSerializer
 
 logger = logging.getLogger(__name__)
@@ -102,7 +106,54 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 comment_text=request.data['comment_text'],
                 parent_comment_id=request.data['parent_comment'],
             )
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                tag_data = {
+                    "model": "comment",
+                    "object_id": comment.id,
+                    "tags": tags
+                }
+                tag_users(tag_data)
+            title = f"{request.user.employee_name} tagged you in a comment"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': 'consultant',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': comment.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': comment.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             serializer = CommentGetSerializer(comment)
+            # notification to consultant poc
             if model == 'consultant':
                 consultant = Consultant.objects.get(id=request.data['id'])
                 title = f"Comments Added for {consultant.name}"

@@ -246,10 +246,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 cc.append(retention.email)
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = None
             if project.end_date:
                 project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-            else:
-                project_end_date = None
 
             mail_data = {
                 'to': to,
@@ -594,10 +593,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             # For Status Change
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = None
             if project.end_date:
                 project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-            else:
-                project_end_date = None
 
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:

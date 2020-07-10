@@ -5,7 +5,7 @@ from consultant.models import *
 from employee.models import User
 from marketing.models import Interview
 from project.models import Project, ProjectSupport
-from employee.serializers import TeamSerializer, UserSerializer
+from employee.serializers import TeamSerializer, UserSerializer, TaggedUserSerializer
 
 
 # Consultant Login
@@ -160,14 +160,18 @@ class ExperienceSerializer(serializers.ModelSerializer):
 
 class ExitDetailConsultantSerializer(serializers.ModelSerializer):
     reasons = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
 
     class Meta:
         model = ConsultantExit
         fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date',  'exit_details',
-                  'reasons', 'notice_period', 'legal_action', 'legal_status', 'cancel_reason')
+                  'reasons', 'notice_period', 'legal_action', 'legal_status', 'tagged_user', 'cancel_reason')
 
     def get_reasons(self, obj):
         return obj.reasons.all().values('id', 'name')
+
+    def get_tagged_user(self, obj):
+        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
 
 
 class ExitConsultantSerializer(serializers.ModelSerializer):
@@ -314,10 +318,15 @@ class ConsultantListSerializer(serializers.ModelSerializer):
 
 class ConsultantFeedbackSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Feedback
-        fields = ('id', 'created', 'feedback_text', 'feedback_type', 'rating', 'consultant', 'created_by')
+        fields = ('id', 'created', 'feedback_text', 'feedback_type', 'rating', 'consultant', 'created_by',
+                  'tagged_user')
 
     def get_created_by(self, obj):
         return obj.created_by.employee_name
+
+    def get_tagged_user(self, obj):
+        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
