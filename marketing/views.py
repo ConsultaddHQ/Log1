@@ -1671,15 +1671,15 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             path = []
             skills = ", ".join(skill.title() for skill in test.skills)
             test_type = 'Online'
-            if test.is_offline:
-                test_type = 'Offline'
-            if test.is_video:
+            if data['is_video'] == 'True':
                 test_type = "Video"
+            if data['is_offline'] == 'True':
+                test_type = 'Offline'
             created_by = test.submission.created_by
             if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
-                subject = f'Test Received:: {consultant.name} :: {skills} :: {test_type}'
+                subject = f'Test Received :: {test_type} :: {consultant.name} :: {skills} '
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
@@ -1687,7 +1687,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
 
-                title = f'Test :: {consultant.name} :: {test_type} :: {skills}'
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -1695,7 +1694,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'subject': subject,
                     'template': '../templates/test_mail.html',
                     'context': {
-                        'title': title,
                         'skills': skills,
                         'consultant': consultant.name,
                         'client': test.submission.client,
@@ -1739,8 +1737,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [created_by.email]
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
-                subject = f'Test Submitted :: {consultant.name} :: {test_type} :: {skills}'
-                title = f"Test Submitted"
+                subject = f'Test Completed  :: {test_type} :: {consultant.name} :: {skills}'
+                title = f"Test Completed"
                 mail_data = {
                     'to': to,
                     'cc': cc,

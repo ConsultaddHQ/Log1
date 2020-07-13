@@ -400,7 +400,7 @@
 
   .left_box p,.right_box p {
     font-size: 13px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 
@@ -421,7 +421,7 @@
     border: solid 1px #cecece;
     padding: 9px;
     padding-top: 0;
-        height: 378px;
+        height: 340px;
     width: 100%;
     float: right;
     margin-top: 10px;
@@ -431,7 +431,7 @@
 .left_box.marketerbox {
     overflow: hidden;
     overflow-y: scroll;
-    height: 108px;
+    height: 60px;
 }
 
 .f-fallback h4{
@@ -534,7 +534,7 @@
                     <td class="content-cell">
                       <div class="f-fallback">
                           <p>Hi Team,</p>
-                          <p>We have received a {% if is_video == 'Yes' %} Video {% elif is_offline == 'Yes' %} Offline {% else %} Online {% endif %} Test for {{consultant}} for the {{job_title}} position. Please find below details for the same.</p>
+                          <p>We have received a {% if is_offline == 'Yes' %} Offline {% elif is_video == 'Yes' %} Video {% else %} Online {% endif %} Test for {{consultant}} for the {{job_title}} position. Please find below details for the same.</p>
 
                           <div class="main_left_box">
                           <h4>Consultant Details</h4>
@@ -555,23 +555,7 @@
 
                           <div class="right_box">
                               <div>
-                                  {% if is_offline == 'Yes' %}
-                                    <p> ✔️ <strong>Offline Test ?:</strong></p>
-                                  {% else %}
-                                    <p> ❌ <strong>Offline Test ?:</strong></p>
-                                      {% if is_video == 'Yes' %}
-                                        <p> ✔️ <strong>Video Test ?:</strong></p>
-                                      {% else %}
-                                        <p> ❌ <strong>Video Test ?:</strong></p>
-                                      {% endif %}
-                                  {% endif %}
-                                {% if is_video == 'Yes' %}
-                                  {% if con_informed == 'Yes' %}
-                                    <p> ✔️ <strong>Consultant Informed ?:</strong></p>
-                                  {% else %}
-                                    <p> ❌ <strong>Consultant Informed ?:</strong></p>
-                                  {% endif %}
-                                {% endif %}
+                                  <p><strong>Test Type:</strong> {% if is_offline == 'Yes' %} Offline {% elif is_video == 'Yes' %} Video {% else %} Online {% endif %}</p>
                                   <p><strong>Skills:</strong> {{skills}}</p>
                                   <p><strong>Client:</strong> {{ client }}</p>
                                   <p><strong>Vendor:</strong> {{ vendor_company }}</p>
