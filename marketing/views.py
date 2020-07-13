@@ -1730,6 +1730,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 engineers_email.append(test.submitted_by.email)
                 if test.engineer.all():
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
+                    engineer += ", " + test.submitted_by.employee_name
                 else:
                     engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')

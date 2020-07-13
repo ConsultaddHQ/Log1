@@ -22,7 +22,7 @@ class Command(BaseCommand):
                       'terminated-fired_security_issue', 'terminated-resigned_location_issue',
                       'terminated-fired_performance_issue', 'terminated-resigned_full_time_offer']
 
-        month = date.today().month
+        month = str(date.today().month)
         new_offer = Project.objects.filter(statuses__status='new', statuses__is_current=True).count()
         received_projects = Project.objects.filter(statuses__status='received', statuses__is_current=True).count()
         on_boarded_projects = Project.objects.filter(statuses__status='on_boarded', statuses__is_current=True).count()
