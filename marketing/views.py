@@ -509,21 +509,21 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
-                consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
-                sub = sub.filter(
-                    Q(created_by=request.user) |
-                    Q(consultant_marketing__in_pool=True) |
-                    Q(consultant_marketing__consultant__in=consultant_ids)
-                )
-
-            # Submissions of a Recruiters consultants (except those are on project)
-            elif 'recruiter' in roles:
-                sub = Submission.objects.filter(
-                    Q(consultant_marketing__status='open',
-                      consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter'
-                      )
-                )
+                if 'recruiter' in roles or 'retention_manager' in roles:
+                    consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
+                    sub = sub.filter(
+                        Q(created_by=request.user) |
+                        Q(consultant_marketing__in_pool=True) |
+                        Q(consultant_marketing__consultant__in=consultant_ids) |
+                        Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
+                    )
+                else:
+                    consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
+                    sub = sub.filter(
+                        Q(created_by=request.user) |
+                        Q(consultant_marketing__in_pool=True) |
+                        Q(consultant_marketing__consultant__in=consultant_ids)
+                    )
 
             if filter_for == 'my':
                 sub = sub.filter(created_by=request.user)
@@ -866,23 +866,21 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 )
 
             elif 'marketer' in roles:
-                queryset = queryset.filter(
-                    Q(submission__consultant_marketing__in_pool=True) |
-                    Q(submission__consultant_marketing__marketer=request.user) |
-                    Q(submission__created_by=request.user)
-                )
+                if 'recruiter' in roles or 'retention_manager' in roles:
+                    queryset = queryset.filter(
+                        Q(submission__created_by=request.user) |
+                        Q(submission__consultant_marketing__in_pool=True) |
+                        Q(submission__consultant_marketing__marketer=request.user) |
+                        Q(submission__consultant_marketing__status='open',
+                          submission__consultant_marketing__consultant__pocs__poc=request.user)
+                    )
 
-            elif 'recruiter' in roles:
-                queryset = queryset.filter(
-                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
-                      submission__consultant_marketing__consultant__pocs__poc_type='recruiter')
-                )
-
-            elif 'retention_manager' in roles:
-                queryset = queryset.filter(
-                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
-                      submission__consultant_marketing__consultant__pocs__poc_type='relation')
-                )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__consultant_marketing__in_pool=True) |
+                        Q(submission__consultant_marketing__marketer=request.user) |
+                        Q(submission__created_by=request.user)
+                    )
 
             queryset = get_time_filter_by_start(queryset, filter_by_time).order_by('-modified').distinct('modified')
 
@@ -1549,8 +1547,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                                                        submission__created__range=[first, last]).count()
             percent = None
             if filter_by_time != 'this_month':
-                prev_po = Project.objects.filter(statuses__status='joined',
-                                                 created__range=[prev_first, prev_last]).count()
+                prev_po = Project.objects.filter(
+                    statuses__status='joined', created__range=[prev_first, prev_last]
+                ).count()
 
                 if prev_po != 0:
                     percent = int(((new_po - prev_po) / prev_po) * 100)
@@ -1670,17 +1669,17 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                                            is_active=True)
             scrum_masters = [user.email for user in queryset]
             path = []
-            skills = ", ".join(skill for skill in test.skills)
+            skills = ", ".join(skill.title() for skill in test.skills)
             test_type = 'Online'
-            if test.is_offline:
-                test_type = 'Offline'
-            if test.is_video:
+            if data['is_video'] == 'True':
                 test_type = "Video"
+            if data['is_offline'] == 'True':
+                test_type = 'Offline'
             created_by = test.submission.created_by
             if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
-                subject = f'Test received for :: {consultant.name} :: {test_type} :: {skills}'
+                subject = f'Test Received :: {test_type} :: {consultant.name} :: {skills} '
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
@@ -1688,7 +1687,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
 
-                title = f"Test Received"
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -1696,7 +1694,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'subject': subject,
                     'template': '../templates/test_mail.html',
                     'context': {
-                        'title': title,
                         'skills': skills,
                         'consultant': consultant.name,
                         'client': test.submission.client,
@@ -1711,7 +1708,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'visa_start': test.submission.visa_start,
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
-                        'deadline': test.deadline if test.deadline else 'NA',
+                        'job_title': test.submission.lead.job_title,
                         'test_link': data['link'] if data['link'] else 'NA',
                         'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
                         'vendor_company': test.submission.lead.vendor_company.name,
@@ -1719,6 +1716,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
+                        'deadline': datetime.strptime(test.deadline, "%Y-%m-%d") if test.deadline else 'NA',
                         'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data[
                             'additional_details'] else 'NA',
                     },
@@ -1740,8 +1738,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [created_by.email]
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
-                subject = f'Test submitted for :: {consultant.name} :: {test_type} :: {skills}'
-                title = f"Test Submitted"
+                subject = f'Test Completed  :: {test_type} :: {consultant.name} :: {skills}'
+                title = f"Test Completed"
                 mail_data = {
                     'to': to,
                     'cc': cc,

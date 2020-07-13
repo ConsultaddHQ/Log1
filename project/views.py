@@ -19,6 +19,7 @@ from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
 from marketing.models import Submission, User
+from consultant.views import send_notification
 from consultant.models import ConsultantPOC, Consultant
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
@@ -579,19 +580,16 @@ class ProjectViewSets(viewsets.ModelViewSet):
             # Emoji for Mattermost update
             if project.consultant.recruiter:
                 recruiter_gender_emoji = '&#128103;' if project.consultant.recruiter.gender == 'female' else '&#129490;'
+                recruiter = project.consultant.recruiter.employee_name
             else:
                 recruiter_gender_emoji = '&#129490; '
+                recruiter = "NA"
 
             client_emoji = '&#127913;'
             role_emoji = '&#128074;'
             employer_emoji = '&#x1F4BC;'
             marketer_gender_emoji = '&#128105;' if project.submission.created_by.gender == 'female' else '&#128104;'
             consultant_gender_emoji = '&#128105;' if project.consultant.gender == 'female' else '&#128104;'
-
-            if project.consultant.recruiter:
-                recruiter = project.consultant.recruiter.employee_name
-            else:
-                recruiter = "NA"
 
             # For Status Change
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
@@ -614,6 +612,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if new_status.startswith('cancelled'):
                     project.submission.consultant_marketing.status = 'open'
                     project.submission.consultant_marketing.save()
+                    title = f"{project.consultant.name} :: Project Cancelled"
+                    send_notification(project.consultant, request.user, title)
 
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
@@ -656,6 +656,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     Total Project Joined count of this month - {total_joined_count}"""
                     }
                     post_msg_using_webhook(config.joined_url, data)
+
+                    title = f"{project.consultant.name} :: Project Joined"
+                    send_notification(project.consultant, request.user, title)
 
                     consultant = project.consultant
 
@@ -707,7 +710,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     supervisors = "\n".join(
                         [f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
                          for interview in interviews if interview.supervisor])
-                    ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else ':raising_hand_man: '
+                    ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
                     if project.is_remote and project.submission.lead.is_w2:
                         con_str = f"**Remote Project** \n"
                         con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
@@ -732,6 +735,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
                     project.save()
+                    title = f"{project.consultant.name} :: Project Received"
+                    send_notification(project.consultant, request.user, title)
 
                 # Mail for Cancellation or Termination of Project
                 cancellation_status = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
@@ -771,6 +776,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                             "text": text
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
+                        title = f"{project.consultant.name} :: Project Terminated"
+                        send_notification(project.consultant, request.user, title)
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
@@ -795,6 +802,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                     elif prev_status_obj.status != 'complete' and new_status == "complete":
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Completion')
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
+                        title = f"{project.consultant.name} :: Project Complete"
+                        send_notification(project.consultant, request.user, title)
 
             serializer = self.serializer_class(project)
 

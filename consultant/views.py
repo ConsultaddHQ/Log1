@@ -13,6 +13,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
 from constance import config
+from employee.models import tag_users
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
@@ -28,6 +29,10 @@ def close_marketing():
     try:
         queryset = ConsultantMarketing.objects.filter(end__lte=date.today(), status='open')
         queryset.update(status='close')
+        admin = get_object_or_404(User, employee_id=1000)
+        for marketing in queryset:
+            title = f"{marketing.consultant.name}'s marketing cycle stopped by {admin.employee_name}"
+            send_notification(marketing.consultant, admin, title)
         return None
     except Exception as error:
         return error
@@ -37,12 +42,16 @@ def start_marketing():
     try:
         queryset = ConsultantMarketing.objects.filter(start__lte=date.today(), status='close', end=None)
         queryset.update(status='open')
+        admin = get_object_or_404(User, employee_id=1000)
+        for marketing in queryset:
+            title = f"{marketing.consultant.name}'s new marketing cycle started by {admin.employee_name}"
+            send_notification(marketing.consultant, admin, title)
         return None
     except Exception as error:
         return error
 
 
-def send_exit_interview_detail(terminate):
+def send_exit_interview_detail(terminate, request):
     try:
         # Mattermost message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
@@ -50,10 +59,56 @@ def send_exit_interview_detail(terminate):
         data = {
             "title": f"Exit interview for {terminate.consultant.name}",
             "text": f"**Reason for leaving** : {reason}<br>"
-                    f"**Termination Date** : {terminate.last_date}<br>"
+                    f"**Termination Date** : {terminate.last_date.strftime('%m/%d/%Y')}<br>"
                     f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
+        user_list = []
+        tags = request.data.get('tagged_user', [])
+        if len(tags) > 0:
+            for tag in tags:
+                user = get_object_or_404(User, id=tag)
+                user_list.append(user)
+            tag_data = {
+                "model": "consultantexit",
+                "object_id": terminate.id,
+                "tags": tags
+            }
+            tag_users(tag_data)
+        title = f"{request.user.employee_name} tagged you in a exit interview of {terminate.consultant.name}"
+        notification_data = {
+            'category': 'info',
+            'sender_user_type': 'user',
+            'target_type': 'consultant',
+            'recipient_user_type': 'user',
+            'description': title,
+            'title': title,
+            'sender_id': request.user.id,
+            'target_id': terminate.id,
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "body": title,
+            "title": title,
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target': 'user',
+                'timestamp': str(datetime.now()),
+                'target_id': terminate.id,
+            },
+        }
+        object_ids = [user.id for user in user_list]
+        registration_ids = list(
+            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                     ).values_list('device_id', flat=True))
+        push_notification(registration_ids, message_body)
+
         return None
     except Exception as error:
         return error
@@ -186,14 +241,65 @@ def send_exit_process_mail(terminate, exit_status):
                 'rehire': 'Yes' if terminate.rehire else 'No',
                 'legal': 'Yes' if terminate.legal_action else 'No',
                 'exit_details': exit_details if terminate.exit_details else 'NA',
-                'last_date': terminate.last_date if terminate.last_date else 'NA',
-                'resign_date': terminate.resign_date if terminate.resign_date else 'NA',
+                'last_date': terminate.last_date.strftime('%m/%d/%Y') if terminate.last_date else 'NA',
+                'resign_date': terminate.resign_date.strftime('%m/%d/%Y') if terminate.resign_date else 'NA',
                 'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
                 'notice_period': terminate.notice_period if terminate.legal_action else 'NA',
             },
         }
         res = send_email(mail_data, terminate.created_by.email)
         return res, "ok"
+    except Exception as error:
+        logger.error(error)
+        return error, "error"
+
+
+def send_notification(consultant, sender, title):
+    try:
+        # App Notification
+        user_list = []
+        pocs = consultant.pocs.all()
+        for user in pocs:
+            user_list.append(user.poc)
+        marketing = consultant.marketing.filter(status='open').first()
+        if marketing:
+            marketers = marketing.marketer.all()
+            for marketer in marketers:
+                user_list.append(marketer)
+            user_list.append(marketing.primary_marketer)
+        notification_data = {
+            'title': title,
+            'category': 'info',
+            'description': title,
+            'sender_id': sender.id,
+            'target_id': consultant.id,
+            'sender_user_type': 'user',
+            'target_type': 'consultant',
+            'recipient_user_type': 'user',
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "body": title,
+            "title": title,
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "data": {
+                'target': 'user',
+                'is_read': False,
+                'is_deleted': False,
+                'timestamp': str(datetime.now()),
+                'target_id': consultant.id,
+            },
+        }
+        object_ids = [user.id for user in user_list]
+        registration_ids = list(
+            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                     ).values_list('device_id', flat=True))
+        push_notification(registration_ids, message_body)
+        return "Notification sent"
     except Exception as error:
         logger.error(error)
         return error, "error"
@@ -311,10 +417,11 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 employer=F('submission__employer'),
                 consultant_name=F('consultant__name'),
                 status=Subquery(project_status.values('status')[:1]),
+                job_title=F('submission__lead__job_title'),
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
             ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
-                     'status', 'employer', 'start_date', 'end_date')
+                     'status', 'employer', 'start_date', 'end_date', 'job_title')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -414,25 +521,25 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             # Creating Recruiter of Consultant
             ConsultantPOC.objects.create(
-                consultant=consultant,
-                poc_type='recruiter',
                 start=timezone.now(),
+                poc_type='recruiter',
+                consultant=consultant,
                 poc_id=data['recruiter']
             )
 
             # Creating Retention of Consultant
             if request.data.get('retention', None):
                 ConsultantPOC.objects.create(
-                    consultant=consultant,
                     poc_type='retention',
                     start=timezone.now(),
+                    consultant=consultant,
                     poc_id=data['retention']
                 )
 
             # Creating Work-Auth
             WorkAuth.objects.create(
-                consultant=consultant,
                 is_current=True,
+                consultant=consultant,
                 visa_end=data['visa_end'],
                 visa_type=data['visa_type'],
                 visa_start=data['visa_start'],
@@ -456,11 +563,12 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             profiles = consultant.profiles.filter(title__iexact='Original')
             if profiles:
                 profile = profiles.first()
-                profile.date_of_birth = consultant.date_of_birth
-                profile.current_city = consultant.current_city
                 profile.links = consultant.links
+                profile.current_city = consultant.current_city
+                profile.date_of_birth = consultant.date_of_birth
                 profile.save()
-
+            title = f"{consultant.name}'s details updated by {request.user.employee_name}"
+            send_notification(consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -503,16 +611,16 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 data = request.data
                 education = Education.objects.create(
                     city=data['city'],
-                    title=data['title'],
                     major=data['major'],
                     remark=data['remark'],
                     org_name=data['org_name'],
                     edu_type=data['edu_type'],
                     end_date=data['end_date'],
-                    start_date=data['start_date'],
                     consultant_id=kwargs.get('pk'),
                 )
                 serializer = EducationSerializer(education)
+                title = f"{education.consultant.name}'s education added by {request.user.employee_name}"
+                send_notification(education.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
@@ -523,6 +631,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 serializer = EducationSerializer(education, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
+                title = f"{education.consultant.name}'s education details updated by {request.user.employee_name}"
+                send_notification(education.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)
@@ -548,6 +658,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     consultant_id=kwargs.get('pk'),
                 )
                 serializer = ExperienceSerializer(experience)
+                title = f"{experience.consultant.name}'s experience added by {request.user.employee_name}"
+                send_notification(experience.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
@@ -558,6 +670,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 serializer = ExperienceSerializer(experience, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
+                title = f"{experience.consultant.name}'s experience details updated by {request.user.employee_name}"
+                send_notification(experience.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 logger.error(error)
@@ -634,6 +748,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     consultant_id=request.data['consultant']
                 )
                 serializer = ConsultantRateRevisionSerializer(rate_obj)
+                title = f"{rate_obj.consultant.name}'s rate revised by {request.user.employee_name}"
+                send_notification(rate_obj.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
@@ -780,7 +896,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant.save()
 
             reset_days = request.data.get('reset_days', 'true')
-            if reset_days == 'true':
+            if reset_days or reset_days == 'true':
                 previous_marketing_days = 0
             else:
                 if not latest_marketing_cycle:
@@ -830,6 +946,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             serializer = ConsultantMarketingCreateSerializer(consultant_marketing, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            title = f"{consultant_marketing.consultant.name}'s marketing details updated by {request.user.employee_name}"
+            send_notification(consultant_marketing.consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)
@@ -887,6 +1005,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     marketer = get_object_or_404(User, id=marketer_id)
                     consultant_marketing.marketer.add(marketer)
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
+                title = f"{consultant_marketing.consultant.name}'s marketing details updated by {request.user.employee_name}"
+                send_notification(consultant_marketing.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
@@ -909,6 +1029,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     team = get_object_or_404(Team, id=team_id)
                     consultant_marketing.teams.add(team)
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
+                teams_string = ", ".join(team.name for team in consultant_marketing.teams.all())
+                title = f"{consultant_marketing.consultant.name} is assigned to {teams_string}"
+                send_notification(consultant_marketing.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
@@ -933,6 +1056,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     marketer = get_object_or_404(User, id=marketer_id)
                     consultant_marketing.marketer.remove(marketer)
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
+                title = f"{consultant_marketing.consultant.name}'s assigned marketer removed"
+                send_notification(consultant_marketing.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_200_OK)
             else:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
@@ -955,6 +1080,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     team = get_object_or_404(Team, id=team_id)
                     consultant_marketing.teams.remove(team)
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
+                title = f"{consultant_marketing.consultant.name}'s marketing team removed"
+                send_notification(consultant_marketing.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
@@ -1014,6 +1141,8 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
                 current_city=data['current_city'],
             )
             serializer = self.serializer_class(consultant_profile)
+            title = f"{consultant_profile.consultant.name}'s profile created by {request.user.employee_name}"
+            send_notification(consultant_profile.consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)
@@ -1026,6 +1155,8 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(consultant_profile, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                title = f"{consultant_profile.consultant.name}'s profile updated by {request.user.employee_name}"
+                send_notification(consultant_profile.consultant, request.user, title)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             return Response({"error": str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
@@ -1051,12 +1182,14 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 previous_poc = instance.first()
                 previous_poc.end = date.today()
                 previous_poc.save()
-            ConsultantPOC.objects.create(
+            poc = ConsultantPOC.objects.create(
                 poc_id=request.data['poc'],
                 poc_type=request.data['poc_type'],
                 consultant_id=request.data['consultant'],
                 start=date.today()
             )
+            title = f"{poc.poc.employee_name} is added as {poc.poc_type.title()} on {poc.consultant.name}"
+            send_notification(poc.consultant, request.user, title)
             return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
         except KeyError as err:
             logger.error(err)
@@ -1071,6 +1204,8 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             serializer = self.serializer_class(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            title = f"{instance.poc.employee_name} is updated as {instance.poc_type.title()} on {instance.consultant.name}"
+            send_notification(instance.consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -1109,6 +1244,8 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 profile.save()
 
             serializer = self.serializer_class(work_auth)
+            title = f"{work_auth.consultant.name}'s work authorization is added by {request.user.employee_name}"
+            send_notification(work_auth.consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except KeyError as err:
             logger.error(err)
@@ -1132,7 +1269,8 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 profile.visa_end = serializer.data['visa_end']
                 profile.visa_type = serializer.data['visa_type']
                 profile.save()
-
+            title = f"{instance.consultant.name}'s work authorization is updated by {request.user.employee_name}"
+            send_notification(instance.consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except KeyError as err:
             logger.error(err)
@@ -1213,6 +1351,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 last_date=request.data.get('last_date', None),
                 resign_date=request.data.get('resign_date', None),
                 exit_details=request.data.get('exit_details', None),
+                legal_status=request.data.get('legal_status', None),
                 legal_action=request.data.get('legal_action', False),
                 notice_period=request.data.get('notice_period', None),
             )
@@ -1227,7 +1366,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             # Mattermost message for exit interview
             if request.data.get('exit_details', None):
-                send_exit_interview_detail(con_exit)
+                send_exit_interview_detail(con_exit, request)
 
             # Email for starting Exit Process
             res = "Development Server"
@@ -1248,16 +1387,15 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
             con_exit = get_object_or_404(ConsultantExit, id=kwargs.get('pk'))
+            # Mattermost message for exit interview
+            if request.data.get('exit_details', None) and not con_exit.exit_details:
+                send_exit_interview_detail(con_exit, request)
             serializer = ExitConsultantSerializer(con_exit, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit)
-
-            # Mattermost message for exit interview
-            if request.data.get('exit_details', None):
-                send_exit_interview_detail(con_exit)
             serializer = self.serializer_class(con_exit)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -1316,7 +1454,60 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 feedback_type=request.data.get('feedback_type'),
                 feedback_text=request.data.get('feedback_text'),
             )
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                tag_data = {
+                    "model": "feedback",
+                    "object_id": feedback.id,
+                    "tags": tags
+                }
+                tag_users(tag_data)
+
+            title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': 'consultant',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': feedback.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': feedback.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
             serializer = self.serializer_class(feedback)
+
+            # notification to poc
+            poc_title = f"{serializer.data['feedback_type']} feedback added for {feedback.consultant.name} " \
+                        f"by {request.user.employee_name}"
+            send_notification(feedback.consultant, request.user, poc_title)
+
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1338,6 +1529,51 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             serializer = self.serializer_class(feedback, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                user_tag = feedback.tagged_user.all().first()
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                    user_tag.tagged_user.add(user)
+            title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': 'consultant',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': feedback.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': feedback.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            push_notification(registration_ids, message_body)
+
+            title = f"{serializer.data['feedback_type']} feedback updated for {feedback.consultant.name} " \
+                    f"by {request.user.employee_name}"
+            send_notification(feedback.consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

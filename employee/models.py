@@ -1,8 +1,12 @@
+import logging
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import BaseUserManager
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from api_key.models import APIKey
@@ -10,6 +14,7 @@ from utils_app.mailing import send_email
 from employee.token import get_token_generator
 from utils_app.models import TimeStampedModel
 
+logger = logging.getLogger(__name__)
 
 GENDER_CHOICE = (
     ('male', 'Male'),
@@ -206,3 +211,39 @@ class Asset(TimeStampedModel):
 
     def __str__(self):
         return self.owner.employee_name
+
+
+class Tagging(models.Model):
+    object_id = models.PositiveIntegerField()
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE,
+        verbose_name='Model Name'
+    )
+    tagged_user = models.ManyToManyField(
+        User, blank=True,
+        related_name='tagged_user',
+        verbose_name='Tagged Users'
+    )
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    def save(self, *args, **kwargs):
+        return super(Tagging, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.object_id}-{self.content_type}'
+
+
+def tag_users(data):
+    try:
+        content_type = ContentType.objects.get(model=data['model'])
+        tag = Tagging.objects.create(
+            content_type=content_type,
+            object_id=data['object_id'],
+        )
+        for user_id in data['tags']:
+            user = get_object_or_404(User, id=user_id)
+            tag.tagged_user.add(user)
+        return True
+    except Exception as error:
+        logger.error(error)
+        return False

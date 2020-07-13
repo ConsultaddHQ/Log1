@@ -329,7 +329,7 @@
     }
 
     .email-body_inner {
-      width: 650px;
+      width: 810px;
       margin: 0 auto;
       padding: 0;
       -premailer-width: 570px;
@@ -369,13 +369,79 @@
     }
 
     .content-cell {
-      padding: 45px;
+      padding: 20px;
     }
 
     .f-fallback strong {
         float: left;
-        width: 35%;
+        width: 49%;
     }
+
+  .main_left_box {
+    width: 45%;
+    margin-top: 23px;
+    float: left;
+  }
+
+  .main_left_box h4{
+      margin:0;
+      color: #cecece;
+   }
+
+    .left_box {
+    border: solid 1px #cecece;
+    padding: 9px;
+    padding-top: 0;
+    width:105%;
+    float: left;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  .left_box p,.right_box p {
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+
+ .main_right_box {
+    width: 45%;
+    margin-top: 23px;
+    float: right;
+  }
+
+
+  .main_right_box h4{
+      margin:0;
+      color: #cecece;
+      margin-left: -20px;
+   }
+
+    .right_box {
+    border: solid 1px #cecece;
+    padding: 9px;
+    padding-top: 0;
+        height: 340px;
+    width: 100%;
+    float: right;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+.left_box.marketerbox {
+    overflow: hidden;
+    overflow-y: scroll;
+    height: 60px;
+}
+
+.f-fallback h4{
+  color: #252525;
+}
+
+.f-fallback h1 {
+    border: solid 2px #000;
+    padding: 5px;
+}
     /*============ Media Queries ============ */
 
     @media only screen and (max-width: 668px) {
@@ -459,13 +525,6 @@
       <tr>
         <td align="center">
           <table class="email-content" width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td class="email-masthead">
-                <a href="https://log1.app" class="f-fallback email-masthead_name">
-                <span style="font-weight: bold; font-size: 40px;"><img src="https://log1.app/api/media/assets/images/logo.png" alt="" width="100"/></span>
-              </a>
-              </td>
-            </tr>
             <!-- Email Body -->
             <tr>
               <td class="email-body" width="570" cellpadding="0" cellspacing="0">
@@ -474,40 +533,64 @@
                   <tr>
                     <td class="content-cell">
                       <div class="f-fallback">
-                        <h1>{{title}}</h1>
-                          <h4>Test/Assessment Details</h4>
-                          {% if is_video == 'Yes' %}
-                            <p><strong>Video Test ?:</strong> {{is_video}}</p>
-                          {% endif %}
-                            <p><strong>Offline Test ?:</strong> {{is_offline}}</p>
-                            <p><strong>Skills:</strong> {{skills}}</p>
-                            <p><strong>Deadline:</strong> {{deadline}}</p>
-                            <p><strong>Client:</strong> {{ client }}</p>
-                            <p><strong>Vendor Company:</strong> {{ vendor_company }}</p>
-                            <p><strong>Test Link:</strong> {{test_link}}</p>
-                          {% if is_video == 'Yes' %}
-                            <p><strong>Consultant Informed ?:</strong> {{con_informed}}</p>
-                          {% endif %}
-                            <p><strong>Consultant Timezone:</strong> {{ con_timezone }}</p>
-                            <p><strong>Additional Details:</strong> {{additional_details}}</p>
+                          <p>Hi Team,</p>
+                          <p>We have received a {% if is_offline == 'Yes' %} Offline {% elif is_video == 'Yes' %} Video {% else %} Online {% endif %} Test for {{consultant}} for the {{job_title}} position. Please find below details for the same.</p>
+
+                          <div class="main_left_box">
                           <h4>Consultant Details</h4>
-                            <p><strong>Name:</strong> {{consultant}}</p>
-                            <p><strong>Email:</strong> {{consultant_email}}</p>
-                            <p><strong>Phone No.:</strong> {{ consultant_phone }}</p>
-                            <p><strong>Date of Birth:</strong> {{ dob }}</p>
-                            <p><strong>Current City:</strong> {{ city }}</p>
-                            <p><strong>Marketing Email:</strong> {{ marketing_email }}</p>
-                            <p><strong>Marketing Phone No.:</strong> {{ marketing_phone }}</p>
-                            <p><strong>Visa Start:</strong> {{ visa_start }}</p>
-                            <p><strong>Visa End:</strong> {{ visa_end }}</p>
-                            <p><strong>Visa Type:</strong> {{ visa_type }}</p>
-                          <h4>Marketer Details</h4>
-                            <p><strong>Name:</strong> {{ marketer }}</p>
-                            <p><strong>Email:</strong> {{ marketer_email }}</p>
-                          <h4>Job Description : </h4>
+                          <div class="left_box">
+                              <div>
+                              <p><strong>Name:</strong> {{consultant}}</p>
+                              <p><strong>Email:</strong> {{consultant_email}}</p>
+                              <p><strong>Phone No.:</strong> {{ consultant_phone }}</p>
+                              <p><strong>Date of Birth:</strong> {{ dob }}</p>
+                              <p><strong>Current City:</strong> {{ city }}</p>
+                              <p><strong>Consultant Timezone:</strong> {{ con_timezone }}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                          <div class="main_right_box">  
+                          <h4>Details For Test</h4>
+
+                          <div class="right_box">
+                              <div>
+                                  <p><strong>Test Type:</strong> {% if is_offline == 'Yes' %} Offline {% elif is_video == 'Yes' %} Video {% else %} Online {% endif %}</p>
+                                  <p><strong>Skills:</strong> {{skills}}</p>
+                                  <p><strong>Client:</strong> {{ client }}</p>
+                                  <p><strong>Vendor:</strong> {{ vendor_company }}</p>
+                                  <p><strong>Visa Start:</strong> {{ visa_start }}</p>
+                                  <p><strong>Visa End:</strong> {{ visa_end }}</p>
+                                  <p><strong>Visa Type:</strong> {{ visa_type }}</p>
+                                  <p><strong>Deadline:</strong> {{deadline}}</p>
+                                  <p><strong>Marketing Email:</strong> {{ marketing_email }}</p>
+                                  <p><strong>Marketing Phone No.:</strong> {{ marketing_phone }}</p>
+                              </div>
+                          </div>
+                          </div>
+
+                          <div class="main_left_box">
+                            <h4>Test Link</h4>
+                            <div class="left_box marketerbox">
+                                <p>{{test_link}}</p>
+                          </div>
+                        </div>  
+
+
+                          
+
+                          <br clear="all"/>
+                          
+                          
+                          
+
+                          <h4>Additional Details</h4>
+                            <p>{{additional_details}}</p>
+                          <h4>Job Description</h4>
                             <p>{{ jd }}</p>
                         <p><strong>Thanks,
                           <br>The Log1 Team</strong></p>
+
                       </div>
                     </td>
                   </tr>

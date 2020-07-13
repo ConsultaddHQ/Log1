@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from activity.models import *
-from employee.serializers import UserSerializer
+from employee.serializers import UserSerializer, TaggedUserSerializer
 
 
 class ActivitySerializer(serializers.ModelSerializer):
@@ -14,22 +14,30 @@ class ActivitySerializer(serializers.ModelSerializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     user = UserSerializer()
+    tagged_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
         fields = '__all__'
 
+    def get_tagged_user(self, obj):
+        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
+
 
 class CommentGetSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     child_comment = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Comment
-        fields = ('id', 'comment_text', 'user', 'parent_comment', 'object_id', 'child_comment', 'created')
+        fields = ('id', 'comment_text', 'user', 'parent_comment', 'object_id', 'tagged_user', 'child_comment', 'created')
 
     def get_child_comment(self, obj):
         return CommentSerializer(obj.child_comments.all(), many=True).data
+
+    def get_tagged_user(self, obj):
+        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
 
 
 class ConsultantCommentSerializer(serializers.ModelSerializer):
