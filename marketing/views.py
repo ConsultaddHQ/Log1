@@ -509,21 +509,21 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
-                consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
-                sub = sub.filter(
-                    Q(created_by=request.user) |
-                    Q(consultant_marketing__in_pool=True) |
-                    Q(consultant_marketing__consultant__in=consultant_ids)
-                )
-
-            # Submissions of a Recruiters consultants (except those are on project)
-            elif 'recruiter' in roles:
-                sub = Submission.objects.filter(
-                    Q(consultant_marketing__status='open',
-                      consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter'
-                      )
-                )
+                if 'recruiter' in roles or 'retention_manager' in roles:
+                    consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
+                    sub = sub.filter(
+                        Q(created_by=request.user) |
+                        Q(consultant_marketing__in_pool=True) |
+                        Q(consultant_marketing__consultant__in=consultant_ids) |
+                        Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
+                    )
+                else:
+                    consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
+                    sub = sub.filter(
+                        Q(created_by=request.user) |
+                        Q(consultant_marketing__in_pool=True) |
+                        Q(consultant_marketing__consultant__in=consultant_ids)
+                    )
 
             if filter_for == 'my':
                 sub = sub.filter(created_by=request.user)
@@ -786,7 +786,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
                      'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'project', 'job_title', 'modified', 'feedback')
+                     'project', 'job_title', 'modified')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -866,23 +866,21 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 )
 
             elif 'marketer' in roles:
-                queryset = queryset.filter(
-                    Q(submission__consultant_marketing__in_pool=True) |
-                    Q(submission__consultant_marketing__marketer=request.user) |
-                    Q(submission__created_by=request.user)
-                )
+                if 'recruiter' in roles or 'retention_manager' in roles:
+                    queryset = queryset.filter(
+                        Q(submission__created_by=request.user) |
+                        Q(submission__consultant_marketing__in_pool=True) |
+                        Q(submission__consultant_marketing__marketer=request.user) |
+                        Q(submission__consultant_marketing__status='open',
+                          submission__consultant_marketing__consultant__pocs__poc=request.user)
+                    )
 
-            elif 'recruiter' in roles:
-                queryset = queryset.filter(
-                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
-                      submission__consultant_marketing__consultant__pocs__poc_type='recruiter')
-                )
-
-            elif 'retention_manager' in roles:
-                queryset = queryset.filter(
-                    Q(submission__consultant_marketing__consultant__pocs__poc=request.user,
-                      submission__consultant_marketing__consultant__pocs__poc_type='relation')
-                )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__consultant_marketing__in_pool=True) |
+                        Q(submission__consultant_marketing__marketer=request.user) |
+                        Q(submission__created_by=request.user)
+                    )
 
             queryset = get_time_filter_by_start(queryset, filter_by_time).order_by('-modified').distinct('modified')
 
@@ -1081,10 +1079,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         interview_status = "Failed"
                         interview_status_emoji = "&#128078;"
-                    text = f"""**CTB:{interview.supervisor.employee_name} :: {interview.round}R :: 
-                    {interview.get_interview_mode_display()} :: 
-                    {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: 
-                    {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})**<br>"""
+                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
                     text += interview.feedback
 
                     data = {
@@ -1166,7 +1161,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
                 ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'job_title', 'submission_id',
                          'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
-                         'screening_type', 'failure_reason', 'interview_mode')
+                         'screening_type', 'interview_mode')
                 notification_data = {
                     'category': 'info',
                     'description': title,
@@ -1402,7 +1397,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
+            ).values('id', 'start_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
 
             upcoming_joinings = projects.filter(
                 statuses__status='on_boarded', statuses__is_current=True
@@ -1552,8 +1547,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                                                        submission__created__range=[first, last]).count()
             percent = None
             if filter_by_time != 'this_month':
-                prev_po = Project.objects.filter(statuses__status='joined',
-                                                 statuses__created__range=[prev_first, prev_last]).count()
+                prev_po = Project.objects.filter(
+                    statuses__status='joined', created__range=[prev_first, prev_last]
+                ).count()
 
                 if prev_po != 0:
                     percent = int(((new_po - prev_po) / prev_po) * 100)
@@ -1732,14 +1728,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return res, "ok"
 
             elif test_status == 'submit':
-                engineers_email = []
-                if test.engineer.all():
-                    engineers_email = engineers_email + [user.email for user in test.engineer.all()]
-                    engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
-                    engineer += ", " + test.submitted_by.employee_name
-                else:
-                    engineer = test.submitted_by.employee_name
+                engineers_email = [user.email for user in test.engineer.all()]
                 engineers_email.append(test.submitted_by.email)
+                if test.engineer.all():
+                    engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
+                else:
+                    engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
