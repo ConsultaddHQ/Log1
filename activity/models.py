@@ -3,8 +3,9 @@ from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.fields import GenericRelation
 
-from employee.models import User
+from employee.models import User, Tagging
 
 
 class Activity(models.Model):
@@ -44,6 +45,7 @@ class Activity(models.Model):
 
 
 class Comment(models.Model):
+    tagged_user = GenericRelation(Tagging)
     comment_text = models.TextField(_('Comment Text'))
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,

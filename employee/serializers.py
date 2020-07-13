@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from employee.models import User, Asset, Team
+from employee.models import User, Asset, Team, Tagging
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -66,3 +66,10 @@ class AssetSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_owner_name(self):
         return self.owner.employee_name
+
+
+class TaggedUserSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Tagging
+        fields = '__all__'
