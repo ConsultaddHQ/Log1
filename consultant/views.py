@@ -1387,16 +1387,15 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
             con_exit = get_object_or_404(ConsultantExit, id=kwargs.get('pk'))
+            # Mattermost message for exit interview
+            if request.data.get('exit_details', None) and not con_exit.exit_details:
+                send_exit_interview_detail(con_exit, request)
             serializer = ExitConsultantSerializer(con_exit, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit)
-
-            # Mattermost message for exit interview
-            if request.data.get('exit_details', None) and not con_exit.exit_details:
-                send_exit_interview_detail(con_exit, request)
             serializer = self.serializer_class(con_exit)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
