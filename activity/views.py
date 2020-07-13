@@ -122,12 +122,12 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             notification_data = {
                 'category': 'info',
                 'sender_user_type': 'user',
-                'target_type': 'consultant',
+                'target_type': model,
                 'recipient_user_type': 'user',
                 'description': title,
                 'title': title,
                 'sender_id': request.user.id,
-                'target_id': comment.id,
+                'target_id': request.data['id'],
             }
             create_notification(user_list, notification_data)
 
@@ -141,9 +141,9 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target': model,
                     'timestamp': str(datetime.now()),
-                    'target_id': comment.id,
+                    'target_id': request.data['id'],
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -162,5 +162,3 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-

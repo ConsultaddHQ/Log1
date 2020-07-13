@@ -1673,7 +1673,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                                            is_active=True)
             scrum_masters = [user.email for user in queryset]
             path = []
-            skills = ", ".join(skill for skill in test.skills)
+            skills = ", ".join(skill.title() for skill in test.skills)
             test_type = 'Online'
             if test.is_offline:
                 test_type = 'Offline'
@@ -1683,7 +1683,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if test_status == 'new':
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
-                subject = f'Test received for :: {consultant.name} :: {test_type} :: {skills}'
+                subject = f'Test Received:: {consultant.name} :: {skills} :: {test_type}'
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     path.append(download_s3_object(resume.first().attachment_file.name))
@@ -1691,7 +1691,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
 
-                title = f"Test Received"
+                title = f'Test :: {consultant.name} :: {test_type} :: {skills}'
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -1714,7 +1714,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'visa_start': test.submission.visa_start,
                         'marketing_email': test.submission.email,
                         'marketing_phone': test.submission.phone,
-                        'deadline': test.deadline if test.deadline else 'NA',
+                        'job_title': test.submission.lead.job_title,
                         'test_link': data['link'] if data['link'] else 'NA',
                         'is_video': 'Yes' if data['is_video'] == 'True' else 'No',
                         'vendor_company': test.submission.lead.vendor_company.name,
@@ -1722,6 +1722,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
+                        'deadline': datetime.strptime(test.deadline, "%Y-%m-%d") if test.deadline else 'NA',
                         'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data[
                             'additional_details'] else 'NA',
                     },
@@ -1744,7 +1745,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     path.append(download_s3_object(doc.attachment_file.name))
                 to = [created_by.email]
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
-                subject = f'Test submitted for :: {consultant.name} :: {test_type} :: {skills}'
+                subject = f'Test Submitted :: {consultant.name} :: {test_type} :: {skills}'
                 title = f"Test Submitted"
                 mail_data = {
                     'to': to,

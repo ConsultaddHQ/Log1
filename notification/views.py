@@ -70,10 +70,9 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
         last, first = page * page_size, page * page_size - page_size
         try:
             queryset = Notification.objects.active(request.user, 'user')
-            data = queryset[first:last].values('id', 'description', 'deleted', 'unread', 'timestamp',
-                                               'target_content_type__model', 'target_object_id')
+            serializer = NotificationListSerializer(queryset[first:last], many=True)
             unread = Notification.objects.unread(request.user, 'user').count()
-            return Response({"results": data, "total": queryset.count(), "unread": unread}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "total": queryset.count(), "unread": unread}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
