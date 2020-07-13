@@ -118,7 +118,11 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                     "tags": tags
                 }
                 tag_users(tag_data)
-            title = f"{request.user.employee_name} tagged you in a comment"
+            if content_type.model == 'consultant':
+                consultant = get_object_or_404(Consultant, id=request.data['id'])
+                title = f"{request.user.employee_name} tagged you in a comment on {consultant.name}"
+            else:
+                title = f"{request.user.employee_name} tagged you in a comment"
             notification_data = {
                 'category': 'info',
                 'sender_user_type': 'user',

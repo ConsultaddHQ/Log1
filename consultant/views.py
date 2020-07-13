@@ -896,7 +896,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant.save()
 
             reset_days = request.data.get('reset_days', 'true')
-            if reset_days == 'true':
+            if reset_days or reset_days == 'true':
                 previous_marketing_days = 0
             else:
                 if not latest_marketing_cycle:
