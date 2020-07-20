@@ -180,6 +180,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             attachment_id = self.request.query_params.get('attachment_id', None)
             attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
             if attachment.content_type.model != 'project':
+                desc = f"{attachment.filename} deleted by {request.user.employee_name}"
+                create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
                 desc = f"{attachment.filename} deleted by {request.user.employee_name}"
@@ -187,6 +189,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 return Response({"result": "deleted"}, status=status.HTTP_202_ACCEPTED)
             else:
                 project = get_object_or_404(Project, id=attachment.object_id)
+                desc = f"{attachment.filename} deleted by {request.user.employee_name}"
+                create_activity(attachment_id, 'project', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
 
@@ -235,8 +239,6 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "vendor_address": vendor_address,
                     "reporting_details": reporting_details,
                 }
-                desc = f"{attachment.filename} deleted by {request.user.employee_name}"
-                create_activity(attachment_id, 'project', request.user, desc, 'deleted')
                 return Response({"result": "deleted", "check_list": check_list}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)
