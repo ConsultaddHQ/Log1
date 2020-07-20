@@ -22,9 +22,10 @@ class Command(BaseCommand):
 
         for test in tests:
             skills = ", ".join(skill for skill in test.skills)
-            deadline = 'NA'
             if test.deadline:
-                deadline = test.deadline.strftime('%m/%d/%Y')
+                deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B')
+            else:
+                deadline = 'NA'
             text += f"""<tr>
                             <td style="padding:5px 8px 5px 8px;"> {test.created.strftime('%a, %d %B')} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.submission.created_by.employee_name} </td>
@@ -32,12 +33,11 @@ class Command(BaseCommand):
                             <td style="padding:5px 8px 5px 8px;"> {skills} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.submission.client} </td>
                             <td style="padding:5px 8px 5px 8px;"> {"Yes" if test.is_video else "No"} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {datetime.strptime(deadline, '%m/%d/%Y').strftime('%a, %d %B')} </td>
+                            <td style="padding:5px 8px 5px 8px;"> {deadline} </td>
                         </tr>"""
         data = {
             "title": "Pending Test &#128203;",
             "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
         }
 
-        test_channel_webhook = "https://outlook.office.com/webhook/2b6b8987-33b0-4a36-bb5e-bd9b94bb2b12@2646e092-48b1-46c2-aea1-02db36a98d68/IncomingWebhook/d791a6acc44441fd9194e04a1f6aa311/825d0fa5-b150-4086-9abe-f47e87f878da"
-        post_msg_using_webhook(test_channel_webhook, data)
+        post_msg_using_webhook(config.test_team_url, data)

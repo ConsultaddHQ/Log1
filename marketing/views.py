@@ -786,7 +786,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
                      'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'project', 'job_title', 'modified')
+                     'project', 'job_title', 'modified', 'feedback')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -860,6 +860,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             if 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
+                    Q(supervisor=request.user) |
                     Q(submission__consultant_marketing__teams=request.user.team,
                       submission__consultant_marketing__in_pool=False) |
                     Q(submission__consultant_marketing__in_pool=True)
@@ -868,6 +869,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             elif 'marketer' in roles:
                 if 'recruiter' in roles or 'retention_manager' in roles:
                     queryset = queryset.filter(
+                        Q(supervisor=request.user) |
                         Q(submission__created_by=request.user) |
                         Q(submission__consultant_marketing__in_pool=True) |
                         Q(submission__consultant_marketing__marketer=request.user) |
@@ -877,6 +879,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 else:
                     queryset = queryset.filter(
+                        Q(supervisor=request.user) |
                         Q(submission__consultant_marketing__in_pool=True) |
                         Q(submission__consultant_marketing__marketer=request.user) |
                         Q(submission__created_by=request.user)
@@ -1670,13 +1673,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             scrum_masters = [user.email for user in queryset]
             path = []
             skills = ", ".join(skill.title() for skill in test.skills)
-            test_type = 'Online'
-            if data['is_video'] == 'True':
-                test_type = "Video"
-            if data['is_offline'] == 'True':
-                test_type = 'Offline'
             created_by = test.submission.created_by
             if test_status == 'new':
+                test_type = 'Online'
+                if data['is_video'] == 'True':
+                    test_type = "Video"
+                if data['is_offline'] == 'True':
+                    test_type = 'Offline'
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
                 subject = f'Test Received :: {test_type} :: {consultant.name} :: {skills} '
@@ -1696,7 +1699,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'context': {
                         'skills': skills,
                         'consultant': consultant.name,
-                        'client': test.submission.client,
                         'marketer_email': created_by.email,
                         'consultant_email': consultant.email,
                         'city': test.submission.current_city,
@@ -1715,6 +1717,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'is_offline': 'Yes' if data['is_offline'] == 'True' else 'No',
                         'jd': test.submission.lead.job_desc.replace("\n", " ;newline; "),
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
+                        'client': test.submission.client if test.submission.client else 'NA',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
                         'deadline': datetime.strptime(test.deadline, "%Y-%m-%d") if test.deadline else 'NA',
                         'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data[
@@ -1726,11 +1729,15 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return res, "ok"
 
             elif test_status == 'submit':
+                test_type = 'Online'
+                if test.is_video:
+                    test_type = "Video"
+                if test.is_offline:
+                    test_type = 'Offline'
                 engineers_email = [user.email for user in test.engineer.all()]
                 engineers_email.append(test.submitted_by.email)
                 if test.engineer.all():
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
-                    engineer += ", " + test.submitted_by.employee_name
                 else:
                     engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')
@@ -1753,7 +1760,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, config.ENGINEERING)
+                res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
                 return res, "ok"
         except Exception as error:
             logger.error(error)
@@ -1833,7 +1840,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 queryset = Test.objects.exclude(submission__consultant_marketing__status='close')
             if filter_for == 'my':
                 if 'engineer' in roles:
-                    queryset = queryset.filter(engineer=request.user)
+                    queryset = queryset.filter(
+                        Q(engineer=request.user) |
+                        Q(submitted_by=request.user)
+                    )
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
             elif filter_for == 'team':
