@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
 
 
 class TimeStampedModel(models.Model):
@@ -34,3 +35,20 @@ class ScrumMeeting(TimeStampedModel):
 
     class Meta:
         ordering = ('-held_on',)
+
+
+class Choice(models.Model):
+    name = models.CharField(_('Choice'), max_length=50)
+    field = models.CharField(_('Model Field'), max_length=50)
+    is_active = models.BooleanField(_('Is Active'), default=True)
+    display_name = models.CharField(_('Display Choice'), max_length=50)
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE,
+        verbose_name='Model Name', null=True, blank=True
+    )
+
+    def save(self, *args, **kwargs):
+        return super(Choice, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.name}-{self.field}-{self.content_type}'

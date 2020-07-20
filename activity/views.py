@@ -120,7 +120,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 tag_users(tag_data)
             if content_type.model == 'consultant':
                 consultant = get_object_or_404(Consultant, id=request.data['id'])
-                title = f"{request.user.employee_name} tagged you in a comment on {consultant.name}"
+                title = f"{request.user.employee_name} tagged you in a comment on {consultant.name}'s profile"
             else:
                 title = f"{request.user.employee_name} tagged you in a comment"
             notification_data = {
@@ -160,7 +160,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             # notification to consultant poc
             if model == 'consultant':
                 consultant = Consultant.objects.get(id=request.data['id'])
-                title = f"Comments Added for {consultant.name}"
+                title = f"Comment added on {consultant.name}'s profile by {request.user.employee_name}"
                 send_notification(consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:

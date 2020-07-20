@@ -5,7 +5,6 @@ from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
-    # A command must define handle()
     def handle(self, *args, **options):
         new = Test.objects.filter(status__iexact='new').count()
         feedback_due = Test.objects.filter(status__iexact='feedback_due').count()
@@ -42,5 +41,4 @@ class Command(BaseCommand):
                         </table>"""
         }
 
-        engineering_channel_webhook = "https://outlook.office.com/webhook/ffe50b6c-3c3c-49d3-b2f5-c8076709b2ef@2646e092-48b1-46c2-aea1-02db36a98d68/IncomingWebhook/28dab3151e154652ae5a3183863a7f1f/825d0fa5-b150-4086-9abe-f47e87f878da"
-        post_msg_using_webhook(engineering_channel_webhook, data)
+        post_msg_using_webhook(config.engineering_url, data)
