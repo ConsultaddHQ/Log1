@@ -15,6 +15,7 @@ from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyM
 
 from attachment.serializers import *
 from project.models import Project
+from activity.views import create_activity
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +182,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             if attachment.content_type.model != 'project':
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
+                desc = f"{attachment.filename} deleted by {request.user.employee_name}"
+                create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 return Response({"result": "deleted"}, status=status.HTTP_202_ACCEPTED)
             else:
                 project = get_object_or_404(Project, id=attachment.object_id)
@@ -232,7 +235,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "vendor_address": vendor_address,
                     "reporting_details": reporting_details,
                 }
-
+                desc = f"{attachment.filename} deleted by {request.user.employee_name}"
+                create_activity(attachment_id, 'project', request.user, desc, 'deleted')
                 return Response({"result": "deleted", "check_list": check_list}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)
