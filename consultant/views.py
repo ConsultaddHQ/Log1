@@ -59,8 +59,8 @@ def send_exit_interview_detail(terminate, request):
         data = {
             "title": f"Exit interview for {terminate.consultant.name}",
             "text": f"**Reason for leaving** : {reason}<br>"
-                    f"**Termination Date** : {terminate.last_date.strftime('%m/%d/%Y')}<br>"
-                    f"**Exit Interview Details** : {exit_details} <br>"
+            f"**Termination Date** : {datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')}<br>"
+            f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
         user_list = []
