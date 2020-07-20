@@ -184,8 +184,6 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
-                desc = f"{attachment.filename} deleted by {request.user.employee_name}"
-                create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 return Response({"result": "deleted"}, status=status.HTTP_202_ACCEPTED)
             else:
                 project = get_object_or_404(Project, id=attachment.object_id)
