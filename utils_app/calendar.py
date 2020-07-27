@@ -1,15 +1,15 @@
+import os
 import httplib2
 from googleapiclient.discovery import build
 from oauth2client.client import OAuth2Credentials
 
 
 def calendar_con():
-    refresh_token = "1/pC5KN2aCTRx_R4tS8xEGlUCZx6LI4pjwkDo71bhgwrw"
+    refresh_token = os.environ.get('REFRESH_TOKEN')
     expires_in = 3599
-    token = "ya29.Glv2BgSkQqLfsWiPn3_S1dZTx_TJPIQBcGsCWcBTmZife20z7ik6b7IzNkUv2iWlc9UaYbEgj4e8I" \
-            "Tkk5WAKYFUz1wVKk1xokIWHbe9GJ-XU7uPo57NTFIUELRLN"
-    credential = OAuth2Credentials(token, "414060049848-lhccvdlscbmoap54i1qk5333oobsfbf3.apps.googleusercontent.com",
-                                   "Kj-4GHm_eRdIKq_Vrlh7Ek78", refresh_token, expires_in,
+    token = os.environ.get('ACCESS_TOKEN')
+    credential = OAuth2Credentials(token, os.environ.get('CLIENT_ID'),
+                                   os.environ.get('CLIENT_SECRET'), refresh_token, expires_in,
                                    'https://accounts.google.com/o/oauth2/token', "")
 
     http = httplib2.Http()

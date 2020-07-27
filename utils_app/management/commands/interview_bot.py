@@ -22,6 +22,7 @@ class Command(BaseCommand):
         ).order_by('start_time')
 
         text = f""" <tr>
+            <th style="padding:5px 8px 5px 8px;">#</th>
             <th style="padding:5px 8px 5px 8px;">CTB</th>
             <th style="padding:5px 8px 5px 8px;">Round</th>
             <th style="padding:5px 8px 5px 8px;">Type</th>
@@ -31,8 +32,9 @@ class Command(BaseCommand):
             <th style="padding:5px 8px 5px 8px;">Marketer</th>
             </tr>"""
 
-        for interview in interviews:
+        for index, interview in enumerate(interviews):
             text += f"""<tr>
+                            <td style="padding:5px 8px 5px 8px;"> {index+1} </td>
                             <td style="padding:5px 8px 5px 8px;"> {interview.supervisor.employee_name} </td>
                             <td style="padding:5px 8px 5px 8px; text-align: center;"> {interview.round} </td>
                             <td style="padding:5px 8px 5px 8px;"> {interview.get_interview_mode_display()} </td>

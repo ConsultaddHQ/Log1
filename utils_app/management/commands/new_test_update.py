@@ -8,9 +8,10 @@ from utils_app.utils import post_msg_using_webhook
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        tests = Test.objects.filter(status='new').order_by('created')
+        tests = Test.objects.filter(status='new').exclude(submission__consultant_marketing__status='close').order_by('created')
 
         text = f""" <tr>
+            <th style="padding:5px 8px 5px 8px;">#</th>
             <th style="padding:5px 8px 5px 8px;">Created</th>
             <th style="padding:5px 8px 5px 8px;">Marketer</th>
             <th style="padding:5px 8px 5px 8px;">Consultant</th>
@@ -20,13 +21,14 @@ class Command(BaseCommand):
             <th style="padding:5px 8px 5px 8px;">Deadline</th>
             </tr>"""
 
-        for test in tests:
+        for index, test in enumerate(tests):
             skills = ", ".join(skill for skill in test.skills)
             if test.deadline:
                 deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B')
             else:
                 deadline = 'NA'
             text += f"""<tr>
+                            <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.created.strftime('%a, %d %B')} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.submission.created_by.employee_name} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.submission.consultant.name} </td>

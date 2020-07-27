@@ -62,7 +62,7 @@ class Command(BaseCommand):
             }
 
             reply_to = [config.RELATIONS]
-            mail_res = send_email(mail_data, "log1@consultadd.com", reply_to)
+            mail_res = send_email(mail_data, "marketing@consultadd.com", reply_to)
             submission_data.append({
                 "scrum_masters": cc,
                 "mail_res": mail_res,
@@ -84,5 +84,5 @@ class Command(BaseCommand):
                 'days': days,
             },
         }
-        send_email(mail_data, "log1@consultadd.com")
+        send_email(mail_data, "marketing@consultadd.com")
 

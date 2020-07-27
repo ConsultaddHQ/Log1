@@ -1689,7 +1689,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_docs = test.attachments.all()
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
-
+                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime("%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -1698,6 +1698,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'template': '../templates/test_mail.html',
                     'context': {
                         'skills': skills,
+                        'deadline': deadline,
                         'consultant': consultant.name,
                         'marketer_email': created_by.email,
                         'consultant_email': consultant.email,
@@ -1719,7 +1720,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'con_informed': 'Yes' if data['con_informed'] == 'True' else 'No',
                         'client': test.submission.client if test.submission.client else 'NA',
                         'con_timezone': data['con_timezone'] if data['con_timezone'] else 'NA',
-                        'deadline': datetime.strptime(test.deadline, "%Y-%m-%d") if test.deadline else 'NA',
                         'additional_details': data['additional_details'].replace("\n", " ;newline; ") if data[
                             'additional_details'] else 'NA',
                     },
