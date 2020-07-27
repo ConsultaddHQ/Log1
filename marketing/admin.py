@@ -107,4 +107,4 @@ class TestAdmin(ExportActionModelAdmin):
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'submitted_by__employee_name',
                      'submission__created_by__employee_name', 'is_offline')
     list_display = ('id', 'submission', 'status', 'skills', 'is_video', 'is_offline', 'deadline', 'submit_date',
-                    'submitted_by', 'feedback')
+                    'submitted_by', 'feedback', 'created')

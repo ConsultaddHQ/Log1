@@ -612,7 +612,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if new_status.startswith('cancelled'):
                     project.submission.consultant_marketing.status = 'open'
                     project.submission.consultant_marketing.save()
-                    title = f"{project.consultant.name} :: Project Cancelled"
+                    title = f"{project.consultant.name} :: {project.submission.client} :: Project Cancelled"
                     send_notification(project.consultant, request.user, title)
 
                 if new_status == 'joined':
