@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from django.core.management import BaseCommand
 from django.utils import timezone
 
@@ -39,7 +39,8 @@ class Command(BaseCommand):
             for user in scrum_masters:
                 user_list.append(user)
 
-            title = f"{consultant.name} got terminated on {terminate.last_date.strftime('%m/%d/%Y')}"
+            last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b. %d, %Y")
+            title = f"""{consultant.name} got terminated on {last_date}"""
 
             notification_data = {
                 'category': 'info',
