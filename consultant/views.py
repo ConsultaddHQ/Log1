@@ -441,7 +441,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             query = request.query_params.get('query', None)
-            consultants = Consultant.objects.filter(marketing__status='open')
+            consultants = Consultant.objects.filter(marketing__status='open').exclude(status__in=['archived', 'terminated'])
             roles = request.user.roles
 
             if 'admin' in roles or 'proxy' in roles:

@@ -28,7 +28,7 @@ from attachment.models import Attachment, create_attachment
 from attachment.views import presigned_post_url, download_s3_object
 from utils_app.utils import get_time_filter, get_time_filter_by_start
 from notification.views import create_notification, push_notification
-from utils_app.calendar import get_interviews, book_calendar, update_calendar, delete_calendar_booking
+from utils_app.calendar import get_interviews, book_ms_calendar, update_ms_calendar, delete_ms_calendar
 
 logger = logging.getLogger(__name__)
 
@@ -981,13 +981,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 if os.environ.get('ENV', 'local') == 'prod':
                     try:
-                        cal_res = book_calendar(event)
+                        cal_res = book_ms_calendar(event)
                         interview.calendar_id = cal_res['id']
                         interview.save()
                     except Exception as error:
-                        logger.error("Calendar booking failed")
-                        logger.error(error)
-                        logger.error(cal_res)
                         return Response({"result": "Calendar event creation failed", "error": str(error)},
                                         status=status.HTTP_400_BAD_REQUEST)
 
@@ -1142,12 +1139,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         if os.environ.get('ENV', 'local') == 'prod':
                             event_id = interview.calendar_id
                             if not event_id:
-                                cal_res = book_calendar(event)
+                                cal_res = book_ms_calendar(event)
                                 interview.calendar_id = cal_res['id']
                                 interview.save()
                             else:
                                 try:
-                                    cal_res['id'] = update_calendar(event_id, event)
+                                    cal_res['id'] = update_ms_calendar(event_id, event)
                                 except Exception as error:
                                     logger.error(error)
                                     logger.error(cal_res)
@@ -1194,7 +1191,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        delete_calendar_booking(interview.calendar_id)
+                        delete_ms_calendar_booking(interview.calendar_id)
                     else:
                         return Response({"result": "calendar id not found"}, status=status.HTTP_404_NOT_FOUND)
                 except Exception as error:
