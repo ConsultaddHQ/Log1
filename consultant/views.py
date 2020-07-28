@@ -141,8 +141,8 @@ def terminate_consultant(terminate):
         scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
         for user in scrum_masters:
             user_list.append(user)
-
-        title = f"{consultant.name} got terminated on {terminate.last_date}"
+        last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b. %d, %Y")
+        title = f"""{consultant.name} got terminated on {last_date}"""
 
         notification_data = {
             'category': 'info',
@@ -224,6 +224,15 @@ def send_exit_process_mail(terminate, exit_status):
             title = "Exit Process Complete, Employee Terminated"
 
         exit_details = html_to_text(terminate.exit_details)
+
+        last_date = 'NA'
+        if terminate.last_date:
+            last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b. %d, %Y")
+
+        resign_date = 'NA'
+        if terminate.resign_date:
+            resign_date = datetime.strptime(terminate.resign_date, "%Y-%m-%d").strftime("%b. %d, %Y")
+
         mail_data = {
             'to': to,
             'cc': cc,
@@ -233,6 +242,8 @@ def send_exit_process_mail(terminate, exit_status):
             'context': {
                 'title': title,
                 'reason': reason,
+                'last_date': last_date,
+                'resign_date': resign_date,
                 'exit_status': exit_status,
                 'type': types[terminate.type],
                 'consultant': consultant.name,
@@ -241,8 +252,6 @@ def send_exit_process_mail(terminate, exit_status):
                 'rehire': 'Yes' if terminate.rehire else 'No',
                 'legal': 'Yes' if terminate.legal_action else 'No',
                 'exit_details': exit_details if terminate.exit_details else 'NA',
-                'last_date': terminate.last_date.strftime('%m/%d/%Y') if terminate.last_date else 'NA',
-                'resign_date': terminate.resign_date.strftime('%m/%d/%Y') if terminate.resign_date else 'NA',
                 'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
                 'notice_period': terminate.notice_period if terminate.legal_action else 'NA',
             },
@@ -432,7 +441,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             query = request.query_params.get('query', None)
-            consultants = Consultant.objects.filter(marketing__status='open')
+            consultants = Consultant.objects.filter(marketing__status='open').exclude(status__in=['archived', 'terminated'])
             roles = request.user.roles
 
             if 'admin' in roles or 'proxy' in roles:
@@ -775,7 +784,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         location = request.query_params.get('location', None)
         con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
+        page_size = int(request.query_params.get("size", 10))
         last, first = page * page_size, page * page_size - page_size
 
         try:
@@ -1361,20 +1370,20 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 reason = get_object_or_404(ExitReason, id=reason)
                 con_exit.reasons.add(reason)
 
-            if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
-                terminate_consultant(con_exit)
-
             # Mattermost message for exit interview
             if request.data.get('exit_details', None):
                 send_exit_interview_detail(con_exit, request)
 
-            # Email for starting Exit Process
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = send_exit_process_mail(con_exit, 'start')
-                if error == 'error':
-                    logger.error(res)
-                    return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
+            if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
+                terminate_consultant(con_exit)
+            else:
+                # Email for starting Exit Process
+                if os.environ.get('ENV', 'local') == 'prod':
+                    res, error = send_exit_process_mail(con_exit, 'start')
+                    if error == 'error':
+                        logger.error(res)
+                        return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
             serializer = self.serializer_class(consultant.exit.all().order_by('-created'), many=True)
             return Response({"result": serializer.data, "exit_mail": str(res)}, status=status.HTTP_201_CREATED)
         except Exception as error:

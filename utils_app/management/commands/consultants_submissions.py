@@ -27,7 +27,8 @@ class Command(BaseCommand):
         for consultant in consultants:
             submission_ids = []
             scrum_masters = []
-            queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days)
+            queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days,
+                                                 is_complete=True)
             submissions = []
             if not queryset:
                 continue
@@ -62,7 +63,7 @@ class Command(BaseCommand):
             }
 
             reply_to = [config.RELATIONS]
-            mail_res = send_email(mail_data, "log1@consultadd.com", reply_to)
+            mail_res = send_email(mail_data, "marketing@consultadd.com", reply_to)
             submission_data.append({
                 "scrum_masters": cc,
                 "mail_res": mail_res,
@@ -84,5 +85,5 @@ class Command(BaseCommand):
                 'days': days,
             },
         }
-        send_email(mail_data, "log1@consultadd.com")
+        send_email(mail_data, "marketing@consultadd.com")
 

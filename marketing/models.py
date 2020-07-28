@@ -21,6 +21,7 @@ TEST_STATUS_CHOICES = (
     ('new', 'New'),
     ('passed', 'Passed'),
     ('failed', 'Failed'),
+    ('cancelled', 'Cancelled'),
     ('feedback_due', 'Feedback Due'),
 )
 
@@ -57,8 +58,8 @@ INTERVIEW_MODE = (
 )
 
 SCREENING_CHOICES = (
-    ('test', 'test'),
-    ('screening', 'Screening'),
+    ('ip_screening', 'IP Tech Screening'),
+    ('vendor_screening', 'Vendor Tech Screening'),
     ('interview', 'Interview'),
 )
 
@@ -166,6 +167,7 @@ class Submission(TimeStampedModel):
     rate = models.FloatField(_('Rate'), null=True, blank=True)
     comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is active'), default=False)
+    is_complete = models.BooleanField(_('Is complete'), default=False)
     email = models.EmailField(_('Marketing Email'), null=True, blank=True)
     client = models.CharField(_('Client'), max_length=100, null=True, blank=True)
     phone = models.CharField(_('Marketing Phone'), max_length=20, null=True, blank=True)
@@ -259,15 +261,16 @@ class VendorLayer(TimeStampedModel):
 
 class Test(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    link = models.TextField(_('Test Link'), null=True, blank=True)
     is_video = models.BooleanField(_('Video Test'), default=False)
     is_offline = models.BooleanField(_('Offline Test'), default=False)
     feedback = models.TextField(_('Test Feedback'), null=True, blank=True)
     deadline = models.DateField(_('Test Deadline'), null=True, blank=True)
-    link = models.TextField(_('Test Link'), null=True, blank=True)
+    cancel_reason = models.TextField(_('Cancellation Reason'), null=True, blank=True)
     engineer_remarks = models.TextField(_("Engineer Remarks"), null=True, blank=True)
     status = models.CharField(_('Status'), max_length=20, choices=TEST_STATUS_CHOICES)
-    additional_details = models.TextField(_('Additional Details'), null=True, blank=True)
     submit_date = models.DateTimeField(_('Test Submission Date'), null=True, blank=True)
+    additional_details = models.TextField(_('Additional Details'), null=True, blank=True)
     skills = ArrayField(models.CharField(_('Skills'), max_length=30), blank=True, null=True)
     engineer = models.ManyToManyField(
         User,
