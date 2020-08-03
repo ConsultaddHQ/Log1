@@ -374,7 +374,7 @@
 
     .f-fallback strong {
         float: left;
-        width: 49%;
+        width: 180px;
     }
 
   .main_left_box {
@@ -396,6 +396,7 @@
     float: left;
     margin-top: 10px;
     padding-top: 10px;
+    margin-bottom: 20px;
   }
 
   .left_box p,.right_box p {
@@ -421,7 +422,8 @@
     border: solid 1px #cecece;
     padding: 9px;
     padding-top: 0;
-        height: 340px;
+    min-height: 340px;
+    height: auto;
     width: 100%;
     float: right;
     margin-top: 10px;
@@ -432,6 +434,7 @@
     overflow: hidden;
     overflow-y: scroll;
     height: 60px;
+
 }
 
 .f-fallback h4{
@@ -550,7 +553,7 @@
                           </div>
                         </div>
 
-                          <div class="main_right_box">  
+                          <div class="main_right_box">
                           <h4>Details For Test</h4>
 
                           <div class="right_box">
@@ -574,24 +577,22 @@
                             <div class="left_box marketerbox">
                                 <p>{{test_link}}</p>
                           </div>
-                        </div>  
-
-
-                          
+                        </div>
 
                           <br clear="all"/>
-                          
-                          
-                          
-
-                          <h4>Additional Details</h4>
-                            <p>{{additional_details}}</p>
-                          <h4>Job Description</h4>
-                            <p>{{ jd }}</p>
-                        <p><strong>Thanks,
-                          <br>The Log1 Team</strong></p>
 
                       </div>
+                          <br clear="all"/>
+
+                      <div style="width: 100%; clear: both;">
+                        <h4>Additional Details</h4>
+                        <p>{{additional_details}}</p>
+                        <h4>Job Description</h4>
+                        <p>{{ jd }}</p>
+                        <p><strong>Thanks,
+                        <br>The Log1 Team</strong></p>
+                      </div>
+
                     </td>
                   </tr>
                 </table>

@@ -25,6 +25,7 @@ ATTACHMENT_TYPE = (
     ('academic', 'Academic Docs'),
     ('photo_id', 'Miscellaneous'),
     ('results', 'Assessment Results'),
+    ('po_extension', "PO Extension Docs"),
     ('msa_signed', 'MSA/Agreement Signed'),
     ('recordings', 'Interview Recordings'),
     ('test_submit', "Test Submission Docs"),

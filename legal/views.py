@@ -540,10 +540,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 }
 
                 object_ids = [petition.created_by.id, petition.assigned_to.id]
-                registration_ids = list(
-                    FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                             ).values_list('device_id', flat=True))
-                push_notification(registration_ids, message_body)
+                push_notification(object_ids, message_body)
 
                 serializer = ConsultantCommentGetSerializer(comment)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
@@ -660,11 +657,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                         'timestamp': str(timezone.now()),
                     },
                 }
-
-                registration_ids = list(
-                    FCMDevice.objects.filter(object_id=petition.assigned_to.id, content_type__model='user').values_list(
-                        'device_id', flat=True))
-                push_notification(registration_ids, message_body)
+                push_notification([petition.assigned_to.id], message_body)
 
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)

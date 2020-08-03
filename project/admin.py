@@ -1,7 +1,7 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
-from project.models import Project, ProjectSupport, TimeSheet, PayrollSchedule, ProjectStatus, IphoneAppLink
+from project.models import *
 
 
 @admin.register(Project)
@@ -44,6 +44,13 @@ class ProjectStatusAdmin(ExportActionModelAdmin):
     list_filter = ('status', 'is_current')
     list_display = ('id', 'project', 'status', 'created', 'is_current')
     search_fields = ('id', 'project__consultant__name', 'status', 'project__submission__client', 'is_current')
+
+
+@admin.register(ProjectOrder)
+class ProjectOrderAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
+    list_display = ('id', 'project', 'start_date', 'end_date', 'created_by')
+    search_fields = ('id', 'project__consultant__name', 'project__submission__client', 'start_date', 'end_date')
 
 
 @admin.register(TimeSheet)

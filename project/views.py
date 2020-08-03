@@ -13,17 +13,18 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
 
 from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
 from marketing.models import Submission, User
 from consultant.views import send_notification
+from attachment.models import create_attachment
 from consultant.models import ConsultantPOC, Consultant
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from notification.views import push_notification, Notification, FCMDevice
+from notification.views import push_notification_consultant, Notification, FCMDevice
 from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
 
 logger = logging.getLogger(__name__)
@@ -833,6 +834,119 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    queryset = ProjectSupport.objects.all()
+    serializer_class = ProjectSupportSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            serializer = ProjectSupportSerializer(project.support.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.data['project_id'])
+            users = request.data['support']
+            for user in users:
+                support = get_object_or_404(User, id=user['id'])
+                ProjectSupport.objects.create(
+                    project=project,
+                    support=support,
+                    start=user['start']
+                )
+                # notification
+            serializer = ProjectSupportSerializer(project.support.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+            support.end = request.data.get('end')
+            support.feedback = request.data.get('feedback', None)
+            support.save()
+            serializer = ProjectSupportSerializer(support)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProjectOrderViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
+    queryset = ProjectSupport.objects.all()
+    serializer_class = ProjectSupportSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            serializer = ProjectOrderSerializer(project.order.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.data['project_id'])
+            po_status = project.statuses.get(is_current=True)
+            if po_status.status == 'joined':
+                order = ProjectOrder.objects.create(
+                    project=project,
+                    created_by=request.user,
+                    end_date=request.data.get('end_date'),
+                    start_date=request.data.get('start_date')
+                )
+                for file in request.FILES.getlist('file'):
+                    file_data = {
+                        "file": file,
+                        "type": 'po_extension',
+                        "model": "projectorder",
+                        "object_id": order.id,
+                        "creator": request.user,
+                    }
+                    create_attachment(file_data)
+                serializer = ProjectOrderSerializer(project.order.all(), many=True)
+                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"error": "Can't add extension"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            order = get_object_or_404(ProjectOrder, id=kwargs.get('pk'))
+            po_status = order.project.statuses.get(is_current=True)
+            if po_status.status == 'joined':
+                serializer = ProjectOrderSerializer(order, data=request.data, partial=True)
+                if serializer.is_valid():
+                    serializer.save()
+                    for file in request.FILES.getlist('file'):
+                        file_data = {
+                            "file": file,
+                            "type": 'po_extension',
+                            "model": "projectorder",
+                            "object_id": order.id,
+                            "creator": request.user,
+                        }
+                        create_attachment(file_data)
+                    return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Can't update extension details"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
     authentication_classes = ()
     permission_classes = (HasAPIKey,)
@@ -1032,7 +1146,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     registration_ids = list(
                         FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='consultanttoken'
                                                  ).values_list('device_id', flat=True))
-                    push_notification(registration_ids, message_body)
+                    push_notification_consultant(registration_ids, message_body)
                 serializer = self.serializer_class(timesheet)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)

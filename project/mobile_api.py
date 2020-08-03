@@ -18,7 +18,7 @@ from notification.models import FCMDevice
 from attachment.views import get_s3_object
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
-from notification.views import create_notification, push_notification
+from notification.views import create_notification, push_notification, push_notification_consultant
 
 logger = logging.getLogger(__name__)
 
@@ -164,11 +164,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 },
             }
             user_ids = list(user_list.values_list('id', flat=True))
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=user_ids, content_type__model='user').values_list(
-                    'device_id', flat=True))
-            push_notification(registration_ids, message_body)
-
+            push_notification(user_ids, message_body)
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -222,7 +218,7 @@ class Test(GenericViewSet, ListModelMixin):
             },
         }
 
-        result = push_notification([device_id], message_body)
+        result = push_notification_consultant([device_id], message_body)
         if result:
             return Response({"result": str(result)}, status=status.HTTP_200_OK)
         return Response({"result": "Success"}, status=status.HTTP_200_OK)
@@ -319,10 +315,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 },
             }
             user_ids = list(user_list.values_list('id', flat=True))
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=user_ids, content_type__model='user').values_list(
-                    'device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(user_ids, message_body)
 
             return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -491,10 +484,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             }
 
             user_ids = list(user_list.values_list('id', flat=True))
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=user_ids, content_type__model='user').values_list(
-                    'device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(user_ids, message_body)
 
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=status.HTTP_201_CREATED)

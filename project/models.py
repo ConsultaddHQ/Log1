@@ -116,7 +116,37 @@ class ProjectStatus(models.Model):
         verbose_name_plural = 'Project Statuses'
 
 
+class ProjectOrder(TimeStampedModel):
+    attachments = GenericRelation(Attachment)
+    end_date = models.DateField(_('End Date'), null=True, blank=True)
+    start_date = models.DateField(_('Start Date'), null=True, blank=True)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE,
+        related_name='order',
+        verbose_name='Project'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='order',
+        verbose_name='Order created by'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(ProjectOrder, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id} - {self.project.consultant.name} - {self.start_date}'
+
+
 class ProjectSupport(TimeStampedModel):
+    feedback = models.TextField(_("Feedback"), null=True, blank=True)
     end = models.DateField(_('Support End Date'), blank=True, null=True)
     start = models.DateField(_('Support Start Date'), blank=True, null=True)
     support = models.ForeignKey(

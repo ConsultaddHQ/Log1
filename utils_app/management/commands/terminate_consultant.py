@@ -73,8 +73,4 @@ class Command(BaseCommand):
             object_ids = []
             for user in user_list:
                 object_ids.append(user.id)
-
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(object_ids, message_body)
