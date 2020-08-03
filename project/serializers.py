@@ -2,6 +2,7 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from project.models import *
+from employee.serializers import UserSerializer
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 
@@ -10,6 +11,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     rate = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     client = serializers.SerializerMethodField()
+    support = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
@@ -19,13 +21,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
                   'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote')
+                  'is_remote', 'support')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
         if status:
             return status.first().status
         return None
+
+    def get_support(self, obj):
+        return ProjectSupportSerializer(obj.support.all(), many=True).data
 
     def get_rate(self, obj):
         return obj.submission.rate
@@ -260,3 +265,22 @@ class ProjectGetSerializer(serializers.ModelSerializer):
             "work_order_signed": s_work_order,
             "reporting_details": reporting_details,
         }
+
+
+class ProjectSupportSerializer(serializers.ModelSerializer):
+    support = UserSerializer()
+
+    class Meta:
+        model = ProjectSupport
+        fields = '__all__'
+
+
+class ProjectOrderSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectOrder
+        fields = '__all__'
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data

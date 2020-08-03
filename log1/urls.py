@@ -25,7 +25,8 @@ from legal.views import PetitionViewSets, PetitionDocsViewSets
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
-from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
+    ProjectSupportViewSet, ProjectOrderViewSet
 
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeSheetV2ViewSets, Test
 
@@ -76,6 +77,8 @@ router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
+router.register(r'project_order', ProjectOrderViewSet)
+router.register(r'project_support', ProjectSupportViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)

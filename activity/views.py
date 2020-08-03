@@ -151,10 +151,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 },
             }
             object_ids = [user.id for user in user_list]
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(object_ids, message_body)
 
             serializer = CommentGetSerializer(comment)
             # notification to consultant poc
