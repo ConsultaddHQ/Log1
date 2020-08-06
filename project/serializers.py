@@ -21,7 +21,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
                   'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote', 'support')
+                  'is_remote', 'support', 'rate', 'employer')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -207,7 +207,7 @@ class ProjectGetSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'reporting_details', 'is_remote')
+                  'start_date', 'end_date', 'rate', 'employer', 'reporting_details', 'is_remote')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -276,6 +276,7 @@ class ProjectSupportSerializer(serializers.ModelSerializer):
 
 
 class ProjectOrderSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
@@ -283,4 +284,4 @@ class ProjectOrderSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_attachments(self, obj):
-        return AttachmentSerializer(obj.attachments.all(), many=True).data
+        return AttachmentSerializer(obj.project.attachments.all(), many=True).data

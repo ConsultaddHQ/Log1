@@ -77,8 +77,8 @@ router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
-router.register(r'project_order', ProjectOrderViewSet)
 router.register(r'project_support', ProjectSupportViewSet)
+router.register(r'project_order', ProjectOrderViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
