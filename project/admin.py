@@ -9,8 +9,9 @@ class ProjectAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('statuses__status',)
     search_fields = ('id', 'consultant__name', 'submission__client', 'submission__created_by__employee_name')
-    list_display = ('id', 'submission', 'start_date', 'end_date', 'consultant', 'project_status_display',
-                    'client_display', 'vendor_display', 'client_address', 'city', 'vendor_address', 'is_remote')
+    list_display = ('id', 'submission', 'start_date', 'end_date', 'consultant', 'rate', 'project_status_display',
+                    'client_display', 'vendor_display', 'employer', 'client_address', 'city', 'vendor_address',
+                    'is_remote')
 
     def project_status_display(self, obj):
         statuses = obj.statuses.filter(is_current=True)
@@ -49,8 +50,8 @@ class ProjectStatusAdmin(ExportActionModelAdmin):
 @admin.register(ProjectOrder)
 class ProjectOrderAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_display = ('id', 'project', 'start_date', 'end_date', 'created_by')
-    search_fields = ('id', 'project__consultant__name', 'project__submission__client', 'start_date', 'end_date')
+    list_display = ('id', 'project', 'field', 'value', 'effective_date', 'created_by')
+    search_fields = ('id', 'project__consultant__name', 'project__submission__client', 'effective_date')
 
 
 @admin.register(TimeSheet)

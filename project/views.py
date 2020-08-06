@@ -18,14 +18,16 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateMode
 from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
+from activity.views import create_activity
 from marketing.models import Submission, User
 from consultant.views import send_notification
 from attachment.models import create_attachment
 from consultant.models import ConsultantPOC, Consultant
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from notification.views import push_notification_consultant, Notification, FCMDevice
 from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
+from notification.views import push_notification_consultant, Notification, FCMDevice, create_notification,\
+    push_notification
 
 logger = logging.getLogger(__name__)
 
@@ -515,6 +517,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.city = sub.lead.city
                 project.is_remote = is_remote
                 project.consultant = consultant
+                project.rate = project.submission.rate
+                project.employer = project.submission.employer
                 project.save()
 
                 scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'],
@@ -553,9 +557,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             data = {
                 "city": request.data.get('city', project.city),
+                "rate": request.data.get('rate', project.rate),
                 "duration": request.data.get('duration', project.duration),
                 "end_date": request.data.get('end_date', project.end_date),
                 "feedback": request.data.get('feedback', project.feedback),
+                "employer": request.data.get('employer', project.employer),
                 "start_date": request.data.get('start_date', project.start_date),
                 "payment_term": request.data.get('payment_term', project.payment_term),
                 "client_address": request.data.get('client_address', project.client_address),
@@ -567,9 +573,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             }
             project.city = data["city"]
+            project.rate = data["rate"]
             project.duration = data["duration"]
             project.end_date = data["end_date"]
             project.feedback = data["feedback"]
+            project.employer = data["employer"]
             project.start_date = data["start_date"]
             project.payment_term = data["payment_term"]
             project.client_address = data["client_address"]
@@ -852,15 +860,55 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     def create(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=request.data['project_id'])
-            users = request.data['support']
+            users = request.data.get('support', [])
+            support_names = []
             for user in users:
                 support = get_object_or_404(User, id=user['id'])
+                support_names.append(support.employee_name)
+                if not user['start']:
+                    return Response({"error": "Start date can not be empty"}, status=status.HTTP_400_BAD_REQUEST)
                 ProjectSupport.objects.create(
                     project=project,
                     support=support,
                     start=user['start']
                 )
-                # notification
+            # notification
+            user_list = []
+            consultant = project.submission.consultant
+            names = ", ".join(name for name in support_names)
+            pocs = consultant.pocs.all()
+            for data in pocs:
+                user_list.append(data.poc)
+            user_list.append(project.submission.created_by)
+            title = f"""{names} is assigned as support to {consultant.name}'s project of {project.submission.client}"""
+            notification_data = {
+                'title': title,
+                'category': 'info',
+                'description': title,
+                'sender_id': request.user.id,
+                'target_id': project.id,
+                'sender_user_type': 'user',
+                'target_type': 'project',
+                'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+            # Push Notification
+            message_body = {
+                "body": title,
+                "title": title,
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "data": {
+                    'target': 'project',
+                    'is_read': False,
+                    'is_deleted': False,
+                    'timestamp': str(datetime.now()),
+                    'target_id': project.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
             serializer = ProjectSupportSerializer(project.support.all(), many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -880,9 +928,9 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ProjectOrderViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
-    queryset = ProjectSupport.objects.all()
-    serializer_class = ProjectSupportSerializer
+class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    queryset = ProjectOrder.objects.all()
+    serializer_class = ProjectOrderSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
@@ -897,27 +945,52 @@ class ProjectOrderViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
 
     def create(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=request.data['project_id'])
-            po_status = project.statuses.get(is_current=True)
-            if po_status.status == 'joined':
-                order = ProjectOrder.objects.create(
-                    project=project,
-                    created_by=request.user,
-                    end_date=request.data.get('end_date'),
-                    start_date=request.data.get('start_date')
-                )
+            project = get_object_or_404(Project, id=request.data.get('project_id'))
+            effective_date = request.data.get('effective_date')
+            desc = ""
+            if request.data.get('field') == 'rate':
+                project.rate = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} rate changed to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            elif request.data.get('field') == 'employer':
+                project.employer = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer changed to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            elif request.data.get('field') == 'end_date':
+                effective_date = project.end_date
+                project.end_date = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} extended to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            order = ProjectOrder.objects.create(
+                project=project,
+                created_by=request.user,
+                effective_date=effective_date,
+                value=request.data.get('value'),
+                field=request.data.get('field'),
+            )
+            project.save()
+
+            if request.FILES.getlist('file'):
+                attachments = project.attachments.all()
+                for attachment in attachments:
+                    attachment.is_active = False
+                    attachment.save()
+
                 for file in request.FILES.getlist('file'):
                     file_data = {
                         "file": file,
-                        "type": 'po_extension',
-                        "model": "projectorder",
-                        "object_id": order.id,
+                        "model": "project",
+                        "object_id": project.id,
                         "creator": request.user,
+                        "type": request.data.get('file_type'),
                     }
                     create_attachment(file_data)
-                serializer = ProjectOrderSerializer(project.order.all(), many=True)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            return Response({"error": "Can't add extension"}, status=status.HTTP_400_BAD_REQUEST)
+            create_activity(order.id, 'projectorder', request.user, desc, 'created')
+            serializer = self.serializer_class(project.order.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -925,23 +998,13 @@ class ProjectOrderViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
     def update(self, request, *args, **kwargs):
         try:
             order = get_object_or_404(ProjectOrder, id=kwargs.get('pk'))
-            po_status = order.project.statuses.get(is_current=True)
-            if po_status.status == 'joined':
-                serializer = ProjectOrderSerializer(order, data=request.data, partial=True)
-                if serializer.is_valid():
-                    serializer.save()
-                    for file in request.FILES.getlist('file'):
-                        file_data = {
-                            "file": file,
-                            "type": 'po_extension',
-                            "model": "projectorder",
-                            "object_id": order.id,
-                            "creator": request.user,
-                        }
-                        create_attachment(file_data)
-                    return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-                return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({"error": "Can't update extension details"}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = ProjectOrderSerializer(order, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                desc = f"Project Order details updated by {request.user.employee_name}"
+                create_activity(order.id, 'projectorder', request.user, desc, 'updated')
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

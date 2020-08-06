@@ -58,7 +58,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'created', 'duration', 'start_date', 'end_date', 'city', 'feedback', 'consultant',
                   'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list',
-                  'reporting_details', 'attachments', 'is_remote', 'consultant_name')
+                  'reporting_details', 'rate', 'employer', 'attachments', 'is_remote', 'consultant_name')
 
     def get_consultant_name(self, obj):
         return obj.consultant.name
