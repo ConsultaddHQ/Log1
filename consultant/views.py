@@ -411,12 +411,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 project=OuterRef("pk"), is_current=True)
 
             data = queryset[first:last].annotate(
-                rate=F('submission__rate'),
                 client=F('submission__client'),
-                employer=F('submission__employer'),
                 consultant_name=F('consultant__name'),
-                status=Subquery(project_status.values('status')[:1]),
                 job_title=F('submission__lead__job_title'),
+                status=Subquery(project_status.values('status')[:1]),
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
             ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
