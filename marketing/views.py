@@ -374,7 +374,7 @@ def create_submission(request, lead_id):
                 date_of_birth=profile.date_of_birth,
             )
 
-        if sub.rate and sub.vendor and sub.client and sub.lead.job_desc:
+        if sub.rate and sub.vendor and sub.client and (sub.lead.job_desc and len(sub.lead.job_desc) > 20):
             sub.is_complete = True
             sub.save()
 
@@ -613,7 +613,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 else:
                     submission.is_active = False
 
-                if submission.rate and submission.vendor and submission.client and submission.lead.job_desc:
+                if submission.rate and submission.vendor and submission.client and\
+                        (submission.lead.job_desc and len(submission.lead.job_desc) > 20):
                     submission.is_complete = True
                 else:
                     submission.is_complete = False
@@ -965,7 +966,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 attendees = [
                                 {'email': supervisor},
                                 {'email': request.user.email},
-                                {"email": config.BOOKING_ADMIN},
                             ] + guest
                 user_list.append(interview.supervisor)
 
@@ -1126,7 +1126,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     attendees = [
                         {'email': supervisor_email},
                         {'email': request.user.email},
-                        {'email': config.BOOKING_ADMIN},
                     ]
 
                     for user in scrum_masters:

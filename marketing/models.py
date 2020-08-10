@@ -312,9 +312,9 @@ class Interview(TimeStampedModel):
     start_time = models.DateTimeField(_('Start Date'), null=True, blank=True)
     call_details = models.TextField(_('Call Details'), null=True, blank=True)
     attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
-    calendar_id = models.CharField(_('Calendar ID'), max_length=50, null=True, blank=True)
-    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=SCREENING_CHOICES)
+    calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
+    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=SCREENING_CHOICES)
     status = models.CharField(_('Status'), max_length=20, choices=SCREENING_STATUS_CHOICES, default='scheduled')
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),

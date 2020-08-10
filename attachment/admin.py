@@ -6,6 +6,6 @@ from .models import Attachment
 
 @admin.register(Attachment)
 class AttachmentAdmin(ExportActionModelAdmin):
-    list_filter = ('content_type',)
-    list_display = ('id', 'content_type', 'object_id', 'creator', 'attachment_type')
+    list_filter = ('content_type', 'is_active')
+    list_display = ('id', 'content_type', 'object_id', 'creator', 'attachment_type', 'is_active')
     search_fields = ('id', 'content_type__model', 'object_id', 'creator__employee_name', 'attachment_type')

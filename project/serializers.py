@@ -8,7 +8,6 @@ from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    rate = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
     client = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
@@ -21,7 +20,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
                   'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote', 'support', 'rate', 'employer')
+                  'is_remote', 'support', 'employer')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
@@ -31,9 +30,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_support(self, obj):
         return ProjectSupportSerializer(obj.support.all(), many=True).data
-
-    def get_rate(self, obj):
-        return obj.submission.rate
 
     def get_marketer_name(self, obj):
         return obj.submission.created_by.employee_name

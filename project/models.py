@@ -83,9 +83,8 @@ class Project(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+        if not self.id:
+            self.created = timezone.now()
         self.modified = timezone.now()
         return super(Project, self).save(*args, **kwargs)
 
@@ -163,9 +162,6 @@ class ProjectSupport(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -200,9 +196,6 @@ class TimeSheet(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

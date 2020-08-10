@@ -43,7 +43,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': [project.consultant.email],
                 'cc': [config.FINANCE],
-                'bcc': ['sarang.m@consultadd.com'],
+                'bcc': [],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'context': {
@@ -189,7 +189,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': to,
                 'cc': cc,
-                'bcc': ['sarang.m@consultadd.com'],
+                'bcc': [],
                 'subject': f'On Boarding of {consultant.name} :: {submission.employer.title()} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
@@ -281,7 +281,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                 }
             }
-            send_email(mail_data, marketer.email)
+            res1 = send_email(mail_data, marketer.email)
             to_engineering = [config.ENGINEERING]
             mail_data_eng = {
                 'to': to_engineering,
@@ -299,8 +299,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                 }
             }
-            res = send_email(mail_data_eng, marketer.email)
-            return res, "ok"
+            res2 = send_email(mail_data_eng, marketer.email)
+            return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
             logger.error("Offer mail error for {}".format(marketer.email), error)
             return error, "error"
@@ -639,7 +639,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if new_status.startswith('cancelled'):
                     project.submission.consultant_marketing.status = 'open'
                     project.submission.consultant_marketing.save()
-                    title = f"{project.consultant.name} :: {project.submission.client} :: Project Cancelled"
+                    title = f"Project Cancelled :: {project.consultant.name} :: {project.submission.client}"
                     send_notification(project.consultant, request.user, title)
 
                 if new_status == 'joined':
@@ -684,7 +684,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.joined_url, data)
 
-                    title = f"{project.consultant.name} :: {project.submission.client} :: Project Joined"
+                    title = f" Project Joined :: {project.consultant.name} :: {project.submission.client}"
                     send_notification(project.consultant, request.user, title)
 
                     consultant = project.consultant
@@ -762,7 +762,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
                     project.save()
-                    title = f"{project.consultant.name} :: {project.submission.client} ::Project Received"
+                    title = f" Project Received :: {project.consultant.name} :: {project.submission.client}"
                     send_notification(project.consultant, request.user, title)
 
                 # Mail for Cancellation or Termination of Project
@@ -803,7 +803,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                             "text": text
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
-                        title = f"{project.consultant.name} :: {project.submission.client} :: Project Terminated"
+                        title = f"Project Terminated :: {project.consultant.name} :: {project.submission.client}"
                         send_notification(project.consultant, request.user, title)
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
@@ -831,7 +831,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Completion')
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                        title = f"{project.consultant.name} :: {project.submission.client} :: Project Complete"
+                        title = f" Project Completed :: {project.consultant.name} :: {project.submission.client}"
                         send_notification(project.consultant, request.user, title)
 
             serializer = self.serializer_class(project)
