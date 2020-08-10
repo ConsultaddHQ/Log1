@@ -27,7 +27,8 @@ class Command(BaseCommand):
         first, last = 0, 50
         while True:
             for user in marketers[first:last]:
-                submissions_count = Submission.objects.filter(created__range=[start, end], created_by=user).count()
+                submissions_count = Submission.objects.filter(created__range=[start, end], created_by=user,
+                                                              is_complete=True).count()
                 if submissions_count <= 5:
                     text += f"""<tr>
                                     <td style="padding:5px 8px 5px 8px;">{user.employee_name}</td>

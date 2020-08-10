@@ -48,7 +48,7 @@ class SubmissionAdmin(ExportActionModelAdmin):
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
                      'consultant_marketing__consultant__email', 'consultant_marketing__consultant__name')
     list_display = ('id', 'consultant_marketing', 'client', 'rate', 'created_by', 'lead_owner_display', 'lead',
-                    'status', 'is_active', 'employer', 'screening_display', 'vendor_contact', 'visa_type',
+                    'status', 'is_active', 'is_complete', 'employer', 'screening_display', 'vendor_contact', 'visa_type',
                     'visa_start', 'visa_end', 'linkedin', 'date_of_birth', 'current_city', 'created', 'modified')
 
     def screening_display(self, obj):
@@ -107,4 +107,4 @@ class TestAdmin(ExportActionModelAdmin):
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'submitted_by__employee_name',
                      'submission__created_by__employee_name', 'is_offline')
     list_display = ('id', 'submission', 'status', 'skills', 'is_video', 'is_offline', 'deadline', 'submit_date',
-                    'submitted_by', 'feedback', 'created')
+                    'submitted_by', 'feedback', 'cancel_reason')

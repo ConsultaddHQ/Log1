@@ -104,10 +104,7 @@ def send_exit_interview_detail(terminate, request):
             },
         }
         object_ids = [user.id for user in user_list]
-        registration_ids = list(
-            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                     ).values_list('device_id', flat=True))
-        push_notification(registration_ids, message_body)
+        push_notification(object_ids, message_body)
 
         return None
     except Exception as error:
@@ -175,11 +172,7 @@ def terminate_consultant(terminate):
         object_ids = []
         for user in user_list:
             object_ids.append(user.id)
-
-        registration_ids = list(
-            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                     ).values_list('device_id', flat=True))
-        push_notification(registration_ids, message_body)
+        push_notification(object_ids, message_body)
         return None
     except Exception as error:
         return error
@@ -304,10 +297,7 @@ def send_notification(consultant, sender, title):
             },
         }
         object_ids = [user.id for user in user_list]
-        registration_ids = list(
-            FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                     ).values_list('device_id', flat=True))
-        push_notification(registration_ids, message_body)
+        push_notification(object_ids, message_body)
         return "Notification sent"
     except Exception as error:
         logger.error(error)
@@ -421,12 +411,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 project=OuterRef("pk"), is_current=True)
 
             data = queryset[first:last].annotate(
-                rate=F('submission__rate'),
                 client=F('submission__client'),
-                employer=F('submission__employer'),
                 consultant_name=F('consultant__name'),
-                status=Subquery(project_status.values('status')[:1]),
                 job_title=F('submission__lead__job_title'),
+                status=Subquery(project_status.values('status')[:1]),
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
             ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
@@ -492,7 +480,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
@@ -562,7 +550,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
@@ -612,7 +600,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
@@ -650,7 +638,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['post', 'put'], detail=True, url_path='experience')
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
         if request.method == 'POST':
@@ -1181,7 +1169,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = ConsultantPOC.objects.filter(poc_type=request.data['poc_type'],
@@ -1206,7 +1194,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
@@ -1229,7 +1217,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
@@ -1262,7 +1250,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
         try:
             instance = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
@@ -1347,7 +1335,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
@@ -1392,7 +1380,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     def update(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
+            if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
                 return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
 
             con_exit = get_object_or_404(ConsultantExit, id=kwargs.get('pk'))
@@ -1505,10 +1493,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 },
             }
             object_ids = [user.id for user in user_list]
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(object_ids, message_body)
 
             serializer = self.serializer_class(feedback)
 
@@ -1575,10 +1560,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 },
             }
             object_ids = [user.id for user in user_list]
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(object_ids, message_body)
 
             title = f"{serializer.data['feedback_type']} feedback updated for {feedback.consultant.name} " \
                     f"by {request.user.employee_name}"

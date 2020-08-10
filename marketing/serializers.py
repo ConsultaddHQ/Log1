@@ -58,7 +58,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'created', 'duration', 'start_date', 'end_date', 'city', 'feedback', 'consultant',
                   'vendor_address', 'client_address', 'payment_term', 'invoicing_period', 'is_msg_sent', 'check_list',
-                  'reporting_details', 'attachments', 'is_remote', 'consultant_name')
+                  'reporting_details', 'rate', 'employer', 'attachments', 'is_remote', 'consultant_name')
 
     def get_consultant_name(self, obj):
         return obj.consultant.name
@@ -138,7 +138,7 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
                   'current_city', 'attachments', 'test', 'interviews', 'project', 'comments', 'marketer_name', 'marketer_id',
-                  'consultant')
+                  'consultant', 'is_complete')
 
     def get_marketer_name(self, obj):
         return obj.created_by.employee_name
@@ -184,7 +184,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
                   'current_city', 'attachments', 'interviews', 'test', 'project', 'comments', 'marketer_name', 'marketer_id',
-                  'consultant')
+                  'consultant', 'is_complete')
 
     def get_marketer_name(self, obj):
         return obj.created_by.employee_name
@@ -273,7 +273,8 @@ class TestCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
-                  'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments')
+                  'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments',
+                  'cancel_reason')
 
     def get_engineers(self, obj):
         if obj.engineer.all():

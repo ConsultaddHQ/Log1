@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 
 from datetime import date, timedelta
 from project.models import TimeSheet
-from notification.views import push_notification
+from notification.views import push_notification_consultant
 from notification.models import Notification, FCMDevice
 
 
@@ -53,4 +53,4 @@ class Command(BaseCommand):
             )
             tokens = list(consultant.consultant_token.all().values_list('key', flat=True))
             device_ids = list(FCMDevice.objects.filter(object_id__in=tokens).values_list('device_id', flat=True))
-            push_notification(device_ids, message_body)
+            push_notification_consultant(device_ids, message_body)

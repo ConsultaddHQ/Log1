@@ -27,7 +27,8 @@ class Command(BaseCommand):
         for consultant in consultants:
             submission_ids = []
             scrum_masters = []
-            queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days)
+            queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days,
+                                                 is_complete=True)
             submissions = []
             if not queryset:
                 continue

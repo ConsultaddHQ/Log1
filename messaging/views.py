@@ -142,11 +142,7 @@ class ReceiveSMSViewSet(GenericViewSet):
                 }
 
                 object_ids = [user1.owner.id]
-
-                registration_ids = list(
-                    FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                             ).values_list('device_id', flat=True))
-                push_notification(registration_ids, message_body)
+                push_notification(object_ids, message_body)
 
                 return HttpResponse(status=status.HTTP_201_CREATED)
             else:

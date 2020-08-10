@@ -13,18 +13,21 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
 
 from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
+from activity.views import create_activity
 from marketing.models import Submission, User
 from consultant.views import send_notification
+from attachment.models import create_attachment
 from consultant.models import ConsultantPOC, Consultant
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from notification.views import push_notification, Notification, FCMDevice
 from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
+from notification.views import push_notification_consultant, Notification, FCMDevice, create_notification,\
+    push_notification
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +43,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': [project.consultant.email],
                 'cc': [config.FINANCE],
-                'bcc': ['sarang.m@consultadd.com'],
+                'bcc': [],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'context': {
@@ -186,7 +189,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': to,
                 'cc': cc,
-                'bcc': ['sarang.m@consultadd.com'],
+                'bcc': [],
                 'subject': f'On Boarding of {consultant.name} :: {submission.employer.title()} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
@@ -278,8 +281,26 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                 }
             }
-            res = send_email(mail_data, marketer.email)
-            return res, "ok"
+            res1 = send_email(mail_data, marketer.email)
+            to_engineering = [config.ENGINEERING]
+            mail_data_eng = {
+                'to': to_engineering,
+                'cc': [],
+                'bcc': [],
+                'subject': f'{po_type} of {consultant.name} :: '
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
+                'template': '../templates/po_termination_engineering.html',
+                'context': {
+                    'end': project_end_date,
+                    'client_name': submission.client,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
+                    'vendor_company': submission.lead.vendor_company.name,
+                    'reason': project.statuses.get(is_current=True).get_status_display(),
+                }
+            }
+            res2 = send_email(mail_data_eng, marketer.email)
+            return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
             logger.error("Offer mail error for {}".format(marketer.email), error)
             return error, "error"
@@ -496,6 +517,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.city = sub.lead.city
                 project.is_remote = is_remote
                 project.consultant = consultant
+                project.rate = project.submission.rate
+                project.employer = project.submission.employer
                 project.save()
 
                 scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'],
@@ -534,9 +557,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             data = {
                 "city": request.data.get('city', project.city),
+                "rate": request.data.get('rate', project.rate),
                 "duration": request.data.get('duration', project.duration),
                 "end_date": request.data.get('end_date', project.end_date),
                 "feedback": request.data.get('feedback', project.feedback),
+                "employer": request.data.get('employer', project.employer),
                 "start_date": request.data.get('start_date', project.start_date),
                 "payment_term": request.data.get('payment_term', project.payment_term),
                 "client_address": request.data.get('client_address', project.client_address),
@@ -548,9 +573,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             }
             project.city = data["city"]
+            project.rate = data["rate"]
             project.duration = data["duration"]
             project.end_date = data["end_date"]
             project.feedback = data["feedback"]
+            project.employer = data["employer"]
             project.start_date = data["start_date"]
             project.payment_term = data["payment_term"]
             project.client_address = data["client_address"]
@@ -612,7 +639,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if new_status.startswith('cancelled'):
                     project.submission.consultant_marketing.status = 'open'
                     project.submission.consultant_marketing.save()
-                    title = f"{project.consultant.name} :: {project.submission.client} :: Project Cancelled"
+                    title = f"Project Cancelled :: {project.consultant.name} :: {project.submission.client}"
                     send_notification(project.consultant, request.user, title)
 
                 if new_status == 'joined':
@@ -657,7 +684,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.joined_url, data)
 
-                    title = f"{project.consultant.name} :: Project Joined"
+                    title = f" Project Joined :: {project.consultant.name} :: {project.submission.client}"
                     send_notification(project.consultant, request.user, title)
 
                     consultant = project.consultant
@@ -735,7 +762,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
                     project.save()
-                    title = f"{project.consultant.name} :: Project Received"
+                    title = f" Project Received :: {project.consultant.name} :: {project.submission.client}"
                     send_notification(project.consultant, request.user, title)
 
                 # Mail for Cancellation or Termination of Project
@@ -776,7 +803,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                             "text": text
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
-                        title = f"{project.consultant.name} :: Project Terminated"
+                        title = f"Project Terminated :: {project.consultant.name} :: {project.submission.client}"
                         send_notification(project.consultant, request.user, title)
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
@@ -804,12 +831,193 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Completion')
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
-                        title = f"{project.consultant.name} :: Project Complete"
+                        title = f" Project Completed :: {project.consultant.name} :: {project.submission.client}"
                         send_notification(project.consultant, request.user, title)
 
             serializer = self.serializer_class(project)
 
             return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    queryset = ProjectSupport.objects.all()
+    serializer_class = ProjectSupportSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.data['project_id'])
+            users = request.data.get('support', [])
+            support_names = []
+            for user in users:
+                support = get_object_or_404(User, id=user['id'])
+                support_names.append(support.employee_name)
+                if not user['start']:
+                    return Response({"error": "Start date can not be empty"}, status=status.HTTP_400_BAD_REQUEST)
+                ProjectSupport.objects.create(
+                    project=project,
+                    support=support,
+                    start=user['start']
+                )
+            # notification
+            user_list = []
+            consultant = project.submission.consultant
+            names = ", ".join(name for name in support_names)
+            pocs = consultant.pocs.all()
+            for data in pocs:
+                user_list.append(data.poc)
+            user_list.append(project.submission.created_by)
+            title = f"""{names} is assigned as support to {consultant.name}'s project of {project.submission.client}"""
+            notification_data = {
+                'title': title,
+                'category': 'info',
+                'description': title,
+                'sender_id': request.user.id,
+                'target_id': project.id,
+                'sender_user_type': 'user',
+                'target_type': 'project',
+                'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+            # Push Notification
+            message_body = {
+                "body": title,
+                "title": title,
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "data": {
+                    'target': 'project',
+                    'is_read': False,
+                    'is_deleted': False,
+                    'timestamp': str(datetime.now()),
+                    'target_id': project.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
+            serializer = ProjectSupportSerializer(project.support.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+            support.end = request.data.get('end')
+            support.feedback = request.data.get('feedback', None)
+            support.save()
+            serializer = ProjectSupportSerializer(support)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    queryset = ProjectOrder.objects.all()
+    serializer_class = ProjectOrderSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            serializer = ProjectOrderSerializer(project.order.all().order_by('-created'), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.data.get('project_id'))
+            effective_date = request.data.get('effective_date')
+            desc = ""
+            if request.data.get('field') == 'rate':
+                project.rate = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} rate changed to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            elif request.data.get('field') == 'employer':
+                project.employer = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer changed to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            elif request.data.get('field') == 'end_date':
+                effective_date = project.end_date
+                project.end_date = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} extended to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            order = ProjectOrder.objects.create(
+                project=project,
+                created_by=request.user,
+                effective_date=effective_date,
+                value=request.data.get('value'),
+                field=request.data.get('field'),
+            )
+            project.save()
+
+            if request.FILES.getlist('file'):
+                attachments = project.attachments.all()
+                for attachment in attachments:
+                    attachment.is_active = False
+                    attachment.save()
+
+                for file in request.FILES.getlist('file'):
+                    file_data = {
+                        "file": file,
+                        "model": "project",
+                        "object_id": project.id,
+                        "creator": request.user,
+                        "type": request.data.get('file_type'),
+                    }
+                    create_attachment(file_data)
+            create_activity(order.id, 'projectorder', request.user, desc, 'created')
+            serializer = self.serializer_class(project.order.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            order = get_object_or_404(ProjectOrder, id=kwargs.get('pk'))
+            prev_value = order.value
+            serializer = ProjectOrderSerializer(order, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                if order.field == 'rate' and prev_value == str(int(order.project.rate)):
+                    order.project.rate = request.data.get('value')
+                    order.project.save()
+
+                elif order.field == 'employer' and prev_value == order.project.employer:
+                    order.project.employer = request.data.get('value')
+                    order.project.save()
+
+                elif order.field == 'end_date' and prev_value == str(order.project.end_date):
+                    order.project.end_date = request.data.get('value')
+                    order.project.save()
+
+                desc = f"Project Order details updated by {request.user.employee_name}"
+                create_activity(order.id, 'projectorder', request.user, desc, 'updated')
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1014,7 +1222,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     registration_ids = list(
                         FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='consultanttoken'
                                                  ).values_list('device_id', flat=True))
-                    push_notification(registration_ids, message_body)
+                    push_notification_consultant(registration_ids, message_body)
                 serializer = self.serializer_class(timesheet)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)

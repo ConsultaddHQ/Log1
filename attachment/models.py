@@ -50,6 +50,7 @@ def create_attachment(data):
     try:
         content_type = ContentType.objects.get(model=data['model'])
         Attachment.objects.create(
+            is_active=True,
             creator=data['creator'],
             content_type=content_type,
             object_id=data['object_id'],
@@ -72,6 +73,7 @@ class Attachment(TimeStampedModel):
     objects = AttachmentManager()
 
     object_id = models.PositiveIntegerField()
+    is_active = models.BooleanField(_('Is active'), default=True)
     attachment_file = models.FileField(_('attachment'), upload_to=attachment_upload)
     attachment_type = models.CharField(choices=ATTACHMENT_TYPE, blank=True, null=True, max_length=50)
     content_type = models.ForeignKey(

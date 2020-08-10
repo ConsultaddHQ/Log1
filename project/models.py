@@ -53,6 +53,7 @@ TIMESHEET_STATUS = (
 
 class Project(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    rate = models.FloatField(_('Rate'), null=True, blank=True)
     end_date = models.DateField(_('End Date'), null=True, blank=True)
     start_date = models.DateField(_('Start Date'), null=True, blank=True)
     feedback = models.TextField(_('Reason of Failure'), null=True, blank=True)
@@ -60,6 +61,7 @@ class Project(TimeStampedModel):
     client_address = models.TextField(_('Client Address'), null=True, blank=True)
     vendor_address = models.TextField(_('Vendor Address'), null=True, blank=True)
     is_remote = models.BooleanField(_('Is Remote Project'), null=True, blank=True)
+    employer = models.CharField(_('Employer'), max_length=50, null=True, blank=True)
     city = models.CharField(_('Client City'), max_length=100, blank=True, null=True)
     duration = models.CharField(_('Duration'), max_length=50, null=True, blank=True)
     reporting_details = models.TextField(_('Reporting Details'), null=True, blank=True)
@@ -81,9 +83,8 @@ class Project(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+        if not self.id:
+            self.created = timezone.now()
         self.modified = timezone.now()
         return super(Project, self).save(*args, **kwargs)
 
@@ -116,7 +117,37 @@ class ProjectStatus(models.Model):
         verbose_name_plural = 'Project Statuses'
 
 
+class ProjectOrder(TimeStampedModel):
+    field = models.CharField(_('Field'), max_length=50, blank=True, null=True)
+    value = models.CharField(_('Value'), max_length=100, blank=True, null=True)
+    effective_date = models.DateField(_('Effective Date'), null=True, blank=True)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE,
+        related_name='order',
+        verbose_name='Project'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='project_order',
+        verbose_name='Project Order created by'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(ProjectOrder, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id} - {self.value} - {self.field}'
+
+
 class ProjectSupport(TimeStampedModel):
+    feedback = models.TextField(_("Feedback"), null=True, blank=True)
     end = models.DateField(_('Support End Date'), blank=True, null=True)
     start = models.DateField(_('Support Start Date'), blank=True, null=True)
     support = models.ForeignKey(
@@ -131,9 +162,6 @@ class ProjectSupport(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -168,9 +196,6 @@ class TimeSheet(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

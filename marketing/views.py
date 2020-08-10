@@ -374,6 +374,10 @@ def create_submission(request, lead_id):
                 date_of_birth=profile.date_of_birth,
             )
 
+        if sub.rate and sub.vendor and sub.client and (sub.lead.job_desc and len(sub.lead.job_desc) > 20):
+            sub.is_complete = True
+            sub.save()
+
         resume = request.FILES.get('file_resume', None)
         resume_data = {
             "file": resume,
@@ -434,7 +438,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 marketer_name=F('created_by__employee_name'),
                 consultant_name=F('consultant_marketing__consultant__name'),
             ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
-                     'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact')
+                     'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact',
+                     'is_complete')
 
             return data, data_counts
         except Exception as error:
@@ -469,6 +474,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', 'all')
+        incomplete = request.query_params.get('incomplete', False)
         consultant_id = request.query_params.get('consultant_id', None)
         filter_by_time = request.query_params.get('filter_by_time', 'all')
         filter_by_status = request.query_params.get('filter_by_status', None)
@@ -495,6 +501,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     Q(consultant_marketing__consultant__status='archived') |
                     Q(status='draft')
                 )
+
+            if incomplete:
+                sub = sub.filter(is_complete=False)
 
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:
@@ -603,6 +612,13 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     submission.is_active = True
                 else:
                     submission.is_active = False
+
+                if submission.rate and submission.vendor and submission.client and\
+                        (submission.lead.job_desc and len(submission.lead.job_desc) > 20):
+                    submission.is_complete = True
+                else:
+                    submission.is_complete = False
+
                 submission.save()
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
@@ -786,7 +802,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
                      'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'project', 'job_title', 'modified', 'feedback')
+                     'screening_type', 'project', 'job_title', 'modified', 'feedback')
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -950,7 +966,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 attendees = [
                                 {'email': supervisor},
                                 {'email': request.user.email},
-                                {"email": config.BOOKING_ADMIN},
                             ] + guest
                 user_list.append(interview.supervisor)
 
@@ -989,9 +1004,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                         status=status.HTTP_400_BAD_REQUEST)
 
                 # Mattermost message for Interview
-                if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
+                if date.today() == interview.start_time.date():
                     text = f"""*CTB:{interview.supervisor.employee_name} :: Round:{interview.round} :: 
-                    {interview.get_interview_mode_display()} :: 
+                    {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
                     {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} :: 
                     {interview.consultant.name} :: {interview.submission.client} :: 
                     {interview.marketer.employee_name}*"""
@@ -1063,7 +1078,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 user_list.append(interview.supervisor)
                 for user in scrum_masters:
                     user_list.append(user)
-                title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
+                title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R :: 
+                        {interview.get_screening_type_display()} ::
                         {interview.get_interview_mode_display()} :: 
                         {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
                         {interview.submission.client} :: {interview.consultant.name} :: 
@@ -1079,7 +1095,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         interview_status = "Failed"
                         interview_status_emoji = "&#128078;"
-                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
+                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
                     text += interview.feedback
 
                     data = {
@@ -1093,9 +1109,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview.status = 'rescheduled'
                         interview.save()
                         # Message to mattermost for interview timing updating
-                        if date.today() == interview.start_time.date() and interview.screening_type == 'interview':
-                            text = "*CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {}*".format(
+                        if date.today() == interview.start_time.date():
+                            text = "*CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {} :: {}*".format(
                                 interview.supervisor.employee_name, interview.round,
+                                interview.get_screening_type_display(),
                                 interview.get_interview_mode_display(),
                                 interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
                                 interview.submission.consultant.name,
@@ -1109,7 +1126,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     attendees = [
                         {'email': supervisor_email},
                         {'email': request.user.email},
-                        {'email': config.BOOKING_ADMIN},
                     ]
 
                     for user in scrum_masters:
@@ -1191,7 +1207,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        delete_ms_calendar_booking(interview.calendar_id)
+                        delete_ms_calendar(interview.calendar_id)
                     else:
                         return Response({"result": "calendar id not found"}, status=status.HTTP_404_NOT_FOUND)
                 except Exception as error:
@@ -1397,7 +1413,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'start_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
+            ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
 
             upcoming_joinings = projects.filter(
                 statuses__status='on_boarded', statuses__is_current=True
@@ -1633,6 +1649,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
             passed = queryset.filter(status='passed').count()
+            cancelled = queryset.filter(status='cancelled').count()
             feedback_due = queryset.filter(status='feedback_due').count()
 
             data_counts = {
@@ -1640,6 +1657,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'total': total,
                 'failed': failed,
                 'passed': passed,
+                'cancelled': cancelled,
                 'feedback_due': feedback_due,
             }
 
@@ -1983,10 +2001,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
 
             object_ids = [user.id for user in user_list]
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(object_ids, message_body)
 
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
