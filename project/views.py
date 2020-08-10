@@ -851,7 +851,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=request.query_params.get('project_id'))
-            serializer = ProjectSupportSerializer(project.support.all(), many=True)
+            serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -937,7 +937,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=request.query_params.get('project_id'))
-            serializer = ProjectOrderSerializer(project.order.all(), many=True)
+            serializer = ProjectOrderSerializer(project.order.all().order_by('-created'), many=True)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -998,9 +998,22 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
     def update(self, request, *args, **kwargs):
         try:
             order = get_object_or_404(ProjectOrder, id=kwargs.get('pk'))
+            prev_value = order.value
             serializer = ProjectOrderSerializer(order, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                if order.field == 'rate' and prev_value == str(int(order.project.rate)):
+                    order.project.rate = request.data.get('value')
+                    order.project.save()
+
+                elif order.field == 'employer' and prev_value == order.project.employer:
+                    order.project.employer = request.data.get('value')
+                    order.project.save()
+
+                elif order.field == 'end_date' and prev_value == str(order.project.end_date):
+                    order.project.end_date = request.data.get('value')
+                    order.project.save()
+
                 desc = f"Project Order details updated by {request.user.employee_name}"
                 create_activity(order.id, 'projectorder', request.user, desc, 'updated')
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
