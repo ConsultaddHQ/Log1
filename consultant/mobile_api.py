@@ -101,7 +101,6 @@ class ConsultantAuthViewSet(GenericViewSet):
                     statuses__is_current=True
                 ).annotate(
                     client=F('submission__client'),
-                    employer=F('submission__employer')
                 ).order_by('-id').values('id', 'start_date', 'client', 'employer')
                 data = {
                     'token': token.key,

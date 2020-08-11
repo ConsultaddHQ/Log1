@@ -251,6 +251,11 @@ class LeadViewSets(viewsets.ModelViewSet):
             serializer = LeadCreateSerializer(lead, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                if len(lead.job_desc) < 20:
+                    submissions = lead.submission.all()
+                    for sub in submissions:
+                        sub.is_complete = False
+                        sub.save()
                 data = queryset.annotate(
                     submission_count=Count('submission')
                 ).annotate(company_name=F('vendor_company__name'),
@@ -502,7 +507,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     Q(status='draft')
                 )
 
-            if incomplete:
+            if incomplete == 'true':
                 sub = sub.filter(is_complete=False)
 
             # Team submissions for Scrum master and Proxy Scrum Master

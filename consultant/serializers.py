@@ -293,9 +293,10 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     def get_support(self, obj):
         queryset = ProjectSupport.objects.filter(project__consultant=obj, end=None)
         if queryset:
-            poc = queryset.first().engineer
+            queryset = queryset.latest('start')
+            poc = queryset.support
             data = {
-                "id": queryset.first().id,
+                "id": queryset.id,
                 'user_id': poc.id,
                 'email': poc.email,
                 'phone': poc.phone,

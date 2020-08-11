@@ -695,7 +695,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 projects = Project.objects.filter(
-                    consultant_id=consultant_id
+                    submission__consultant_marketing__consultant_id=consultant_id
                 )
                 data, counts = self.get_project_data(projects, filter_by_status, first, last)
                 if counts == "error":
@@ -772,7 +772,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         location = request.query_params.get('location', None)
         con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("size", 10))
+        page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
 
         try:
