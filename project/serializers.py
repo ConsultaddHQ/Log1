@@ -40,8 +40,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_consultant_name(self, obj):
         if obj.consultant:
             if obj.is_remote:
-                initials = ''.join([x[0].upper() for x in obj.consultant.name.split(' ')])
-                return f"{obj.submission.consultant.name} ({initials})"
+                firstname = obj.consultant.name.split(' ')[0]
+                return f"{obj.submission.consultant.name} ({firstname})"
             else:
                 return obj.consultant.name
         return None

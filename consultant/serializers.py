@@ -291,7 +291,9 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return None
 
     def get_support(self, obj):
-        project = Project.objects.filter(submission__consultant_marketing__consultant=obj)
+        project = Project.objects.filter(
+            submission__consultant_marketing__consultant=obj,
+            statuses__status='joined', statuses__is_current=True)
         if project:
             project = project.latest('start_date')
             queryset = project.support.all()
