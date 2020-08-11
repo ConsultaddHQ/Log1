@@ -395,7 +395,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             on_boarded = queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count()
             not_joined = queryset.filter(statuses__status='not_joined', statuses__is_current=True).count()
 
-            queryset = queryset.order_by('-modified').distinct('modified')
+            queryset = queryset.order_by('-start_date')
             if filter_by_status:
                 queryset = queryset.filter(statuses__status=filter_by_status, statuses__is_current=True)
 
@@ -410,7 +410,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             project_status = ProjectStatus.objects.filter(
                 project=OuterRef("pk"), is_current=True)
 
-            data = queryset[first:last].annotate(
+            data = queryset.annotate(
                 client=F('submission__client'),
                 consultant_name=F('consultant__name'),
                 job_title=F('submission__lead__job_title'),
@@ -695,7 +695,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 projects = Project.objects.filter(
-                    consultant_id=consultant_id
+                    Q(consultant_id=consultant_id) |
+                    Q(submission__consultant_marketing__consultant_id=consultant_id)
                 )
                 data, counts = self.get_project_data(projects, filter_by_status, first, last)
                 if counts == "error":
@@ -772,7 +773,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         location = request.query_params.get('location', None)
         con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("size", 10))
+        page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
 
         try:

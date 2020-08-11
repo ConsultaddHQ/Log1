@@ -39,7 +39,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_consultant_name(self, obj):
         if obj.consultant:
-            return obj.consultant.name
+            if obj.is_remote:
+                firstname = obj.consultant.name.split(' ')[0]
+                return f"{obj.submission.consultant.name} ({firstname})"
+            else:
+                return obj.consultant.name
         return None
 
     def get_company_name(self, obj):
@@ -125,7 +129,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
             'id': obj.project.id,
             'start_date': obj.project.start_date,
             'client': obj.project.submission.client,
-            'employer': obj.project.submission.employer.title(),
+            'employer': obj.project.employer.title(),
             'vendor': obj.project.submission.lead.vendor_company.name,
         }
 
@@ -155,7 +159,7 @@ class FinanceSerializer(serializers.ModelSerializer):
             'id': obj.project.id,
             'start_date': obj.project.start_date,
             'client': obj.project.submission.client,
-            'employer': obj.project.submission.employer.title(),
+            'employer': obj.project.employer.title(),
             'vendor': obj.project.submission.lead.vendor_company.name,
         }
 
@@ -181,7 +185,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
                 'id': project.id,
                 'start_date': project.start_date,
                 'client': project.submission.client,
-                'team': project.submission.employer.title(),
+                'team': project.employer.title(),
                 'vendor': project.submission.lead.vendor_company.name,
             }
         return None
