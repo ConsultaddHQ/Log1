@@ -395,7 +395,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             on_boarded = queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count()
             not_joined = queryset.filter(statuses__status='not_joined', statuses__is_current=True).count()
 
-            queryset = queryset.order_by('-modified').distinct('modified')
+            queryset = queryset.order_by('-start_date')
             if filter_by_status:
                 queryset = queryset.filter(statuses__status=filter_by_status, statuses__is_current=True)
 
@@ -410,7 +410,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             project_status = ProjectStatus.objects.filter(
                 project=OuterRef("pk"), is_current=True)
 
-            data = queryset[first:last].annotate(
+            data = queryset.annotate(
                 client=F('submission__client'),
                 consultant_name=F('consultant__name'),
                 job_title=F('submission__lead__job_title'),
@@ -695,7 +695,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 projects = Project.objects.filter(
-                    submission__consultant_marketing__consultant_id=consultant_id
+                    Q(consultant_id=consultant_id) |
+                    Q(submission__consultant_marketing__consultant_id=consultant_id)
                 )
                 data, counts = self.get_project_data(projects, filter_by_status, first, last)
                 if counts == "error":

@@ -44,7 +44,7 @@ class LeadAdmin(ExportActionModelAdmin):
 @admin.register(Submission)
 class SubmissionAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_filter = ('status',)
+    list_filter = ('status', 'is_complete')
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
                      'consultant_marketing__consultant__email', 'consultant_marketing__consultant__name')
     list_display = ('id', 'consultant_marketing', 'client', 'rate', 'created_by', 'lead_owner_display', 'lead',

@@ -253,9 +253,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 serializer.save()
                 if len(lead.job_desc) < 20:
                     submissions = lead.submission.all()
-                    for sub in submissions:
-                        sub.is_complete = False
-                        sub.save()
+                    submissions.update(is_complete=False)
                 data = queryset.annotate(
                     submission_count=Count('submission')
                 ).annotate(company_name=F('vendor_company__name'),
