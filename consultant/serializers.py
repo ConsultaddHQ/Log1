@@ -291,17 +291,27 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return None
 
     def get_support(self, obj):
-        queryset = ProjectSupport.objects.filter(project__consultant=obj, end=None)
-        if queryset:
-            poc = queryset.first().engineer
-            data = {
-                "id": queryset.first().id,
-                'user_id': poc.id,
-                'email': poc.email,
-                'phone': poc.phone,
-                'employee_name': poc.employee_name,
-            }
-            return data
+        projects = Project.objects.filter(submission__consultant_marketing__consultant=obj)
+        if projects:
+            active_po = projects.filter(statuses__status='joined', statuses__is_current=True)
+            if active_po:
+                project = active_po.latest('start_date')
+            else:
+                project = projects.latest('start_date')
+
+            queryset = project.support.all()
+            if queryset:
+                queryset = queryset.latest('start')
+                poc = queryset.support
+                data = {
+                    "id": queryset.id,
+                    'user_id': poc.id,
+                    'email': poc.email,
+                    'phone': poc.phone,
+                    'employee_name': poc.employee_name,
+                }
+                return data
+            return None
         return None
 
 

@@ -87,10 +87,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/offer.html',
                 'context': {
-                    'rate': submission.rate,
+                    'rate': project.rate,
                     'start': project_start_date,
                     'con_rate': consultant.rate,
-                    'employer': submission.employer,
+                    'employer': project.employer,
                     'client_name': submission.client,
                     'consultant_name': consultant.name,
                     'consultant_email': consultant.email,
@@ -146,7 +146,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'notes': notes,
                     'recordings': recordings,
                     'start': project_start_date,
-                    'employer': submission.employer,
+                    'employer': project.employer,
                     'client_name': submission.client,
                     'location': submission.lead.city,
                     'recruiter_name': recruiter_name,
@@ -190,12 +190,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'On Boarding of {consultant.name} :: {submission.employer.title()} :: '
+                'subject': f'On Boarding of {consultant.name} :: {project.employer.title()} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
                 'context': {
                     'type': po_type,
-                    'rate': submission.rate,
+                    'rate': project.rate,
                     'start': project_start_date,
                     'client_name': submission.client,
                     'con_rate': int(consultant.rate),
@@ -206,7 +206,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
                     'vendor_number': vendor_contact.number,
-                    'employer': submission.employer.title(),
+                    'employer': project.employer.title(),
                     'client_address': project.client_address,
                     'vendor_address': project.vendor_address,
                     'invoicing_period': project.invoicing_period,
@@ -257,11 +257,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'{po_type} of {consultant.name} :: {submission.employer} :: '
+                'subject': f'{po_type} of {consultant.name} :: {project.employer} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination.html',
                 'context': {
-                    'rate': submission.rate,
+                    'rate': project.rate,
                     'end': project_end_date,
                     'remark': project.feedback,
                     'vendor_name': vendor_name,
@@ -272,7 +272,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_name': consultant.name,
                     'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
-                    'employer': submission.employer.title(),
+                    'employer': project.employer.title(),
                     'marketer_name': marketer.employee_name,
                     'vendor_address': project.vendor_address,
                     'client_address': project.client_address,
@@ -658,7 +658,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     team_joined_count = Project.objects.filter(
                         statuses__status='joined',
                         statuses__created__gte=day_one,
-                        submission__employer__iexact=project.submission.employer,
+                        employer__iexact=project.employer,
                     ).count()
                     if project.is_remote and project.submission.lead.is_w2:
                         con_str = f"**Remote Project** \n"
@@ -673,13 +673,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         "text": f"""{con_str}<br>
                     {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                     {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                    {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                    {employer_emoji} Employer :  {project.employer.title()}<br>
                     {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                     🇺🇸 Location :  {project.city}<br>
                     {client_emoji} Client :  {project.submission.client}<br>
                     {role_emoji} Role :  {project.submission.lead.job_title}<br>
                     &#128221; Joining Date :  {project_start_date}<br><br>
-                    Project Joined count of {project.submission.employer} for this month - {team_joined_count}<br>
+                    Project Joined count of {project.employer} for this month - {team_joined_count}<br>
                     Total Project Joined count of this month - {total_joined_count}"""
                     }
                     post_msg_using_webhook(config.joined_url, data)
@@ -730,7 +730,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     team_offer_count = Project.objects.filter(
                         statuses__status='received',
                         statuses__created__gte=day_one,
-                        submission__employer__iexact=project.submission.employer,
+                        employer__iexact=project.employer,
                     ).count()
                     interviews = project.submission.screening.exclude(status='cancelled')
                     ctb_gender = interviews.last().supervisor.gender
@@ -750,13 +750,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         "text": f"""{con_str}<br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                        {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                        {employer_emoji} Employer :  {project.employer.title()}<br>
                         {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                         {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul> 🇺🇸 Location :  {project.city}
                         <br> {client_emoji} Client :  {project.submission.client}
                         <br> {role_emoji} Role :  {project.submission.lead.job_title}
                         <br> &#128221; Start Date :  {project_start_date}
-                        <br> <br> Offer count of {project.submission.employer} for this month - {team_offer_count}
+                        <br> <br> Offer count of {project.employer} for this month - {team_offer_count}
                         <br> Total offer count of this month - {total_offer_count}"""
                     }
                     post_msg_using_webhook(config.offer_url, data)
@@ -788,7 +788,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                        {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                        {employer_emoji} Employer :  {project.employer.title()}<br>
                         {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                         {client_emoji} Client :  {project.submission.client}<br>
                         {role_emoji} Role :  {project.submission.lead.job_title}<br>
@@ -812,7 +812,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                        {employer_emoji} Employer :  {project.submission.employer.title()}<br>
+                        {employer_emoji} Employer :  {project.employer.title()}<br>
                         {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                          🇺🇸 Location :  {project.city}<br>
                         {client_emoji} Client :  {project.submission.client}<br>
@@ -1048,7 +1048,6 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
                 location=F('city'),
                 status=F('statuses__status'),
                 client=F('submission__client'),
-                employer=F('submission__employer'),
                 job_desc=F('submission__lead__job_desc'),
                 job_title=F('submission__lead__job_title'),
                 marketer_email=F('submission__created_by__email'),
@@ -1146,7 +1145,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultants = Consultant.objects.filter(
                     Q(name__istartswith=query) |
                     Q(projects__submission__client__icontains=query) |
-                    Q(projects__submission__employer__startswith=query) |
+                    Q(projects__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 ).order_by('id').distinct('id')
 

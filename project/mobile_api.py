@@ -369,7 +369,6 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 )
             ).annotate(
                 client=F('submission__client'),
-                employer=F('submission__employer'),
                 status=Subquery(project_status.values('status')[:1]),
             ).order_by('-start_date').values('id', 'start_date', 'client', 'employer', 'status')
             return Response({'result': result}, status=status.HTTP_200_OK)
