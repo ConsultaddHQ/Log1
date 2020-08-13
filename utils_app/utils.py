@@ -21,7 +21,9 @@ def get_time_filter(queryset, filter_by):
     elif filter_by == 'week':
         today = date.today()
         start_of_week = today - timedelta(today.weekday())
-        queryset = queryset.filter(created__gte=start_of_week)
+        start_of_week = start_of_week - timedelta(days=7)
+        end_of_week = start_of_week + timedelta(days=6)
+        queryset = queryset.filter(created__gte=start_of_week, created__lte=end_of_week)
 
     elif filter_by == 'last_month':
         last = date.today().replace(day=1) - timedelta(days=1)
