@@ -1,5 +1,6 @@
 import os
 import logging
+from datetime import datetime
 from pyfcm import FCMNotification
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
@@ -44,7 +45,26 @@ def create_notification(user_list, data):
         return error
 
 
-def push_notification(registration_ids, message_body):
+def push_notification(object_ids, message_body):
+    try:
+        for obj_id in object_ids:
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id=obj_id, content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            message_body['data']['count'] = Notification.objects.filter(recipient_object_id=obj_id, unread=True,
+                                                                        deleted=False).count()
+            push_service.notify_multiple_devices(
+                registration_ids=registration_ids,
+                message_title=message_body['title'],
+                message_body=message_body['body'],
+                data_message=message_body,
+            )
+        return False
+    except Exception as error:
+        return error
+
+
+def push_notification_consultant(registration_ids, message_body):
     try:
         push_service.notify_multiple_devices(
             registration_ids=registration_ids,
@@ -69,11 +89,10 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
         try:
-            data = Notification.objects.active(request.user, 'user')[first:last].values(
-                'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model', 'target_object_id'
-            )
-            total = Notification.objects.unread(request.user, 'user').count()
-            return Response({"results": data, "total": total}, status=status.HTTP_200_OK)
+            queryset = Notification.objects.active(request.user, 'user')
+            serializer = NotificationListSerializer(queryset[first:last], many=True)
+            unread = Notification.objects.unread(request.user, 'user').count()
+            return Response({"results": serializer.data, "total": queryset.count(), "unread": unread}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -94,6 +113,39 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
         try:
             Notification.objects.mark_all_as_read(request.user, 'user')
             return Response({"result": "success"}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_name='count')
+    def count(self, request):
+        try:
+            queryset = Notification.objects.unread(request.user, 'user')
+            total = queryset.count()
+            return Response({"count": total}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_name='push_notification')
+    def push_notification(self, request):
+        try:
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": "Test Push Notification",
+                "title": "Test Push Notification",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'user',
+                    'timestamp': str(datetime.now()),
+                    'target_id': request.user.id,
+                },
+            }
+            push_notification([request.user.id], message_body)
+            return Response({"result": "done"}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

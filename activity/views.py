@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status
@@ -9,15 +10,16 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
-from consultant.permissions import ConsultantPetitionIsAuthenticated
-from consultant.authentication import ConsultantPetitionTokenAuthentication
-
 from legal.models import Petition
 from consultant.models import Consultant
+from notification.models import FCMDevice
+from employee.models import User, tag_users
+from activity.models import Activity, Comment
 from project.models import Project, TimeSheet
+from consultant.views import send_notification
 from marketing.models import Submission, Interview
-from activity.models import Activity, Comment, ConsultantComment
-from activity.serializers import ActivitySerializer, ConsultantCommentGetSerializer, CommentGetSerializer
+from notification.views import create_notification, push_notification
+from activity.serializers import ActivitySerializer, CommentGetSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +106,60 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 comment_text=request.data['comment_text'],
                 parent_comment_id=request.data['parent_comment'],
             )
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                tag_data = {
+                    "model": "comment",
+                    "object_id": comment.id,
+                    "tags": tags
+                }
+                tag_users(tag_data)
+            if content_type.model == 'consultant':
+                consultant = get_object_or_404(Consultant, id=request.data['id'])
+                title = f"{request.user.employee_name} tagged you in a comment on {consultant.name}'s profile"
+            else:
+                title = f"{request.user.employee_name} tagged you in a comment"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': model,
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': request.data['id'],
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': model,
+                    'timestamp': str(datetime.now()),
+                    'target_id': request.data['id'],
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
+
             serializer = CommentGetSerializer(comment)
+            # notification to consultant poc
+            if model == 'consultant':
+                consultant = Consultant.objects.get(id=request.data['id'])
+                title = f"Comment added on {consultant.name}'s profile by {request.user.employee_name}"
+                send_notification(consultant, request.user, title)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-

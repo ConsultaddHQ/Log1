@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
@@ -12,8 +13,8 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        upper_limit = timezone.now().date() - timedelta(days=45)
-        lower_limit = timezone.now().date() - timedelta(days=46)
+        upper_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')))
+        lower_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS'))+1)
 
         queryset = ConsultantMarketing.objects.filter(
             Q(status='open') &

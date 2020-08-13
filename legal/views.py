@@ -140,24 +140,23 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
             beneficiary = petition.beneficiary
             petition_type = petition.get_petition_type_display()
-            to = ['sarang.m@consultadd.com']
             if os.environ.get('ENV') == 'prod':
                 to = [beneficiary.email]
-            mail_data = {
-                'to': to,
-                'cc': [],
-                'bcc': [],
-                'template': '../templates/doc_upload_request.html',
-                'subject': f'Your H1B process - Request for documents',
-                'context': {
-                    'visa': petition_type,
-                    'pin': beneficiary.pin,
-                    'name': beneficiary.name,
-                    'petitioner_name': petition.assigned_to.employee_name,
-                    'link': f"{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
-                },
-            }
-            send_email(mail_data, petition.assigned_to.email)
+                mail_data = {
+                    'to': to,
+                    'cc': [],
+                    'bcc': [],
+                    'template': '../templates/doc_upload_request.html',
+                    'subject': f'Your H1B process - Request for documents',
+                    'context': {
+                        'visa': petition_type,
+                        'pin': beneficiary.pin,
+                        'name': beneficiary.name,
+                        'petitioner_name': petition.assigned_to.employee_name,
+                        'link': f"{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
+                    },
+                }
+                send_email(mail_data, petition.assigned_to.email)
             petition.status = "doc_request_sent"
             petition.save()
             return Response({
@@ -265,11 +264,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition = get_object_or_404(Petition, id=petition_id)
             lca_no = request.data.get('lca_no', None)
             file = request.FILES.get('file', None)
-            if petition.status == 'doc_request_sent' and lca_no:
-                petition.status = 'lca_filed'
+            if lca_no:
                 petition.lca_no = lca_no
+                petition.save()
 
-            elif petition.status == 'lca_filed' and file:
+            elif file:
                 Document.objects.create(
                     file=file,
                     verified=True,
@@ -277,14 +276,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     creator=request.user,
                     petition_id=petition_id,
                 )
-                petition.status = 'lca_approved'
             else:
                 return Response({'error': 'Data is missing'}, status=status.HTTP_400_BAD_REQUEST)
 
-            petition.save()
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -294,31 +290,26 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition_id = kwargs.get('pk')
             file = request.FILES.get('file')
             request_status = request.data.get('status')
+            doc_type_id = request.data.get('doc_type')
             petition = get_object_or_404(Petition, id=petition_id)
 
-            if petition.status != 'print':
-                if file:
-                    Document.objects.create(
-                        file=file,
-                        verified=True,
-                        creator=request.user,
-                        doc_type_id='26',
-                        petition_id=petition_id,
-                    )
-                    if petition.status == 'lca_approved':
-                        petition.status = 'under_review'
+            if file:
+                Document.objects.create(
+                    file=file,
+                    verified=True,
+                    creator=request.user,
+                    doc_type_id=doc_type_id,
+                    petition_id=petition_id,
+                )
 
-                if request_status == 'reviewed' or request_status == 'print':
-                    document = Document.objects.filter(petition=petition_id, doc_type_id='26').first()
-                    if not document:
-                        return Response({"error": "Please upload document before moving further"},
-                                        status=status.HTTP_400_BAD_REQUEST)
+            if request_status in ['reviewed', 'print']:
+                document = Document.objects.filter(petition=petition_id, doc_type_id='26').first()
+                if not document:
+                    return Response({"error": "Please upload document before moving further"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+            if request_status in ['under_review', 'reviewed', 'print']:
                 petition.status = request_status
-
-            else:
-                return Response({"error": "Changes can't be done at this stage"}, status=status.HTTP_400_BAD_REQUEST)
-
-            petition.save()
+                petition.save()
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
@@ -429,16 +420,18 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def comment(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
         try:
-            if not ('legal' in request.user.roles):
-                return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
 
             if request.method == 'GET':
+                if not ('legal' in request.user.roles or 'superadmin' in request.user.roles):
+                    return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
                 petition = get_object_or_404(Petition, id=object_id)
                 comments = petition.consultant_comments.filter(parent_comment=None)
                 serializer = ConsultantCommentGetSerializer(comments, many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
 
             elif request.method == 'POST':
+                if not ('legal' in request.user.roles):
+                    return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
                 content_type = ContentType.objects.get(model='petition')
                 created_by_content_type = ContentType.objects.get(model='user')
                 comment = ConsultantComment.objects.create(
@@ -513,6 +506,42 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     comment_text=request.data['comment_text'],
                     parent_comment_id=request.data['parent_comment'],
                 )
+                # App Notification
+
+                user_list = [petition.created_by, petition.assigned_to]
+                title = f"{request.user.name} posted a new comment"
+
+                notification_data = {
+                    'category': 'alert',
+                    'sender_user_type': 'consultant',
+                    'target_type': 'user',
+                    'recipient_user_type': 'user',
+                    'description': title,
+                    'title': title,
+                    'sender_id': request.user.id,
+                    'target_id': petition.assigned_to.id,
+                }
+                create_notification(user_list, notification_data)
+
+                # Push Notification
+                message_body = {
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "https://app.log1.com",
+                    "body": title,
+                    "title": title,
+                    "data": {
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target': 'user',
+                        'timestamp': str(datetime.now()),
+                        'target_id': petition.assigned_to.id,
+                    },
+                }
+
+                object_ids = [petition.created_by.id, petition.assigned_to.id]
+                push_notification(object_ids, message_body)
+
                 serializer = ConsultantCommentGetSerializer(comment)
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -628,11 +657,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                         'timestamp': str(timezone.now()),
                     },
                 }
-
-                registration_ids = list(
-                    FCMDevice.objects.filter(object_id=petition.assigned_to.id, content_type__model='user').values_list(
-                        'device_id', flat=True))
-                push_notification(registration_ids, message_body)
+                push_notification([petition.assigned_to.id], message_body)
 
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)

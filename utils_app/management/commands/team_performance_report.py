@@ -27,11 +27,17 @@ class Command(BaseCommand):
                                 'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
                                 'terminated-resigned_full_time_offer']
 
-        text = f"""
-#### Project Details :memo: \n
-| Team | Submissions | Interviews | Offers | Joined | Cancelled | Completed | PO Received | Offer Not Joined |
-|:-----|:------------|:-----------|:-------|:-------|:----------|:----------|:------------|:-----------------|
-"""
+        text = f""" <tr>
+                        <td style="padding:5px 8px 5px 8px;">Team</td>
+                        <td style="padding:5px 8px 5px 8px;">Submissions</td>
+                        <td style="padding:5px 8px 5px 8px;">Interviews</td>
+                        <td style="padding:5px 8px 5px 8px;">Offers</td>
+                        <td style="padding:5px 8px 5px 8px;">Joined</td>
+                        <td style="padding:5px 8px 5px 8px;">Cancelled</td>
+                        <td style="padding:5px 8px 5px 8px;">Completed</td>
+                        <td style="padding:5px 8px 5px 8px;">PO Received</td>
+                        <td style="padding:5px 8px 5px 8px;">Offer Not Joined</td>
+                    </tr>"""
         total_submission, total_interview, total_joined, total_cancelled = 0, 0, 0, 0
         total_complete, total_on_roll, total_offer_not_joined, total_offer = 0, 0, 0, 0
 
@@ -78,14 +84,33 @@ class Command(BaseCommand):
             ).exclude(statuses__is_current=True, statuses__status__in=joined_or_terminated).count()
             total_offer_not_joined += offers_not_joined
 
-            text += f"| {team.name.title()} | {submission_count} | {interview_count} | {offer_count} | {joined_count} | {cancelled_count} | {completed_count} | {on_roll_count} | {offers_not_joined} |\n"
+            text += f"""<tr>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{team.name.title()}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{submission_count}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{interview_count}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{offer_count}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{joined_count}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{cancelled_count}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{completed_count}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{on_roll_count}</td>
+                            <td style="padding:5px 8px 5px 8px; text-align: center;">{offers_not_joined}</td>
+                        </tr>\n"""
 
-        text += f"| Total | {total_submission} | {total_interview} | {total_offer} | {total_joined} | {total_cancelled} | {total_complete} | {total_on_roll} | {total_offer_not_joined} |\n"
+        text += f"""<tr>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;"> Total </td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_submission}</td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_interview}</td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_offer}</td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_joined}</td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_cancelled}</td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_complete}</td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_on_roll}</td>
+                        <td style="padding:5px 8px 5px 8px; text-align: center;">{total_offer_not_joined}</td>
+                    </tr>\n"""
 
         data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": text
+            "title": "Project Details &#128221;",
+            "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
         }
 
         post_msg_using_webhook(config.marketing_report_url, data)

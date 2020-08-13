@@ -13,5 +13,5 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(FCMDevice)
 class FCMDeviceAdmin(ExportActionModelAdmin):
-    list_display = ('type', 'active', 'date_created', 'device_id')
-    search_fields = ('name', 'device_id', 'type')
+    list_display = ('type', 'active', 'object_id', 'date_created', 'device_id')
+    search_fields = ('name', 'device_id', 'type', 'object_id')

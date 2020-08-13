@@ -8,15 +8,14 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_swagger.views import get_swagger_view
 from rest_framework.documentation import include_docs_urls
 
-from utils_app.views import CityViewSets, WebHookViewSet
 
-from ckiller.views import CkillerSubmissionView
+from ckiller.views import CkillerSubmissionViewSet
 
 from impersonate.views import ImpersonateViewSets
 
-from messaging.views import SMSViewSet, ReceiveSMSViewSet
+from utils_app.views import CityViewSets, ChoiceViewSet
 
-from ckiller.views import CkillerSubmissionViewSet
+from messaging.views import SMSViewSet, ReceiveSMSViewSet
 
 from attachment.views import AttachmentView, AttachmentGetView
 
@@ -26,7 +25,8 @@ from legal.views import PetitionViewSets, PetitionDocsViewSets
 
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
 
-from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
+    ProjectSupportViewSet, ProjectOrderViewSet
 
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeSheetV2ViewSets, Test
 
@@ -36,7 +36,7 @@ from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets
+    InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
@@ -66,19 +66,23 @@ router.register(r'consultant_bench', ConsultantBenchViewSets)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
 
+router.register(r'test', TestViewSets)
 router.register(r'lead', LeadViewSets)
 router.register(r'interview', InterviewViewSets)
 router.register(r'submission', SubmissionViewSets)
 router.register(r'vendor_layer', VendorLayerViewSets)
+router.register(r'dashboard', MarketingDashboardViewSet)
 router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
+router.register(r'project_support', ProjectSupportViewSet)
+router.register(r'project_order', ProjectOrderViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 
 router.register(r'city', CityViewSets)
-router.register(r'hook', WebHookViewSet)
+router.register(r'choice', ChoiceViewSet)
 
 router.register(r'cmd', SlashCommandViewSets)
 
@@ -88,7 +92,7 @@ router.register(r'comment', CommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
 
-router.register(r'ckiller_data', CkillerSubmissionView)
+router.register(r'ckiller_data', CkillerSubmissionViewSet)
 
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)

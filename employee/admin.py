@@ -8,7 +8,7 @@ from import_export.admin import ExportActionModelAdmin
 
 from utils_app.admin import ExportCsvMixin
 from rest_framework.authtoken.models import Token
-from .models import User, Role, Team, ResetPasswordToken, Asset
+from .models import User, Role, Team, ResetPasswordToken, Asset , Tagging
 
 admin.site.site_header = "Log1"
 
@@ -84,3 +84,8 @@ class AssetAdmin(ExportActionModelAdmin):
     list_filter = ('asset_type',)
     list_display = ('id', 'owner', 'email', 'asset_type')
     search_fields = ('id', 'owner__employee_name', 'email', 'asset_type')
+
+
+@admin.register(Tagging)
+class AssetAdmin(ExportActionModelAdmin):
+    list_display = ('id', 'content_type', 'object_id')

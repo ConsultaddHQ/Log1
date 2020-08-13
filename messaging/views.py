@@ -13,7 +13,9 @@ from rest_framework.authentication import TokenAuthentication
 from twilio.rest import Client
 from employee.models import Asset
 from api_key.permissions import APIKey
+from notification.models import FCMDevice
 from messaging.models import Message, Conversation
+from notification.views import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
 
 
@@ -97,8 +99,8 @@ class ReceiveSMSViewSet(GenericViewSet):
                 to = request.data.get('To')
                 body = request.data.get('Body')
                 from_ = request.data.get('From')
-                user1 = Asset.objects.filter(number=to).first().id
-                conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=from_)
+                user1 = Asset.objects.filter(number=to).first()
+                conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
                 Message.objects.create(
                     text=body,
                     is_sent=False,
@@ -106,6 +108,42 @@ class ReceiveSMSViewSet(GenericViewSet):
                 )
                 conversation.modified = datetime.now()
                 conversation.save()
+
+                # App Notification
+                user_list = [user1.owner]
+                title = f"New message received from {from_}"
+
+                notification_data = {
+                    'category': 'alert',
+                    'sender_user_type': 'conversation',
+                    'target_type': 'user',
+                    'recipient_user_type': 'user',
+                    'description': title,
+                    'title': title,
+                    'sender_id': conversation.id,
+                    'target_id': user1.owner.id,
+                }
+                create_notification(user_list, notification_data)
+
+                # Push Notification
+                message_body = {
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "https://app.log1.com",
+                    "body": title,
+                    "title": title,
+                    "data": {
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target': 'user',
+                        'timestamp': str(datetime.now()),
+                        'target_id': user1.owner.id,
+                    },
+                }
+
+                object_ids = [user1.owner.id]
+                push_notification(object_ids, message_body)
+
                 return HttpResponse(status=status.HTTP_201_CREATED)
             else:
                 return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)

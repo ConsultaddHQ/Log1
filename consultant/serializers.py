@@ -5,7 +5,7 @@ from consultant.models import *
 from employee.models import User
 from marketing.models import Interview
 from project.models import Project, ProjectSupport
-from employee.serializers import TeamSerializer, UserSerializer
+from employee.serializers import TeamSerializer, UserSerializer, TaggedUserSerializer
 
 
 # Consultant Login
@@ -160,14 +160,18 @@ class ExperienceSerializer(serializers.ModelSerializer):
 
 class ExitDetailConsultantSerializer(serializers.ModelSerializer):
     reasons = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
 
     class Meta:
         model = ConsultantExit
         fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date',  'exit_details',
-                  'reasons', 'notice_period', 'legal_action', 'cancel_reason')
+                  'reasons', 'notice_period', 'legal_action', 'legal_status', 'tagged_user', 'cancel_reason')
 
     def get_reasons(self, obj):
         return obj.reasons.all().values('id', 'name')
+
+    def get_tagged_user(self, obj):
+        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
 
 
 class ExitConsultantSerializer(serializers.ModelSerializer):
@@ -287,17 +291,27 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return None
 
     def get_support(self, obj):
-        queryset = ProjectSupport.objects.filter(project__consultant=obj, end=None)
-        if queryset:
-            poc = queryset.first().engineer
-            data = {
-                "id": queryset.first().id,
-                'user_id': poc.id,
-                'email': poc.email,
-                'phone': poc.phone,
-                'employee_name': poc.employee_name,
-            }
-            return data
+        projects = Project.objects.filter(submission__consultant_marketing__consultant=obj)
+        if projects:
+            active_po = projects.filter(statuses__status='joined', statuses__is_current=True)
+            if active_po:
+                project = active_po.latest('start_date')
+            else:
+                project = projects.latest('start_date')
+
+            queryset = project.support.all()
+            if queryset:
+                queryset = queryset.latest('start')
+                poc = queryset.support
+                data = {
+                    "id": queryset.id,
+                    'user_id': poc.id,
+                    'email': poc.email,
+                    'phone': poc.phone,
+                    'employee_name': poc.employee_name,
+                }
+                return data
+            return None
         return None
 
 
@@ -314,10 +328,15 @@ class ConsultantListSerializer(serializers.ModelSerializer):
 
 class ConsultantFeedbackSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Feedback
-        fields = ('id', 'created', 'feedback_text', 'feedback_type', 'rating', 'consultant', 'created_by')
+        fields = ('id', 'created', 'feedback_text', 'feedback_type', 'rating', 'consultant', 'created_by',
+                  'tagged_user')
 
     def get_created_by(self, obj):
         return obj.created_by.employee_name
+
+    def get_tagged_user(self, obj):
+        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data

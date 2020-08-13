@@ -7,7 +7,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
 
-from employee.models import User, Team
+from employee.models import User, Team, Tagging
 from utils_app.mailing import send_email
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
@@ -43,9 +43,11 @@ VISA_CHOICES = (
 )
 
 EDUCATION_CHOICES = (
+    ('phd', 'PhD'),
     ('diploma', 'Diploma'),
     ('masters', 'Masters'),
     ('bachelors', 'Bachelors'),
+    ('associate', 'Associate'),
     ('certification', 'Certification'),
 )
 
@@ -61,6 +63,7 @@ FEEDBACK_CHOICES = (
     ('marketing', 'Marketing'),
     ('engineering', 'Engineering'),
     ('recruitment', 'Recruitment'),
+    ('re_marketing', 'Re-marketing'),
 )
 
 WORK_TYPE_CHOICE = (
@@ -72,6 +75,13 @@ EXIT_STATUS_CHOICE = (
     ('complete', 'Consultant Exit Complete'),
     ('cancelled', 'Consultant Exit Cancelled'),
     ('in_process', 'Consultant Exit in Process'),
+)
+
+LEGAL_STATUS_CHOICE = (
+    ('solved', "Action Solved"),
+    ('in_process', "Action in Process"),
+    ('notice_sent', "Legal Notice Sent"),
+    ('finders_fee', "Taking Finder's Fee"),
 )
 
 EXIT_TYPE_CHOICE = (
@@ -441,7 +451,7 @@ class ConsultantMarketing(TimeStampedModel):
 
 class ConsultantRateRevision(TimeStampedModel):
     rate = models.FloatField(_('Rate'))
-    previous_rate = models.IntegerField(_('Previous Rate'), default=0)
+    previous_rate = models.FloatField(_('Previous Rate'), default=0)
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
     feedback = models.TextField(_('Revision Feedback'), blank=True, null=True)
     end = models.DateField(_('Rate End Date'), default=None, blank=True, null=True)
@@ -500,6 +510,7 @@ class ExitReason(models.Model):
 
 
 class ConsultantExit(TimeStampedModel):
+    tagged_user = GenericRelation(Tagging)
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
     legal_action = models.BooleanField(_('Legal Actions'), default=False)
     last_date = models.DateField(_('Relieving Date'), blank=True, null=True)
@@ -517,6 +528,11 @@ class ConsultantExit(TimeStampedModel):
         _('Consultant Exit Status'),
         max_length=30,
         choices=EXIT_STATUS_CHOICE,
+    )
+    legal_status = models.CharField(
+        _('Legal Action Status'),
+        max_length=30, blank=True, null=True,
+        choices=LEGAL_STATUS_CHOICE,
     )
     type = models.CharField(
         _('Consultant Exit Type'),
@@ -548,6 +564,7 @@ class ConsultantExit(TimeStampedModel):
 
 
 class Feedback(TimeStampedModel):
+    tagged_user = GenericRelation(Tagging)
     feedback_text = models.TextField(_('Feedback'))
     feedback_type = models.CharField(
         _('Feedback Type'), max_length=20,
@@ -565,7 +582,7 @@ class Feedback(TimeStampedModel):
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='feedback_created',
-        verbose_name='Termination added by'
+        verbose_name='Feedback Created By'
     )
 
     def save(self, *args, **kwargs):

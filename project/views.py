@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, F, Subquery, OuterRef
+from django.db.models import F, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status, viewsets
@@ -13,17 +13,21 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
 
 from constance import config
 from project.serializers import *
 from api_key.permissions import HasAPIKey
+from activity.views import create_activity
 from marketing.models import Submission, User
+from consultant.views import send_notification
+from attachment.models import create_attachment
 from consultant.models import ConsultantPOC, Consultant
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from notification.views import push_notification, Notification, FCMDevice
 from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
+from notification.views import push_notification_consultant, Notification, FCMDevice, create_notification,\
+    push_notification
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +43,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             mail_data = {
                 'to': [project.consultant.email],
                 'cc': [config.FINANCE],
-                'bcc': ['sarang.m@consultadd.com'],
+                'bcc': [],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
                 'context': {
@@ -64,31 +68,34 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             cc = [config.SUPERADMIN, submission.created_by.email] + scrum_masters
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            consultant = project.submission.consultant
+            recruiter = consultant.recruiter
+            retention = consultant.relation
             if recruiter:
                 cc.append(recruiter.email)
 
             if retention:
                 cc.append(retention.email)
 
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'Offer Received of {project.consultant.name} :: {submission.client} :: '
-                           f'{str(project.start_date)} :: {submission.client} :: {submission.vendor.name}',
+                'subject': f'Offer Received of {consultant.name} :: {submission.client} :: '
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/offer.html',
                 'context': {
-                    'start': project.start_date,
-                    'rate': int(submission.rate),
-                    'employer': submission.employer,
+                    'rate': project.rate,
+                    'start': project_start_date,
+                    'con_rate': consultant.rate,
+                    'employer': project.employer,
                     'client_name': submission.client,
-                    'con_rate': project.consultant.rate,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
                     'vendor_company': submission.vendor.name,
-                    'consultant_name': project.consultant.name,
-                    'consultant_email': project.consultant.email,
                     'marketer_name': submission.created_by.employee_name,
                 },
             }
@@ -114,8 +121,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if resume:
                 path.append(download_s3_object(resume.first().attachment_file.name))
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            consultant = project.submission.consultant
+            recruiter = consultant.recruiter
+            retention = consultant.relation
             cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
             cc = cc + scrum_masters
 
@@ -126,27 +134,28 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            consultant_name = project.consultant.name
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+
             mail_data = {
                 'to': [config.ENGINEERING],
                 'cc': cc,
                 'bcc': [],
-                'subject': f'Support Initiation for {consultant_name} {submission.client} {submission.lead.city}',
+                'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'template': '../templates/support.html',
                 'context': {
                     'notes': notes,
                     'recordings': recordings,
-                    'start': project.start_date,
-                    'employer': submission.employer,
+                    'start': project_start_date,
+                    'employer': project.employer,
                     'client_name': submission.client,
                     'location': submission.lead.city,
                     'recruiter_name': recruiter_name,
-                    'consultant_name': consultant_name,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
-                    'consultant_email': project.consultant.email,
-                    'consultant_phone_no': project.consultant.phone_no,
+                    'consultant_phone_no': consultant.phone_no,
+                    'consultant_location': consultant.current_city,
                     'marketer_name': submission.created_by.employee_name,
-                    'consultant_location': project.consultant.current_city,
                     'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
                 },
                 'attachments': path
@@ -160,13 +169,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def po_mail(self, project, path, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
+        consultant = project.submission.consultant
         try:
             vendor_contact = submission.vendor_contact
             if not vendor_contact:
                 return "Vendor is empty", 'error'
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            recruiter = consultant.recruiter
+            retention = consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
             cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
@@ -174,30 +184,31 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
-            consultant_name = project.consultant.name
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'On Boarding of {consultant_name} :: {submission.employer.title()} :: '
-                           f'{str(project.start_date)} :: {submission.client} :: {submission.vendor.name}',
+                'subject': f'On Boarding of {consultant.name} :: {project.employer.title()} :: '
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
                 'context': {
                     'type': po_type,
-                    'rate': submission.rate,
-                    'start': project.start_date,
+                    'rate': project.rate,
+                    'start': project_start_date,
                     'client_name': submission.client,
+                    'con_rate': int(consultant.rate),
                     'vendor_name': vendor_contact.name,
-                    'consultant_name': consultant_name,
+                    'consultant_name': consultant.name,
                     'vendor_email': vendor_contact.email,
                     'payment_term': project.payment_term,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
                     'vendor_number': vendor_contact.number,
-                    'employer': submission.employer.title(),
+                    'employer': project.employer.title(),
                     'client_address': project.client_address,
                     'vendor_address': project.vendor_address,
-                    'con_rate': int(project.consultant.rate),
-                    'consultant_email': project.consultant.email,
                     'invoicing_period': project.invoicing_period,
                     'reporting_details': project.reporting_details,
                     'marketer_name': submission.created_by.employee_name,
@@ -214,6 +225,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def po_termination_or_cancellation_mail(self, project, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
+        consultant = project.submission.consultant
         try:
             vendor = submission.vendor_contact
             if vendor:
@@ -227,8 +239,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
 
-            recruiter = project.consultant.recruiter
-            retention = project.consultant.relation
+            recruiter = consultant.recruiter
+            retention = consultant.relation
 
             cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
@@ -236,36 +248,59 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if retention:
                 cc.append(retention.email)
 
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = None
+            if project.end_date:
+                project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+
             mail_data = {
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'{po_type} of {project.consultant.name} :: {submission.employer} ::'
-                           f' {str(project.start_date)} :: {submission.client} :: {submission.vendor.name}',
+                'subject': f'{po_type} of {consultant.name} :: {project.employer} :: '
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination.html',
                 'context': {
-                    'end': project.end_date,
-                    'rate': submission.rate,
+                    'rate': project.rate,
+                    'end': project_end_date,
                     'remark': project.feedback,
-                    'start': project.start_date,
                     'vendor_name': vendor_name,
+                    'start': project_start_date,
                     'vendor_email': vendor_email,
                     'vendor_number': vendor_number,
                     'client_name': submission.client,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
-                    'employer': submission.employer.title(),
+                    'employer': project.employer.title(),
                     'marketer_name': marketer.employee_name,
                     'vendor_address': project.vendor_address,
                     'client_address': project.client_address,
-                    'consultant_name': project.consultant.name,
-                    'consultant_email': project.consultant.email,
                     'reporting_details': project.reporting_details,
                     'vendor_company': submission.lead.vendor_company.name,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                 }
             }
-            res = send_email(mail_data, marketer.email)
-            return res, "ok"
+            res1 = send_email(mail_data, marketer.email)
+            to_engineering = [config.ENGINEERING]
+            mail_data_eng = {
+                'to': to_engineering,
+                'cc': [],
+                'bcc': [],
+                'subject': f'{po_type} of {consultant.name} :: '
+                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
+                'template': '../templates/po_termination_engineering.html',
+                'context': {
+                    'end': project_end_date,
+                    'client_name': submission.client,
+                    'consultant_name': consultant.name,
+                    'consultant_email': consultant.email,
+                    'vendor_company': submission.lead.vendor_company.name,
+                    'reason': project.statuses.get(is_current=True).get_status_display(),
+                }
+            }
+            res2 = send_email(mail_data_eng, marketer.email)
+            return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
             logger.error("Offer mail error for {}".format(marketer.email), error)
             return error, "error"
@@ -355,9 +390,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
             scrum_masters = [user.email for user in queryset]
             submission = project.submission
             support_mail_res, support_mail_error = self.support_mail(project, submission, scrum_masters)
+            offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, submission, scrum_masters)
 
-            if support_mail_error == 'error':
-                return Response({"error": str(support_mail_res)}, status=status.HTTP_400_BAD_REQUEST)
+            if support_mail_error == 'error' or offer_mail_error == "error":
+                return Response({"support": str(support_mail_res), "offer": str(offer_mail_res)}, status=400)
 
             return Response({"result": str(support_mail_res)}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -481,6 +517,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.city = sub.lead.city
                 project.is_remote = is_remote
                 project.consultant = consultant
+                project.rate = project.submission.rate
+                project.employer = project.submission.employer
                 project.save()
 
                 scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'],
@@ -518,40 +556,34 @@ class ProjectViewSets(viewsets.ModelViewSet):
             prev_status_obj = project.statuses.get(is_current=True)
 
             data = {
-                "city": request.data.get('city', None),
-                "duration": request.data.get('duration', None),
-                "end_date": request.data.get('end_date', None),
-                "feedback": request.data.get('feedback', None),
-                "start_date": request.data.get('start_date', None),
-                "payment_term": request.data.get('payment_term', None),
-                "client_address": request.data.get('client_address', None),
-                "vendor_address": request.data.get('vendor_address', None),
-                "invoicing_period": request.data.get('invoicing_period', None),
-                "reporting_details": request.data.get('reporting_details', None),
+                "city": request.data.get('city', project.city),
+                "rate": request.data.get('rate', project.rate),
+                "duration": request.data.get('duration', project.duration),
+                "end_date": request.data.get('end_date', project.end_date),
+                "feedback": request.data.get('feedback', project.feedback),
+                "employer": request.data.get('employer', project.employer),
+                "start_date": request.data.get('start_date', project.start_date),
+                "payment_term": request.data.get('payment_term', project.payment_term),
+                "client_address": request.data.get('client_address', project.client_address),
+                "vendor_address": request.data.get('vendor_address', project.vendor_address),
+                "invoicing_period": request.data.get('invoicing_period', project.invoicing_period),
+                "reporting_details": request.data.get('reporting_details', project.reporting_details),
                 "remote_consultant_id": request.data.get('remote_consultant_id', None),
                 "remote_consultant_type": request.data.get('remote_consultant_type', None),
 
             }
-            if data["city"]:
-                project.city = data["city"]
-            if data["duration"]:
-                project.duration = data["duration"]
-            if data["end_date"]:
-                project.end_date = data["end_date"]
-            if data["feedback"]:
-                project.feedback = data["feedback"]
-            if data["start_date"]:
-                project.start_date = data["start_date"]
-            if data["payment_term"]:
-                project.payment_term = data["payment_term"]
-            if data["client_address"]:
-                project.client_address = data["client_address"]
-            if data["vendor_address"]:
-                project.vendor_address = data["vendor_address"]
-            if data["invoicing_period"]:
-                project.invoicing_period = data["invoicing_period"]
-            if data["reporting_details"]:
-                project.reporting_details = data["reporting_details"]
+            project.city = data["city"]
+            project.rate = data["rate"]
+            project.duration = data["duration"]
+            project.end_date = data["end_date"]
+            project.feedback = data["feedback"]
+            project.employer = data["employer"]
+            project.start_date = data["start_date"]
+            project.payment_term = data["payment_term"]
+            project.client_address = data["client_address"]
+            project.vendor_address = data["vendor_address"]
+            project.invoicing_period = data["invoicing_period"]
+            project.reporting_details = data["reporting_details"]
 
             if data["remote_consultant_id"]:
                 if data['remote_consultant_type'] == 'user':
@@ -574,22 +606,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             # Emoji for Mattermost update
             if project.consultant.recruiter:
-                recruiter_gender_emoji = ':pouting_woman: ' if project.consultant.recruiter.gender == 'female' else ':man_office_worker: '
-            else:
-                recruiter_gender_emoji = ':man_office_worker: '
-
-            client_emoji = ':tophat: '
-            role_emoji = ':fist_oncoming: '
-            employer_emoji = ':briefcase: '
-            marketer_gender_emoji = ':blonde_woman: ' if project.submission.created_by.gender == 'female' else ':blonde_man: '
-            consultant_gender_emoji = ':woman: ' if project.consultant.gender == 'female' else ':man: '
-
-            if project.consultant.recruiter:
+                recruiter_gender_emoji = '&#128103;' if project.consultant.recruiter.gender == 'female' else '&#129490;'
                 recruiter = project.consultant.recruiter.employee_name
             else:
+                recruiter_gender_emoji = '&#129490; '
                 recruiter = "NA"
 
+            client_emoji = '&#127913;'
+            role_emoji = '&#128074;'
+            employer_emoji = '&#x1F4BC;'
+            marketer_gender_emoji = '&#128105;' if project.submission.created_by.gender == 'female' else '&#128104;'
+            consultant_gender_emoji = '&#128105;' if project.consultant.gender == 'female' else '&#128104;'
+
             # For Status Change
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            project_end_date = None
+            if project.end_date:
+                project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 p_status, p_s_created = ProjectStatus.objects.get_or_create(
@@ -605,6 +639,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if new_status.startswith('cancelled'):
                     project.submission.consultant_marketing.status = 'open'
                     project.submission.consultant_marketing.save()
+                    title = f"Project Cancelled :: {project.consultant.name} :: {project.submission.client}"
+                    send_notification(project.consultant, request.user, title)
 
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
@@ -622,29 +658,34 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     team_joined_count = Project.objects.filter(
                         statuses__status='joined',
                         statuses__created__gte=day_one,
-                        submission__employer__iexact=project.submission.employer,
+                        employer__iexact=project.employer,
                     ).count()
+                    if project.is_remote and project.submission.lead.is_w2:
+                        con_str = f"**Remote Project** \n"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
+                    else:
+                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
 
                     # Sending message on Mattermost on joined status
                     data = {
-                        "response_type": "in_channel",
-                        "username": "Log1 Updates",
-                        "text": f"""
-#### Project Joined :metal: :smile: :metal:\n
-{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-:us: Location: {project.city}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n
-`Project Joined count of {project.submission.employer} for this month - {team_joined_count} `
-`Total Project Joined count of this month - {total_joined_count}`
-"""
+                        "title": "Project Joined  &#129304;&#128516;&#129304;",
+                        "text": f"""{con_str}<br>
+                    {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                    {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                    {employer_emoji} Employer :  {project.employer.title()}<br>
+                    {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                    🇺🇸 Location :  {project.city}<br>
+                    {client_emoji} Client :  {project.submission.client}<br>
+                    {role_emoji} Role :  {project.submission.lead.job_title}<br>
+                    &#128221; Joining Date :  {project_start_date}<br><br>
+                    Project Joined count of {project.employer} for this month - {team_joined_count}<br>
+                    Total Project Joined count of this month - {total_joined_count}"""
                     }
                     post_msg_using_webhook(config.joined_url, data)
+
+                    title = f" Project Joined :: {project.consultant.name} :: {project.submission.client}"
+                    send_notification(project.consultant, request.user, title)
 
                     consultant = project.consultant
 
@@ -689,41 +730,40 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     team_offer_count = Project.objects.filter(
                         statuses__status='received',
                         statuses__created__gte=day_one,
-                        submission__employer__iexact=project.submission.employer,
+                        employer__iexact=project.employer,
                     ).count()
-
                     interviews = project.submission.screening.exclude(status='cancelled')
                     ctb_gender = interviews.last().supervisor.gender
                     supervisors = "\n".join(
-                        [f"-    Round {interview.round} - {interview.supervisor.employee_name}\n" for
-                         interview in
-                         interviews if interview.supervisor])
-                    ctb_gender_emoji = ':raising_hand_woman: ' if ctb_gender == 'female' else ':raising_hand_man: '
-
+                        [f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
+                         for interview in interviews if interview.supervisor])
+                    ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
+                    if project.is_remote and project.submission.lead.is_w2:
+                        con_str = f"**Remote Project** \n"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
+                    else:
+                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
                     # Sending message on Mattermost
                     data = {
-                        "response_type": "in_channel",
-                        "username": "Log1 Updates",
-                        "text": f"""
-#### Offer :metal: :smile: :metal:\n
-{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-{ctb_gender_emoji} CTB :
-{supervisors}
-:us: Location: {project.city}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {str(project.start_date)}\n\n
-`Offer count of {project.submission.employer} for this month - {team_offer_count} `
-`Total offer count of this month - {total_offer_count}`
-"""
+                        "title": "Offer  &#129304;&#128516;&#129304;",
+                        "text": f"""{con_str}<br>
+                        {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                        {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                        {employer_emoji} Employer :  {project.employer.title()}<br>
+                        {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                        {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul> 🇺🇸 Location :  {project.city}
+                        <br> {client_emoji} Client :  {project.submission.client}
+                        <br> {role_emoji} Role :  {project.submission.lead.job_title}
+                        <br> &#128221; Start Date :  {project_start_date}
+                        <br> <br> Offer count of {project.employer} for this month - {team_offer_count}
+                        <br> Total offer count of this month - {total_offer_count}"""
                     }
                     post_msg_using_webhook(config.offer_url, data)
                     project.is_msg_sent = True
                     project.save()
+                    title = f" Project Received :: {project.consultant.name} :: {project.submission.client}"
+                    send_notification(project.consultant, request.user, title)
 
                 # Mail for Cancellation or Termination of Project
                 cancellation_status = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
@@ -745,57 +785,239 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
 
-                        text = f"""#### Offer Termination Feedback \n"""
-                        text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Start Date :   {str(project.start_date)}
-:spiral_calendar: End Date :   {str(project.end_date)}
-:x: Status :   {str(p_status.get_status_display())}
-\n\n"""
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
+                        {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                        {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                        {employer_emoji} Employer :  {project.employer.title()}<br>
+                        {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                        {client_emoji} Client :  {project.submission.client}<br>
+                        {role_emoji} Role :  {project.submission.lead.job_title}<br>
+                        &#128221; Start Date :  {project_start_date}<br>
+                        &#128221; End Date :  {project_end_date}<br>
+                        &#10060; Status :   {str(p_status.get_status_display())}<br>"""
 
-                        text += "**Reason: **" + project.feedback if project.feedback else "None"
+                        text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
-                            "response_type": "in_channel",
-                            "username": "Log1 Updates",
-                            "text": text,
+                            "title": "Offer Termination Feedback ",
+                            "text": text
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
+                        title = f"Project Terminated :: {project.consultant.name} :: {project.submission.client}"
+                        send_notification(project.consultant, request.user, title)
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
 
-                        text = f"""#### Offer Cancellation Feedback \n"""
-                        text += f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} **
-{marketer_gender_emoji} Marketer :   {project.marketer_name}
-{recruiter_gender_emoji} Recruiter :   {recruiter}
-{employer_emoji} Employer :   {project.submission.employer.title()}
-{employer_emoji} Team :   {project.submission.created_by.team.name}
-:us: Location: {project.city}
-{client_emoji} Client :  {project.submission.client}
-{role_emoji} Role :  {project.submission.lead.job_title}
-:spiral_calendar: Joining Date :   {str(project.start_date)}\n\n"""
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
+                        {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
+                        {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
+                        {employer_emoji} Employer :  {project.employer.title()}<br>
+                        {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
+                         🇺🇸 Location :  {project.city}<br>
+                        {client_emoji} Client :  {project.submission.client}<br>
+                        {role_emoji} Role :  {project.submission.lead.job_title}<br>
+                        &#128221; Joining Date :  {project_start_date}<br>"""
 
-                        text += "**Reason: **" + project.feedback if project.feedback else "None"
+                        text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
-                            "response_type": "in_channel",
-                            "username": "Log1 Updates",
-                            "text": text,
+                            "title": "Offer Cancellation Feedback ",
+                            "text": text
                         }
                         post_msg_using_webhook(config.offer_failure_url, data)
 
                     elif prev_status_obj.status != 'complete' and new_status == "complete":
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Completion')
+                        project.consultant.status = 'on_bench'
+                        project.consultant.save()
+                        title = f" Project Completed :: {project.consultant.name} :: {project.submission.client}"
+                        send_notification(project.consultant, request.user, title)
 
             serializer = self.serializer_class(project)
 
             return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    queryset = ProjectSupport.objects.all()
+    serializer_class = ProjectSupportSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.data['project_id'])
+            users = request.data.get('support', [])
+            support_names = []
+            for user in users:
+                support = get_object_or_404(User, id=user['id'])
+                support_names.append(support.employee_name)
+                if not user['start']:
+                    return Response({"error": "Start date can not be empty"}, status=status.HTTP_400_BAD_REQUEST)
+                ProjectSupport.objects.create(
+                    project=project,
+                    support=support,
+                    start=user['start']
+                )
+            # notification
+            user_list = []
+            consultant = project.submission.consultant
+            names = ", ".join(name for name in support_names)
+            pocs = consultant.pocs.all()
+            for data in pocs:
+                user_list.append(data.poc)
+            user_list.append(project.submission.created_by)
+            title = f"""{names} is assigned as support to {consultant.name}'s project of {project.submission.client}"""
+            notification_data = {
+                'title': title,
+                'category': 'info',
+                'description': title,
+                'sender_id': request.user.id,
+                'target_id': project.id,
+                'sender_user_type': 'user',
+                'target_type': 'project',
+                'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+            # Push Notification
+            message_body = {
+                "body": title,
+                "title": title,
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "data": {
+                    'target': 'project',
+                    'is_read': False,
+                    'is_deleted': False,
+                    'timestamp': str(datetime.now()),
+                    'target_id': project.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
+            serializer = ProjectSupportSerializer(project.support.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+            support.end = request.data.get('end')
+            support.feedback = request.data.get('feedback', None)
+            support.save()
+            serializer = ProjectSupportSerializer(support)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    queryset = ProjectOrder.objects.all()
+    serializer_class = ProjectOrderSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            serializer = ProjectOrderSerializer(project.order.all().order_by('-created'), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=request.data.get('project_id'))
+            effective_date = request.data.get('effective_date')
+            desc = ""
+            if request.data.get('field') == 'rate':
+                project.rate = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} rate changed to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            elif request.data.get('field') == 'employer':
+                project.employer = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer changed to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            elif request.data.get('field') == 'end_date':
+                effective_date = project.end_date
+                project.end_date = request.data.get('value')
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} extended to " \
+                       f"{request.data.get('value')} by {request.user.employee_name}"
+
+            order = ProjectOrder.objects.create(
+                project=project,
+                created_by=request.user,
+                effective_date=effective_date,
+                value=request.data.get('value'),
+                field=request.data.get('field'),
+            )
+            project.save()
+
+            if request.FILES.getlist('file'):
+                attachments = project.attachments.all()
+                for attachment in attachments:
+                    attachment.is_active = False
+                    attachment.save()
+
+                for file in request.FILES.getlist('file'):
+                    file_data = {
+                        "file": file,
+                        "model": "project",
+                        "object_id": project.id,
+                        "creator": request.user,
+                        "type": request.data.get('file_type'),
+                    }
+                    create_attachment(file_data)
+            create_activity(order.id, 'projectorder', request.user, desc, 'created')
+            serializer = self.serializer_class(project.order.all(), many=True)
+            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            order = get_object_or_404(ProjectOrder, id=kwargs.get('pk'))
+            prev_value = order.value
+            serializer = ProjectOrderSerializer(order, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                if order.field == 'rate' and prev_value == str(int(order.project.rate)):
+                    order.project.rate = request.data.get('value')
+                    order.project.save()
+
+                elif order.field == 'employer' and prev_value == order.project.employer:
+                    order.project.employer = request.data.get('value')
+                    order.project.save()
+
+                elif order.field == 'end_date' and prev_value == str(order.project.end_date):
+                    order.project.end_date = request.data.get('value')
+                    order.project.save()
+
+                desc = f"Project Order details updated by {request.user.employee_name}"
+                create_activity(order.id, 'projectorder', request.user, desc, 'updated')
+                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -826,7 +1048,6 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
                 location=F('city'),
                 status=F('statuses__status'),
                 client=F('submission__client'),
-                employer=F('submission__employer'),
                 job_desc=F('submission__lead__job_desc'),
                 job_title=F('submission__lead__job_title'),
                 marketer_email=F('submission__created_by__email'),
@@ -924,7 +1145,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultants = Consultant.objects.filter(
                     Q(name__istartswith=query) |
                     Q(projects__submission__client__icontains=query) |
-                    Q(projects__submission__employer__startswith=query) |
+                    Q(projects__employer__startswith=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 ).order_by('id').distinct('id')
 
@@ -1000,7 +1221,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     registration_ids = list(
                         FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='consultanttoken'
                                                  ).values_list('device_id', flat=True))
-                    push_notification(registration_ids, message_body)
+                    push_notification_consultant(registration_ids, message_body)
                 serializer = self.serializer_class(timesheet)
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)

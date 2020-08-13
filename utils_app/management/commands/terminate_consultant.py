@@ -1,5 +1,4 @@
-import os
-from datetime import date
+from datetime import date, datetime
 from django.core.management import BaseCommand
 from django.utils import timezone
 
@@ -31,8 +30,7 @@ class Command(BaseCommand):
             terminate.save()
 
             # Email for Exit Process Cancelled
-            res, error = send_exit_process_mail(terminate, 'complete')
-            print(res)
+            send_exit_process_mail(terminate, 'complete')
 
             # App Notification
             recruiter = consultant.recruiter
@@ -41,7 +39,8 @@ class Command(BaseCommand):
             for user in scrum_masters:
                 user_list.append(user)
 
-            title = f"{consultant.name} got terminated on {terminate.last_date}"
+            last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b. %d, %Y")
+            title = f"""{consultant.name} got terminated on {last_date}"""
 
             notification_data = {
                 'category': 'info',
@@ -57,16 +56,16 @@ class Command(BaseCommand):
 
             # Push Notification
             message_body = {
+                "body": None,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
                     'target': 'consultant',
-                    'timestamp': str(timezone.now()),
+                    'timestamp': str(timezone.now().strftime('%m/%d/%Y')),
                     'target_id': terminate.consultant.id,
                 },
             }
@@ -74,8 +73,4 @@ class Command(BaseCommand):
             object_ids = []
             for user in user_list:
                 object_ids.append(user.id)
-
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            push_notification(registration_ids, message_body)
+            push_notification(object_ids, message_body)

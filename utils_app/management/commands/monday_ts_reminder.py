@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 
 from datetime import date, timedelta
 from project.models import TimeSheet
-from notification.views import push_notification
+from notification.views import push_notification_consultant
 from notification.models import Notification, FCMDevice
 
 
@@ -20,9 +20,10 @@ class Command(BaseCommand):
         ).order_by('project__consultant__id').distinct('project__consultant_id')
         for timesheet in timesheets:
             consultant = timesheet.project.consultant
-            title = f"Reminder: Please submit timesheet for the week {str(timesheet.start)} - {str(timesheet.end)}"
+            title = f"Reminder: Please submit timesheet for the week {str(timesheet.start.strftime('%m/%d/%Y'))} - " \
+                    f"{str(timesheet.end.strftime('%m/%d/%Y'))}"
             message_body = {
-                "body": title,
+                "body": None,
                 "title": title,
                 "category": "pending",
                 "show_in_foreground": True,
@@ -41,8 +42,8 @@ class Command(BaseCommand):
             target_content_type = ContentType.objects.get(model="timesheet")
             Notification.objects.create(
                 title=title,
-                category="pending",
                 description=title,
+                category="pending",
                 sender_object_id=1,
                 target_object_id=timesheet.id,
                 recipient_object_id=consultant.id,
@@ -52,4 +53,4 @@ class Command(BaseCommand):
             )
             tokens = list(consultant.consultant_token.all().values_list('key', flat=True))
             device_ids = list(FCMDevice.objects.filter(object_id__in=tokens).values_list('device_id', flat=True))
-            push_notification(device_ids, message_body)
+            push_notification_consultant(device_ids, message_body)

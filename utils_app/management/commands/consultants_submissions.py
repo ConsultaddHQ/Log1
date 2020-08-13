@@ -27,7 +27,8 @@ class Command(BaseCommand):
         for consultant in consultants:
             submission_ids = []
             scrum_masters = []
-            queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days)
+            queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days,
+                                                 is_complete=True)
             submissions = []
             if not queryset:
                 continue
@@ -60,27 +61,29 @@ class Command(BaseCommand):
                     'days': days,
                 },
             }
+
+            reply_to = [config.RELATIONS]
+            mail_res = send_email(mail_data, "marketing@consultadd.com", reply_to)
             submission_data.append({
                 "scrum_masters": cc,
+                "mail_res": mail_res,
                 "consultant": consultant.id,
                 "submissions": submission_ids,
                 "consultant_name": consultant.name,
                 "consultant_email": consultant.email,
-
             })
-            reply_to = [config.RELATIONS]
-            send_email(mail_data, "log1@consultadd.com", reply_to)
 
         mail_data = {
             'cc': [],
             'bcc': [],
             'to': ['sarang.m@consultadd.com'],
-            'subject': f"Consultant submission data {str(last_2_days)} - {str(date.today())}",
+            'subject': f"Consultant submission data {str(last_2_days.strftime('%m/%d/%Y'))} -"
+                       f" {str(date.today().strftime('%m/%d/%Y'))}",
             'template': '../templates/consultants_submissions_admin_report.html',
             'context': {
                 "data": submission_data,
                 'days': days,
             },
         }
-        send_email(mail_data, "log1@consultadd.com")
+        send_email(mail_data, "marketing@consultadd.com")
 

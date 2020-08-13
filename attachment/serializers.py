@@ -12,7 +12,7 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Attachment
-        fields = ('id', 'object_id', 'creator', 'attachment_type', 'file_name')
+        fields = ('id', 'object_id', 'creator', 'attachment_type', 'file_name', 'is_active')
 
 
 class AttachmentURLSerializer(serializers.ModelSerializer):
@@ -23,5 +23,5 @@ class AttachmentURLSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Attachment
-        fields = ('id', 'object_id', 'creator', 'attachment_type', 'attachment_file', 'file_type')
+        fields = ('id', 'object_id', 'creator', 'attachment_type', 'attachment_file', 'file_type', 'is_active')
 

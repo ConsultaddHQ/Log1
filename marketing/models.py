@@ -17,6 +17,14 @@ STATUS_CHOICES = (
     ('archived', 'Archived'),
 )
 
+TEST_STATUS_CHOICES = (
+    ('new', 'New'),
+    ('passed', 'Passed'),
+    ('failed', 'Failed'),
+    ('cancelled', 'Cancelled'),
+    ('feedback_due', 'Feedback Due'),
+)
+
 SUB_CHOICES = (
     ('draft', 'Draft'),
     ('sub', 'Submitted'),
@@ -50,9 +58,22 @@ INTERVIEW_MODE = (
 )
 
 SCREENING_CHOICES = (
-    ('test', 'test'),
-    ('screening', 'Screening'),
+    ('ip_screening', 'IP Tech Screening'),
+    ('vendor_screening', 'Vendor Tech Screening'),
     ('interview', 'Interview'),
+)
+
+FAILURE_CHOICES = (
+    ('resume_error', 'Error In Resume'),
+    ('hired_else', 'Hired Someone Else'),
+    ('internal_hiring', 'Internal Hiring'),
+    ('caught_mimicking', 'Caught us Mimicking'),
+    ('insufficient_skills', 'Insufficient Skills'),
+    ('test_failed', 'Test Failed during Interview'),
+    ('feedback_not_received', 'Never Received Feedback'),
+    ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
+    ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
+    ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
 )
 
 
@@ -146,6 +167,7 @@ class Submission(TimeStampedModel):
     rate = models.FloatField(_('Rate'), null=True, blank=True)
     comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is active'), default=False)
+    is_complete = models.BooleanField(_('Is complete'), default=False)
     email = models.EmailField(_('Marketing Email'), null=True, blank=True)
     client = models.CharField(_('Client'), max_length=100, null=True, blank=True)
     phone = models.CharField(_('Marketing Phone'), max_length=20, null=True, blank=True)
@@ -237,6 +259,50 @@ class VendorLayer(TimeStampedModel):
         return f'{self.id}:L{self.level} {self.vendor_company.name}'
 
 
+class Test(TimeStampedModel):
+    attachments = GenericRelation(Attachment)
+    link = models.TextField(_('Test Link'), null=True, blank=True)
+    is_video = models.BooleanField(_('Video Test'), default=False)
+    is_offline = models.BooleanField(_('Offline Test'), default=False)
+    feedback = models.TextField(_('Test Feedback'), null=True, blank=True)
+    deadline = models.DateField(_('Test Deadline'), null=True, blank=True)
+    cancel_reason = models.TextField(_('Cancellation Reason'), null=True, blank=True)
+    engineer_remarks = models.TextField(_("Engineer Remarks"), null=True, blank=True)
+    status = models.CharField(_('Status'), max_length=20, choices=TEST_STATUS_CHOICES)
+    submit_date = models.DateTimeField(_('Test Submission Date'), null=True, blank=True)
+    additional_details = models.TextField(_('Additional Details'), null=True, blank=True)
+    skills = ArrayField(models.CharField(_('Skills'), max_length=30), blank=True, null=True)
+    engineer = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='associated_tests',
+        verbose_name='Engineer Associated'
+    )
+    submission = models.ForeignKey(
+        Submission, on_delete=models.CASCADE,
+        related_name='test',
+        verbose_name='Submission'
+    )
+    submitted_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='test_submissions',
+        verbose_name='Submission done by'
+    )
+
+    def save(self, *args, **kwargs):
+        """
+            On save timestamps
+        """
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Test, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.submission.consultant.name} :: {self.submission.created_by.employee_name}"
+
+
 class Interview(TimeStampedModel):
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
@@ -246,10 +312,15 @@ class Interview(TimeStampedModel):
     start_time = models.DateTimeField(_('Start Date'), null=True, blank=True)
     call_details = models.TextField(_('Call Details'), null=True, blank=True)
     attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
-    calendar_id = models.CharField(_('Calendar ID'), max_length=50, null=True, blank=True)
-    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=SCREENING_CHOICES)
+    calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
+    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=SCREENING_CHOICES)
     status = models.CharField(_('Status'), max_length=20, choices=SCREENING_STATUS_CHOICES, default='scheduled')
+    failure_reason = ArrayField(models.CharField(
+        _('Failure Reason'),
+        max_length=50, choices=FAILURE_CHOICES),
+        null=True, blank=True
+    )
     supervisor = models.ForeignKey(
         User, on_delete=models.PROTECT,
         null=True, blank=True,
