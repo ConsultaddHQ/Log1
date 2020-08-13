@@ -190,13 +190,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'to': to,
                 'cc': cc,
                 'bcc': [],
-                'subject': f'On Boarding of {consultant.name} :: {project.employer.title()} :: '
+                'subject': f'On Boarding of {consultant.name} :: {project.employer} :: '
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po.html',
                 'context': {
                     'type': po_type,
                     'rate': project.rate,
                     'start': project_start_date,
+                    'employer': project.employer,
                     'client_name': submission.client,
                     'con_rate': int(consultant.rate),
                     'vendor_name': vendor_contact.name,
@@ -206,7 +207,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
                     'vendor_number': vendor_contact.number,
-                    'employer': project.employer.title(),
                     'client_address': project.client_address,
                     'vendor_address': project.vendor_address,
                     'invoicing_period': project.invoicing_period,
@@ -267,12 +267,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'vendor_name': vendor_name,
                     'start': project_start_date,
                     'vendor_email': vendor_email,
+                    'employer': project.employer,
                     'vendor_number': vendor_number,
                     'client_name': submission.client,
                     'consultant_name': consultant.name,
                     'consultant_email': consultant.email,
                     'job_title': submission.lead.job_title,
-                    'employer': project.employer.title(),
                     'marketer_name': marketer.employee_name,
                     'vendor_address': project.vendor_address,
                     'client_address': project.client_address,
@@ -673,7 +673,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         "text": f"""{con_str}<br>
                     {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                     {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                    {employer_emoji} Employer :  {project.employer.title()}<br>
+                    {employer_emoji} Employer :  {project.employer}<br>
                     {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                     🇺🇸 Location :  {project.city}<br>
                     {client_emoji} Client :  {project.submission.client}<br>
@@ -750,7 +750,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         "text": f"""{con_str}<br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                        {employer_emoji} Employer :  {project.employer.title()}<br>
+                        {employer_emoji} Employer :  {project.employer}<br>
                         {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                         {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul> 🇺🇸 Location :  {project.city}
                         <br> {client_emoji} Client :  {project.submission.client}
@@ -788,7 +788,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                        {employer_emoji} Employer :  {project.employer.title()}<br>
+                        {employer_emoji} Employer :  {project.employer}<br>
                         {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                         {client_emoji} Client :  {project.submission.client}<br>
                         {role_emoji} Role :  {project.submission.lead.job_title}<br>
@@ -812,7 +812,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                        {employer_emoji} Employer :  {project.employer.title()}<br>
+                        {employer_emoji} Employer :  {project.employer}<br>
                         {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
                          🇺🇸 Location :  {project.city}<br>
                         {client_emoji} Client :  {project.submission.client}<br>
