@@ -127,9 +127,9 @@ class TimeSheetSerializer(serializers.ModelSerializer):
     def get_project(self, obj):
         return {
             'id': obj.project.id,
+            'employer': obj.project.employer,
             'start_date': obj.project.start_date,
             'client': obj.project.submission.client,
-            'employer': obj.project.employer.title(),
             'vendor': obj.project.submission.lead.vendor_company.name,
         }
 
@@ -157,9 +157,9 @@ class FinanceSerializer(serializers.ModelSerializer):
     def get_project(self, obj):
         return {
             'id': obj.project.id,
+            'employer': obj.project.employer,
             'start_date': obj.project.start_date,
             'client': obj.project.submission.client,
-            'employer': obj.project.employer.title(),
             'vendor': obj.project.submission.lead.vendor_company.name,
         }
 
@@ -183,9 +183,9 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
             project = project.latest('-start_date')
             return {
                 'id': project.id,
+                'team': project.employer,
                 'start_date': project.start_date,
                 'client': project.submission.client,
-                'team': project.employer.title(),
                 'vendor': project.submission.lead.vendor_company.name,
             }
         return None
