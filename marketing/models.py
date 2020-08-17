@@ -21,6 +21,7 @@ TEST_STATUS_CHOICES = (
     ('new', 'New'),
     ('passed', 'Passed'),
     ('failed', 'Failed'),
+    ('assigned', 'Assigned'),
     ('cancelled', 'Cancelled'),
     ('feedback_due', 'Feedback Due'),
 )
@@ -277,6 +278,12 @@ class Test(TimeStampedModel):
         blank=True,
         related_name='associated_tests',
         verbose_name='Engineer Associated'
+    )
+    assign_to = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name='assigned_to',
+        verbose_name='Test assigned to'
     )
     submission = models.ForeignKey(
         Submission, on_delete=models.CASCADE,

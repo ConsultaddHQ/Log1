@@ -1652,6 +1652,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
             passed = queryset.filter(status='passed').count()
+            assigned = queryset.filter(status='assigned').count()
             cancelled = queryset.filter(status='cancelled').count()
             feedback_due = queryset.filter(status='feedback_due').count()
 
@@ -1660,6 +1661,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'total': total,
                 'failed': failed,
                 'passed': passed,
+                'assigned': assigned,
                 'cancelled': cancelled,
                 'feedback_due': feedback_due,
             }
@@ -1918,6 +1920,63 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
             else:
                 return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path='assign')
+    def assign_test(self, request, *args, **kwargs):
+        try:
+            test = get_object_or_404(Test, id=kwargs.get('pk'))
+            users = request.data.get('assign_to')
+            user_list = []
+            for user_id in users:
+                user = get_object_or_404(User, id=user_id)
+                test.assign_to.add(user)
+                user_list.append(user)
+            test.status = 'assigned'
+            test.save()
+
+            # notification
+            skills = ", ".join(skill.title() for skill in test.skills)
+            test_type = 'Online'
+            if test.is_video:
+                test_type = "Video"
+            if test.is_offline:
+                test_type = 'Offline'
+            title = f"Test :: {test_type} :: {test.submission.consultant.name} :: {skills}, assigned to you"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': 'test',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': test.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'test',
+                    'timestamp': str(datetime.now()),
+                    'target_id': test.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
+
+            serializer = TestCreateSerializer(test)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
