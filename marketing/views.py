@@ -2029,6 +2029,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.save()
+            file = request.FILES.get('file')
+            if file:
+                file_data = {
+                    "file": file,
+                    "type": 'test_feedback',
+                    "object_id": test.id,
+                    "model": "test",
+                    "creator": request.user,
+                }
+                create_attachment(file_data)
             # App Notification
             user_list = [user for user in test.engineer.all()]
             user_list.append(test.submitted_by)
