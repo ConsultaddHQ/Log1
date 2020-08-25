@@ -39,6 +39,13 @@ class ProjectSupportAdmin(ExportActionModelAdmin):
                      'support__employee_name', 'project__submission__created_by__employee_name')
 
 
+@admin.register(SupportStatus)
+class SupportStatusAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
+    list_display = ('id', "frequency", "is_current")
+    search_fields = ('id', "frequency")
+
+
 @admin.register(ProjectStatus)
 class ProjectStatusAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
