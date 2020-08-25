@@ -453,6 +453,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.union(recruits)
 
             if query:
+                query = query.strip()
                 consultants = consultants.filter(name__istartswith=query)
 
             consultants = consultants.order_by('id').distinct('id')
@@ -779,6 +780,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         try:
             # Consultants search based on name, email, recruiter and location
             if query:
+                query = query.strip()
                 consultants = Consultant.objects.filter(
                     Q(email__iexact=query) |
                     Q(name__icontains=query) |

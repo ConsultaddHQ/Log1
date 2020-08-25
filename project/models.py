@@ -147,6 +147,7 @@ class ProjectOrder(TimeStampedModel):
 
 
 class ProjectSupport(TimeStampedModel):
+    is_primary = models.BooleanField(_('Is primary'), default=False)
     feedback = models.TextField(_("Feedback"), null=True, blank=True)
     end = models.DateField(_('Support End Date'), blank=True, null=True)
     start = models.DateField(_('Support Start Date'), blank=True, null=True)
@@ -169,6 +170,20 @@ class ProjectSupport(TimeStampedModel):
 
     def __str__(self):
         return f'{self.id}:{self.project.submission.consultant.name} - {self.support.employee_name}'
+
+
+class SupportStatus(models.Model):
+    frequency = models.CharField(_('Frequency'), max_length=50)
+    is_current = models.BooleanField(_('Is Current'), default=True)
+    created = models.DateTimeField(_('Created'), default=timezone.now)
+    project_support = models.ForeignKey(
+        ProjectSupport, on_delete=models.CASCADE,
+        related_name='status',
+        verbose_name='Support frequency'
+    )
+
+    def __str__(self):
+        return f'{self.id}:{self.project_support.support.employee_name} - {self.frequency}'
 
 
 class TimeSheet(TimeStampedModel):

@@ -267,12 +267,23 @@ class ProjectGetSerializer(serializers.ModelSerializer):
         }
 
 
+class SupportStatusSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SupportStatus
+        fields = '__all__'
+
+
 class ProjectSupportSerializer(serializers.ModelSerializer):
     support = UserSerializer()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
         fields = '__all__'
+
+    def get_status(self, obj):
+        return SupportStatusSerializer(obj.status.all(), many=True).data
 
 
 class ProjectOrderSerializer(serializers.ModelSerializer):

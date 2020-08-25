@@ -189,6 +189,7 @@ class LeadViewSets(viewsets.ModelViewSet):
         last, first = page * page_size, page * page_size - page_size
         try:
             if query:
+                query = query.strip()
                 leads = Lead.objects.filter(
                     Q(owner=request.user) & (
                             Q(city__icontains=query) |
