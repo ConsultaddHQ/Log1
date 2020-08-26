@@ -176,14 +176,15 @@ class SupportStatus(models.Model):
     frequency = models.CharField(_('Frequency'), max_length=50)
     is_current = models.BooleanField(_('Is Current'), default=True)
     created = models.DateTimeField(_('Created'), default=timezone.now)
-    project_support = models.ForeignKey(
+    support = models.ForeignKey(
         ProjectSupport, on_delete=models.CASCADE,
-        related_name='status',
-        verbose_name='Support frequency'
+        null=True, blank=True,
+        related_name='statuses',
+        verbose_name='Support'
     )
 
     def __str__(self):
-        return f'{self.id}:{self.project_support.support.employee_name} - {self.frequency}'
+        return f'{self.id}:{self.support.support.employee_name} - {self.frequency}'
 
 
 class TimeSheet(TimeStampedModel):

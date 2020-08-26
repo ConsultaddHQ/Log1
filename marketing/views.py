@@ -47,7 +47,6 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
         try:
-            query = query.strip()
             queryset = VendorCompany.objects.filter(name__icontains=query.strip()).order_by(Lower('name'))
             total = queryset.count()
             data = queryset[first:last].values('id', 'name', 'created_by')
