@@ -15,7 +15,7 @@ from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from employee.serializers import UserSerializer
-from project.serializers import ProjectSupportSerializer
+from project.serializers import ProjectSupportDetailSerializer
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
 from utils_app.utils import post_msg_using_webhook
@@ -542,19 +542,22 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     queryset = ProjectSupport.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-    serializer_class = ProjectSupportSerializer
+    serializer_class = ProjectSupportDetailSerializer
 
     def list(self, request, *args, **kwargs):
         try:
             query = request.query_params.get('query', None)
+            filter_for = request.query_params.get('filter_for', None)
+            filter_by_status = request.query_params.get('status', None)
+
             page = int(request.query_params.get("page", 1))
             page_size = int(request.query_params.get("page_size", 10))
             last, first = page * page_size, page * page_size - page_size
 
-            support = ProjectSupport.objects.filter(end=None)
+            supports = ProjectSupport.objects.filter(end=None)
             if query:
                 query = query.strip()
-                projects = support.filter(
+                supports = supports.filter(
                     Q(support__employee_name__istartswith=query) |
                     Q(project__consultant__name__istartswith=query) |
                     Q(project__submission__client__istartswith=query) |
@@ -562,5 +565,28 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                     Q(project__submission__lead__secondary_skills__istartswith=query)
                 )
 
+            if filter_for == 'my':
+                supports = supports.filter(support=request.user)
+
+            data = {
+                "total": supports,
+                "active": supports.filter(statuses__frequency__exact='more_than_3_days', statuses__is_current=True),
+                "less_active": supports.filter(statuses__frequency__exact='less_than_3_days', statuses__is_current=True),
+                "independent": supports.filter(statuses__frequency__in=('twice_a_month', 'less_than_once_in_a_month'),
+                                               statuses__is_current=True)
+            }
+            print(filter_by_status)
+            if filter_by_status:
+                supports = data[filter_by_status]
+            print(supports)
+            data_count = {
+                'total': data["total"].count(),
+                'active': data["active"].count(),
+                'less_active': data["less_active"].count(),
+                'independent': data["independent"].count(),
+            }
+
+            serializer = ProjectSupportDetailSerializer(supports[first:last], many=True)
+            return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)

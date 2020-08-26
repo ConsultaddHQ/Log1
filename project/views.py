@@ -941,12 +941,12 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             support.is_primary = request.data.get('is_primary')
             new_freq = request.data.get('frequency')
             if prev.first().frequency != new_freq:
+                prev.update(is_current=False)
                 SupportStatus.objects.create(
                     is_current=True,
                     frequency=new_freq,
                     project_support=support,
                 )
-                prev.update(is_current=False)
             support.save()
             serializer = ProjectSupportSerializer(support)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
