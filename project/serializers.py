@@ -267,12 +267,67 @@ class ProjectGetSerializer(serializers.ModelSerializer):
         }
 
 
+class SupportStatusSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SupportStatus
+        fields = '__all__'
+
+
 class ProjectSupportSerializer(serializers.ModelSerializer):
     support = UserSerializer()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
         fields = '__all__'
+
+    def get_status(self, obj):
+        return SupportStatusSerializer(obj.statuses.filter(is_current=True).first()).data
+
+
+class ProjectSupportDetailSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+    client = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    technology = serializers.SerializerMethodField()
+    support = serializers.SerializerMethodField()
+    joining_date = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSupport
+        fields = ('id', 'created', 'is_primary', 'end', 'start', 'feedback', 'status',
+                  'client', 'consultant', 'technology', 'support', 'joining_date')
+
+    def get_status(self, obj):
+        status = obj.statuses.filter(is_current=True).first()
+        if status:
+            if status.frequency == 'more_than_3_days':
+                return 'active'
+            elif status.frequency == 'less_than_3_days':
+                return 'less_active'
+            elif status.frequency in ('twice_a_month', 'less_than_once_in_a_month'):
+                return 'independent'
+
+    def get_client(self, obj):
+        return obj.project.submission.client
+
+    def get_support(self, obj):
+        return UserSerializer(obj.support).data
+
+    def get_technology(self, obj):
+        return obj.project.submission.lead.primary_skill
+
+    def get_joining_date(self, obj):
+        return obj.project.start_date
+
+    def get_consultant(self, obj):
+        data = {
+            'name': obj.project.consultant.name,
+            'email': obj.project.consultant.email,
+            'contact': obj.project.consultant.phone_no
+        }
+        return data
 
 
 class ProjectOrderSerializer(serializers.ModelSerializer):
