@@ -935,19 +935,27 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             project = support.project
             all_support = project.support.filter(end=None)
             primary_support = [user for user in all_support if user.is_primary is True]
+
             if len(primary_support) == 1 and primary_support[0] == support and request.data.get('is_primary') is False:
                 return Response({'error': 'At least one support should be primary'}, status=status.HTTP_400_BAD_REQUEST)
-            prev = support.statuses.filter(is_current=True)
+
             support.is_primary = request.data.get('is_primary')
+            support.save()
             new_freq = request.data.get('frequency')
-            if prev.first().frequency != new_freq:
+            prev = support.statuses.filter(is_current=True)
+            if prev.first() and prev.first().frequency != new_freq:
                 prev.update(is_current=False)
                 SupportStatus.objects.create(
                     is_current=True,
                     frequency=new_freq,
                     support=support,
                 )
-            support.save()
+            elif not prev.first():
+                SupportStatus.objects.create(
+                    is_current=True,
+                    frequency=new_freq,
+                    support=support,
+                )
             serializer = ProjectSupportSerializer(support)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:

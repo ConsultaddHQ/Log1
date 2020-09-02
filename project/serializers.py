@@ -301,12 +301,13 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True).first()
-        if status.frequency == 'more_than_3_days':
-            return 'active'
-        elif status.frequency == 'less_than_3_days':
-            return 'less_active'
-        elif status.frequency in ('twice_a_month', 'less_than_once_in_a_month'):
-            return 'independent'
+        if status:
+            if status.frequency == 'more_than_3_days':
+                return 'active'
+            elif status.frequency == 'less_than_3_days':
+                return 'less_active'
+            elif status.frequency in ('twice_a_month', 'less_than_once_in_a_month'):
+                return 'independent'
 
     def get_client(self, obj):
         return obj.project.submission.client
