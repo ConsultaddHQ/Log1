@@ -882,7 +882,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     is_primary=user['primary'],
                 )
                 SupportStatus.objects.create(
-                    project_support=project_support,
+                    support=project_support,
                     is_current=True,
                     frequency=user['frequency']
                 )
@@ -945,7 +945,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 SupportStatus.objects.create(
                     is_current=True,
                     frequency=new_freq,
-                    project_support=support,
+                    support=support,
                 )
             support.save()
             serializer = ProjectSupportSerializer(support)
