@@ -575,10 +575,8 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                 "independent": supports.filter(statuses__frequency__in=('twice_a_month', 'less_than_once_in_a_month'),
                                                statuses__is_current=True)
             }
-            print(filter_by_status)
             if filter_by_status:
                 supports = data[filter_by_status]
-            print(supports)
             data_count = {
                 'total': data["total"].count(),
                 'active': data["active"].count(),

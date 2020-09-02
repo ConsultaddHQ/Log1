@@ -937,7 +937,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             primary_support = [user for user in all_support if user.is_primary is True]
             if len(primary_support) == 1 and primary_support[0] == support and request.data.get('is_primary') is False:
                 return Response({'error': 'At least one support should be primary'}, status=status.HTTP_400_BAD_REQUEST)
-            prev = support.status.filter(is_current=True)
+            prev = support.statuses.filter(is_current=True)
             support.is_primary = request.data.get('is_primary')
             new_freq = request.data.get('frequency')
             if prev.first().frequency != new_freq:

@@ -1857,7 +1857,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
             else:
-                queryset = Test.objects.exclude(submission__consultant_marketing__status='close')
+                queryset = Test.objects.all()
             if filter_for == 'my':
                 if 'engineer' in roles:
                     queryset = queryset.filter(
