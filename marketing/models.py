@@ -281,8 +281,7 @@ class Test(TimeStampedModel):
     )
     assign_to = models.ManyToManyField(
         User,
-        blank=True,
-        related_name='assigned_to',
+        related_name='test_assigned',
         verbose_name='Test assigned to'
     )
     submission = models.ForeignKey(

@@ -176,6 +176,7 @@ class SupportStatus(models.Model):
     frequency = models.CharField(_('Frequency'), max_length=50)
     is_current = models.BooleanField(_('Is Current'), default=True)
     created = models.DateTimeField(_('Created'), default=timezone.now)
+    change_date = models.DateField(_('Status Change Date'), blank=True, null=True)
     support = models.ForeignKey(
         ProjectSupport, on_delete=models.CASCADE,
         null=True, blank=True,

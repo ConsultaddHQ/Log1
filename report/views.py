@@ -2,7 +2,6 @@ from datetime import datetime, date, timedelta
 
 from django.db import transaction
 from django.db.models import Q
-from rest_framework import status
 from rest_framework.mixins import *
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -15,11 +14,11 @@ from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from employee.serializers import UserSerializer
-from project.serializers import ProjectSupportDetailSerializer
 from project.models import Project, ProjectSupport
-from marketing.models import Submission, Interview
 from utils_app.utils import post_msg_using_webhook
+from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
+from project.serializers import ProjectSupportDetailSerializer
 
 
 class ScrumMeetingReport(GenericViewSet):

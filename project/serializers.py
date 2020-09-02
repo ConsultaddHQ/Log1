@@ -283,7 +283,7 @@ class ProjectSupportSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_status(self, obj):
-        return SupportStatusSerializer(obj.statuses.filter(is_current=True), many=True).data
+        return SupportStatusSerializer(obj.statuses.filter(is_current=True).first()).data
 
 
 class ProjectSupportDetailSerializer(serializers.ModelSerializer):

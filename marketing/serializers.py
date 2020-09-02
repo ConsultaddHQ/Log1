@@ -283,9 +283,7 @@ class TestCreateSerializer(serializers.ModelSerializer):
         return None
 
     def get_assigned_to(self, obj):
-        if obj.assign_to.all():
-            return obj.assign_to.all().values('id', 'employee_name')
-        return None
+        return obj.assign_to.all().values('id', 'employee_name')
 
     def get_submitted_by(self, obj):
         if obj.submitted_by:
