@@ -1,5 +1,6 @@
 from django.db.models import Q
 from rest_framework import serializers
+from datetime import date
 
 from project.models import *
 from employee.serializers import UserSerializer
@@ -301,13 +302,17 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True).first()
-        if status:
-            if status.frequency == 'more_than_3_days':
+        if obj.project.start_date and obj.project.start_date > date.today():
+            return 'training'
+        elif status:
+            if status.frequency == 'more_than_2_days':
                 return 'active'
             elif status.frequency == 'less_than_3_days':
                 return 'less_active'
-            elif status.frequency in ('twice_a_month', 'less_than_once_in_a_month'):
+            elif status.frequency in ('twice_a_month', 'independent'):
                 return 'independent'
+        else:
+            return None
 
     def get_client(self, obj):
         return obj.project.submission.client

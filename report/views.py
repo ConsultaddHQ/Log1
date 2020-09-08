@@ -560,7 +560,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             elif project.support.filter(statuses__frequency__exact='more_than_2_days', statuses__is_current=True,
                                         project__start_date__lte=date.today()).first():
                 active += 1
-            elif project.support.filter(statuses__frequency__exact='more_than_3_days', statuses__is_current=True).first():
+            elif project.support.filter(statuses__frequency__exact='less_than_3_days', statuses__is_current=True).first():
                 less_active += 1
             elif project.support.filter(statuses__frequency__in=('twice_a_month', 'independent'),
                                         statuses__is_current=True).first():

@@ -76,7 +76,7 @@ class ConsultantCommentGetSerializer(serializers.ModelSerializer):
         fields = ('id', 'comment_text', 'parent_comment', 'object_id', 'user_type', 'user', 'child_comment', 'created')
 
     def get_child_comment(self, obj):
-        return ConsultantCommentSerializer(obj.child_comments.all(), many=True).data
+        return ConsultantCommentSerializer(obj.child_comments.all().order_by('-created'), many=True).data
 
     def get_user_type(self, obj):
         return obj.created_by_content_type.model
