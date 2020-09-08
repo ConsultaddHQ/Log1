@@ -1370,7 +1370,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
         # Get interviews from Google Calendar for specific Email ID
         try:
             data, visibility = get_interviews(event)
-            return Response({"result": data, "visibility": visibility}, status=status.HTTP_200_OK)
+            return Response({"result": [], "visibility": visibility}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1862,7 +1862,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if 'engineer' in roles:
                     queryset = queryset.filter(
                         Q(engineer=request.user) |
-                        Q(submitted_by=request.user)
+                        Q(assign_to=request.user) |
+                        Q(submitted_by=request.user) |
+                        Q(submission__created_by=request.user)
                     )
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
