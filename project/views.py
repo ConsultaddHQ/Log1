@@ -807,7 +807,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
-                            "title": "Offer Termination Feedback ",
+                            "title": "Offer Termination Feedback",
                             "text": text
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
@@ -817,7 +817,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
 
-                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
                         {employer_emoji} Employer :  {project.employer}<br>
