@@ -1369,8 +1369,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
         }
         # Get interviews from Google Calendar for specific Email ID
         try:
-            data, visibility = get_interviews(event)
-            return Response({"result": [], "visibility": visibility}, status=status.HTTP_200_OK)
+            # data, visibility = get_interviews(event)
+            return Response({"result": [], "visibility": True}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1946,7 +1946,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_type = "Video"
             if test.is_offline:
                 test_type = 'Offline'
-            title = f"Test :: {test_type} :: {test.submission.consultant.name} :: {skills}, assigned to you"
+            title = f"Test assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {test_type} :: {skills}"
             notification_data = {
                 'category': 'info',
                 'sender_user_type': 'user',
