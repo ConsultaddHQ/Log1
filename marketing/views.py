@@ -47,7 +47,6 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
         page_size = int(request.query_params.get("page_size", 10))
         last, first = page * page_size, page * page_size - page_size
         try:
-            query = query.strip()
             queryset = VendorCompany.objects.filter(name__icontains=query.strip()).order_by(Lower('name'))
             total = queryset.count()
             data = queryset[first:last].values('id', 'name', 'created_by')
@@ -189,6 +188,7 @@ class LeadViewSets(viewsets.ModelViewSet):
         last, first = page * page_size, page * page_size - page_size
         try:
             if query:
+                query = query.strip()
                 leads = Lead.objects.filter(
                     Q(owner=request.user) & (
                             Q(city__icontains=query) |
@@ -1369,8 +1369,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
         }
         # Get interviews from Google Calendar for specific Email ID
         try:
-            data, visibility = get_interviews(event)
-            return Response({"result": data, "visibility": visibility}, status=status.HTTP_200_OK)
+            # data, visibility = get_interviews(event)
+            return Response({"result": [], "visibility": True}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1652,6 +1652,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
             passed = queryset.filter(status='passed').count()
+            assigned = queryset.filter(status='assigned').count()
             cancelled = queryset.filter(status='cancelled').count()
             feedback_due = queryset.filter(status='feedback_due').count()
 
@@ -1660,6 +1661,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'total': total,
                 'failed': failed,
                 'passed': passed,
+                'assigned': assigned,
                 'cancelled': cancelled,
                 'feedback_due': feedback_due,
             }
@@ -1855,12 +1857,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
             else:
-                queryset = Test.objects.exclude(submission__consultant_marketing__status='close')
+                queryset = Test.objects.all()
             if filter_for == 'my':
                 if 'engineer' in roles:
                     queryset = queryset.filter(
                         Q(engineer=request.user) |
-                        Q(submitted_by=request.user)
+                        Q(assign_to=request.user) |
+                        Q(submitted_by=request.user) |
+                        Q(submission__created_by=request.user)
                     )
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
@@ -1922,6 +1926,63 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['put'], detail=True, url_path='assign')
+    def assign_test(self, request, *args, **kwargs):
+        try:
+            test = get_object_or_404(Test, id=kwargs.get('pk'))
+            users = request.data.get('assign_to')
+            user_list = []
+            for user_id in users:
+                user = get_object_or_404(User, id=user_id)
+                test.assign_to.add(user)
+                user_list.append(user)
+            test.status = 'assigned'
+            test.save()
+
+            # notification
+            skills = ", ".join(skill.title() for skill in test.skills)
+            test_type = 'Online'
+            if test.is_video:
+                test_type = "Video"
+            if test.is_offline:
+                test_type = 'Offline'
+            title = f"Test assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {test_type} :: {skills}"
+            notification_data = {
+                'category': 'info',
+                'sender_user_type': 'user',
+                'target_type': 'test',
+                'recipient_user_type': 'user',
+                'description': title,
+                'title': title,
+                'sender_id': request.user.id,
+                'target_id': test.id,
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "body": title,
+                "title": title,
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'test',
+                    'timestamp': str(datetime.now()),
+                    'target_id': test.id,
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
+
+            serializer = TestCreateSerializer(test)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['put'], detail=True, url_path='submit')
     def submit_test(self, request, *args, **kwargs):
         try:
@@ -1970,6 +2031,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.save()
+            file = request.FILES.get('file')
+            if file:
+                file_data = {
+                    "file": file,
+                    "type": 'test_feedback',
+                    "object_id": test.id,
+                    "model": "test",
+                    "creator": request.user,
+                }
+                create_attachment(file_data)
             # App Notification
             user_list = [user for user in test.engineer.all()]
             user_list.append(test.submitted_by)

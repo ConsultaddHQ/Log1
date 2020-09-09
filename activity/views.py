@@ -89,7 +89,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
 
             instance = get_object_or_404(models[model], id=object_id)
             comments = instance.comments.filter(parent_comment=None)
-            serializer = CommentGetSerializer(comments, many=True)
+            serializer = CommentGetSerializer(comments.order_by('-created'), many=True)
             return Response({'results': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)

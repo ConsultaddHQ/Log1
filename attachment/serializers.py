@@ -19,7 +19,9 @@ class AttachmentURLSerializer(serializers.ModelSerializer):
     file_type = serializers.SerializerMethodField()
 
     def get_file_type(self, obj):
-        return os.path.split(obj.attachment_file.name)[1].split('.')[1]
+        if len(os.path.split(obj.attachment_file.name)[1].split('.')) > 1:
+            return os.path.split(obj.attachment_file.name)[1].split('.')[1]
+        return None
 
     class Meta:
         model = Attachment

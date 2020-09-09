@@ -425,7 +425,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 if not ('legal' in request.user.roles or 'superadmin' in request.user.roles):
                     return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
                 petition = get_object_or_404(Petition, id=object_id)
-                comments = petition.consultant_comments.filter(parent_comment=None)
+                comments = petition.consultant_comments.filter(parent_comment=None).order_by('-created')
                 serializer = ConsultantCommentGetSerializer(comments, many=True)
                 return Response({'results': serializer.data}, status=status.HTTP_200_OK)
 

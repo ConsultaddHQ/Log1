@@ -1,7 +1,8 @@
 from datetime import datetime, date, timedelta
 
 from django.db import transaction
-from rest_framework import status
+from django.db.models import Q
+from rest_framework.mixins import *
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
@@ -10,13 +11,14 @@ from rest_framework.authentication import TokenAuthentication
 
 from constance import config
 from api_key.models import APIKey
-from project.models import Project
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from employee.serializers import UserSerializer
-from marketing.models import Submission, Interview
+from project.models import Project, ProjectSupport
 from utils_app.utils import post_msg_using_webhook
+from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
+from project.serializers import ProjectSupportDetailSerializer
 
 
 class ScrumMeetingReport(GenericViewSet):
@@ -533,3 +535,102 @@ command - {slash_command}\n
             return Response({"text": text}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"text": "Bad request", "error": str(error)}, status=status.HTTP_200_OK)
+
+
+class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
+    queryset = ProjectSupport.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ProjectSupportDetailSerializer
+
+    @staticmethod
+    def get_support_counts(supports):
+        supports = supports.order_by('project__id',
+                                     'project__consultant__id'
+                                     ).distinct('project__id', 'project__consultant__id')
+        counts = dict()
+        active = training = less_active = independent = 0
+        terminated = supports.filter(project__statuses__status__istartswith='terminated', is_primary=True).count()
+        supports = supports.filter(end=None).exclude(project__statuses__status__istartswith='terminated')
+        total = supports.count()
+        for support in supports:
+            project = support.project
+            if project.start_date and project.start_date > date.today():
+                training += 1
+            elif project.support.filter(statuses__frequency__exact='more_than_2_days', statuses__is_current=True,
+                                        project__start_date__lte=date.today()).first():
+                active += 1
+            elif project.support.filter(statuses__frequency__exact='less_than_3_days', statuses__is_current=True).first():
+                less_active += 1
+            elif project.support.filter(statuses__frequency__in=('twice_a_month', 'independent'),
+                                        statuses__is_current=True).first():
+                independent += 1
+        counts['total'] = total
+        counts['active'] = active
+        counts['training'] = training
+        counts['terminated'] = terminated
+        counts['less_active'] = less_active
+        counts['independent'] = independent
+        return counts
+
+    def list(self, request, *args, **kwargs):
+        try:
+            query = request.query_params.get('query', None)
+            filter_for = request.query_params.get('filter_for', None)
+            filter_by_status = request.query_params.get('status', None)
+            filter_by_tech = request.query_params.get('filter_by_tech', None)
+
+            page = int(request.query_params.get("page", 1))
+            page_size = int(request.query_params.get("page_size", 10))
+            last, first = page * page_size, page * page_size - page_size
+
+            supports = ProjectSupport.objects.all().order_by('-project__start_date', '-start')
+            if query:
+                query = query.strip()
+                supports = supports.filter(
+                    Q(support__employee_name__istartswith=query) |
+                    Q(project__consultant__name__istartswith=query) |
+                    Q(project__submission__client__istartswith=query) |
+                    Q(project__submission__lead__primary_skill__istartswith=query) |
+                    Q(project__submission__lead__secondary_skills__istartswith=query)
+                )
+
+            if filter_for == 'my':
+                supports = supports.filter(support=request.user)
+
+            dev = ['Java', 'Python', 'Aws', 'DevOps', 'Full Stack', 'Nodejs', 'Angular', 'React', 'DA', 'Others']
+            ba = ['Salesforce', 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'BA', 'BI']
+            if filter_by_tech == 'ba':
+                supports = supports.filter(
+                    Q(project__submission__lead__primary_skill__in=ba) |
+                    Q(project__submission__lead__secondary_skills__istartswith=ba)
+                )
+            elif filter_by_tech == 'dev':
+                supports = supports.filter(
+                    Q(project__submission__lead__primary_skill__in=dev) |
+                    Q(project__submission__lead__secondary_skills__istartswith=dev)
+                )
+
+            data_count = self.get_support_counts(supports)
+
+            data = {
+                "total": supports.exclude(end=None).exclude(project__statuses__status__istartswith='terminated'),
+                "training": supports.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                                            statuses__is_current=True, project__start_date__gt=date.today()),
+                "active": supports.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                                          statuses__is_current=True, project__start_date__lte=date.today()),
+                "less_active": supports.filter(end=None, statuses__frequency__exact='less_than_3_days',
+                                               statuses__is_current=True),
+                "independent": supports.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
+                                               statuses__is_current=True),
+                "terminated": supports.filter(project__statuses__status__istartswith='terminated', is_primary=True)
+            }
+            if filter_by_status:
+                supports = data[filter_by_status]
+            else:
+                supports = supports.filter(end=None).order_by('-project__start_date', '-start')
+
+            serializer = ProjectSupportDetailSerializer(supports[first:last], many=True)
+            return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)

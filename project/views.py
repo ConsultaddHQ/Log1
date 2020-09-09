@@ -432,6 +432,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = projects.filter(submission__lead__is_w2=True)
 
             if query:
+                query = query.strip()
                 projects = projects.filter(
                     Q(city__istartswith=query) |
                     Q(consultant__name__istartswith=query) |
@@ -554,6 +555,22 @@ class ProjectViewSets(viewsets.ModelViewSet):
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
             prev_status_obj = project.statuses.get(is_current=True)
+
+            cancellation_status = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
+                                   'cancelled-contract_conflicts', 'cancelled-candidate_denied',
+                                   'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                                   'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
+            termination_status = ['terminated', 'terminated-resigned', 'terminated-fired',
+                                  'terminated-resigned_rate_issue', 'terminated-resigned_technology_issue',
+                                  'terminated-fired_budget_issue', 'terminated-fired_security_issue',
+                                  'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
+                                  'terminated-resigned_full_time_offer']
+
+            all_status = ['new', 'other', 'joined', 'received', 'signed', 'extended', 'on_boarded', 'complete']
+            all_status = all_status + cancellation_status + termination_status
+
+            if new_status not in all_status:
+                return Response({'error': 'Project status does not exist'}, status=status.HTTP_400_BAD_REQUEST)
 
             data = {
                 "city": request.data.get('city', project.city),
@@ -766,15 +783,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     send_notification(project.consultant, request.user, title)
 
                 # Mail for Cancellation or Termination of Project
-                cancellation_status = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
-                                       'cancelled-contract_conflicts', 'cancelled-candidate_denied',
-                                       'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
-                                       'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
-                termination_status = ['terminated', 'terminated-resigned', 'terminated-fired',
-                                      'terminated-resigned_rate_issue', 'terminated-resigned_technology_issue',
-                                      'terminated-fired_budget_issue', 'terminated-fired_security_issue',
-                                      'terminated-resigned_location_issue', 'terminated-fired_performance_issue',
-                                      'terminated-resigned_full_time_offer']
 
                 if os.environ.get('ENV', 'local') == 'prod':
                     scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy']
@@ -799,7 +807,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text += "**Reason:**" + project.feedback if project.feedback else "None"
 
                         data = {
-                            "title": "Offer Termination Feedback ",
+                            "title": "Offer Termination Feedback",
                             "text": text
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
@@ -809,7 +817,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
 
-                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
                         {employer_emoji} Employer :  {project.employer}<br>
@@ -867,10 +875,16 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 support_names.append(support.employee_name)
                 if not user['start']:
                     return Response({"error": "Start date can not be empty"}, status=status.HTTP_400_BAD_REQUEST)
-                ProjectSupport.objects.create(
+                project_support = ProjectSupport.objects.create(
                     project=project,
                     support=support,
-                    start=user['start']
+                    start=user['start'],
+                    is_primary=user['primary'],
+                )
+                SupportStatus.objects.create(
+                    support=project_support,
+                    is_current=True,
+                    frequency=user['frequency']
                 )
             # notification
             user_list = []
@@ -916,6 +930,40 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
+        try:
+            support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+            project = support.project
+            all_support = project.support.filter(end=None)
+            primary_support = [user for user in all_support if user.is_primary is True]
+
+            if len(primary_support) == 1 and primary_support[0] == support and request.data.get('is_primary') is False:
+                return Response({'error': 'At least one support should be primary'}, status=status.HTTP_400_BAD_REQUEST)
+
+            support.is_primary = request.data.get('is_primary')
+            support.save()
+            new_freq = request.data.get('frequency')
+            prev = support.statuses.filter(is_current=True)
+            if prev.first() and prev.first().frequency != new_freq:
+                prev.update(is_current=False)
+                SupportStatus.objects.create(
+                    is_current=True,
+                    frequency=new_freq,
+                    support=support,
+                )
+            elif not prev.first():
+                SupportStatus.objects.create(
+                    is_current=True,
+                    frequency=new_freq,
+                    support=support,
+                )
+            serializer = ProjectSupportSerializer(support)
+            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=True, url_path="remove")
+    def remove_support(self, request, *args, **kwargs):
         try:
             support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
             support.end = request.data.get('end')
