@@ -603,12 +603,12 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             if filter_by_tech == 'ba':
                 supports = supports.filter(
                     Q(project__submission__lead__primary_skill__in=ba) |
-                    Q(project__submission__lead__secondary_skills__istartswith=ba)
+                    Q(project__submission__lead__secondary_skills__in=ba)
                 )
             elif filter_by_tech == 'dev':
                 supports = supports.filter(
                     Q(project__submission__lead__primary_skill__in=dev) |
-                    Q(project__submission__lead__secondary_skills__istartswith=dev)
+                    Q(project__submission__lead__secondary_skills__in=dev)
                 )
 
             data_count = self.get_support_counts(supports)
@@ -625,10 +625,9 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                                                statuses__is_current=True),
                 "terminated": supports.filter(project__statuses__status__istartswith='terminated', is_primary=True)
             }
+            supports = supports.filter(end=None).order_by('-project__start_date', '-start')
             if filter_by_status:
                 supports = data[filter_by_status]
-            else:
-                supports = supports.filter(end=None).order_by('-project__start_date', '-start')
 
             serializer = ProjectSupportDetailSerializer(supports[first:last], many=True)
             return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)

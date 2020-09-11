@@ -172,6 +172,13 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             fcm_token.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(methods=['get'], detail=False, url_path='me')
+    def me(self, request):
+        try:
+            return Response({"data": UserSerializer(request.user).data}, status=200)
+        except Exception as error:
+            return Response({"message": str(error)}, status=400)
+
 
 class ResetPasswordViewSets(GenericViewSet):
     queryset = User.objects.all()

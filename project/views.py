@@ -261,6 +261,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination.html',
                 'context': {
+                    'po_type': po_type,
                     'rate': project.rate,
                     'end': project_end_date,
                     'remark': project.feedback,
@@ -291,6 +292,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination_engineering.html',
                 'context': {
+                    'po_type': po_type,
                     'end': project_end_date,
                     'client_name': submission.client,
                     'consultant_name': consultant.name,

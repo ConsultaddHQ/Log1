@@ -215,6 +215,19 @@ class LeadViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            lead = Lead.objects.filter(id=kwargs.get('pk'))
+            data = lead.annotate(submission_count=Count('submission')).annotate(
+                company_name=F('vendor_company__name'),
+                company_id=F('vendor_company__id'),
+            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+                     'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+            return Response({"result": data[0]}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
