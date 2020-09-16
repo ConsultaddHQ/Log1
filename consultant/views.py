@@ -1530,6 +1530,13 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             tags = request.data.get('tagged_user', [])
             if len(tags) > 0:
                 user_tag = feedback.tagged_user.all().first()
+                if not user_tag:
+                    tag_data = {
+                        "model": "feedback",
+                        "object_id": feedback.id,
+                        "tags": tags
+                    }
+                    tag_users(tag_data)
                 for tag in tags:
                     user = get_object_or_404(User, id=tag)
                     user_list.append(user)

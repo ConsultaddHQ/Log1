@@ -603,12 +603,12 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             if filter_by_tech == 'ba':
                 supports = supports.filter(
                     Q(project__submission__lead__primary_skill__in=ba) |
-                    Q(project__submission__lead__secondary_skills__in=ba)
+                    Q(project__submission__lead__secondary_skills__istartswith=ba)
                 )
             elif filter_by_tech == 'dev':
                 supports = supports.filter(
                     Q(project__submission__lead__primary_skill__in=dev) |
-                    Q(project__submission__lead__secondary_skills__in=dev)
+                    Q(project__submission__lead__secondary_skills__istartswith=dev)
                 )
 
             data_count = self.get_support_counts(supports)

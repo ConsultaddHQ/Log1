@@ -15,5 +15,5 @@ class ConversationAdmin(ExportActionModelAdmin):
 class MessageAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('is_sent',)
-    list_display = ('id', 'conversation', 'text', 'is_sent', 'created')
+    list_display = ('id', 'conversation', 'text', 'is_sent', 'read', 'created')
     search_fields = ('id', 'conversation__user1__owner__employee_name', 'user2')

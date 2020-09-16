@@ -1660,7 +1660,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def get_test_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
-            queryset = queryset.order_by('-modified').distinct('modified')
+            queryset = queryset.order_by('-created').distinct('created')
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1681,7 +1681,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = queryset.order_by('-modified')[first:last].annotate(
+            data = queryset.order_by('-created')[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
