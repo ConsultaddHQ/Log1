@@ -884,9 +884,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     is_primary=user['primary'],
                 )
                 SupportStatus.objects.create(
-                    support=project_support,
                     is_current=True,
-                    frequency=user['frequency']
+                    support=project_support,
+                    change_date=user['start'],
+                    frequency=user['frequency'],
                 )
             # notification
             user_list = []
@@ -943,20 +944,23 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
 
             support.is_primary = request.data.get('is_primary')
             support.save()
+            start = request.data.get('start')
             new_freq = request.data.get('frequency')
             prev = support.statuses.filter(is_current=True)
             if prev.first() and prev.first().frequency != new_freq:
                 prev.update(is_current=False)
                 SupportStatus.objects.create(
                     is_current=True,
-                    frequency=new_freq,
                     support=support,
+                    change_date=start,
+                    frequency=new_freq,
                 )
             elif not prev.first():
                 SupportStatus.objects.create(
                     is_current=True,
-                    frequency=new_freq,
                     support=support,
+                    change_date=start,
+                    frequency=new_freq,
                 )
             serializer = ProjectSupportSerializer(support)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)

@@ -550,19 +550,19 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                                      ).distinct('project__id', 'project__consultant__id')
         counts = dict()
         active = training = less_active = independent = 0
-        terminated = supports.filter(project__statuses__status__istartswith='terminated', is_primary=True).count()
+        terminated = supports.filter(project__statuses__status__istartswith='terminated').count()
         supports = supports.filter(end=None).exclude(project__statuses__status__istartswith='terminated')
         total = supports.count()
         for support in supports:
             project = support.project
             if project.start_date and project.start_date > date.today():
                 training += 1
-            elif project.support.filter(statuses__frequency__exact='more_than_2_days', statuses__is_current=True,
+            elif project.support.filter(end=None, statuses__frequency__exact='more_than_2_days', statuses__is_current=True,
                                         project__start_date__lte=date.today()).first():
                 active += 1
-            elif project.support.filter(statuses__frequency__exact='less_than_3_days', statuses__is_current=True).first():
+            elif project.support.filter(end=None, statuses__frequency__exact='less_than_3_days', statuses__is_current=True).first():
                 less_active += 1
-            elif project.support.filter(statuses__frequency__in=('twice_a_month', 'independent'),
+            elif project.support.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
                                         statuses__is_current=True).first():
                 independent += 1
         counts['total'] = total
@@ -613,23 +613,37 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             data_count = self.get_support_counts(supports)
 
+            terminated = supports.filter(project__statuses__status__istartswith='terminated', is_primary=True)
+
+            supports = supports.filter(end=None).exclude(
+                project__statuses__status__istartswith='terminated'
+            ).order_by('-project__start_date', '-start')
             data = {
-                "total": supports.exclude(end=None).exclude(project__statuses__status__istartswith='terminated'),
-                "training": supports.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                "total": supports,
+                "training": supports.filter(statuses__frequency__exact='more_than_2_days',
                                             statuses__is_current=True, project__start_date__gt=date.today()),
-                "active": supports.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                "active": supports.filter(statuses__frequency__exact='more_than_2_days',
                                           statuses__is_current=True, project__start_date__lte=date.today()),
-                "less_active": supports.filter(end=None, statuses__frequency__exact='less_than_3_days',
+                "less_active": supports.filter(statuses__frequency__exact='less_than_3_days',
                                                statuses__is_current=True),
-                "independent": supports.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
+                "independent": supports.filter(statuses__frequency__in=('twice_a_month', 'independent'),
                                                statuses__is_current=True),
-                "terminated": supports.filter(project__statuses__status__istartswith='terminated', is_primary=True)
             }
-            supports = supports.filter(end=None).order_by('-project__start_date', '-start')
-            if filter_by_status:
+            if filter_by_status != 'terminated':
                 supports = data[filter_by_status]
+            elif filter_by_status == 'terminated':
+                supports = terminated
+
+            page_count = {
+                "total": data['total'].count(),
+                "active": data["active"].count(),
+                "training": data['training'].count(),
+                "terminated": terminated.count(),
+                "less_active": data["less_active"].count(),
+                "independent": data["independent"].count()
+            }
 
             serializer = ProjectSupportDetailSerializer(supports[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)

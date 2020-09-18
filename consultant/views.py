@@ -3,6 +3,9 @@ from datetime import date, datetime
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, Count
+from operator import or_
+from functools import reduce
+
 
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -770,6 +773,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
+        skills = request.query_params.get('skills', None)
         team_name = request.query_params.get('team', None)
         location = request.query_params.get('location', None)
         con_status = request.query_params.get('status', 'all')
@@ -802,11 +806,25 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                     current_city=location,
                 )
 
+            dev = ['Java', 'Python', 'Aws', 'DevOps', 'Full Stack', 'Nodejs', 'Angular', 'React', 'DA', 'Others']
+            ba = ['Salesforce', 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'BA', 'BI']
+            if skills == 'ba':
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in ba]))
+            elif skills == 'dev':
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in dev]))
+
             consultants = consultants.order_by('id').distinct('id')
 
             total = consultants.all()
 
-            on_project = consultants.filter(status='on_project')
+            on_project = consultants.filter(projects__statuses__status='joined',
+                                            projects__statuses__is_current=True)
+
+            in_offer = consultants.filter(projects__statuses__status__in=['new', 'received'],
+                                          projects__statuses__is_current=True)
+
+            on_boarded = consultants.filter(projects__statuses__status='on_boarded',
+                                            projects__statuses__is_current=True)
 
             open_candidates = list(ConsultantMarketing.objects.filter(
                 status='open'
@@ -821,7 +839,9 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             count = {
                 "total": total.count(),
                 "in_pool": in_pool.count(),
+                "in_offer": in_offer.count(),
                 "on_project": on_project.count(),
+                "on_boarded": on_boarded.count(),
                 "in_marketing": in_marketing.count(),
                 "candidate": candidate.count() if candidate.count() > 0 else 0
             }
@@ -829,6 +849,10 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             # Filter Consultant by status and In pool
             if con_status == 'all':
                 consultants = total
+            elif con_status == 'in_offer':
+                consultants = in_offer
+            elif con_status == 'on_boarded':
+                consultants = on_boarded
             elif con_status == 'in_marketing':
                 consultants = in_marketing
             elif con_status == 'in_pool':
