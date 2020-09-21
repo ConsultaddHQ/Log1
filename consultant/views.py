@@ -6,7 +6,6 @@ from django.db.models import Subquery, OuterRef, Q, Count
 from operator import or_
 from functools import reduce
 
-
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action

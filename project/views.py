@@ -493,12 +493,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         gender=user.gender,
                         name=user.employee_name,
                     )
-                    consultant.status = 'on_project'
                     consultant.remote_only = True
                     consultant.save()
                 else:
                     consultant = get_object_or_404(Consultant, id=remote_consultant_id)
-                    consultant.status = 'on_project'
                     consultant.remote_only = True
                     consultant.save()
             else:
@@ -612,7 +610,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         gender=user.gender,
                         name=user.employee_name,
                     )
-                    consultant.status = 'on_project'
                     consultant.remote_only = True
                     consultant.save()
                 else:
