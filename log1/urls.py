@@ -19,7 +19,7 @@ from messaging.views import SMSViewSet, ReceiveSMSViewSet
 
 from attachment.views import AttachmentView, AttachmentGetView
 
-from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets
+from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
 
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 
@@ -88,6 +88,7 @@ router.register(r'cmd', SlashCommandViewSets)
 
 router.register(r'report', ScrumMeetingReport)
 router.register(r'support_report', EngineeringReportViewSets)
+router.register(r'marketing_report', MarketingReportViewSets)
 
 router.register(r'comment', CommentViewSet)
 

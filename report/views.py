@@ -647,3 +647,182 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             return Response({"results": serializer.data, "counts": data_count, "page_count": page_count}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MarketingReportViewSets(GenericViewSet):
+    queryset = Consultant.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ProjectSupportDetailSerializer
+
+    @action(methods=['get'], detail=False, url_path='marketer')
+    def marketer(self, request):
+        try:
+            query = request.query_params.get('query', None)
+            start = request.query_params.get('start', None)
+            end = request.query_params.get('end', None)
+            employees = User.objects.filter(team__dept='Marketing', is_active=True)
+            if query:
+                query.strip()
+                employees = employees.filter(employee_name__istartswith=query)
+
+            if not start:
+                start = date.today() - timedelta(days=30)
+            if not end:
+                end = date.today()
+
+            data = list()
+            for user in employees:
+                payload = dict()
+                con_assigned = ", ".join(
+                    list(user.marketed.filter(status='open').values_list('consultant__name', flat=True)))
+                submission_count = Submission.objects.filter(
+                    created_by=user, created__gte=start, created__lte=end
+                ).exclude(status='cancelled').count()
+                interview_count = Interview.objects.filter(
+                    submission__created_by=user, created__gte=start, created__lte=end
+                ).exclude(status='cancelled').count()
+                offer_count = Project.objects.filter(
+                    statuses__status='received',
+                    submission__created_by=user,
+                    statuses__created__gte=start, statuses__created__lte=end
+                ).count()
+                consultant_assigned = con_assigned if len(con_assigned) > 0 else None
+                payload["employee_name"] = user.employee_name
+                payload["team"] = user.team.name
+                payload["submission"] = submission_count
+                payload["interview"] = interview_count
+                payload["offer"] = offer_count
+                payload["consultant_assigned"] = consultant_assigned
+                data.append(payload)
+            return Response({"results": data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='team')
+    def team(self, request):
+        try:
+            query = request.query_params.get('query', None)
+            start = request.query_params.get('start', None)
+            end = request.query_params.get('end', None)
+
+            if not start:
+                start = date.today() - timedelta(days=30)
+            if not end:
+                end = date.today()
+
+            data = list()
+            teams = Team.objects.filter(dept='Marketing')
+            for team in teams:
+                payload = dict()
+                bench_consultant = Consultant.objects.filter(
+                    marketing__teams__name__iexact=team.name,
+                    marketing__status='open'
+                ).count()
+                submission_count = Submission.objects.filter(
+                    created__gte=start, created__lte=end,
+                    created_by__team__name__iexact=team.name
+                ).exclude(status='draft').count()
+                interview_count = Interview.objects.filter(
+                    created__gte=start, created__lte=end,
+                    submission__created_by__team__name__iexact=team.name
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                offer_count = Project.objects.filter(
+                    statuses__created__gte=start, statuses__created__lte=end,
+                    statuses__status__in=['received', 'on_boarded'],
+                    submission__created_by__team__name__iexact=team.name,
+
+                ).count()
+                joined_count = Project.objects.filter(
+                    statuses__status='joined',
+                    statuses__created__gte=start, statuses__created__lte=end,
+                    submission__created_by__team__name__iexact=team.name,
+                ).count()
+                scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
+                scrum_master = None
+                if scrum_masters:
+                    scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
+
+                payload["team"] = team.name.title()
+                payload["scrum_master"] = scrum_master
+                payload["bench_consultant"] = bench_consultant
+                payload["submission_count"] = submission_count
+                payload["interview_count"] = interview_count
+                payload["offer_count"] = offer_count
+                payload["joined_count"] = joined_count
+                data.append(payload)
+
+            bench_consultant = Consultant.objects.filter(marketing__status='open').count()
+            submission_count = Submission.objects.filter(created__gte=start, created__lte=end).exclude(status='draft').count()
+            interview_count = Interview.objects.filter(
+                created__gte=start, created__lte=end).exclude(status='cancelled').order_by('submission_id').distinct(
+                'submission_id').count()
+            offer_count = Project.objects.filter(
+                statuses__status__in=['received', 'on_boarded'], statuses__created__gte=start,
+                statuses__created__lte=end
+            ).count()
+            joined_count = Project.objects.filter(
+                statuses__status='joined',
+                statuses__created__gte=start,  statuses__created__lte=end
+            ).count()
+            total_count = {
+                "bench_consultant": bench_consultant,
+                "submission_count": submission_count,
+                "interview_count": interview_count,
+                "offer_count": offer_count,
+                "joined_count": joined_count,
+
+            }
+            return Response({"results": data, "total_count": total_count}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='consultant')
+    def consultant(self, request):
+        try:
+            query = request.query_params.get('query', None)
+            filter_by_team = request.query_params.get('filter_by_team', None)
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 10))
+            last, first = page * page_size, page * page_size - page_size
+            data = []
+            bench_consultant = Consultant.objects.all().exclude(status__in=['archived', 'terminated'])
+            if query:
+                query = query.strip()
+                bench_consultant = bench_consultant.filter(name__istartswith=query)
+
+            if filter_by_team:
+                bench_consultant = bench_consultant.filter(marketing__teams__name__iexact=filter_by_team)
+
+            for consultant in bench_consultant:
+                obj = dict()
+                marketing = consultant.marketing.filter(status='open').first()
+                preferred_location = marketing.preferred_location.replace('\r\n', ', ') if marketing else None
+                teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True))) if marketing else 'Consultadd'
+                recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
+                submission_count = Submission.objects.filter(consultant_marketing__consultant=consultant).exclude(
+                    status='cancelled').count()
+                interview_count = Interview.objects.filter(
+                    submission__consultant_marketing__consultant=consultant
+                ).exclude(status='cancelled').distinct('submission').order_by().count()
+                project_count = Project.objects.filter(consultant=consultant).count()
+                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing and marketing.start else None
+
+                obj['days'] = days
+                obj['teams'] = teams
+                obj['recruiter'] = recruiter
+                obj['name'] = consultant.name
+                obj['email'] = consultant.email
+                obj['status'] = consultant.status
+                obj['project_count'] = project_count
+                obj['phone_no'] = consultant.phone_no
+                obj['interview_count'] = interview_count
+                obj['submission_count'] = submission_count
+                obj['preferred_location'] = preferred_location
+                obj['rtg'] = marketing.rtg if marketing else None
+                obj['in_pool'] = marketing.in_pool if marketing else None
+                obj['start'] = str(marketing.start) if marketing else None
+                data.append(obj)
+            return Response({'results': data[first:last]}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
