@@ -40,7 +40,7 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
-    FeedbackViewSet
+    FeedbackViewSet, ConsultantImportViewSet
 
 from activity.views import CommentViewSet
 
@@ -62,6 +62,7 @@ router.register(r'consultant', ConsultantViewSets)
 router.register(r'consultant_poc', ConsultantPOCViewSets)
 router.register(r'consultant_work_auth', WorkAuthViewSets)
 router.register(r'consultant_exit', ConsultantExitViewSets)
+router.register(r'beats_consultant', ConsultantImportViewSet)
 router.register(r'consultant_bench', ConsultantBenchViewSets)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
