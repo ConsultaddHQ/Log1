@@ -449,6 +449,16 @@ class ConsultantMarketing(TimeStampedModel):
         return self.consultant.relation
 
 
+class PayrollEmployer(models.Model):
+    created = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(_("Employer Name"), max_length=20)
+    start = models.DateField(_('Start'), blank=True, null=True)
+    consultant = models.ForeignKey(Consultant, on_delete=models.CASCADE, related_name='employers')
+
+    def __str__(self):
+        return f'{self.consultant.name} - {self.name}'
+
+
 class ConsultantRateRevision(TimeStampedModel):
     rate = models.FloatField(_('Rate'))
     previous_rate = models.FloatField(_('Previous Rate'), default=0)

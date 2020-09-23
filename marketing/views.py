@@ -1655,6 +1655,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     queryset = Test.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+    serializer_class = TestCreateSerializer
 
     @staticmethod
     def get_test_data(queryset, filter_by_status, first, last):

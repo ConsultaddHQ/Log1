@@ -14,14 +14,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
+from api_key.models import APIKey
 from constance import config
 from employee.models import tag_users
 from consultant.serializers import *
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
 from attachment.serializers import AttachmentSerializer
-from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import create_notification, push_notification
+from utils_app.utils import post_msg_using_webhook, html_to_text, beats_to_log1
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -831,9 +832,13 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             candidate = consultants.filter(status='on_bench').exclude(id__in=open_candidates)
 
-            in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True)
+            in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True).exclude(
+                projects__statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
+                projects__statuses__is_current=True)
 
-            in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False)
+            in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False).exclude(
+                projects__statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
+                projects__statuses__is_current=True)
 
             count = {
                 "total": total.count(),
@@ -1634,4 +1639,128 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         logger.error("Incorrect Email Id OR Password")
         return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def create_consultant(request, creator_id):
+    try:
+        links = ", ".join(request.data.get('links', []))
+        skills = ", ".join(request.data.get('skills', []))
+        phone_numbers = ", ".join(request.data.get('phone_numbers', []))
+        consultant = Consultant.objects.create(
+            links=links,
+            skills=skills,
+            work_type='full_time',
+            phone_no=phone_numbers,
+            ssn=request.data.get('ssn'),
+            name=request.data.get('name'),
+            email=request.data.get('email'),
+            skype=request.data.get('skype'),
+            gender=request.data.get('gender'),
+            date_of_birth=request.data.get('dob'),
+            current_city=request.data.get('current_location')
+        )
+        # Adding Recruiter of Consultant
+        recruiter_employee_id = request.data.get('recruiter')
+        qs = User.objects.filter(email=recruiter_employee_id)
+        if qs:
+            recruiter = qs.first()
+            ConsultantPOC.objects.create(
+                poc=recruiter,
+                start=timezone.now(),
+                poc_type='recruiter',
+                consultant=consultant,
+            )
+        # Adding rate
+        rate = request.data.get('rate', None)
+        if rate:
+            ConsultantRateRevision.objects.create(
+                previous_rate=0,
+                rate=rate,
+                start=date.today(),
+                consultant=consultant
+            )
+        # Adding Work-Auth
+        for visa in request.data.get('work_auth', []):
+            WorkAuth.objects.create(
+                consultant=consultant,
+                visa_end=visa['end'],
+                visa_start=visa['start'],
+                is_current=visa['current'],
+                visa_type=visa['type']["name"],
+            )
+
+        # Creating Consultant Original Profile Consultant
+        ConsultantProfile.objects.create(
+            title="Original",
+            consultant=consultant,
+            profile_owner_id=creator_id,
+            links=request.data.get('links'),
+            date_of_birth=request.data.get('dob'),
+            visa_end=request.data.get('visa_end'),
+            visa_type=request.data.get('visa_type'),
+            visa_start=request.data.get('visa_start'),
+            current_city=request.data.get('current_location'),
+        )
+        # Adding Education
+        for education in request.data.get('education', []):
+            Education.objects.create(
+                city=education['city'],
+                major=education['major'],
+                remark=education['remark'],
+                org_name=education['org_name'],
+                edu_type=education['edu_type']['name'],
+                end_date=education['end_date'],
+                consultant_id=consultant.id,
+            )
+        for experience in request.data.get('experience', []):
+            Experience.objects.create(
+                city=experience['city'],
+                title=experience['title'],
+                remark=experience['remark'],
+                company=experience['company'],
+                exp_type=experience['exp_type']['name'],
+                end_date=experience['end_date'],
+                start_date=experience['start_date'],
+                consultant_id=consultant.id,
+            )
+
+        # Adding Documents
+        for document in request.data.get('documents', []):
+            res, res_data = beats_to_log1(
+                document['file_name'],
+                consultant.id,
+                document['attachment_type'],
+                'consultant'
+            )
+            if not res:
+                return res_data, "error"
+        return consultant, "ok"
+    except Exception as error:
+        print(error)
+        return error, "error"
+
+
+class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            api_key = request.query_params.get('api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+            creator_id = User.objects.get(employee_id=1000)
+            data, msg = create_consultant(request, creator_id.id)
+            if msg == 'ok':
+                return Response({"message": "Created"}, status=201)
+            else:
+                return Response({"message": data}, status=400)
+        except Exception as error:
+            print(error)
+            return Response({"message": str(error)}, status=400)
+
+
+
 

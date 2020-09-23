@@ -48,6 +48,16 @@ def download_s3_object(key):
     return f'media/{file_name}'
 
 
+def download_s3_object_beats(key):
+    s3 = boto3.client('s3',
+                      region_name=os.getenv('AWS_REGION_NAME'),
+                      aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                      aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+                      )
+    s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME_BEATS'), f'media/{key}', f'media/{key}')
+    return f'media/{key}'
+
+
 def delete_temp_file(paths):
     for path in paths:
         if os.path.exists(path):
