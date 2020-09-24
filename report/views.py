@@ -508,7 +508,8 @@ command - {slash_command}\n
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        days = (
+                                       date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
                 else:
@@ -526,7 +527,8 @@ command - {slash_command}\n
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        days = (
+                                       date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
             else:
@@ -557,10 +559,12 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             project = support.project
             if project.start_date and project.start_date > date.today():
                 training += 1
-            elif project.support.filter(end=None, statuses__frequency__exact='more_than_2_days', statuses__is_current=True,
+            elif project.support.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                                        statuses__is_current=True,
                                         project__start_date__lte=date.today()).first():
                 active += 1
-            elif project.support.filter(end=None, statuses__frequency__exact='less_than_3_days', statuses__is_current=True).first():
+            elif project.support.filter(end=None, statuses__frequency__exact='less_than_3_days',
+                                        statuses__is_current=True).first():
                 less_active += 1
             elif project.support.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
                                         statuses__is_current=True).first():
@@ -644,7 +648,8 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             }
 
             serializer = ProjectSupportDetailSerializer(supports[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count},
+                            status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -674,6 +679,10 @@ class MarketingReportViewSets(GenericViewSet):
             if filter_by_team:
                 employees = employees.filter(team__name=filter_by_team)
 
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
+
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -681,7 +690,6 @@ class MarketingReportViewSets(GenericViewSet):
 
             data = list()
             for user in employees:
-                payload = dict()
                 con_assigned = ", ".join(
                     list(user.marketed.filter(status='open').values_list('consultant__name', flat=True)))
                 submission_count = Submission.objects.filter(
@@ -696,14 +704,16 @@ class MarketingReportViewSets(GenericViewSet):
                     statuses__created__gte=start, statuses__created__lte=end
                 ).count()
                 consultant_assigned = con_assigned if len(con_assigned) > 0 else None
-                payload["id"] = user.id
-                payload["employee_name"] = user.employee_name
-                payload["team"] = user.team.name
-                payload["submission"] = submission_count
-                payload["interview"] = interview_count
-                payload["offer"] = offer_count
-                payload["consultant_assigned"] = consultant_assigned
-                data.append(payload)
+
+                data.append({
+                    "id": user.id,
+                    "employee_name": user.employee_name,
+                    "team": user.team.name,
+                    "submission": submission_count,
+                    "interview": interview_count,
+                    "offer": offer_count,
+                    "consultant_assigned": consultant_assigned
+                })
             return Response({"results": data[first:last], "total": len(data)}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -714,6 +724,10 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.query_params.get('end', None)
             start = request.query_params.get('start', None)
 
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
+
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -722,7 +736,6 @@ class MarketingReportViewSets(GenericViewSet):
             data = list()
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
-                payload = dict()
                 bench_consultant = Consultant.objects.filter(
                     marketing__teams__name__iexact=team.name,
                     marketing__status='open'
@@ -750,19 +763,20 @@ class MarketingReportViewSets(GenericViewSet):
                 scrum_master = None
                 if scrum_masters:
                     scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
-
-                payload["id"] = team.id
-                payload["team"] = team.name.title()
-                payload["scrum_master"] = scrum_master
-                payload["bench_consultant"] = bench_consultant
-                payload["submission_count"] = submission_count
-                payload["interview_count"] = interview_count
-                payload["offer_count"] = offer_count
-                payload["joined_count"] = joined_count
-                data.append(payload)
+                data.append({
+                    "id": team.id,
+                    "team": team.name.title(),
+                    "scrum_master": scrum_master,
+                    "bench_consultant": bench_consultant,
+                    "submission_count": submission_count,
+                    "interview_count": interview_count,
+                    "offer_count": offer_count,
+                    "joined_count": joined_count
+                })
 
             bench_consultant = Consultant.objects.filter(marketing__status='open').count()
-            submission_count = Submission.objects.filter(created__gte=start, created__lte=end).exclude(status='draft').count()
+            submission_count = Submission.objects.filter(created__gte=start, created__lte=end).exclude(
+                status='draft').count()
             interview_count = Interview.objects.filter(
                 created__gte=start, created__lte=end).exclude(status='cancelled').order_by('submission_id').distinct(
                 'submission_id').count()
@@ -772,18 +786,18 @@ class MarketingReportViewSets(GenericViewSet):
             ).count()
             joined_count = Project.objects.filter(
                 statuses__status='joined',
-                statuses__created__gte=start,  statuses__created__lte=end
+                statuses__created__gte=start, statuses__created__lte=end
             ).count()
-            payload = dict()
-            payload["id"] = 0
-            payload["team"] = "Total"
-            payload["scrum_master"] = ""
-            payload["bench_consultant"] = bench_consultant
-            payload["submission_count"] = submission_count
-            payload["interview_count"] = interview_count
-            payload["offer_count"] = offer_count
-            payload["joined_count"] = joined_count
-            data.append(payload)
+            data.append({
+                "id": 0,
+                "team": "Total",
+                "scrum_master": "",
+                "bench_consultant": bench_consultant,
+                "submission_count": submission_count,
+                "interview_count": interview_count,
+                "offer_count": offer_count,
+                "joined_count": joined_count
+            })
 
             return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -810,7 +824,6 @@ class MarketingReportViewSets(GenericViewSet):
                 )
 
             for consultant in bench_consultant:
-                obj = dict()
                 marketing = consultant.marketing.filter(status='open').first()
                 preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                 teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
@@ -821,21 +834,22 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__consultant_marketing__consultant=consultant
                 ).exclude(status='cancelled').distinct('submission').order_by().count()
                 project_count = Project.objects.filter(consultant=consultant).count()
-                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
-
-                obj["id"] = consultant.id
-                obj['days'] = days
-                obj['teams'] = teams
-                obj['recruiter'] = recruiter
-                obj['name'] = consultant.name
-                obj['email'] = consultant.email
-                obj['status'] = consultant.status
-                obj['project_count'] = project_count
-                obj['phone_no'] = consultant.phone_no
-                obj['interview_count'] = interview_count
-                obj['submission_count'] = submission_count
-                obj['preferred_location'] = preferred_location
-                data.append(obj)
+                days = (
+                               date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                data.append({
+                    "id": consultant.id,
+                    'days': days,
+                    'teams': teams,
+                    'recruiter': recruiter,
+                    'name': consultant.name,
+                    'email': consultant.email,
+                    'status': consultant.status,
+                    'project_count': project_count,
+                    'phone_no': consultant.phone_no,
+                    'interview_count': interview_count,
+                    'submission_count': submission_count,
+                    'preferred_location': preferred_location
+                })
             return Response({'results': data[first:last], "total": len(data)}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
