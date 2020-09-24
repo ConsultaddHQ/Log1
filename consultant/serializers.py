@@ -134,6 +134,12 @@ class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class PayrollEmployerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollEmployer
+        fields = '__all__'
+
+
 class ConsultantPOCSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantPOC
@@ -227,12 +233,13 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     terminate = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
+    payroll_employer = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
                   'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation', 'support',
-                  'profiles', 'education', 'terminate', 'experience', 'rate', 'marketing')
+                  'profiles', 'education', 'terminate', 'experience', 'rate', 'marketing', 'payroll_employer')
 
     def get_work_auth(self, obj):
         return WorkAuthSerializer(obj.work_auth.all(), many=True).data
@@ -253,6 +260,12 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         rate_revision = obj.rates.filter(end=None)
         if rate_revision:
             return rate_revision.first().rate
+        return 0
+
+    def get_payroll_employer(self, obj):
+        employers = obj.employers.all().order_by('-start')
+        if employers:
+            return employers.first().name
         return 0
 
     def get_marketing(self, obj):

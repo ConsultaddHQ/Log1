@@ -508,7 +508,8 @@ command - {slash_command}\n
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        days = (
+                                           date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
                 else:
@@ -526,7 +527,8 @@ command - {slash_command}\n
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        days = (
+                                           date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
             else:
@@ -557,10 +559,12 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             project = support.project
             if project.start_date and project.start_date > date.today():
                 training += 1
-            elif project.support.filter(end=None, statuses__frequency__exact='more_than_2_days', statuses__is_current=True,
+            elif project.support.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                                        statuses__is_current=True,
                                         project__start_date__lte=date.today()).first():
                 active += 1
-            elif project.support.filter(end=None, statuses__frequency__exact='less_than_3_days', statuses__is_current=True).first():
+            elif project.support.filter(end=None, statuses__frequency__exact='less_than_3_days',
+                                        statuses__is_current=True).first():
                 less_active += 1
             elif project.support.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
                                         statuses__is_current=True).first():
@@ -644,7 +648,8 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             }
 
             serializer = ProjectSupportDetailSerializer(supports[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count},
+                            status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -673,6 +678,10 @@ class MarketingReportViewSets(GenericViewSet):
 
             if filter_by_team:
                 employees = employees.filter(team__name=filter_by_team)
+
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
 
             if not start:
                 start = date.today() - timedelta(days=30)
@@ -713,6 +722,10 @@ class MarketingReportViewSets(GenericViewSet):
         try:
             end = request.query_params.get('end', None)
             start = request.query_params.get('start', None)
+
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
 
             if not start:
                 start = date.today() - timedelta(days=30)
@@ -762,7 +775,8 @@ class MarketingReportViewSets(GenericViewSet):
                 data.append(payload)
 
             bench_consultant = Consultant.objects.filter(marketing__status='open').count()
-            submission_count = Submission.objects.filter(created__gte=start, created__lte=end).exclude(status='draft').count()
+            submission_count = Submission.objects.filter(created__gte=start, created__lte=end).exclude(
+                status='draft').count()
             interview_count = Interview.objects.filter(
                 created__gte=start, created__lte=end).exclude(status='cancelled').order_by('submission_id').distinct(
                 'submission_id').count()
@@ -772,7 +786,7 @@ class MarketingReportViewSets(GenericViewSet):
             ).count()
             joined_count = Project.objects.filter(
                 statuses__status='joined',
-                statuses__created__gte=start,  statuses__created__lte=end
+                statuses__created__gte=start, statuses__created__lte=end
             ).count()
             payload = dict()
             payload["id"] = 0
@@ -821,7 +835,8 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__consultant_marketing__consultant=consultant
                 ).exclude(status='cancelled').distinct('submission').order_by().count()
                 project_count = Project.objects.filter(consultant=consultant).count()
-                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                days = (
+                                   date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
 
                 obj["id"] = consultant.id
                 obj['days'] = days

@@ -1682,20 +1682,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'cancelled': cancelled,
                 'feedback_due': feedback_due,
             }
-
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = queryset.order_by('-'+sort_by)[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                marketer_id=F('submission__created_by'),
-                job_title=F('submission__lead__job_title'),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created',
-                     'modified')
+            data = TestListSerializer(queryset.order_by('-'+sort_by)[first:last], many=True).data
             return data, data_counts
         except Exception as error:
             logger.error(error)
