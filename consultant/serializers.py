@@ -266,7 +266,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         employers = obj.employers.all().order_by('-start')
         if employers:
             return employers.first().name
-        return 0
+        return None
 
     def get_marketing(self, obj):
         marketing = obj.marketing.filter(status='open')
