@@ -34,8 +34,9 @@ class Message(models.Model):
         related_name='messages'
     )
     text = models.TextField(_("Message text"), max_length=2000)
-    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
+    read = models.BooleanField(_('Message Read or Unread'), default=False)
     is_sent = models.BooleanField(_('Message Sent or Received'), default=True)
+    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
 
     def save(self, *args, **kwargs):
         """

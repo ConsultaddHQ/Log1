@@ -292,17 +292,20 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     technology = serializers.SerializerMethodField()
+    frequency = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     joining_date = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
         fields = ('id', 'created', 'is_primary', 'end', 'start', 'feedback', 'status',
-                  'client', 'consultant', 'technology', 'support', 'joining_date')
+                  'client', 'consultant', 'technology', 'support', 'joining_date', 'frequency')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True).first()
-        if obj.project.start_date and obj.project.start_date > date.today():
+        if obj.project.statuses.filter(status__istartswith='terminated').first():
+            return 'terminated'
+        elif obj.project.start_date and obj.project.start_date > date.today():
             return 'training'
         elif status:
             if status.frequency == 'more_than_2_days':
@@ -313,6 +316,12 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
                 return 'independent'
         else:
             return None
+
+    def get_frequency(self, obj):
+        status = obj.statuses.filter(is_current=True).first()
+        if status:
+            return status.frequency
+        return None
 
     def get_client(self, obj):
         return obj.project.submission.client

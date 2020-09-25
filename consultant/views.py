@@ -1,4 +1,6 @@
 import logging
+from operator import or_
+from functools import reduce
 from datetime import date, datetime
 from django.db import transaction
 from django.shortcuts import get_object_or_404
@@ -13,13 +15,14 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
 from constance import config
-from employee.models import tag_users
+from api_key.models import APIKey
 from consultant.serializers import *
+from employee.models import tag_users
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
 from attachment.serializers import AttachmentSerializer
-from utils_app.utils import post_msg_using_webhook, html_to_text
 from notification.views import create_notification, push_notification
+from utils_app.utils import post_msg_using_webhook, html_to_text, beats_to_log1
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
@@ -59,8 +62,8 @@ def send_exit_interview_detail(terminate, request):
         data = {
             "title": f"Exit interview for {terminate.consultant.name}",
             "text": f"**Reason for leaving** : {reason}<br>"
-            f"**Termination Date** : {datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')}<br>"
-            f"**Exit Interview Details** : {exit_details} <br>"
+                    f"**Termination Date** : {datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')}<br>"
+                    f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
         user_list = []
@@ -429,7 +432,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             query = request.query_params.get('query', None)
-            consultants = Consultant.objects.filter(marketing__status='open').exclude(status__in=['archived', 'terminated'])
+            consultants = Consultant.objects.filter(marketing__status='open').exclude(
+                status__in=['archived', 'terminated'])
             roles = request.user.roles
 
             if 'admin' in roles or 'proxy' in roles:
@@ -541,6 +545,12 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 visa_end=data['visa_end'],
                 visa_type=data['visa_type'],
                 visa_start=data['visa_start'],
+            )
+            # Create Employer
+            PayrollEmployer.objects.create(
+                consultant=consultant,
+                name=data['payroll_employer'],
+                start=data['employer_start_date'],
             )
 
         except Exception as error:
@@ -718,6 +728,20 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['put'], detail=True, url_path='payroll_employer')
+    def payroll_employer(self, request, *args, **kwargs):
+        try:
+            consultant = Consultant.objects.get(id=kwargs.get('pk'))
+            employer = PayrollEmployer.objects.create(
+                consultant=consultant,
+                name=request.data['payroll_employer'],
+                start=request.data['employer_start_date'],
+            )
+            serializer = PayrollEmployerSerializer(employer)
+            return Response({"results": serializer.data}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, *args, **kwargs):
         if request.method == 'GET':
@@ -770,6 +794,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
+        skills = request.query_params.get('skills', None)
         team_name = request.query_params.get('team', None)
         location = request.query_params.get('location', None)
         con_status = request.query_params.get('status', 'all')
@@ -802,41 +827,49 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                     current_city=location,
                 )
 
+            dev = ['Java', 'Python', 'Aws', 'DevOps', 'Full Stack', 'Nodejs', 'Angular', 'React', 'DA', 'Others']
+            ba = ['Salesforce', 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'BA', 'BI']
+            if skills == 'ba':
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in ba]))
+            elif skills == 'dev':
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in dev]))
+
             consultants = consultants.order_by('id').distinct('id')
-
-            total = consultants.all()
-
-            on_project = consultants.filter(status='on_project')
 
             open_candidates = list(ConsultantMarketing.objects.filter(
                 status='open'
             ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
 
-            candidate = consultants.filter(status='on_bench').exclude(id__in=open_candidates)
-
-            in_pool = consultants.filter(marketing__status='open', marketing__in_pool=True)
-
-            in_marketing = consultants.filter(marketing__status='open', marketing__in_pool=False)
+            obj = {
+                "all": consultants.all(),
+                "on_project": consultants.filter(projects__statuses__status='joined',
+                                                 projects__statuses__is_current=True),
+                "in_offer": consultants.filter(projects__statuses__status__in=['new', 'received'],
+                                               projects__statuses__is_current=True),
+                "on_boarded": consultants.filter(projects__statuses__status='on_boarded',
+                                                 projects__statuses__is_current=True),
+                "candidate": consultants.filter(status='on_bench').exclude(id__in=open_candidates),
+                "in_pool": consultants.filter(marketing__status='open', marketing__in_pool=True).exclude(
+                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                    projects__statuses__is_current=True),
+                "in_marketing": consultants.filter(marketing__status='open', marketing__in_pool=False).exclude(
+                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                    projects__statuses__is_current=True)
+            }
 
             count = {
-                "total": total.count(),
-                "in_pool": in_pool.count(),
-                "on_project": on_project.count(),
-                "in_marketing": in_marketing.count(),
-                "candidate": candidate.count() if candidate.count() > 0 else 0
+                "total": obj['all'].count(),
+                "in_pool": obj['in_pool'].count(),
+                "in_offer": obj['in_offer'].count(),
+                "on_project": obj['on_project'].count(),
+                "on_boarded": obj['on_boarded'].count(),
+                "in_marketing": obj['in_marketing'].count(),
+                "candidate": obj['candidate'].count() if obj['candidate'].count() > 0 else 0
             }
 
             # Filter Consultant by status and In pool
-            if con_status == 'all':
-                consultants = total
-            elif con_status == 'in_marketing':
-                consultants = in_marketing
-            elif con_status == 'in_pool':
-                consultants = in_pool
-            elif con_status == 'candidate':
-                consultants = candidate
-            elif con_status == 'on_project':
-                consultants = on_project
+            if con_status:
+                consultants = obj[con_status]
 
             poc = ConsultantPOC.objects.filter(
                 consultant=OuterRef("pk"), end=None, poc_type='recruiter')
@@ -1374,7 +1407,8 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     res, error = send_exit_process_mail(con_exit, 'start')
                     if error == 'error':
                         logger.error(res)
-                        return Response({"error": "error", "exit_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
+                        return Response({"error": "error", "exit_mail_error": str(res)},
+                                        status=status.HTTP_400_BAD_REQUEST)
             serializer = self.serializer_class(consultant.exit.all().order_by('-created'), many=True)
             return Response({"result": serializer.data, "exit_mail": str(res)}, status=status.HTTP_201_CREATED)
         except Exception as error:
@@ -1530,6 +1564,13 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             tags = request.data.get('tagged_user', [])
             if len(tags) > 0:
                 user_tag = feedback.tagged_user.all().first()
+                if not user_tag:
+                    tag_data = {
+                        "model": "feedback",
+                        "object_id": feedback.id,
+                        "tags": tags
+                    }
+                    tag_users(tag_data)
                 for tag in tags:
                     user = get_object_or_404(User, id=tag)
                     user_list.append(user)
@@ -1605,3 +1646,123 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
         logger.error("Incorrect Email Id OR Password")
         return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
 
+
+def create_consultant(request, creator_id):
+    try:
+        links = ", ".join(request.data.get('links', []))
+        skills = ", ".join(request.data.get('skills', []))
+        phone_numbers = ", ".join(request.data.get('phone_numbers', []))
+        consultant = Consultant.objects.create(
+            links=links,
+            skills=skills,
+            work_type='full_time',
+            phone_no=phone_numbers,
+            ssn=request.data.get('ssn'),
+            name=request.data.get('name'),
+            email=request.data.get('email'),
+            skype=request.data.get('skype'),
+            gender=request.data.get('gender'),
+            date_of_birth=request.data.get('dob'),
+            current_city=request.data.get('current_location')
+        )
+        # Adding Recruiter of Consultant
+        recruiter_employee_id = request.data.get('recruiter')
+        qs = User.objects.filter(email=recruiter_employee_id)
+        if qs:
+            recruiter = qs.first()
+            ConsultantPOC.objects.create(
+                poc=recruiter,
+                start=timezone.now(),
+                poc_type='recruiter',
+                consultant=consultant,
+            )
+        # Adding rate
+        rate = request.data.get('rate', None)
+        if rate:
+            ConsultantRateRevision.objects.create(
+                previous_rate=0,
+                rate=rate,
+                start=date.today(),
+                consultant=consultant
+            )
+        # Adding Work-Auth
+        for visa in request.data.get('work_auth', []):
+            WorkAuth.objects.create(
+                consultant=consultant,
+                visa_end=visa['end'],
+                visa_start=visa['start'],
+                is_current=visa['current'],
+                visa_type=visa['type']["name"],
+            )
+
+        # Creating Consultant Original Profile Consultant
+        ConsultantProfile.objects.create(
+            title="Original",
+            consultant=consultant,
+            profile_owner_id=creator_id,
+            links=request.data.get('links'),
+            date_of_birth=request.data.get('dob'),
+            visa_end=request.data.get('visa_end'),
+            visa_type=request.data.get('visa_type'),
+            visa_start=request.data.get('visa_start'),
+            current_city=request.data.get('current_location'),
+        )
+        # Adding Education
+        for education in request.data.get('education', []):
+            Education.objects.create(
+                city=education['city'],
+                major=education['major'],
+                remark=education['remark'],
+                org_name=education['org_name'],
+                edu_type=education['edu_type']['name'],
+                end_date=education['end_date'],
+                consultant_id=consultant.id,
+            )
+        for experience in request.data.get('experience', []):
+            Experience.objects.create(
+                city=experience['city'],
+                title=experience['title'],
+                remark=experience['remark'],
+                company=experience['company'],
+                exp_type=experience['exp_type']['name'],
+                end_date=experience['end_date'],
+                start_date=experience['start_date'],
+                consultant_id=consultant.id,
+            )
+
+        # Adding Documents
+        for document in request.data.get('documents', []):
+            res, res_data = beats_to_log1(
+                document['file_name'],
+                consultant.id,
+                document['attachment_type'],
+                'consultant'
+            )
+            if not res:
+                return res_data, "error"
+        return consultant, "ok"
+    except Exception as error:
+        print(error)
+        return error, "error"
+
+
+class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            api_key = request.query_params.get('api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+            creator_id = User.objects.get(employee_id=1000)
+            data, msg = create_consultant(request, creator_id.id)
+            if msg == 'ok':
+                return Response({"message": "Created"}, status=201)
+            else:
+                return Response({"message": data}, status=400)
+        except Exception as error:
+            print(error)
+            return Response({"message": str(error)}, status=400)

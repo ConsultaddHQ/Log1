@@ -215,6 +215,19 @@ class LeadViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            lead = Lead.objects.filter(id=kwargs.get('pk'))
+            data = lead.annotate(submission_count=Count('submission')).annotate(
+                company_name=F('vendor_company__name'),
+                company_id=F('vendor_company__id'),
+            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+                     'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+            return Response({"result": data[0]}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
@@ -1642,12 +1655,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     queryset = Test.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+    serializer_class = TestCreateSerializer
 
     @staticmethod
     def get_test_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
-            queryset = queryset.order_by('-modified').distinct('modified')
+            sort_by = 'created'
+            if filter_by_status == 'failed':
+                sort_by = 'modified'
+            queryset = queryset.order_by('-'+sort_by).distinct(sort_by)
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1665,20 +1682,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'cancelled': cancelled,
                 'feedback_due': feedback_due,
             }
-
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = queryset.order_by('-modified')[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                marketer_id=F('submission__created_by'),
-                job_title=F('submission__lead__job_title'),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'status', 'deadline', 'is_offline', 'company_name', 'submission_id', 'marketer_name',
-                     'marketer_id', 'consultant_name', 'client', 'project', 'job_title', 'skills', 'created',
-                     'modified')
+            data = TestListSerializer(queryset.order_by('-'+sort_by)[first:last], many=True).data
             return data, data_counts
         except Exception as error:
             logger.error(error)

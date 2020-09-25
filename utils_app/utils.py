@@ -1,8 +1,16 @@
+import os
 import json
 import random
 import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
+
+from django.core.files.base import ContentFile
+from django.contrib.contenttypes.models import ContentType
+
+from employee.models import User
+from attachment.models import Attachment
+from attachment import views
 
 
 def get_time_filter(queryset, filter_by):
@@ -108,3 +116,24 @@ def html_to_text(html):
     html = html.replace('<strong>', '**').replace('</strong>', '**').replace('<em>', '_').replace('</em>', '_')
     soup = BeautifulSoup(html, features="html.parser")
     return soup.get_text('\n')
+
+
+def beats_to_log1(file_name, obj_id, doc_type, model):
+    try:
+        content_type = ContentType.objects.get(model=model)
+        creator = User.objects.get(employee_id=1000)
+        path = views.download_s3_object_beats(file_name)
+        local_file = open(path, 'rb')
+        file = ContentFile(local_file.read())
+        attachment = Attachment.objects.create(
+            creator=creator,
+            object_id=obj_id,
+            attachment_type=doc_type,
+            content_type_id=content_type.id,
+        )
+        attachment.attachment_file.save(path, file, save=True)
+        attachment.save()
+        os.remove(path)
+        return True, path
+    except Exception as error:
+        return False, error

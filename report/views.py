@@ -508,7 +508,8 @@ command - {slash_command}\n
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        days = (
+                                       date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
                 else:
@@ -526,7 +527,8 @@ command - {slash_command}\n
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        days = (
+                                       date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
             else:
@@ -550,19 +552,21 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                                      ).distinct('project__id', 'project__consultant__id')
         counts = dict()
         active = training = less_active = independent = 0
-        terminated = supports.filter(project__statuses__status__istartswith='terminated', is_primary=True).count()
+        terminated = supports.filter(project__statuses__status__istartswith='terminated').count()
         supports = supports.filter(end=None).exclude(project__statuses__status__istartswith='terminated')
         total = supports.count()
         for support in supports:
             project = support.project
             if project.start_date and project.start_date > date.today():
                 training += 1
-            elif project.support.filter(statuses__frequency__exact='more_than_2_days', statuses__is_current=True,
+            elif project.support.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                                        statuses__is_current=True,
                                         project__start_date__lte=date.today()).first():
                 active += 1
-            elif project.support.filter(statuses__frequency__exact='less_than_3_days', statuses__is_current=True).first():
+            elif project.support.filter(end=None, statuses__frequency__exact='less_than_3_days',
+                                        statuses__is_current=True).first():
                 less_active += 1
-            elif project.support.filter(statuses__frequency__in=('twice_a_month', 'independent'),
+            elif project.support.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
                                         statuses__is_current=True).first():
                 independent += 1
         counts['total'] = total
@@ -613,24 +617,239 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             data_count = self.get_support_counts(supports)
 
+            terminated = supports.filter(project__statuses__status__istartswith='terminated', is_primary=True)
+
+            supports = supports.filter(end=None).exclude(
+                project__statuses__status__istartswith='terminated'
+            ).order_by('-project__start_date', '-start')
             data = {
-                "total": supports.exclude(end=None).exclude(project__statuses__status__istartswith='terminated'),
-                "training": supports.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                "total": supports,
+                "training": supports.filter(statuses__frequency__exact='more_than_2_days',
                                             statuses__is_current=True, project__start_date__gt=date.today()),
-                "active": supports.filter(end=None, statuses__frequency__exact='more_than_2_days',
+                "active": supports.filter(statuses__frequency__exact='more_than_2_days',
                                           statuses__is_current=True, project__start_date__lte=date.today()),
-                "less_active": supports.filter(end=None, statuses__frequency__exact='less_than_3_days',
+                "less_active": supports.filter(statuses__frequency__exact='less_than_3_days',
                                                statuses__is_current=True),
-                "independent": supports.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
+                "independent": supports.filter(statuses__frequency__in=('twice_a_month', 'independent'),
                                                statuses__is_current=True),
-                "terminated": supports.filter(project__statuses__status__istartswith='terminated', is_primary=True)
             }
-            if filter_by_status:
+            if filter_by_status != 'terminated':
                 supports = data[filter_by_status]
-            else:
-                supports = supports.filter(end=None).order_by('-project__start_date', '-start')
+            elif filter_by_status == 'terminated':
+                supports = terminated
+
+            page_count = {
+                "total": data['total'].count(),
+                "active": data["active"].count(),
+                "training": data['training'].count(),
+                "terminated": terminated.count(),
+                "less_active": data["less_active"].count(),
+                "independent": data["independent"].count()
+            }
 
             serializer = ProjectSupportDetailSerializer(supports[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count},
+                            status=status.HTTP_200_OK)
         except Exception as error:
             return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MarketingReportViewSets(GenericViewSet):
+    queryset = Consultant.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ProjectSupportDetailSerializer
+
+    @action(methods=['get'], detail=False, url_path='marketer')
+    def marketer(self, request):
+        try:
+            query = request.query_params.get('query', None)
+            start = request.query_params.get('start', None)
+            end = request.query_params.get('end', None)
+            filter_by_team = request.query_params.get('filter_by_team', None)
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 10))
+            last, first = page * page_size, page * page_size - page_size
+
+            employees = User.objects.filter(team__dept='Marketing', is_active=True)
+            if query:
+                query.strip()
+                employees = employees.filter(employee_name__istartswith=query)
+
+            if filter_by_team:
+                employees = employees.filter(team__name=filter_by_team)
+
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not start:
+                start = date.today() - timedelta(days=30)
+            if not end:
+                end = date.today()
+
+            data = list()
+            for user in employees:
+                con_assigned = ", ".join(
+                    list(user.marketed.filter(status='open').values_list('consultant__name', flat=True)))
+                submission_count = Submission.objects.filter(
+                    created_by=user, created__gte=start, created__lte=end
+                ).exclude(status='cancelled').count()
+                interview_count = Interview.objects.filter(
+                    submission__created_by=user, created__gte=start, created__lte=end
+                ).exclude(status='cancelled').count()
+                offer_count = Project.objects.filter(
+                    statuses__status='received',
+                    submission__created_by=user,
+                    statuses__created__gte=start, statuses__created__lte=end
+                ).count()
+                consultant_assigned = con_assigned if len(con_assigned) > 0 else None
+
+                data.append({
+                    "id": user.id,
+                    "employee_name": user.employee_name,
+                    "team": user.team.name,
+                    "submission": submission_count,
+                    "interview": interview_count,
+                    "offer": offer_count,
+                    "consultant_assigned": consultant_assigned
+                })
+            return Response({"results": data[first:last], "total": len(data)}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='team')
+    def team(self, request):
+        try:
+            end = request.query_params.get('end', None)
+            start = request.query_params.get('start', None)
+
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not start:
+                start = date.today() - timedelta(days=30)
+            if not end:
+                end = date.today()
+
+            data = list()
+            teams = Team.objects.filter(dept='Marketing')
+            for team in teams:
+                bench_consultant = Consultant.objects.filter(
+                    marketing__teams__name__iexact=team.name,
+                    marketing__status='open'
+                ).count()
+                submission_count = Submission.objects.filter(
+                    created__gte=start, created__lte=end,
+                    created_by__team__name__iexact=team.name
+                ).exclude(status='draft').count()
+                interview_count = Interview.objects.filter(
+                    created__gte=start, created__lte=end,
+                    submission__created_by__team__name__iexact=team.name
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                offer_count = Project.objects.filter(
+                    statuses__created__gte=start, statuses__created__lte=end,
+                    statuses__status__in=['received', 'on_boarded'],
+                    submission__created_by__team__name__iexact=team.name,
+
+                ).count()
+                joined_count = Project.objects.filter(
+                    statuses__status='joined',
+                    statuses__created__gte=start, statuses__created__lte=end,
+                    submission__created_by__team__name__iexact=team.name,
+                ).count()
+                scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
+                scrum_master = None
+                if scrum_masters:
+                    scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
+                data.append({
+                    "id": team.id,
+                    "team": team.name.title(),
+                    "scrum_master": scrum_master,
+                    "bench_consultant": bench_consultant,
+                    "submission_count": submission_count,
+                    "interview_count": interview_count,
+                    "offer_count": offer_count,
+                    "joined_count": joined_count
+                })
+
+            bench_consultant = Consultant.objects.filter(marketing__status='open').count()
+            submission_count = Submission.objects.filter(created__gte=start, created__lte=end).exclude(
+                status='draft').count()
+            interview_count = Interview.objects.filter(
+                created__gte=start, created__lte=end).exclude(status='cancelled').order_by('submission_id').distinct(
+                'submission_id').count()
+            offer_count = Project.objects.filter(
+                statuses__status__in=['received', 'on_boarded'], statuses__created__gte=start,
+                statuses__created__lte=end
+            ).count()
+            joined_count = Project.objects.filter(
+                statuses__status='joined',
+                statuses__created__gte=start, statuses__created__lte=end
+            ).count()
+            data.append({
+                "id": 0,
+                "team": "Total",
+                "scrum_master": "",
+                "bench_consultant": bench_consultant,
+                "submission_count": submission_count,
+                "interview_count": interview_count,
+                "offer_count": offer_count,
+                "joined_count": joined_count
+            })
+
+            return Response({"results": data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='consultant')
+    def consultant(self, request):
+        try:
+            query = request.query_params.get('query', None)
+            filter_by_team = request.query_params.get('filter_by_team', None)
+            page = int(request.query_params.get('page', 1))
+            page_size = int(request.query_params.get('page_size', 10))
+            last, first = page * page_size, page * page_size - page_size
+            data = []
+            bench_consultant = Consultant.objects.filter(
+                marketing__status='open').exclude(status__in=['archived', 'terminated'])
+            if query:
+                query = query.strip()
+                bench_consultant = bench_consultant.filter(name__istartswith=query)
+
+            if filter_by_team:
+                bench_consultant = bench_consultant.filter(
+                    marketing__teams__name__iexact=filter_by_team
+                )
+
+            for consultant in bench_consultant:
+                marketing = consultant.marketing.filter(status='open').first()
+                preferred_location = marketing.preferred_location.replace('\r\n', ', ')
+                teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
+                recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
+                submission_count = Submission.objects.filter(consultant_marketing__consultant=consultant).exclude(
+                    status='cancelled').count()
+                interview_count = Interview.objects.filter(
+                    submission__consultant_marketing__consultant=consultant
+                ).exclude(status='cancelled').distinct('submission').order_by().count()
+                project_count = Project.objects.filter(consultant=consultant).count()
+                days = (
+                               date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                data.append({
+                    "id": consultant.id,
+                    'days': days,
+                    'teams': teams,
+                    'recruiter': recruiter,
+                    'name': consultant.name,
+                    'email': consultant.email,
+                    'status': consultant.status,
+                    'project_count': project_count,
+                    'phone_no': consultant.phone_no,
+                    'interview_count': interview_count,
+                    'submission_count': submission_count,
+                    'preferred_location': preferred_location
+                })
+            return Response({'results': data[first:last], "total": len(data)}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

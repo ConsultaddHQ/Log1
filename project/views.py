@@ -261,6 +261,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination.html',
                 'context': {
+                    'po_type': po_type,
                     'rate': project.rate,
                     'end': project_end_date,
                     'remark': project.feedback,
@@ -291,6 +292,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'template': '../templates/po_termination_engineering.html',
                 'context': {
+                    'po_type': po_type,
                     'end': project_end_date,
                     'client_name': submission.client,
                     'consultant_name': consultant.name,
@@ -491,12 +493,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         gender=user.gender,
                         name=user.employee_name,
                     )
-                    consultant.status = 'on_project'
                     consultant.remote_only = True
                     consultant.save()
                 else:
                     consultant = get_object_or_404(Consultant, id=remote_consultant_id)
-                    consultant.status = 'on_project'
                     consultant.remote_only = True
                     consultant.save()
             else:
@@ -610,7 +610,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         gender=user.gender,
                         name=user.employee_name,
                     )
-                    consultant.status = 'on_project'
                     consultant.remote_only = True
                     consultant.save()
                 else:
@@ -882,9 +881,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     is_primary=user['primary'],
                 )
                 SupportStatus.objects.create(
-                    support=project_support,
                     is_current=True,
-                    frequency=user['frequency']
+                    support=project_support,
+                    change_date=user['start'],
+                    frequency=user['frequency'],
                 )
             # notification
             user_list = []
@@ -941,20 +941,23 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
 
             support.is_primary = request.data.get('is_primary')
             support.save()
+            start = request.data.get('start')
             new_freq = request.data.get('frequency')
             prev = support.statuses.filter(is_current=True)
             if prev.first() and prev.first().frequency != new_freq:
                 prev.update(is_current=False)
                 SupportStatus.objects.create(
                     is_current=True,
-                    frequency=new_freq,
                     support=support,
+                    change_date=start,
+                    frequency=new_freq,
                 )
             elif not prev.first():
                 SupportStatus.objects.create(
                     is_current=True,
-                    frequency=new_freq,
                     support=support,
+                    change_date=start,
+                    frequency=new_freq,
                 )
             serializer = ProjectSupportSerializer(support)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
