@@ -137,8 +137,8 @@ class SubmissionDetailSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'test', 'interviews', 'project', 'comments', 'marketer_name', 'marketer_id',
-                  'consultant', 'is_complete')
+                  'current_city', 'attachments', 'test', 'interviews', 'project', 'comments', 'marketer_name',
+                  'marketer_id', 'consultant', 'is_complete')
 
     def get_marketer_name(self, obj):
         return obj.created_by.employee_name
@@ -183,8 +183,8 @@ class SubmissionSerializer(serializers.ModelSerializer):
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'interviews', 'test', 'project', 'comments', 'marketer_name', 'marketer_id',
-                  'consultant', 'is_complete')
+                  'current_city', 'attachments', 'interviews', 'test', 'project', 'comments', 'marketer_name',
+                  'marketer_id', 'consultant', 'is_complete')
 
     def get_marketer_name(self, obj):
         return obj.created_by.employee_name
@@ -263,6 +263,42 @@ class InterviewGetSerializer(serializers.ModelSerializer):
         if obj.attachment_link:
             return obj.attachment_link.split('/')[-1]
         return None
+
+
+class TestListSerializer(serializers.ModelSerializer):
+    assigned_to = serializers.SerializerMethodField()
+    client = serializers.SerializerMethodField()
+    marketer_id = serializers.SerializerMethodField()
+    job_title = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
+    consultant_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Test
+        fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id',
+                  'consultant_name', 'client', 'job_title', 'skills', 'created', 'modified', 'assigned_to')
+
+    def get_assigned_to(self, obj):
+        return obj.assign_to.all().values('id', 'employee_name')
+
+    def get_client(self, obj):
+        return obj.submission.client
+
+    def get_job_title(self, obj):
+        return obj.submission.lead.job_title
+
+    def get_company_name(self, obj):
+        return obj.submission.lead.vendor_company.name
+
+    def get_marketer_name(self, obj):
+        return obj.submission.created_by.employee_name
+
+    def get_consultant_name(self, obj):
+        return obj.submission.consultant_marketing.consultant.name
+
+    def get_marketer_id(self, obj):
+        return obj.submission.created_by.id
 
 
 class TestCreateSerializer(serializers.ModelSerializer):

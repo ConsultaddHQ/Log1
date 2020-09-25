@@ -3,6 +3,7 @@ from datetime import datetime
 
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.db.models import Subquery, OuterRef
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -40,8 +41,10 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             conversation_id = kwargs.get('pk', None)
             messages = Message.objects.filter(
                 conversation=conversation_id, conversation__user1__owner=request.user
-            ).order_by('created').values('id', 'text', 'created', 'is_sent', 'conversation_id')
-            return Response({"results": messages}, status=status.HTTP_200_OK)
+            ).order_by('created')
+            data = messages.values('id', 'text', 'created', 'is_sent', 'conversation_id', 'read')
+            messages.update(read=True)
+            return Response({"results": data}, status=status.HTTP_200_OK)
         except Exception as err:
             return Response({'error': str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -49,9 +52,13 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             asset_id = request.query_params.get('user1', None)
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
-            conversations = Conversation.objects.filter(user1=asset)\
-                .order_by('id', '-messages__created').distinct('id')\
-                .values('id', 'user2', 'created', 'modified', 'messages__text')
+            messages = Message.objects.filter(conversation=OuterRef('pk'))
+            conversations = Conversation.objects.filter(user1=asset).annotate(
+                text=Subquery(messages.values('text').order_by('-id')[:1]),
+                read=Subquery(messages.values('read').order_by('-id')[:1])
+            ).values(
+                'id', 'user2', 'created', 'modified', 'text', 'read'
+            ).order_by('-id', '-messages__created').distinct('id')
             return Response({"results": conversations}, status=status.HTTP_200_OK)
         except Exception as err:
             return Response({'error': str(err)}, status=status.HTTP_400_BAD_REQUEST)
@@ -76,6 +83,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=to)
                 message = Message.objects.create(
                     text=body,
+                    read=True,
                     is_sent=True,
                     conversation=conversation
                 )
@@ -103,6 +111,7 @@ class ReceiveSMSViewSet(GenericViewSet):
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
                 Message.objects.create(
                     text=body,
+                    read=False,
                     is_sent=False,
                     conversation_id=conversation.id
                 )
