@@ -1079,6 +1079,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 serializer.save()
 
                 # Setting Submission is_active value
+                if interview.status == 'cancelled' and not interview.submission.exclude(status='cancelled'):
+                    interview.submission.status = 'sub'
                 if interview.status in ['cancelled', 'next_round']:
                     interview.submission.is_active = True
                 if interview.status in ['offer']:

@@ -1,10 +1,14 @@
+import boto3
 import logging
 from operator import or_
 from functools import reduce
 from datetime import date, datetime
 from django.db import transaction
+from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, Count
+from django.contrib.contenttypes.models import ContentType
+
 
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -22,10 +26,41 @@ from marketing.models import Interview
 from project.models import Project, ProjectStatus
 from attachment.serializers import AttachmentSerializer
 from notification.views import create_notification, push_notification
-from utils_app.utils import post_msg_using_webhook, html_to_text, beats_to_log1
+from utils_app.utils import post_msg_using_webhook, html_to_text
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
+
+
+def download_s3_object_beats(key):
+    s3 = boto3.client('s3',
+                      region_name=os.getenv('AWS_REGION_NAME'),
+                      aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                      aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+                      )
+    s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME_BEATS'), f'media/{key}', f'media/{key}')
+    return f'media/{key}'
+
+
+def beats_to_log1(file_name, obj_id, doc_type, model):
+    try:
+        content_type = ContentType.objects.get(model=model)
+        creator = User.objects.get(employee_id=1000)
+        path = download_s3_object_beats(file_name)
+        local_file = open(path, 'rb')
+        file = ContentFile(local_file.read())
+        attachment = Attachment.objects.create(
+            creator=creator,
+            object_id=obj_id,
+            attachment_type=doc_type,
+            content_type_id=content_type.id,
+        )
+        attachment.attachment_file.save(path, file, save=True)
+        attachment.save()
+        os.remove(path)
+        return True, path
+    except Exception as error:
+        return False, error
 
 
 def close_marketing():
