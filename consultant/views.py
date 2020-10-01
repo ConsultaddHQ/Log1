@@ -763,20 +763,37 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['put'], detail=True, url_path='payroll_employer')
+    @action(methods=['get', 'post', 'put'], detail=True, url_path='payroll_employer')
     def payroll_employer(self, request, *args, **kwargs):
-        try:
-            consultant = Consultant.objects.get(id=kwargs.get('pk'))
-            employer = PayrollEmployer.objects.create(
-                consultant=consultant,
-                name=request.data['payroll_employer'],
-                start=request.data['employer_start_date'],
-            )
-            serializer = PayrollEmployerSerializer(employer)
-            return Response({"results": serializer.data}, status=status.HTTP_202_ACCEPTED)
-        except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
+        if request.method == 'GET':
+            try:
+                consultant = Consultant.objects.get(id=kwargs.get('pk'))
+                serializer = PayrollEmployerSerializer(consultant.employers.all(), many=True)
+                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            except Exception as error:
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        elif request.method == 'PUT':
+            try:
+                employer = PayrollEmployer.objects.get(id=kwargs.get('pk'))
+                employer.start = request.data['employer_start_date']
+                employer.save()
+                serializer = PayrollEmployerSerializer(employer)
+                return Response({"results": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            except Exception as error:
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            try:
+                consultant = Consultant.objects.get(id=kwargs.get('pk'))
+                employer = PayrollEmployer.objects.create(
+                    consultant=consultant,
+                    name=request.data['payroll_employer'],
+                    start=request.data['employer_start_date'],
+                )
+                serializer = PayrollEmployerSerializer(employer)
+                return Response({"results": serializer.data}, status=status.HTTP_201_CREATED)
+            except Exception as error:
+                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+    
     @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, *args, **kwargs):
         if request.method == 'GET':

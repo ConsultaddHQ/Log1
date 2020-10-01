@@ -265,7 +265,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     def get_payroll_employer(self, obj):
         employers = obj.employers.all().order_by('-start')
         if employers:
-            return employers.first().name
+            return PayrollEmployerSerializer(employers.first()).data
         return None
 
     def get_marketing(self, obj):

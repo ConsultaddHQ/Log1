@@ -1939,6 +1939,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             test = get_object_or_404(Test, id=kwargs.get('pk'))
             users = request.data.get('assign_to')
+            test.assign_to.clear()
             user_list = []
             for user_id in users:
                 user = get_object_or_404(User, id=user_id)
