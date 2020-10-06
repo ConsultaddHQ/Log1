@@ -617,7 +617,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             data_count = self.get_support_counts(supports)
 
-            terminated = supports.filter(project__statuses__status__istartswith='terminated', is_primary=True)
+            terminated = supports.filter(project__statuses__status__istartswith='terminated')
 
             supports = supports.filter(end=None).exclude(
                 project__statuses__status__istartswith='terminated'
