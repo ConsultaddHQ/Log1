@@ -181,6 +181,9 @@ class LeadViewSets(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
+        sort_by = request.query_params.get('sort_by', None)
+        version = request.query_params.get('version', 'v1')
+        filter_json = request.query_params.get('filter_json', None)
         filter_by_time = request.query_params.get('filter_by_time', 'all')
         filter_by_status = request.query_params.get('filter_by_status', None)
         page = int(request.query_params.get("page", 1))
@@ -196,21 +199,69 @@ class LeadViewSets(viewsets.ModelViewSet):
                             Q(vendor_company__name__icontains=query)
                     )
                 ).annotate(submission_count=Count('submission'))
-
             else:
                 leads = Lead.objects.filter(
                     Q(owner=request.user) |
                     Q(shared_to=request.user)
                 ).annotate(submission_count=Count('submission')).order_by('-modified')
 
-            leads = get_time_filter(leads, filter_by=filter_by_time)
+            if version == 'v2':
+                order_by = '-created'
+                if sort_by:
+                    print(sort_by)
+                    field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
+                    if field_name == 'modified':
+                        order_by = "modified" if order == "asc" else "-" + field_name
+                    elif field_name == 'created':
+                        order_by = "created" if order == "asc" else "-" + field_name
 
-            data, data_counts = self.get_lead_data(leads, filter_by_status, first, last)
+                filter_string = dict()
+                filters = json.loads(filter_json)
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    filter_string["vendor_company_id__in"] = filters["vendor"]
+                if 'date' in filters:
+                    if 'lte' in filters["date"] and len(filters["date"]['lte']) > 0:
+                        filter_string["created__lte"] = filters["date"]['lte']
+                    if 'gte' in filters["date"] and len(filters["date"]['gte']) > 0:
+                        filter_string["created__gte"] = filters["date"]['gte']
+                print(order_by)
+                leads = leads.filter(**filter_string).order_by(order_by)
 
-            if data_counts == 'error':
-                return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+                total = leads.count()
+                new = leads.filter(status='new').count()
+                sub = leads.filter(status='sub').count()
+                draft = leads.filter(status='draft').count()
+                archive = leads.filter(status='archived').count()
 
-            return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
+                if 'status' in filters and len(filters["status"]) > 0:
+                    if filters["status"] == 'archived':
+                        leads = leads.filter(status=filters["status"])
+                    else:
+                        leads = leads.filter(status=filters["status"]).exclude(status='archived')
+
+                data_counts = {
+                    "new": new,
+                    "sub": sub,
+                    "draft": draft,
+                    "total": total,
+                    "archive": archive,
+                }
+                data = leads[first:last].annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
+
+                return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
+            else:
+                leads = get_time_filter(leads, filter_by=filter_by_time)
+
+                data, data_counts = self.get_lead_data(leads, filter_by_status, first, last)
+
+                if data_counts == 'error':
+                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+
+                return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
