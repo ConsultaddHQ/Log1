@@ -13,8 +13,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
 
-from attachment.serializers import *
 from project.models import Project
+from attachment.serializers import *
 from activity.views import create_activity
 
 logger = logging.getLogger(__name__)
@@ -46,16 +46,6 @@ def download_s3_object(key):
                       )
     s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME'), f'media/{key}', f'media/{file_name}')
     return f'media/{file_name}'
-
-
-def download_s3_object_beats(key):
-    s3 = boto3.client('s3',
-                      region_name=os.getenv('AWS_REGION_NAME'),
-                      aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                      aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-                      )
-    s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME_BEATS'), f'media/{key}', f'media/{key}')
-    return f'media/{key}'
 
 
 def delete_temp_file(paths):
@@ -187,8 +177,14 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
 
     def destroy(self, request, *args, **kwargs):
         try:
+            content_type = self.request.query_params.get('type')
             attachment_id = self.request.query_params.get('attachment_id', None)
-            attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
+            roles = request.user.roles
+            if content_type == 'consultant' and ('recruiter' in roles or 'admin' in roles or 'superadmin' in roles):
+                attachment = get_object_or_404(Attachment, id=attachment_id)
+            else:
+                attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
+
             if attachment.content_type.model != 'project':
                 desc = f"{attachment.filename} deleted by {request.user.employee_name}"
                 create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')

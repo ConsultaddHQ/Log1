@@ -3,7 +3,7 @@ from import_export.admin import ExportActionModelAdmin
 
 from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, ConsultantPOC, \
     Education, Experience, WorkAuth, ConsultantToken, ConsultantPetitionToken, ConsultantExit, Feedback, ExitReason,\
-    PayrollEmployer
+    PayrollEmployer, ConsultantResetPasswordToken
 
 
 @admin.register(Consultant)
@@ -16,6 +16,12 @@ class ConsultantAdmin(ExportActionModelAdmin):
 
     class Media(object):
         css = {'all': ('no-more-warnings.css',)}
+
+
+@admin.register(ConsultantResetPasswordToken)
+class ConsultantResetPasswordTokenAdmin(admin.ModelAdmin):
+    list_display = ('consultant', 'key', 'created_at', 'user_agent')
+    search_fields = ('consultant__name', 'consultant__email', 'key')
 
 
 @admin.register(ConsultantToken)
@@ -105,7 +111,7 @@ class FeedbackAdmin(ExportActionModelAdmin):
 @admin.register(ConsultantExit)
 class ConsultantExitAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'consultant__name',  'consultant__email', 'type', 'resign_date', 'last_date')
+    search_fields = ('id', 'consultant__name', 'consultant__email', 'type', 'resign_date', 'last_date')
     list_display = ('id', 'consultant', 'type', 'resign_date', 'last_date', 'notice_period', 'legal_action',
                     'exit_details', 'reasons_display')
 
