@@ -892,6 +892,11 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 status='open'
             ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
 
+            offer_candidates = list(consultants.filter(
+                projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                projects__statuses__is_current=True).order_by('id').distinct('id').values_list(
+                'id', flat=True))
+
             obj = {
                 "all": consultants.all(),
                 "on_project": consultants.filter(projects__statuses__status='joined',
@@ -902,11 +907,9 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                                                  projects__statuses__is_current=True),
                 "candidate": consultants.filter(status='on_bench').exclude(id__in=open_candidates),
                 "in_pool": consultants.filter(marketing__status='open', marketing__in_pool=True).exclude(
-                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                    projects__statuses__is_current=True),
+                    id__in=offer_candidates),
                 "in_marketing": consultants.filter(marketing__status='open', marketing__in_pool=False).exclude(
-                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                    projects__statuses__is_current=True)
+                    id__in=offer_candidates)
             }
 
             count = {
