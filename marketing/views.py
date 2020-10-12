@@ -1079,6 +1079,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 serializer.save()
 
                 # Setting Submission is_active value
+                if interview.status == 'cancelled' and not interview.submission.exclude(status='cancelled'):
+                    interview.submission.status = 'sub'
                 if interview.status in ['cancelled', 'next_round']:
                     interview.submission.is_active = True
                 if interview.status in ['offer']:
@@ -1937,6 +1939,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             test = get_object_or_404(Test, id=kwargs.get('pk'))
             users = request.data.get('assign_to')
+            test.assign_to.clear()
             user_list = []
             for user_id in users:
                 user = get_object_or_404(User, id=user_id)
