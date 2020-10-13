@@ -644,7 +644,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 if 'status' in filters and len(filters["status"]) > 0:
                     sub = sub.filter(status__in=filters["status"])
 
-                data = sub.order_by('-modified')[first:last].annotate(
+                data = sub.order_by(order_by)[first:last].annotate(
                     city=F('lead__city'),
                     marketer_id=F('created_by'),
                     company_name=F('lead__vendor_company__name'),
@@ -814,6 +814,17 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 client=None).values_list('client', flat=True)
             result = difflib.get_close_matches(query, client_list, 1)
             return Response({"result": result}, status=status.HTTP_200_OK)
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='client')
+    def clients(self, request):
+        try:
+            query = request.query_params.get('query', None)
+            result = Submission.objects.filter(client__istartswith=query.strip()).order_by('client').distinct('client').exclude(
+                client=None).values_list('client', flat=True)
+            return Response({"result": result[:10]}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
