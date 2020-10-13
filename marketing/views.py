@@ -224,7 +224,6 @@ class LeadViewSets(viewsets.ModelViewSet):
                         filter_string["created__lte"] = filters["date"]['lte']
                     if 'gte' in filters["date"] and len(filters["date"]['gte']) > 0:
                         filter_string["created__gte"] = filters["date"]['gte']
-                print(order_by)
                 leads = leads.filter(**filter_string).order_by(order_by)
 
                 total = leads.count()
@@ -235,9 +234,9 @@ class LeadViewSets(viewsets.ModelViewSet):
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     if filters["status"] == 'archived':
-                        leads = leads.filter(status=filters["status"])
+                        leads = leads.filter(status__in=filters["status"])
                     else:
-                        leads = leads.filter(status=filters["status"]).exclude(status='archived')
+                        leads = leads.filter(status__in=filters["status"]).exclude(status='archived')
 
                 data_counts = {
                     "new": new,
@@ -540,8 +539,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
+        version = request.query_params.get('version', 'v1')
+        sort_by = request.query_params.get('sort_by', None)
         filter_for = request.query_params.get('filter_for', 'all')
         incomplete = request.query_params.get('incomplete', False)
+        filter_json = request.query_params.get('filter_json', None)
         consultant_id = request.query_params.get('consultant_id', None)
         filter_by_time = request.query_params.get('filter_by_time', 'all')
         filter_by_status = request.query_params.get('filter_by_status', None)
@@ -568,9 +570,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     Q(consultant_marketing__consultant__status='archived') |
                     Q(status='draft')
                 )
-
-            if incomplete == 'true':
-                sub = sub.filter(is_complete=False)
 
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:
@@ -606,19 +605,72 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             elif filter_for == 'team':
                 sub = sub.filter(created_by__team=request.user.team)
 
-            if consultant_id and consultant_id != 'null':
-                sub = sub.filter(consultant_marketing__consultant_id=consultant_id)
+            if version == 'v2':
+                order_by = '-created'
+                if sort_by:
+                    field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
+                    if field_name == 'modified':
+                        order_by = "modified" if order == "asc" else "-" + field_name
+                    elif field_name == 'created':
+                        order_by = "created" if order == "asc" else "-" + field_name
+                    elif field_name == 'name':
+                        order_by = "consultant_marketing__consultant__name" if order == "asc" else "-" + field_name
 
-            # Submission filter by week, month and all
-            sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct('modified')
+                filter_string = dict()
+                filters = json.loads(filter_json)
+                if 'incomplete' in filters:
+                    filter_string["is_complete"] = not filters["incomplete"]
+                if 'client' in filters and len(filters["client"]) > 0:
+                    filter_string["client"] = filters["client"]
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    filter_string["lead__vendor_company_id__in"] = filters["vendor"]
+                if 'consultant_id' in filters and len(filters["consultant_id"]) > 0:
+                    filter_string["consultant_marketing__consultant_id__in"] = filters["consultant_id"]
+                if 'date' in filters:
+                    if 'lte' in filters["date"] and len(filters["date"]['lte']) > 0:
+                        filter_string["created__lte"] = filters["date"]['lte']
+                    if 'gte' in filters["date"] and len(filters["date"]['gte']) > 0:
+                        filter_string["created__gte"] = filters["date"]['gte']
 
-            # Submission filter by status
-            data, sub_data = self.get_submission_data(sub, filter_by_status, first, last)
+                sub = sub.filter(**filter_string).order_by(order_by)
+                # Submission filter by status
+                data_counts = {
+                    'total': sub.count(),
+                    'sub': sub.filter(status='sub').count(),
+                    'project': sub.filter(status='project').count(),
+                    'interview': sub.filter(status='interview').count()
+                }
 
-            if sub_data == "error":
-                return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+                if 'status' in filters and len(filters["status"]) > 0:
+                    sub = sub.filter(status__in=filters["status"])
 
-            return Response({"results": data, "counts": sub_data}, status=status.HTTP_200_OK)
+                data = sub.order_by('-modified')[first:last].annotate(
+                    city=F('lead__city'),
+                    marketer_id=F('created_by'),
+                    company_name=F('lead__vendor_company__name'),
+                    marketer_name=F('created_by__employee_name'),
+                    consultant_name=F('consultant_marketing__consultant__name'),
+                ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
+                         'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact',
+                         'is_complete')
+                return Response({"results": data, "counts": data_counts}, status=status.HTTP_200_OK)
+            else:
+                if incomplete == 'true':
+                    sub = sub.filter(is_complete=False)
+
+                if consultant_id and consultant_id != 'null':
+                    sub = sub.filter(consultant_marketing__consultant_id=consultant_id)
+
+                # Submission filter by week, month and all
+                sub = get_time_filter(sub, filter_by_time).order_by('-modified').distinct('modified')
+
+                # Submission filter by status
+                data, sub_data = self.get_submission_data(sub, filter_by_status, first, last)
+
+                if sub_data == "error":
+                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+
+                return Response({"results": data, "counts": sub_data}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
