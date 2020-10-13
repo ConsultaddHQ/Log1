@@ -767,7 +767,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def payroll_employer(self, request, *args, **kwargs):
         if request.method == 'GET':
             try:
-                consultant = Consultant.objects.get(id=kwargs.get('pk'))
+                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
                 serializer = PayrollEmployerSerializer(consultant.employers.all().order_by('-start'), many=True)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
             except Exception as error:
@@ -775,21 +775,18 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         elif request.method == 'PUT':
             try:
                 employer = PayrollEmployer.objects.get(id=kwargs.get('pk'))
-                employer.start = request.data['employer_start_date']
-                employer.save()
-                serializer = PayrollEmployerSerializer(employer)
+                serializer = PayrollEmployerSerializer(employer, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
                 return Response({"results": serializer.data}, status=status.HTTP_202_ACCEPTED)
             except Exception as error:
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
         else:
             try:
-                consultant = Consultant.objects.get(id=kwargs.get('pk'))
-                employer = PayrollEmployer.objects.create(
-                    consultant=consultant,
-                    name=request.data['payroll_employer'],
-                    start=request.data['employer_start_date'],
-                )
-                serializer = PayrollEmployerSerializer(employer)
+                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+                serializer = PayrollEmployerSerializer(data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save(consultant=consultant)
                 return Response({"results": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -892,6 +889,11 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 status='open'
             ).order_by('consultant_id').distinct('consultant_id').values_list('consultant_id', flat=True))
 
+            offer_candidates = list(consultants.filter(
+                projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                projects__statuses__is_current=True).order_by('id').distinct('id').values_list(
+                'id', flat=True))
+
             obj = {
                 "all": consultants.all(),
                 "on_project": consultants.filter(projects__statuses__status='joined',
@@ -902,11 +904,9 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                                                  projects__statuses__is_current=True),
                 "candidate": consultants.filter(status='on_bench').exclude(id__in=open_candidates),
                 "in_pool": consultants.filter(marketing__status='open', marketing__in_pool=True).exclude(
-                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                    projects__statuses__is_current=True),
+                    id__in=offer_candidates),
                 "in_marketing": consultants.filter(marketing__status='open', marketing__in_pool=False).exclude(
-                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                    projects__statuses__is_current=True)
+                    id__in=offer_candidates)
             }
 
             count = {
