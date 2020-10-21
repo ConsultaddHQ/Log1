@@ -1390,6 +1390,30 @@ class InterviewViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['get'], detail=False, url_path='repeat')
+    def repeat_interviews(self, request):
+        try:
+            sub_id = request.query_params.get('submission_id')
+            sub = get_object_or_404(Submission, id=sub_id)
+            interviews = Interview.objects.filter(
+                submission__client=sub.client,
+                submission__lead__city=sub.lead.city,
+                submission__lead__position=sub.lead.position
+            ).exclude(status='cancelled').exclude(submission=sub).order_by('submission_id', '-created').distinct('submission_id')
+            total = interviews.count()
+            data = interviews.annotate(
+                client=F('submission__client'),
+                location=F('submission__lead__city'),
+                supervisor_name=F('supervisor__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('submission', 'supervisor_name', 'feedback', 'screening_type', 'client', 'marketer_name', 'status',
+                     'consultant_name', 'start_time', 'end_time', 'location', 'company_name', 'interview_mode', )
+            return Response({"result": data, "total": total}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     queryset = Submission.objects.all()
