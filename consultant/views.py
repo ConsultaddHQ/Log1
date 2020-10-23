@@ -898,6 +898,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             # dev = ['Java', 'Python', 'Aws', 'DevOps', 'Full Stack', 'Nodejs', 'Angular', 'React', 'DA', 'Others']
             # ba = ['Salesforce', 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'BA', 'BI']
+
             skills = json.loads(skills)
             visa = json.loads(visa)
             if len(skills) > 0:
@@ -955,16 +956,21 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             marketing = ConsultantMarketing.objects.filter(
                 consultant=OuterRef("pk"), status='open')
 
+            work_auth = WorkAuth.objects.filter(
+                consultant=OuterRef("pk"), is_current=True
+            )
+
             data = consultants[first:last].annotate(
                 rate=Subquery(rate.values('rate')[:1]),
                 rtg=Subquery(marketing.values('rtg')[:1]),
+                visa=Subquery(work_auth.values('visa_type')[:1]),
                 in_pool=Subquery(marketing.values('in_pool')[:1]),
                 marketing_start=Subquery(marketing.values('start')[:1]),
                 recruiter=Subquery(poc.values('poc__employee_name')[:1]),
                 preferred_location=Subquery(marketing.values('preferred_location')[:1]),
                 previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
             ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
-                     'marketing_start', 'previous_marketing_days')
+                     'marketing_start', 'previous_marketing_days', 'visa')
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
