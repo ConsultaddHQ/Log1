@@ -843,10 +843,10 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         return Response({"results": consultants}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
-        visa = request.query_params.get('visa', None)
+        visa = request.query_params.get('visa', [])
         days = request.query_params.get('days', None)
         query = request.query_params.get('query', None)
-        skills = request.query_params.get('skills', None)
+        skills = request.query_params.get('skills', [])
         gender = request.query_params.get('gender', None)
         team_name = request.query_params.get('team', None)
         # location = request.query_params.get('location', None)

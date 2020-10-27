@@ -693,8 +693,11 @@ class MarketingReportViewSets(GenericViewSet):
                 submission_count = Submission.objects.filter(
                     created_by=user, created__gte=start, created__lte=end
                 ).exclude(status='cancelled').count()
-                interview_count = Interview.objects.filter(
-                    submission__created_by=user, created__gte=start, created__lte=end
+                unique_interview_count = Interview.objects.filter(
+                    submission__created_by=user, created__gte=start, created__lte=end, submission__rank__in=[0, 1]
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                repeat_interview_count = Interview.objects.filter(
+                    submission__created_by=user, created__gte=start, created__lte=end, submission__rank__gt=1
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
                     statuses__status='received',
@@ -705,9 +708,10 @@ class MarketingReportViewSets(GenericViewSet):
                     "id": user.id,
                     "offer": offer_count,
                     "team": user.team.name,
-                    "interview": interview_count,
                     "submission": submission_count,
                     "employee_name": user.employee_name,
+                    "unique_interview": unique_interview_count,
+                    "repeat_interview": repeat_interview_count,
                     "consultant_assigned": con_assigned if len(con_assigned) > 0 else None,
                 })
             return Response({"results": data, "total": total}, status=status.HTTP_200_OK)

@@ -165,6 +165,7 @@ class Lead(TimeStampedModel):
 
 class Submission(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    rank = models.IntegerField(_('Rank'), default=0)
     employer = models.CharField(_('Employer'), max_length=50)
     rate = models.FloatField(_('Rate'), null=True, blank=True)
     comments = GenericRelation(Comment, verbose_name="comments")
