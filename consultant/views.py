@@ -26,11 +26,25 @@ from employee.models import tag_users
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
 from attachment.serializers import AttachmentSerializer
-from notification.views import create_notification, push_notification
+from activity.serializers import Activity, ActivitySerializer
 from utils_app.utils import post_msg_using_webhook, html_to_text
+from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
+
+
+def create_activity(object_id, model, user, desc, activity_type):
+    content_type = ContentType.objects.get(model=model)
+    activity = Activity.objects.create(
+        user=user,
+        desc=desc,
+        object_id=object_id,
+        content_type=content_type,
+        activity_type=activity_type,
+    )
+    serializer = ActivitySerializer(activity)
+    return serializer.data
 
 
 def download_s3_object_beats(key):
@@ -823,6 +837,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 serializer = ConsultantRateRevisionSerializer(rate_obj)
                 title = f"{rate_obj.consultant.name}'s rate revised by {request.user.employee_name}"
                 send_notification(rate_obj.consultant, request.user, title)
+
+                desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {request.data['rate']}"
+                create_activity(rate_obj.id, 'consultantraterevision', request.user, desc, 'updated')
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
