@@ -2060,7 +2060,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     "title": f"&#128203; Test Assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {skills} <br>",
                     "text": text
                 }
-                # post_msg_using_webhook(config.test_team_url, data)
+                post_msg_using_webhook(config.engineering_url, data)
 
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)

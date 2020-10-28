@@ -8,7 +8,9 @@ from utils_app.utils import post_msg_using_webhook
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        tests = Test.objects.filter(status__in=['assigned', 'new']).exclude(submission__consultant_marketing__status='close').order_by('created')
+        tests = Test.objects.filter(status__in=['new', 'assigned']).exclude(
+            submission__consultant_marketing__status='close'
+        ).order_by('-modified')
 
         text = f""" <tr>
             <th style="padding:5px 8px 5px 8px;">#</th>
@@ -16,34 +18,32 @@ class Command(BaseCommand):
             <th style="padding:5px 8px 5px 8px;">Marketer</th>
             <th style="padding:5px 8px 5px 8px;">Consultant</th>
             <th style="padding:5px 8px 5px 8px;">Assigned to</th>
-            <th style="padding:5px 8px 5px 8px;">Skills</th>
             <th style="padding:5px 8px 5px 8px;">Client</th>
             <th style="padding:5px 8px 5px 8px;">Video</th>
             <th style="padding:5px 8px 5px 8px;">Deadline</th>
             </tr>"""
 
         for index, test in enumerate(tests):
-            skills = ", ".join(skill for skill in test.skills)
             if test.deadline:
                 deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B')
             else:
                 deadline = 'NA'
-            assigned = 'NA'
-            if len(test.assign_to.all()) > 0:
-                assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
+            assigned_to = 'Not Assigned'
+            assigned = test.assign_to.all()
+            if assigned.count() > 0:
+                assigned_to = ", ".join(assign.employee_name for assign in assigned)
             text += f"""<tr>
                             <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.created.strftime('%a, %d %B')} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.submission.created_by.employee_name} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.submission.consultant.name} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {assigned} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {skills} </td>
+                            <td style="padding:5px 8px 5px 8px;"> {assigned_to} </td>
                             <td style="padding:5px 8px 5px 8px;"> {test.submission.client} </td>
                             <td style="padding:5px 8px 5px 8px;"> {"Yes" if test.is_video else "No"} </td>
                             <td style="padding:5px 8px 5px 8px;"> {deadline} </td>
                         </tr>"""
         data = {
-            "title": "Assigned Test &#128203;",
+            "title": "New/Assigned Test &#128203;",
             "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
         }
-        post_msg_using_webhook(config.test_team_url, data)
+        post_msg_using_webhook(config.engineering_url, data)
