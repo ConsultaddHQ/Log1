@@ -824,8 +824,7 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__consultant_marketing__consultant=consultant
                 ).exclude(status='cancelled').distinct('submission').order_by().count()
                 project_count = Project.objects.filter(consultant=consultant).count()
-                days = (
-                                   date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                 data.append({
                     'days': days,
                     'teams': teams,

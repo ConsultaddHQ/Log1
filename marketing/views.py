@@ -173,15 +173,13 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills',
-                         'company_id',
+                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills',
-                         'company_id',
+                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
@@ -232,7 +230,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 company_name=F('vendor_company__name'),
                 company_id=F('vendor_company__id'),
             ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'status', 'created',
-                     'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+                     'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
             return Response({"result": data[0]}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -254,7 +252,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
                 ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'status', 'created',
-                         'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+                         'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -282,8 +280,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
                            ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill',
-                                    'secondary_skills', 'status'
-                                    , 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
+                                    'status', 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
                 return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -1129,9 +1126,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 # Setting Submission is_active value
                 if interview.status == 'cancelled' and not interview.submission.exclude(status='cancelled'):
                     interview.submission.status = 'sub'
-                    # clear rank for cancel interview
+                    # clear rank for cancelled interview
                     if interview.round == 1:
-                        print('cancel')
                         interview = self.rank_interviews(interview, 'cancel')
                 if interview.status in ['cancelled', 'next_round']:
                     interview.submission.is_active = True
@@ -1412,33 +1408,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-
             ).values('submission', 'supervisor_name', 'round', 'feedback', 'screening_type', 'marketer_name', 'status',
                      'consultant_name', 'start_time', 'end_time', 'company_name', 'client', 'interview_mode')
-
             return Response({"result": data, "total": total}, status=status.HTTP_200_OK)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(methods=['get'], detail=False, url_path='calendar_interviews')
-    def calendar_interviews(self, request):
-        end = request.query_params.get('end', None)
-        start = request.query_params.get('start', None)
-        email = request.query_params.get('email', None)
-        start_time = datetime.strptime(start, "%Y-%m-%d")
-        end_time = datetime.strptime(end, "%Y-%m-%d")
-        start_time = start_time.strftime("%Y-%m-%dT")
-        end_time = end_time.strftime("%Y-%m-%dT")
-        event = {
-            "email": email,
-            "start": start_time,
-            "end": end_time
-        }
-        # Get interviews from Google Calendar for specific Email ID
-        try:
-            # data, visibility = get_interviews(event)
-            return Response({"result": [], "visibility": True}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1509,8 +1481,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client',
-                     'job_title')
+            ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client', 'job_title')
 
             upcoming_joinings = projects.filter(
                 statuses__status='on_boarded', statuses__is_current=True
@@ -1633,6 +1604,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
+
                 new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
                                                 submission__created_by__team__name=team_name).count()
 
@@ -1652,13 +1624,17 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).count()
 
             else:
-                new_po = Project.objects.filter(statuses__status='joined',
-                                                statuses__created__range=[first, last]).count()
+
                 offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
                 submissions_count = Submission.objects.filter(created__range=[first, last]).count()
                 interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1').count()
-                joining_count = Project.objects.filter(statuses__status='joined',
-                                                       submission__created__range=[first, last]).count()
+                new_po = Project.objects.filter(
+                    statuses__status='joined', statuses__created__range=[first, last]
+                ).count()
+                joining_count = Project.objects.filter(
+                    statuses__status='joined', submission__created__range=[first, last]
+                ).count()
+
             percent = None
             if filter_by_time != 'this_month':
                 prev_po = Project.objects.filter(

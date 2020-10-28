@@ -240,9 +240,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation',
-                  'support',
-                  'profiles', 'education', 'terminate', 'experience', 'rate', 'marketing', 'payroll_employer')
+                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation', 'rate',
+                  'support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer')
 
     def get_work_auth(self, obj):
         return WorkAuthSerializer(obj.work_auth.all(), many=True).data
