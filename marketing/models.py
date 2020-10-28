@@ -125,6 +125,7 @@ class Lead(TimeStampedModel):
     job_desc = models.TextField(_('Job Description'))
     city = models.CharField(_('City'), max_length=50, blank=True, null=True)
     job_title = models.CharField(_('Job Title'), max_length=100, blank=True, null=True)
+    position = models.CharField(_('Job Position'), max_length=100, blank=True, null=True)
     primary_skill = models.CharField(_('Primary Skill'), max_length=50, blank=True, null=True)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='new')
     secondary_skills = ArrayField(models.CharField(_('Secondary Skills'), max_length=30), blank=True, null=True)
@@ -164,6 +165,7 @@ class Lead(TimeStampedModel):
 
 class Submission(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    rank = models.IntegerField(_('Rank'), default=0)
     employer = models.CharField(_('Employer'), max_length=50)
     rate = models.FloatField(_('Rate'), null=True, blank=True)
     comments = GenericRelation(Comment, verbose_name="comments")

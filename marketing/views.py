@@ -165,13 +165,13 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
@@ -221,7 +221,7 @@ class LeadViewSets(viewsets.ModelViewSet):
             data = lead.annotate(submission_count=Count('submission')).annotate(
                 company_name=F('vendor_company__name'),
                 company_id=F('vendor_company__id'),
-            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+            ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'status', 'created',
                      'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
             return Response({"result": data[0]}, status=status.HTTP_200_OK)
         except Exception as error:
@@ -243,7 +243,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset.annotate(submission_count=Count('submission')).annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
+                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'status', 'created',
                          'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
@@ -271,7 +271,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     submission_count=Count('submission')
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
-                           ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'status'
+                           ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills', 'status'
                                     , 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
                 return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
@@ -585,8 +585,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     owner=request.user,
                     city=request.data['city'],
                     job_desc=request.data['job_desc'],
+                    position=request.data['position'],
                     job_title=request.data['job_title'],
-                    primary_skill=request.data['primary_skill'],
                     vendor_company_id=request.data['vendor_company'],
                 )
                 lead_id = lead.id
@@ -782,6 +782,38 @@ class InterviewViewSets(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
+    def rank_interviews(interview, status):
+        try:
+            submission = interview.submission
+            similar_interviews = Interview.objects.filter(
+                round=1,
+                submission__client=submission.client,
+                submission__lead__city=submission.lead.city,
+                submission__lead__position=submission.lead.position,
+            ).exclude(status='cancelled').exclude(submission=submission)
+            ranked_interviews = []
+            if status == 'create':
+                ranked_interviews = similar_interviews.filter(submission__rank=0)
+                submission.rank = similar_interviews.count() + 1
+                submission.save()
+            elif status == 'cancel':
+                ranked_interviews = similar_interviews.filter(
+                    Q(submission__rank=0) |
+                    Q(submission__rank__gt=submission.rank)
+                )
+                submission.rank = 0
+                submission.save()
+
+            if len(ranked_interviews) > 0:
+                similar_interviews = similar_interviews.order_by('created')
+                for index, inter in enumerate(similar_interviews):
+                    inter.submission.rank = index + 1
+                    inter.submission.save()
+            return interview
+        except Exception as error:
+            return error
+
+    @staticmethod
     def get_interview_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
@@ -935,7 +967,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             # Change status of past Interview to feedback due
             self.change_to_feedback_due()
 
-            submissions = Submission.objects.filter(id=request.data.get('submission'), created_by=request.user)
+            submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
             if not submissions:
                 return Response({"error": 'This is not your submission'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -963,6 +995,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 submission.is_active = False
                 submission.status = 'interview'
                 submission.save()
+
+                # Ranking Interview
+                if interview.round == 1:
+                    interview = self.rank_interviews(interview, 'create')
 
                 # Calendar title
                 title = f"CTB:{interview.supervisor.employee_name} " \
@@ -1034,13 +1070,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.announcement_url, data)
 
                 data = queryset.annotate(
+                    rank=F('submission__rank'),
                     client=F('submission__client'),
                     job_title=F('submission__lead__job_title'),
                     supervisor_name=F('supervisor__employee_name'),
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'screening_type',
+                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'screening_type', 'rank',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name', 'job_title',
                          'submission_id', 'interview_mode')
                 # Creating Notification
@@ -1081,6 +1118,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 # Setting Submission is_active value
                 if interview.status == 'cancelled' and not interview.submission.exclude(status='cancelled'):
                     interview.submission.status = 'sub'
+                    # clear rank for cancel interview
+                    if interview.round == 1:
+                        print('cancel')
+                        interview = self.rank_interviews(interview, 'cancel')
                 if interview.status in ['cancelled', 'next_round']:
                     interview.submission.is_active = True
                 if interview.status in ['offer']:
@@ -1238,6 +1279,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview.save()
             if interview.round == 1:
                 interview.submission.status = 'sub'
+                interview = self.rank_interviews(interview, 'cancel')
             interview.submission.is_active = True
             interview.submission.save()
             scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
@@ -1389,6 +1431,30 @@ class InterviewViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='repeat')
+    def repeat_interviews(self, request):
+        try:
+            sub_id = request.query_params.get('submission_id')
+            sub = get_object_or_404(Submission, id=sub_id)
+            interviews = Interview.objects.filter(
+                submission__client=sub.client,
+                submission__lead__city=sub.lead.city,
+                submission__lead__position=sub.lead.position
+            ).exclude(status='cancelled').exclude(submission=sub).order_by('submission_id', '-created').distinct('submission_id')
+            total = interviews.count()
+            data = interviews.annotate(
+                client=F('submission__client'),
+                location=F('submission__lead__city'),
+                supervisor_name=F('supervisor__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('submission', 'supervisor_name', 'feedback', 'screening_type', 'client', 'marketer_name', 'status',
+                     'consultant_name', 'start_time', 'end_time', 'location', 'company_name', 'interview_mode', )
+            return Response({"result": data, "total": total}, status=status.HTTP_200_OK)
+        except Exception as error:
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
@@ -1985,6 +2051,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
+            # message to channel
+            current_time = datetime.strftime(datetime.utcnow(), "%H:%M:%S")
+            if current_time > "14:30:00" and current_time < "23:30:00":
+                assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
+                text = f"Test Assigned to :- {assigned} <br>"
+                data = {
+                    "title": f"&#128203; Test Assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {skills} <br>",
+                    "text": text
+                }
+                post_msg_using_webhook(config.engineering_url, data)
 
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)

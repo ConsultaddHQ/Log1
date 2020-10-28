@@ -1,9 +1,10 @@
 import boto3
 import logging
+import json
 from operator import or_
 from functools import reduce
-from datetime import date, datetime
 from django.db import transaction
+from datetime import date, datetime, timedelta
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, Count
@@ -25,11 +26,25 @@ from employee.models import tag_users
 from marketing.models import Interview
 from project.models import Project, ProjectStatus
 from attachment.serializers import AttachmentSerializer
-from notification.views import create_notification, push_notification
+from activity.serializers import Activity, ActivitySerializer
 from utils_app.utils import post_msg_using_webhook, html_to_text
+from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
 dont_have_access = 'you don\'t have access'
+
+
+def create_activity(object_id, model, user, desc, activity_type):
+    content_type = ContentType.objects.get(model=model)
+    activity = Activity.objects.create(
+        user=user,
+        desc=desc,
+        object_id=object_id,
+        content_type=content_type,
+        activity_type=activity_type,
+    )
+    serializer = ActivitySerializer(activity)
+    return serializer.data
 
 
 def download_s3_object_beats(key):
@@ -822,6 +837,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 serializer = ConsultantRateRevisionSerializer(rate_obj)
                 title = f"{rate_obj.consultant.name}'s rate revised by {request.user.employee_name}"
                 send_notification(rate_obj.consultant, request.user, title)
+
+                desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {request.data['rate']}"
+                create_activity(rate_obj.id, 'consultantraterevision', request.user, desc, 'updated')
                 return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
             except Exception as error:
                 logger.error(error)
@@ -842,10 +860,13 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         return Response({"results": consultants}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
+        visa = request.query_params.get('visa', [])
+        days = request.query_params.get('days', None)
         query = request.query_params.get('query', None)
-        skills = request.query_params.get('skills', None)
+        skills = request.query_params.get('skills', [])
+        gender = request.query_params.get('gender', None)
         team_name = request.query_params.get('team', None)
-        location = request.query_params.get('location', None)
+        # location = request.query_params.get('location', None)
         con_status = request.query_params.get('status', 'all')
         page = int(request.query_params.get("page", 1))
         page_size = int(request.query_params.get("page_size", 10))
@@ -869,19 +890,39 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
                 consultants = consultants.filter(marketing__teams__name=team_name, marketing__status='open')
 
-            # Location wise Filter
-            if location:
-                con_status = 'in_marketing'
-                consultants = consultants.filter(
-                    current_city=location,
-                )
+            # # Location wise Filter
+            # if location:
+            #     con_status = 'in_marketing'
+            #     consultants = consultants.filter(
+            #         current_city=location,
+            #     )
 
-            dev = ['Java', 'Python', 'Aws', 'DevOps', 'Full Stack', 'Nodejs', 'Angular', 'React', 'DA', 'Others']
-            ba = ['Salesforce', 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'BA', 'BI']
-            if skills == 'ba':
-                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in ba]))
-            elif skills == 'dev':
-                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in dev]))
+            if gender:
+                consultants = consultants.filter(gender=gender)
+
+            if days:
+                day_filter = dict()
+                day_filter["marketing__status"] = 'open'
+                if days == 'lt_12':
+                    day_filter["marketing__start__gte"] = timezone.now().date() - timedelta(days=24)
+                elif days == 'lt_24':
+                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
+                elif days == 'lt_36':
+                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=36)
+                elif days == 'gt_36':
+                    day_filter['marketing__start__lte'] = timezone.now().date() - timedelta(days=36)
+                consultants = consultants.filter(**day_filter)
+
+            # dev = ['Java', 'Python', 'Aws', 'DevOps', 'Full Stack', 'Nodejs', 'Angular', 'React', 'DA', 'Others']
+            # ba = ['Salesforce', 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'BA', 'BI']
+
+            skills = json.loads(skills)
+            visa = json.loads(visa)
+            if len(skills) > 0:
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in skills]))
+
+            if len(visa) > 0:
+                consultants = consultants.filter(work_auth__visa_type__in=visa, work_auth__is_current=True)
 
             consultants = consultants.order_by('id').distinct('id')
 
@@ -932,16 +973,21 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
             marketing = ConsultantMarketing.objects.filter(
                 consultant=OuterRef("pk"), status='open')
 
+            work_auth = WorkAuth.objects.filter(
+                consultant=OuterRef("pk"), is_current=True
+            )
+
             data = consultants[first:last].annotate(
                 rate=Subquery(rate.values('rate')[:1]),
                 rtg=Subquery(marketing.values('rtg')[:1]),
+                visa=Subquery(work_auth.values('visa_type')[:1]),
                 in_pool=Subquery(marketing.values('in_pool')[:1]),
                 marketing_start=Subquery(marketing.values('start')[:1]),
                 recruiter=Subquery(poc.values('poc__employee_name')[:1]),
                 preferred_location=Subquery(marketing.values('preferred_location')[:1]),
                 previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
             ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
-                     'marketing_start', 'previous_marketing_days')
+                     'marketing_start', 'previous_marketing_days', 'visa')
             return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
