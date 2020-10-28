@@ -2052,13 +2052,15 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
             # message to channel
-            assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
-            text = f"Test Assigned to :- {assigned} <br>"
-            data = {
-                "title": f"&#128203; Test Assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {skills} <br>",
-                "text": text
-            }
-            # post_msg_using_webhook(config.test_team_url, data)
+            current_time = datetime.strftime(datetime.utcnow(), "%H:%M:%S")
+            if current_time > "14:30:00" and current_time < "23:30:00":
+                assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
+                text = f"Test Assigned to :- {assigned} <br>"
+                data = {
+                    "title": f"&#128203; Test Assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {skills} <br>",
+                    "text": text
+                }
+                # post_msg_using_webhook(config.test_team_url, data)
 
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
@@ -2101,15 +2103,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if error == 'error':
                     logger.error(res)
                     return Response({"error": "error", "test_mail_error": str(res)}, status=status.HTTP_400_BAD_REQUEST)
-                skills = ", ".join(skill.title() for skill in test.skills)
-                associated = ", ".join(engineer.employee_name for engineer in test.engineer.all())
-                text = f"People Associated :- {associated} <br> " \
-                       f"Engineering remarks :- {test.engineer_remarks} <br>"
-                data = {
-                    "title": f"&#9996; Test Completed :: {test.submission.consultant.name} :: {test.submission.client} :: {skills} <br>",
-                    "text": text
-                }
-                # post_msg_using_webhook(config.test_team_url, data)
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data, "mail": res}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
