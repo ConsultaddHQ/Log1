@@ -1,6 +1,8 @@
+import os
 import logging
 from datetime import datetime
 from django.db.models import Q
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
 from rest_framework import status, viewsets
@@ -15,12 +17,12 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModel
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
-from legal.models import *
-from legal.serializers import *
+from legal.models import Types, Petition, Reason, Document, DocumentList
+from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer
 from utils_app.mailing import send_email
 from employee.token import get_token_generator
 from attachment.views import presigned_post_url, get_s3_object
-from activity.serializers import ConsultantCommentGetSerializer
+from activity.serializers import ConsultantComment, ConsultantCommentGetSerializer
 from notification.views import create_notification, push_notification
 
 logger = logging.getLogger(__name__)
@@ -318,15 +320,16 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def petition_shipping_status(self, request, *args, **kwargs):
         try:
             petition_id = kwargs.get('pk')
-            fedex_no = request.data.get('fedex_no')
-            receipt_no = request.data.get('receipt_no')
-            reason = request.data.get('reason', None)
             file = request.FILES.get('file')
             rfe_doc = request.FILES.get('rfe_doc')
-            approved_doc = request.FILES.get('approved_doc')  # optional
-            denied_doc = request.FILES.get('denied_doc')  # optional
+            fedex_no = request.data.get('fedex_no')
+            reason = request.data.get('reason', None)
+            receipt_no = request.data.get('receipt_no')
             request_status = request.data.get('status')
+            denied_doc = request.FILES.get('denied_doc')
+            approved_doc = request.FILES.get('approved_doc')
             petition = get_object_or_404(Petition, id=petition_id)
+
             if petition.status == 'print' and request_status == 'shipped':
                 if fedex_no:
                     petition.fedex_no = fedex_no
@@ -671,4 +674,3 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             return Response({"result": "File deleted"}, status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-

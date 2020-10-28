@@ -1,11 +1,11 @@
 from rest_framework import serializers
 
-from marketing.models import *
 from project.models import Project
 from employee.serializers import UserSerializer
 from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentSerializer
 from consultant.serializers import ConsultantSerializer
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):

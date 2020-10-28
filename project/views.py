@@ -3,8 +3,9 @@ import logging
 from datetime import datetime, date, timedelta
 
 from django.db import transaction
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.db.models import F, Subquery, OuterRef
+from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
 
 from rest_framework import status, viewsets
@@ -16,18 +17,20 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
 
 from constance import config
-from project.serializers import *
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
 from consultant.views import send_notification
 from attachment.models import create_attachment
 from consultant.models import ConsultantPOC, Consultant
+from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
 from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
-from notification.views import push_notification_consultant, Notification, FCMDevice, create_notification,\
-    push_notification
+from notification.views import push_notification_consultant, create_notification, push_notification
+from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
+from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
+    ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
 logger = logging.getLogger(__name__)
 

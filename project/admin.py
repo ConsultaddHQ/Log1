@@ -1,7 +1,8 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
-from project.models import *
+from project.models import Project, ProjectSupport, SupportStatus, ProjectStatus, ProjectOrder, TimeSheet, \
+    PayrollSchedule
 
 
 @admin.register(Project)
@@ -23,6 +24,7 @@ class ProjectAdmin(ExportActionModelAdmin):
 
     def client_display(self, obj):
         return obj.submission.client
+
     client_display.short_description = "Client"
 
     def vendor_display(self, obj):
@@ -75,5 +77,3 @@ class PayrollScheduleAdmin(ExportActionModelAdmin):
     list_display = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
     search_fields = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
     actions = ["export_as_csv"]
-
-

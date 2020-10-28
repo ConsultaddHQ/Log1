@@ -1,10 +1,11 @@
 from datetime import datetime, date, timedelta
 
-from django.db import transaction
 from django.db.models import Q
-from rest_framework.mixins import *
+from django.db import transaction
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
@@ -823,7 +824,8 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__consultant_marketing__consultant=consultant
                 ).exclude(status='cancelled').distinct('submission').order_by().count()
                 project_count = Project.objects.filter(consultant=consultant).count()
-                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                days = (
+                                   date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                 data.append({
                     'days': days,
                     'teams': teams,
