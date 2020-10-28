@@ -798,8 +798,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 submission.save()
             elif status == 'cancel':
                 ranked_interviews = similar_interviews.filter(
-                    Q(submissions__rank=0) |
-                    Q(submissions__rank__gt=submission.rank)
+                    Q(submission__rank=0) |
+                    Q(submission__rank__gt=submission.rank)
                 )
                 submission.rank = 0
                 submission.save()
@@ -1279,6 +1279,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview.save()
             if interview.round == 1:
                 interview.submission.status = 'sub'
+                interview = self.rank_interviews(interview, 'cancel')
             interview.submission.is_active = True
             interview.submission.save()
             scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])

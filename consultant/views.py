@@ -905,7 +905,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in skills]))
 
             if len(visa) > 0:
-                consultants = consultants.filter(work_auth__visa_type__in=visa)
+                consultants = consultants.filter(work_auth__visa_type__in=visa, work_auth__is_current=True)
 
             consultants = consultants.order_by('id').distinct('id')
 
