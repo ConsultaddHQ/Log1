@@ -24,12 +24,12 @@ class Command(BaseCommand):
             </tr>"""
 
         for index, test in enumerate(tests):
+            assigned_to = 'Not Assigned'
+            assigned = test.assign_to.all()
             if test.deadline:
                 deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B')
             else:
                 deadline = 'NA'
-            assigned_to = 'Not Assigned'
-            assigned = test.assign_to.all()
             if assigned.count() > 0:
                 assigned_to = ", ".join(assign.employee_name for assign in assigned)
             text += f"""<tr>

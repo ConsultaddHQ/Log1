@@ -1,34 +1,42 @@
 import os
+import json
 import difflib
 import logging
-import json
+from django.conf import settings
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
-from rest_framework.mixins import *
-from rest_framework import viewsets
+from rest_framework import viewsets, status
+from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, \
+    DestroyModelMixin
 
 from constance import config
 from django.db import transaction
 from django.db.models.functions import Lower
-from django.db.models import Count, Q, F, Max
+from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
 
-from log1.settings import MEDIA_URL
-from marketing.serializers import *
-from notification.models import FCMDevice
+from employee.models import User
+from project.serializers import Project
 from utils_app.utils import post_msg_using_webhook
-from utils_app.mailing import send_email_attachment_multiple
+from attachment.serializers import AttachmentSerializer
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
+from utils_app.mailing import send_email_attachment_multiple
 from attachment.views import presigned_post_url, download_s3_object
 from utils_app.utils import get_time_filter, get_time_filter_by_start
 from notification.views import create_notification, push_notification
-from utils_app.calendar import get_interviews, book_ms_calendar, update_ms_calendar, delete_ms_calendar
+from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
+from marketing.serializers import Lead, Submission, VendorCompany, VendorContact, VendorLayer, Interview, Test, \
+    VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
+    SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
+    InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, TestListSerializer, \
+    TestUpdateSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -165,13 +173,13 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills', 'company_id',
+                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills', 'company_id',
+                ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
@@ -222,7 +230,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 company_name=F('vendor_company__name'),
                 company_id=F('vendor_company__id'),
             ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'status', 'created',
-                     'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+                     'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
             return Response({"result": data[0]}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -244,7 +252,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
                 ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'status', 'created',
-                         'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+                         'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -271,8 +279,8 @@ class LeadViewSets(viewsets.ModelViewSet):
                     submission_count=Count('submission')
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
-                           ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill', 'secondary_skills', 'status'
-                                    , 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
+                           ).values('id', 'job_desc', 'city', 'job_title', 'position', 'primary_skill',
+                                    'status', 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
                 return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -629,7 +637,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 else:
                     submission.is_active = False
 
-                if submission.rate and submission.vendor and submission.client and\
+                if submission.rate and submission.vendor and submission.client and \
                         (submission.lead.job_desc and len(submission.lead.job_desc) > 20):
                     submission.is_complete = True
                 else:
@@ -1118,9 +1126,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 # Setting Submission is_active value
                 if interview.status == 'cancelled' and not interview.submission.exclude(status='cancelled'):
                     interview.submission.status = 'sub'
-                    # clear rank for cancel interview
+                    # clear rank for cancelled interview
                     if interview.round == 1:
-                        print('cancel')
                         interview = self.rank_interviews(interview, 'cancel')
                 if interview.status in ['cancelled', 'next_round']:
                     interview.submission.is_active = True
@@ -1339,7 +1346,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 object_name = f'media/attachments/recordings/{object_id}/{file_name}'
                 interview = get_object_or_404(Interview, id=object_id)
                 response = presigned_post_url(object_name=object_name)
-                interview.attachment_link = MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
+                interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
                 interview.save()
                 return Response({"result": response}, status=status.HTTP_202_ACCEPTED)
             else:
@@ -1401,33 +1408,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-
             ).values('submission', 'supervisor_name', 'round', 'feedback', 'screening_type', 'marketer_name', 'status',
                      'consultant_name', 'start_time', 'end_time', 'company_name', 'client', 'interview_mode')
-
             return Response({"result": data, "total": total}, status=status.HTTP_200_OK)
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(methods=['get'], detail=False, url_path='calendar_interviews')
-    def calendar_interviews(self, request):
-        end = request.query_params.get('end', None)
-        start = request.query_params.get('start', None)
-        email = request.query_params.get('email', None)
-        start_time = datetime.strptime(start, "%Y-%m-%d")
-        end_time = datetime.strptime(end, "%Y-%m-%d")
-        start_time = start_time.strftime("%Y-%m-%dT")
-        end_time = end_time.strftime("%Y-%m-%dT")
-        event = {
-            "email": email,
-            "start": start_time,
-            "end": end_time
-        }
-        # Get interviews from Google Calendar for specific Email ID
-        try:
-            # data, visibility = get_interviews(event)
-            return Response({"result": [], "visibility": True}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -1441,7 +1424,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 submission__client=sub.client,
                 submission__lead__city=sub.lead.city,
                 submission__lead__position=sub.lead.position
-            ).exclude(status='cancelled').exclude(submission=sub).order_by('submission_id', '-created').distinct('submission_id')
+            ).exclude(status='cancelled').exclude(submission=sub).order_by('submission_id', '-created').distinct(
+                'submission_id')
             total = interviews.count()
             data = interviews.annotate(
                 client=F('submission__client'),
@@ -1620,6 +1604,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
+
                 new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
                                                 submission__created_by__team__name=team_name).count()
 
@@ -1639,12 +1624,17 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).count()
 
             else:
-                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last]).count()
+
                 offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
                 submissions_count = Submission.objects.filter(created__range=[first, last]).count()
                 interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1').count()
-                joining_count = Project.objects.filter(statuses__status='joined',
-                                                       submission__created__range=[first, last]).count()
+                new_po = Project.objects.filter(
+                    statuses__status='joined', statuses__created__range=[first, last]
+                ).count()
+                joining_count = Project.objects.filter(
+                    statuses__status='joined', submission__created__range=[first, last]
+                ).count()
+
             percent = None
             if filter_by_time != 'this_month':
                 prev_po = Project.objects.filter(
@@ -1732,7 +1722,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             sort_by = 'created'
             if filter_by_status == 'failed':
                 sort_by = 'modified'
-            queryset = queryset.order_by('-'+sort_by).distinct(sort_by)
+            queryset = queryset.order_by('-' + sort_by).distinct(sort_by)
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1752,7 +1742,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = TestListSerializer(queryset.order_by('-'+sort_by)[first:last], many=True).data
+            data = TestListSerializer(queryset.order_by('-' + sort_by)[first:last], many=True).data
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -1783,7 +1773,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_docs = test.attachments.all()
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
-                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime("%b. %d, %Y") if test.deadline else 'NA'
+                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
+                    "%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -2051,9 +2042,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
+
             # message to channel
             current_time = datetime.strftime(datetime.utcnow(), "%H:%M:%S")
-            if current_time > "14:30:00" and current_time < "23:30:00":
+            if "14:30:00" < current_time < "23:30:00":
                 assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
                 text = f"Test Assigned to :- {assigned} <br>"
                 data = {

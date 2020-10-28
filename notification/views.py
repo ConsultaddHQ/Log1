@@ -14,9 +14,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, CreateModelMixin
 
-from notification.serializers import *
+from notification.models import FCMDevice, Notification
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
+from notification.serializers import NotificationSerializer, NotificationListSerializer
 
 logger = logging.getLogger(__name__)
 

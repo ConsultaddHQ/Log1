@@ -13,7 +13,9 @@ class UserSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_team(self):
+        if self.team:
             return self.team.name
+        return None
 
 
 # Login

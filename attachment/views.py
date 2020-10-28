@@ -1,3 +1,4 @@
+import os
 import boto3
 import logging
 from datetime import datetime
@@ -14,8 +15,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
 
 from project.models import Project
-from attachment.serializers import *
 from activity.views import create_activity
+from attachment.serializers import Attachment, AttachmentSerializer
 
 logger = logging.getLogger(__name__)
 
