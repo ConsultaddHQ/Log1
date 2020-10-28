@@ -1,11 +1,13 @@
 from django.db.models import F
 from rest_framework import serializers
 
-from consultant.models import *
 from employee.models import User
+from project.models import Project
 from marketing.models import Interview
-from project.models import Project, ProjectSupport
 from employee.serializers import TeamSerializer, UserSerializer, TaggedUserSerializer
+from consultant.models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, ConsultantPOC, \
+    ConsultantRateRevision, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ConsultantToken, \
+    ConsultantPetitionToken
 
 
 # Consultant Login
@@ -170,7 +172,7 @@ class ExitDetailConsultantSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantExit
-        fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date',  'exit_details',
+        fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date', 'exit_details',
                   'reasons', 'notice_period', 'legal_action', 'legal_status', 'tagged_user', 'cancel_reason')
 
     def get_reasons(self, obj):
@@ -238,7 +240,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation', 'support',
+                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation',
+                  'support',
                   'profiles', 'education', 'terminate', 'experience', 'rate', 'marketing', 'payroll_employer')
 
     def get_work_auth(self, obj):

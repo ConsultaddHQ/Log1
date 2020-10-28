@@ -18,7 +18,6 @@ from consultant.authentication import ConsultantPetitionTokenAuthentication
 from legal.models import *
 from legal.serializers import *
 from utils_app.mailing import send_email
-from notification.models import FCMDevice
 from employee.token import get_token_generator
 from attachment.views import presigned_post_url, get_s3_object
 from activity.serializers import ConsultantCommentGetSerializer

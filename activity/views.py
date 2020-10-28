@@ -12,7 +12,6 @@ from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateMode
 
 from legal.models import Petition
 from consultant.models import Consultant
-from notification.models import FCMDevice
 from employee.models import User, tag_users
 from activity.models import Activity, Comment
 from project.models import Project, TimeSheet
