@@ -598,7 +598,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     owner=request.user,
                     city=request.data['city'],
                     job_desc=request.data['job_desc'],
-                    position=request.data['position'],
+                    position_id=request.data['position'],
                     job_title=request.data['job_title'],
                     vendor_company_id=request.data['vendor_company'],
                 )

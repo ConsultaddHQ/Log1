@@ -30,8 +30,8 @@ class VendorContactAdmin(ExportActionModelAdmin):
 @admin.register(Lead)
 class LeadAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'job_title', 'status', 'owner__employee_name', 'vendor_company__name', 'position__name')
     list_display = ('id', 'job_title', 'city', 'position', 'status', 'owner', 'vendor_company', 'sub_display')
+    search_fields = ('id', 'job_title', 'status', 'owner__employee_name', 'vendor_company__name', 'position__name')
 
     def sub_display(self, obj):
         return ", ".join([
