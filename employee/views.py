@@ -6,25 +6,27 @@ from datetime import timedelta, datetime
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
+from django.db.models import F, Value, CharField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import F, Value, CharField
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.authtoken.models import Token
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, exceptions, viewsets
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
-from employee.serializers import *
-from employee.models import Role, Team
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
-from employee.models import ResetPasswordToken, clear_expired, get_password_reset_token_expiry_time, Asset
+from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, \
+    get_password_reset_token_expiry_time
+from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
+    AssetSerializer
 
 logger = logging.getLogger(__name__)
 

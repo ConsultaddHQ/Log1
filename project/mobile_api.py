@@ -1,9 +1,10 @@
 import os
 import logging
-from django.db.models import F, Max
 from datetime import datetime, timedelta
+
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.db.models import Subquery, OuterRef
+from django.db.models import Q, F, Max, Subquery, OuterRef
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -12,12 +13,14 @@ from rest_framework.viewsets import GenericViewSet
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
-from project.serializers import *
+from employee.models import User
 from utils_app.mailing import send_email
-from notification.models import FCMDevice
 from attachment.views import get_s3_object
+from attachment.serializers import Attachment
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
+from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus
+from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer
 from notification.views import create_notification, push_notification, push_notification_consultant
 
 logger = logging.getLogger(__name__)
@@ -232,9 +235,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
     @action(methods=['GET'], detail=True, url_path='history')
     def history(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        # page = int(request.query_params.get("page", 1))
+        # page_size = int(request.query_params.get("page_size", 10))
+        # last, first = page * page_size, page * page_size - page_size
         try:
             project_id = kwargs.get('pk')
             pending = TimeSheet.objects.filter(project_id=project_id, is_active=True, status='draft').order_by('start')
@@ -490,4 +493,3 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-

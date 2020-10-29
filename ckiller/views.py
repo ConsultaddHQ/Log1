@@ -9,7 +9,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
-from ckiller.models import *
+from consultant.models import Consultant
+from ckiller.models import CkillerSubmission, CkillerVendorClient
 
 logger = logging.getLogger(__name__)
 
