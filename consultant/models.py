@@ -7,11 +7,11 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.contenttypes.fields import GenericRelation
 
-from employee.models import User, Team, Tagging
 from utils_app.mailing import send_email
 from attachment.models import Attachment
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
+from employee.models import User, Team, Tagging
 from activity.models import Comment, ConsultantComment
 from notification.models import FCMDevice, Notification
 

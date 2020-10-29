@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from activity.models import *
+from activity.models import Activity, Comment, ConsultantComment
 from employee.serializers import UserSerializer, TaggedUserSerializer
 
 

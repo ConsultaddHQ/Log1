@@ -1,11 +1,11 @@
 from rest_framework import serializers
 
-from marketing.models import *
 from project.models import Project
 from employee.serializers import UserSerializer
 from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentSerializer
 from consultant.serializers import ConsultantSerializer
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -27,8 +27,9 @@ class LeadCreateSerializer(serializers.ModelSerializer):
 
 
 class LeadSerializer(serializers.ModelSerializer):
-    vendor_company_name = serializers.SerializerMethodField()
     owner = serializers.SerializerMethodField()
+    position_name = serializers.SerializerMethodField()
+    vendor_company_name = serializers.SerializerMethodField()
 
     def get_vendor_company_name(self, obj):
         return obj.vendor_company.name if obj.vendor_company else None
@@ -36,10 +37,13 @@ class LeadSerializer(serializers.ModelSerializer):
     def get_owner(self, obj):
         return obj.owner.employee_name
 
+    def get_position_name(self, obj):
+        return obj.position.display_name
+
     class Meta:
         model = Lead
         fields = ('id', 'job_desc', 'job_title', 'primary_skill', 'city', 'vendor_company_id', 'vendor_company_name',
-                  'owner', 'status', 'created', 'modified', 'is_w2')
+                  'owner', 'status', 'created', 'modified', 'is_w2', 'position_name')
 
 
 class SubmissionCreateSerializer(serializers.ModelSerializer):

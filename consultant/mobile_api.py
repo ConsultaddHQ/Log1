@@ -1,5 +1,8 @@
+import os
 import logging
 from datetime import timedelta
+from django.db.models import F
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
@@ -9,12 +12,15 @@ from rest_framework import status, exceptions
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 
-from consultant.serializers import *
+from project.models import Project
+from utils_app.mailing import send_email
 from consultant.auth import consultant_authenticate
 from consultant.permissions import ConsultantIsAuthenticated
-from employee.models import get_password_reset_token_expiry_time
+from consultant.serializers import ConsultantLoginSerializer
 from consultant.authentication import ConsultantTokenAuthentication
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
+from employee.models import clear_expired, get_password_reset_token_expiry_time
+from consultant.models import Consultant, ConsultantToken, ConsultantResetPasswordToken, FCMDevice
 
 logger = logging.getLogger(__name__)
 
@@ -170,9 +176,8 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
 class ConsultantResetPasswordViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
-    queryset = Consultant.objects.all()
     serializer_class = EmailSerializer
-    pass_serializer_class = PasswordTokenSerializer
+    queryset = Consultant.objects.all()
 
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
@@ -234,7 +239,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
-        serializer = self.pass_serializer_class(data=request.data)
+        serializer = PasswordTokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         password = serializer.validated_data['password']
         token = serializer.validated_data['token']
