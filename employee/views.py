@@ -43,13 +43,13 @@ class EmployeeAuthViewSets(GenericViewSet):
             :param request, email, password, employee_id, name, phone, gender, team, role
         """
         try:
-            employee_id = int(request.data.get('employee_id'))
             role = request.data.get('role')
-            email = request.data.get('email')
             name = request.data.get('name')
+            email = request.data.get('email')
             phone = request.data.get('phone')
             gender = request.data.get('gender').lower()
             password = request.data.get('password').strip()
+            employee_id = int(request.data.get('employee_id'))
             team = Team.objects.get(name=request.data.get('team'))
 
             user = User.objects.filter(employee_id__exact=employee_id)
@@ -500,8 +500,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '')
-
+            query = request.query_params.get('query', '').strip()
             users = self.queryset.filter(employee_name__istartswith=query, is_active=True).annotate(
                 name=F('employee_name'),
                 type=Value('user', CharField())
