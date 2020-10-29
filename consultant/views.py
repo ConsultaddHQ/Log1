@@ -29,10 +29,9 @@ from employee.serializers import TeamSerializer
 from employee.models import tag_users, User, Team
 from project.models import Project, ProjectStatus
 from activity.serializers import Activity, ActivitySerializer
-from utils_app.utils import post_msg_using_webhook, html_to_text
 from attachment.serializers import Attachment, AttachmentSerializer
 from notification.views import create_notification, push_notification
-
+from utils_app.utils import post_msg_using_webhook, html_to_text, get_page_limits
 from consultant.models import EXIT_TYPE_CHOICE, Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, \
     ConsultantRateRevision, ConsultantPOC, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ExitReason
 
@@ -131,7 +130,7 @@ def start_marketing():
 
 def send_exit_interview_detail(terminate, request):
     try:
-        # Mattermost message for Exit Interview
+        # Message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
         reason = ", ".join(reason.name for reason in terminate.reasons.all())
         data = {
@@ -627,11 +626,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 start=data['employer_start_date'],
             )
 
+            return Response({"result": ConsultantSerializer(consultant).data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response({"result": ConsultantSerializer(consultant).data}, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
@@ -642,10 +640,23 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             serializer = ConsultantUpdateSerializer(consultant, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
 
+            important_fields = {
+                "ssn": "SSN",
+                "is_w2": "W2",
+                "name": "Name",
+                "email": "Email",
+                "links": "Links",
+                "skills": "Skills",
+                "gender": "Gender",
+                "skype": "Skype Id",
+                "phone_no": "Phone No",
+                "current_city": "Current City",
+                "date_of_birth": "Date of Birth",
+            }
             changed_fields = []
             for field in request.data.keys():
                 if getattr(consultant, field) != request.data[field]:
-                    changed_fields.append(field.replace('_', ' ').title())
+                    changed_fields.append(important_fields[field])
 
             serializer.save()
             profiles = consultant.profiles.filter(title__iexact='Original')
@@ -810,11 +821,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     @action(methods=['get'], detail=True, url_path='marketing')
     def marketing(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
+        first, last = get_page_limits(request)
         marketing_stage = request.query_params.get('stage')
-        page_size = int(request.query_params.get("page_size", 10))
         filter_by_status = request.query_params.get("filter_by_status", None)
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             consultant_id = kwargs.get('pk')
@@ -832,7 +841,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     Q(consultant_id=consultant_id) |
                     Q(submission__consultant_marketing__consultant_id=consultant_id)
                 )
-                data, counts = self.get_project_data(projects, filter_by_status, first, last)
+                data, counts = self.get_project_data(projects, filter_by_status)
                 if counts == "error":
                     return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
             return Response({"results": data, "total": counts})
@@ -952,6 +961,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         return Response({"results": consultants}, status=status.HTTP_200_OK)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         visa = request.query_params.get('visa', [])
         days = request.query_params.get('days', None)
         query = request.query_params.get('query', None)
@@ -959,9 +969,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         gender = request.query_params.get('gender', None)
         team_name = request.query_params.get('team', None)
         con_status = request.query_params.get('status', 'all')
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             # Consultants search based on name, email, recruiter and location
@@ -1575,11 +1582,9 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         con_status = request.query_params.get('status', 'all')
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             consultants = Consultant.objects.filter(status__in=['terminated', 'archived'])
@@ -2013,6 +2018,7 @@ def create_consultant(request, creator_id):
                     start_date=experience['start_date'],
                     consultant_id=consultant.id,
                 )
+
             # Adding Documents
             for document in request.data.get('documents', []):
                 res, res_data = beats_to_log1(
