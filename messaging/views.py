@@ -75,19 +75,10 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             from_ = get_object_or_404(Asset, id=request.data['user1']).number
             client = Client(account_sid, auth_token)
-            twilio_message = client.messages.create(
-                body=body,
-                from_=from_,
-                to=to
-            )
+            twilio_message = client.messages.create(body=body, from_=from_, to=to)
             if twilio_message.sid:
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=to)
-                message = Message.objects.create(
-                    text=body,
-                    read=True,
-                    is_sent=True,
-                    conversation=conversation
-                )
+                message = Message.objects.create(text=body, read=True, is_sent=True, conversation=conversation)
                 serializer = self.serializer_class(message)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
             else:
@@ -110,12 +101,7 @@ class ReceiveSMSViewSet(GenericViewSet):
                 from_ = request.data.get('From')
                 user1 = Asset.objects.filter(number=to).first()
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
-                Message.objects.create(
-                    text=body,
-                    read=False,
-                    is_sent=False,
-                    conversation_id=conversation.id
-                )
+                Message.objects.create(text=body, read=False, is_sent=False, conversation_id=conversation.id)
                 conversation.modified = datetime.now()
                 conversation.save()
 

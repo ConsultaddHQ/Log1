@@ -17,13 +17,14 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModel
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
-from legal.models import Types, Petition, Reason, Document, DocumentList
-from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer
 from utils_app.mailing import send_email
+from utils_app.utils import get_page_limits
 from employee.token import get_token_generator
 from attachment.views import presigned_post_url, get_s3_object
-from activity.serializers import ConsultantComment, ConsultantCommentGetSerializer
 from notification.views import create_notification, push_notification
+from legal.models import Types, Petition, Reason, Document, DocumentList
+from activity.serializers import ConsultantComment, ConsultantCommentGetSerializer
+from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer
 
 logger = logging.getLogger(__name__)
 TOKEN_GENERATOR_CLASS = get_token_generator()
@@ -180,24 +181,20 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def upload(self, request):
         file_name = request.data['file_name']
         object_id = request.data['object_id']
-
         object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
         response = presigned_post_url(object_name=object_name)
         return Response({"result": response}, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            petition_id = kwargs.get('pk')
-            petition = get_object_or_404(Petition, id=petition_id)
+            petition = get_object_or_404(Petition, id=kwargs.get('pk'))
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        first, last = get_page_limits(request)
 
         try:
             filter_for = request.query_params.get('filter', 'all')
@@ -209,8 +206,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 )
             if query:
                 queryset = queryset.filter(
-                    Q(beneficiary__name__istartswith=query) |
-                    Q(assigned_to__employee_name=query)
+                    Q(beneficiary__name__istartswith=query.strip()) |
+                    Q(assigned_to__employee_name=query.strip())
                 )
             total = queryset.count()
             serializer = self.serializer_class(queryset[first:last], many=True)
@@ -422,7 +419,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def comment(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
         try:
-
             if request.method == 'GET':
                 if not ('legal' in request.user.roles or 'superadmin' in request.user.roles):
                     return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
@@ -598,7 +594,6 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     def upload(self, request):
         file_name = request.data['file_name']
         object_id = request.data['object_id']
-
         object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
         response = presigned_post_url(object_name=object_name)
         return Response({"result": response}, status=status.HTTP_200_OK)

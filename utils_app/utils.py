@@ -5,6 +5,12 @@ from bs4 import BeautifulSoup
 from datetime import date, timedelta
 
 
+def get_page_limits(request):
+    page = int(request.query_params.get("page", 1))
+    page_size = int(request.query_params.get("page_size", 10))
+    return page * page_size - page_size, page * page_size
+
+
 def get_time_filter(queryset, filter_by):
     if filter_by == 'today':
         queryset = queryset.filter(created__date=date.today())

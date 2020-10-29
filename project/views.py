@@ -26,8 +26,8 @@ from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator
 from notification.views import push_notification_consultant, create_notification, push_notification
+from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator, get_page_limits
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
@@ -117,8 +117,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                           if interview.attachment_link is not None]
             recordings = ", ".join(recordings) if len(recordings) != 0 else "NA"
 
-            notes = [interview.notes for interview in submission.screening.all()
-                     if interview.notes is not None]
+            notes = [interview.notes for interview in submission.screening.all() if interview.notes is not None]
             notes = "\n".join(notes) if len(notes) != 0 else "NA"
 
             if resume:
@@ -393,9 +392,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
             scrum_masters = [user.email for user in queryset]
-            submission = project.submission
-            support_mail_res, support_mail_error = self.support_mail(project, submission, scrum_masters)
-            offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, submission, scrum_masters)
+
+            support_mail_res, support_mail_error = self.support_mail(project, project.submission, scrum_masters)
+            offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, project.submission, scrum_masters)
 
             if support_mail_error == 'error' or offer_mail_error == "error":
                 return Response({"support": str(support_mail_res), "offer": str(offer_mail_res)}, status=400)
@@ -414,15 +413,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', None)
         filter_by_time = request.query_params.get('filter_by_time', None)
         filter_by_lead = request.query_params.get('filter_by_lead', None)
         filter_by_status = request.query_params.get('filter_by_status', None)
-
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             # search project by client and consultant
@@ -1127,13 +1123,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     authentication_classes = (TokenAuthentication,)
 
     def retrieve(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         start = request.query_params.get('start', None)
         end = request.query_params.get('end', date.today())
-
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             projects = Project.objects.filter(
@@ -1166,10 +1159,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
-
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         consultant_id = request.query_params.get('consultant', None)
         consultant_name = request.query_params.get('consultant_name', None)
