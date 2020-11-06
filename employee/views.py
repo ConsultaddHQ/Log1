@@ -6,25 +6,27 @@ from datetime import timedelta, datetime
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
+from django.db.models import F, Value, CharField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import F, Value, CharField
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.authtoken.models import Token
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status, exceptions, viewsets
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
-from employee.serializers import *
-from employee.models import Role, Team
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
-from employee.models import ResetPasswordToken, clear_expired, get_password_reset_token_expiry_time, Asset
+from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, \
+    get_password_reset_token_expiry_time
+from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
+    AssetSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +43,13 @@ class EmployeeAuthViewSets(GenericViewSet):
             :param request, email, password, employee_id, name, phone, gender, team, role
         """
         try:
-            employee_id = int(request.data.get('employee_id'))
             role = request.data.get('role')
-            email = request.data.get('email')
             name = request.data.get('name')
+            email = request.data.get('email')
             phone = request.data.get('phone')
             gender = request.data.get('gender').lower()
             password = request.data.get('password').strip()
+            employee_id = int(request.data.get('employee_id'))
             team = Team.objects.get(name=request.data.get('team'))
 
             user = User.objects.filter(employee_id__exact=employee_id)
@@ -159,6 +161,18 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             request.user.save()
             return Response({"result": "password updated"}, status=status.HTTP_200_OK)
         return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['put'], detail=False, url_path='change_team')
+    def change_team(self, request):
+        user_id = request.data.get('user_id')
+        team_id = request.data.get('team_id')
+        if request.user.is_superuser:
+            user = get_object_or_404(User, id=user_id)
+            team = get_object_or_404(Team, id=team_id)
+            user.team = team
+            user.save()
+            return Response({"result": f"{user.employee_name}'s team update to {team.name}"}, status=202)
+        return Response({"error": "You dont have access"}, status=status.HTTP_401_UNAUTHORIZED)
 
     @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request, *args, **kwargs):
@@ -498,8 +512,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '')
-
+            query = request.query_params.get('query', '').strip()
             users = self.queryset.filter(employee_name__istartswith=query, is_active=True).annotate(
                 name=F('employee_name'),
                 type=Value('user', CharField())

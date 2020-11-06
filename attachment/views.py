@@ -1,3 +1,4 @@
+import os
 import boto3
 import logging
 from datetime import datetime
@@ -14,8 +15,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
 
 from project.models import Project
-from attachment.serializers import *
 from activity.views import create_activity
+from attachment.serializers import Attachment, AttachmentSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +178,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
 
     def destroy(self, request, *args, **kwargs):
         try:
-            content_type = self.request.query_params.get('type')
+            content_type = self.request.query_params.get('type', None)
             attachment_id = self.request.query_params.get('attachment_id', None)
             roles = request.user.roles
             if content_type == 'consultant' and ('recruiter' in roles or 'admin' in roles or 'superadmin' in roles):

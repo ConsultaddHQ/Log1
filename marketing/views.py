@@ -1,34 +1,42 @@
 import os
+import json
 import difflib
 import logging
-import json
+from django.conf import settings
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
-from rest_framework.mixins import *
-from rest_framework import viewsets
+from rest_framework import viewsets, status
+from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, \
+    DestroyModelMixin
 
 from constance import config
 from django.db import transaction
 from django.db.models.functions import Lower
-from django.db.models import Count, Q, F, Max
+from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
 
-from log1.settings import MEDIA_URL
-from marketing.serializers import *
-from notification.models import FCMDevice
+from employee.models import User
+from project.serializers import Project
 from utils_app.utils import post_msg_using_webhook
-from utils_app.mailing import send_email_attachment_multiple
+from attachment.serializers import AttachmentSerializer
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
+from utils_app.mailing import send_email_attachment_multiple
 from attachment.views import presigned_post_url, download_s3_object
-from utils_app.utils import get_time_filter, get_time_filter_by_start
 from notification.views import create_notification, push_notification
-from utils_app.calendar import get_interviews, book_ms_calendar, update_ms_calendar, delete_ms_calendar
+from utils_app.utils import get_time_filter, get_time_filter_by_start, get_page_limits
+from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
+from marketing.serializers import Lead, Submission, VendorCompany, VendorContact, VendorLayer, Interview, Test, \
+    VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
+    SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
+    InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, TestListSerializer, \
+    TestUpdateSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +50,8 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get("query", "")
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
         try:
             queryset = VendorCompany.objects.filter(name__icontains=query.strip()).order_by(Lower('name'))
             total = queryset.count()
@@ -96,18 +102,17 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
-        data = request.data
         email = request.data.get('email', None)
-        vendor = VendorContact.objects.filter(email=email, created_by=request.user, company_id=data['company'])
+        vendor = VendorContact.objects.filter(email=email, created_by=request.user, company_id=request.data['company'])
         if vendor:
             return Response({"error": "already exists"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             vendor_contact = VendorContact.objects.create(
                 email=email,
-                name=data['name'],
-                number=data['number'],
                 created_by=request.user,
-                company_id=data['company'],
+                name=request.data['name'],
+                number=request.data['number'],
+                company_id=request.data['company'],
             )
             data = {
                 "id": vendor_contact.id,
@@ -165,13 +170,15 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                    position_name=F('position__display_name')
+                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
+                    position_name=F('position__display_name')
+                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
@@ -180,15 +187,13 @@ class LeadViewSets(viewsets.ModelViewSet):
             return error, 'error'
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         sort_by = request.query_params.get('sort_by', None)
         version = request.query_params.get('version', 'v1')
         filter_json = request.query_params.get('filter_json', None)
         filter_by_time = request.query_params.get('filter_by_time', 'all')
         filter_by_status = request.query_params.get('filter_by_status', None)
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
         try:
             if query:
                 query = query.strip()
@@ -271,8 +276,9 @@ class LeadViewSets(viewsets.ModelViewSet):
             data = lead.annotate(submission_count=Count('submission')).annotate(
                 company_name=F('vendor_company__name'),
                 company_id=F('vendor_company__id'),
-            ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
-                     'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+                position_name=F('position__display_name')
+            ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'created',
+                     'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
             return Response({"result": data[0]}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -293,8 +299,9 @@ class LeadViewSets(viewsets.ModelViewSet):
                 data = queryset.annotate(submission_count=Count('submission')).annotate(
                     company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'status', 'created',
-                         'is_w2', 'secondary_skills', 'company_id', 'company_name', 'modified', 'submission_count')
+                    position_name=F('position__display_name')
+                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'created',
+                         'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=status.HTTP_201_CREATED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -321,8 +328,9 @@ class LeadViewSets(viewsets.ModelViewSet):
                     submission_count=Count('submission')
                 ).annotate(company_name=F('vendor_company__name'),
                            company_id=F('vendor_company__id'),
-                           ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'status'
-                                    , 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
+                           position_name=F('position__display_name')
+                           ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill',
+                                    'status', 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
                 return Response({"result": data[0]}, status=status.HTTP_202_ACCEPTED)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -343,9 +351,7 @@ class LeadViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='archived')
     def archived(self, request):
         try:
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
-            last, first = page * page_size, page * page_size - page_size
+            first, last = get_page_limits(request)
             leads = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
             data, data_counts = self.get_lead_data(leads, 'archived', first, last)
             if data_counts == 'error':
@@ -359,10 +365,8 @@ class LeadViewSets(viewsets.ModelViewSet):
     def map(self, request):
         try:
             leads = Lead.objects.filter(
-                Q(owner=request.user) |
-                Q(shared_to=request.user)
-            ).values('city'). \
-                annotate(total=Count('city')).order_by('city')
+                Q(owner=request.user) | Q(shared_to=request.user)
+            ).values('city').annotate(total=Count('city')).order_by('city')
             return Response({"results": leads}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
@@ -371,10 +375,8 @@ class LeadViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='leads_by_city')
     def leads_by_city(self, request):
         try:
+            first, last = get_page_limits(request)
             city = request.query_params.get('query', None)
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
-            last, first = page * page_size, page * page_size - page_size
 
             leads = Lead.objects.annotate(submission_count=Count('submission')).filter(
                 Q(owner=request.user, city__iexact=city) |
@@ -538,6 +540,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         version = request.query_params.get('version', 'v1')
         sort_by = request.query_params.get('sort_by', None)
@@ -547,10 +550,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
         consultant_id = request.query_params.get('consultant_id', None)
         filter_by_time = request.query_params.get('filter_by_time', 'all')
         filter_by_status = request.query_params.get('filter_by_status', None)
-
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             roles = request.user.roles
@@ -567,8 +566,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 ).exclude(status='draft')
             else:
                 sub = Submission.objects.exclude(
-                    Q(consultant_marketing__consultant__status='archived') |
-                    Q(status='draft')
+                    Q(consultant_marketing__consultant__status='archived') | Q(status='draft')
                 )
 
             # Team submissions for Scrum master and Proxy Scrum Master
@@ -688,8 +686,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     owner=request.user,
                     city=request.data['city'],
                     job_desc=request.data['job_desc'],
+                    position_id=request.data['position'],
                     job_title=request.data['job_title'],
-                    primary_skill=request.data['primary_skill'],
                     vendor_company_id=request.data['vendor_company'],
                 )
                 lead_id = lead.id
@@ -732,7 +730,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 else:
                     submission.is_active = False
 
-                if submission.rate and submission.vendor and submission.client and\
+                if submission.rate and submission.vendor and submission.client and \
                         (submission.lead.job_desc and len(submission.lead.job_desc) > 20):
                     submission.is_complete = True
                 else:
@@ -758,11 +756,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     # Suggestions for Submission
     @action(methods=['get'], detail=False, url_path='suggestions')
     def suggestions(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         client_name = request.query_params.get('client_name', None)
         consultant_id = request.query_params.get('consultant', None)
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             if request.query_params.get('lead_id') == "0":
@@ -896,6 +892,38 @@ class InterviewViewSets(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
+    def rank_interviews(interview, interview_status):
+        try:
+            submission = interview.submission
+            similar_interviews = Interview.objects.filter(
+                round=1,
+                submission__client=submission.client,
+                submission__lead__city=submission.lead.city,
+                submission__lead__position=submission.lead.position,
+            ).exclude(status='cancelled').exclude(submission=submission)
+            ranked_interviews = []
+            if interview_status == 'create':
+                ranked_interviews = similar_interviews.filter(submission__rank=0)
+                submission.rank = similar_interviews.count() + 1
+                submission.save()
+            elif interview_status == 'cancel':
+                ranked_interviews = similar_interviews.filter(
+                    Q(submission__rank=0) |
+                    Q(submission__rank__gt=submission.rank)
+                )
+                submission.rank = 0
+                submission.save()
+
+            if len(ranked_interviews) > 0:
+                similar_interviews = similar_interviews.order_by('created')
+                for index, inter in enumerate(similar_interviews):
+                    inter.submission.rank = index + 1
+                    inter.submission.save()
+            return interview
+        except Exception as error:
+            return error
+
+    @staticmethod
     def get_interview_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
@@ -966,13 +994,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', 'all')
         filter_by_time = request.query_params.get('filter_by_time', None)
         filter_by_status = request.query_params.get('filter_by_status', None)
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get('page_size', 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             # Change status of past Interview to feedback due
@@ -1049,7 +1075,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             # Change status of past Interview to feedback due
             self.change_to_feedback_due()
 
-            submissions = Submission.objects.filter(id=request.data.get('submission'), created_by=request.user)
+            submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
             if not submissions:
                 return Response({"error": 'This is not your submission'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1077,6 +1103,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 submission.is_active = False
                 submission.status = 'interview'
                 submission.save()
+
+                # Ranking Interview
+                if interview.round == 1:
+                    interview = self.rank_interviews(interview, 'create')
 
                 # Calendar title
                 title = f"CTB:{interview.supervisor.employee_name} " \
@@ -1148,13 +1178,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.announcement_url, data)
 
                 data = queryset.annotate(
+                    rank=F('submission__rank'),
                     client=F('submission__client'),
                     job_title=F('submission__lead__job_title'),
                     supervisor_name=F('supervisor__employee_name'),
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'screening_type',
+                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'screening_type', 'rank',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name', 'job_title',
                          'submission_id', 'interview_mode')
                 # Creating Notification
@@ -1195,6 +1226,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 # Setting Submission is_active value
                 if interview.status == 'cancelled' and not interview.submission.exclude(status='cancelled'):
                     interview.submission.status = 'sub'
+                    # clear rank for cancelled interview
+                    if interview.round == 1:
+                        interview = self.rank_interviews(interview, 'cancel')
                 if interview.status in ['cancelled', 'next_round']:
                     interview.submission.is_active = True
                 if interview.status in ['offer']:
@@ -1352,6 +1386,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview.save()
             if interview.round == 1:
                 interview.submission.status = 'sub'
+                interview = self.rank_interviews(interview, 'cancel')
             interview.submission.is_active = True
             interview.submission.save()
             scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
@@ -1385,11 +1420,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def update_notes(self, request, *args, **kwargs):
         try:
             queryset = Interview.objects.filter(
-                Q(id=kwargs.get('pk')) &
-                (
-                        Q(submission__created_by=request.user) |
-                        Q(supervisor=request.user)
-                )
+                Q(id=kwargs.get('pk')) & (Q(submission__created_by=request.user) | Q(supervisor=request.user))
             )
             if queryset:
                 interview = queryset.first()
@@ -1411,7 +1442,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 object_name = f'media/attachments/recordings/{object_id}/{file_name}'
                 interview = get_object_or_404(Interview, id=object_id)
                 response = presigned_post_url(object_name=object_name)
-                interview.attachment_link = MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
+                interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
                 interview.save()
                 return Response({"result": response}, status=status.HTTP_202_ACCEPTED)
             else:
@@ -1427,8 +1458,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def recording(self, request, *args, **kwargs):
         try:
             from attachment.views import get_s3_object
-            object_id = kwargs.get('pk')
-            interview = get_object_or_404(Interview, id=object_id)
+            interview = get_object_or_404(Interview, id=kwargs.get('pk'))
             if interview.attachment_link:
                 url = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
                 return Response({"result": url}, status=status.HTTP_200_OK)
@@ -1440,9 +1470,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
     # Suggestions for Interview
     @action(methods=['get'], detail=False, url_path='suggestions')
     def interview_suggestions(self, request):
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        first, last = get_page_limits(request)
         sub_id = request.query_params.get('sub_id')
         ctb = request.query_params.get('ctb', None)
         sub = get_object_or_404(Submission, id=sub_id)
@@ -1473,36 +1501,37 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-
             ).values('submission', 'supervisor_name', 'round', 'feedback', 'screening_type', 'marketer_name', 'status',
                      'consultant_name', 'start_time', 'end_time', 'company_name', 'client', 'interview_mode')
-
             return Response({"result": data, "total": total}, status=status.HTTP_200_OK)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(methods=['get'], detail=False, url_path='calendar_interviews')
-    def calendar_interviews(self, request):
-        end = request.query_params.get('end', None)
-        start = request.query_params.get('start', None)
-        email = request.query_params.get('email', None)
-        start_time = datetime.strptime(start, "%Y-%m-%d")
-        end_time = datetime.strptime(end, "%Y-%m-%d")
-        start_time = start_time.strftime("%Y-%m-%dT")
-        end_time = end_time.strftime("%Y-%m-%dT")
-        event = {
-            "email": email,
-            "start": start_time,
-            "end": end_time
-        }
-        # Get interviews from Google Calendar for specific Email ID
+    @action(methods=['get'], detail=False, url_path='repeat')
+    def repeat_interviews(self, request):
         try:
-            # data, visibility = get_interviews(event)
-            return Response({"result": [], "visibility": True}, status=status.HTTP_200_OK)
+            sub_id = request.query_params.get('submission_id')
+            sub = get_object_or_404(Submission, id=sub_id)
+            interviews = Interview.objects.filter(
+                submission__client=sub.client,
+                submission__lead__city=sub.lead.city,
+                submission__lead__position=sub.lead.position
+            ).exclude(status='cancelled').exclude(submission=sub).order_by('submission_id', '-created').distinct(
+                'submission_id')
+            total = interviews.count()
+            data = interviews.annotate(
+                client=F('submission__client'),
+                location=F('submission__lead__city'),
+                supervisor_name=F('supervisor__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('submission', 'supervisor_name', 'feedback', 'screening_type', 'client', 'marketer_name', 'status',
+                     'consultant_name', 'start_time', 'end_time', 'location', 'company_name', 'interview_mode', )
+            return Response({"result": data, "total": total}, status=status.HTTP_200_OK)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
@@ -1511,10 +1540,10 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
-        filter_by_time = request.query_params.get("filter_by", None)
-        result_count = request.query_params.get("result_count", 5)
-        filter_for = request.query_params.get("filter_for", None)
         team_name = request.query_params.get("team", None)
+        filter_for = request.query_params.get("filter_for", None)
+        result_count = request.query_params.get("result_count", 5)
+        filter_by_time = request.query_params.get("filter_by", None)
 
         try:
             if filter_for == 'my':
@@ -1537,9 +1566,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 interviews = Interview.objects.all()
                 sub = Submission.objects.all()
 
-            upcoming_interviews = interviews.filter(status__in=['scheduled', 'rescheduled'],
-                                                    start_time__gte=datetime.today()
-                                                    ).order_by('start_time')[:result_count].annotate(
+            upcoming_interviews = interviews.filter(
+                status__in=['scheduled', 'rescheduled'], start_time__gte=datetime.today()
+            ).order_by('start_time')[:result_count].annotate(
                 client=F('submission__client'),
                 job_title=F('submission__lead__job_title'),
                 vendor=F('submission__lead__vendor_company__name'),
@@ -1557,8 +1586,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
 
             new_offers = projects.filter(
-                statuses__status__in=['new', 'received', 'on_boarded'], statuses__is_current=True,
-                start_date__gte=datetime.today()
+                statuses__is_current=True,
+                start_date__gte=datetime.today(),
+                statuses__status__in=['new', 'received', 'on_boarded'],
             ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
                 consultant_name=F('consultant__name'),
@@ -1624,9 +1654,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
     @action(methods=['get'], detail=False, url_path='performance')
     def marketing_performance(self, request):
+        team_name = request.query_params.get("team", None)
         filter_for = request.query_params.get("filter_for", None)
         filter_by_time = request.query_params.get("filter_by", None)
-        team_name = request.query_params.get("team", None)
 
         try:
             if filter_by_time == 'last_month':
@@ -1668,17 +1698,26 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
-                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
-                                                submission__created_by__team__name=team_name).count()
 
-                offers_count = Project.objects.filter(submission__created__range=[first, last],
-                                                      submission__created_by__team__name=team_name).count()
+                new_po = Project.objects.filter(
+                    statuses__status='joined',
+                    statuses__created__range=[first, last],
+                    submission__created_by__team__name=team_name,
+                ).count()
 
-                submissions_count = Submission.objects.filter(created__range=[first, last],
-                                                              created_by__team__name=team_name).count()
+                offers_count = Project.objects.filter(
+                    submission__created__range=[first, last], submission__created_by__team__name=team_name
+                ).count()
 
-                interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1',
-                                                            submission__created_by__team__name=team_name).count()
+                submissions_count = Submission.objects.filter(
+                    created__range=[first, last], created_by__team__name=team_name
+                ).count()
+
+                interviews_count = Interview.objects.filter(
+                    round = '1',
+                    submission__created__range=[first, last],
+                    submission__created_by__team__name=team_name
+                ).count()
 
                 joining_count = Project.objects.filter(
                     statuses__status='joined',
@@ -1687,12 +1726,17 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).count()
 
             else:
-                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last]).count()
-                offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
+
                 submissions_count = Submission.objects.filter(created__range=[first, last]).count()
+                offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
                 interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1').count()
-                joining_count = Project.objects.filter(statuses__status='joined',
-                                                       submission__created__range=[first, last]).count()
+                new_po = Project.objects.filter(
+                    statuses__status='joined', statuses__created__range=[first, last]
+                ).count()
+                joining_count = Project.objects.filter(
+                    statuses__status='joined', submission__created__range=[first, last]
+                ).count()
+
             percent = None
             if filter_by_time != 'this_month':
                 prev_po = Project.objects.filter(
@@ -1729,9 +1773,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
     @action(methods=['get'], detail=False, url_path='history')
     def dashboard_history(self, request):
+        team_name = request.query_params.get("team", None)
         filter_for = request.query_params.get("filter_for", "")
         filter_by_time = request.query_params.get("filter_by", "")
-        team_name = request.query_params.get("team", None)
 
         try:
             if filter_for == 'my':
@@ -1780,7 +1824,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             sort_by = 'created'
             if filter_by_status == 'failed':
                 sort_by = 'modified'
-            queryset = queryset.order_by('-'+sort_by).distinct(sort_by)
+            queryset = queryset.order_by('-' + sort_by).distinct(sort_by)
             total = queryset.count()
             new = queryset.filter(status='new').count()
             failed = queryset.filter(status='failed').count()
@@ -1800,7 +1844,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = TestListSerializer(queryset.order_by('-'+sort_by)[first:last], many=True).data
+            data = TestListSerializer(queryset.order_by('-' + sort_by)[first:last], many=True).data
             return data, data_counts
         except Exception as error:
             logger.error(error)
@@ -1810,12 +1854,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def send_test_mail(test, data, test_status):
         try:
             consultant = test.submission.consultant
-            queryset = User.objects.filter(team=test.submission.created_by.team, role__name__in=['admin', 'proxy'],
-                                           is_active=True)
-            scrum_masters = [user.email for user in queryset]
+            queryset = User.objects.filter(
+                team=test.submission.created_by.team, role__name__in=['admin', 'proxy'], is_active=True
+            )
             path = []
-            skills = ", ".join(skill.title() for skill in test.skills)
             created_by = test.submission.created_by
+            scrum_masters = [user.email for user in queryset]
+            skills = ", ".join(skill.title() for skill in test.skills)
             if test_status == 'new':
                 test_type = 'Online'
                 if data['is_video'] == 'True':
@@ -1831,7 +1876,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_docs = test.attachments.all()
                 for doc in test_docs:
                     path.append(download_s3_object(doc.attachment_file.name))
-                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime("%b. %d, %Y") if test.deadline else 'NA'
+                deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
+                    "%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
                     'to': to,
                     'cc': cc,
@@ -1958,13 +2004,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
         filter_for = request.query_params.get('filter_for', 'all')
         filter_by_time = request.query_params.get('filter_by_time', None)
         filter_by_status = request.query_params.get('filter_by_status', None)
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get('page_size', 10))
-        last, first = page * page_size, page * page_size - page_size
 
         try:
             # Search Test by Client, VendorContact and Consultant
@@ -2099,6 +2143,17 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
+
+            # message to channel
+            current_time = datetime.strftime(datetime.utcnow(), "%H:%M:%S")
+            if "14:30:00" < current_time < "23:30:00":
+                assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
+                text = f"Test Assigned to :- {assigned} <br>"
+                data = {
+                    "title": f"&#128203; Test Assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {skills} <br>",
+                    "text": text
+                }
+                post_msg_using_webhook(config.engineering_url, data)
 
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)

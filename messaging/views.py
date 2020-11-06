@@ -5,16 +5,17 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef
 
-from rest_framework.mixins import *
+from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 
 from twilio.rest import Client
 from employee.models import Asset
 from api_key.permissions import APIKey
-from notification.models import FCMDevice
 from messaging.models import Message, Conversation
 from notification.views import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
@@ -74,19 +75,10 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             from_ = get_object_or_404(Asset, id=request.data['user1']).number
             client = Client(account_sid, auth_token)
-            twilio_message = client.messages.create(
-                    body=body,
-                    from_=from_,
-                    to=to
-                )
+            twilio_message = client.messages.create(body=body, from_=from_, to=to)
             if twilio_message.sid:
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=to)
-                message = Message.objects.create(
-                    text=body,
-                    read=True,
-                    is_sent=True,
-                    conversation=conversation
-                )
+                message = Message.objects.create(text=body, read=True, is_sent=True, conversation=conversation)
                 serializer = self.serializer_class(message)
                 return Response({"results": serializer.data}, status=status.HTTP_200_OK)
             else:
@@ -109,12 +101,7 @@ class ReceiveSMSViewSet(GenericViewSet):
                 from_ = request.data.get('From')
                 user1 = Asset.objects.filter(number=to).first()
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
-                Message.objects.create(
-                    text=body,
-                    read=False,
-                    is_sent=False,
-                    conversation_id=conversation.id
-                )
+                Message.objects.create(text=body, read=False, is_sent=False, conversation_id=conversation.id)
                 conversation.modified = datetime.now()
                 conversation.save()
 

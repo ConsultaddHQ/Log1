@@ -1,10 +1,11 @@
 from datetime import datetime, date, timedelta
 
-from django.db import transaction
 from django.db.models import Q
-from rest_framework.mixins import *
+from django.db import transaction
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
@@ -15,10 +16,10 @@ from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from employee.serializers import UserSerializer
 from project.models import Project, ProjectSupport
-from utils_app.utils import post_msg_using_webhook
 from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
+from utils_app.utils import post_msg_using_webhook, get_page_limits
 
 
 class ScrumMeetingReport(GenericViewSet):
@@ -579,14 +580,11 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
+            first, last = get_page_limits(request)
             query = request.query_params.get('query', None)
             filter_for = request.query_params.get('filter_for', None)
             filter_by_status = request.query_params.get('status', None)
             filter_by_tech = request.query_params.get('filter_by_tech', None)
-
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
-            last, first = page * page_size, page * page_size - page_size
 
             supports = ProjectSupport.objects.all()
             if query:
@@ -664,13 +662,12 @@ class MarketingReportViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
+            first, last = get_page_limits(request)
             end = request.query_params.get('end', None)
             start = request.query_params.get('start', None)
             query = request.query_params.get('query', None)
             filter_by_team = request.query_params.get('filter_by_team', None)
-            page = int(request.query_params.get('page', 1))
-            page_size = int(request.query_params.get('page_size', 10))
-            last, first = page * page_size, page * page_size - page_size
+
             if query:
                 employees = User.objects.filter(employee_name__istartswith=query.strip())
             else:
@@ -693,8 +690,11 @@ class MarketingReportViewSets(GenericViewSet):
                 submission_count = Submission.objects.filter(
                     created_by=user, created__gte=start, created__lte=end
                 ).exclude(status='cancelled').count()
-                interview_count = Interview.objects.filter(
-                    submission__created_by=user, created__gte=start, created__lte=end
+                unique_interview_count = Interview.objects.filter(
+                    submission__created_by=user, created__gte=start, created__lte=end, submission__rank__in=[0, 1]
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                repeat_interview_count = Interview.objects.filter(
+                    submission__created_by=user, created__gte=start, created__lte=end, submission__rank__gt=1
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
                     statuses__status='received',
@@ -705,9 +705,10 @@ class MarketingReportViewSets(GenericViewSet):
                     "id": user.id,
                     "offer": offer_count,
                     "team": user.team.name,
-                    "interview": interview_count,
                     "submission": submission_count,
                     "employee_name": user.employee_name,
+                    "unique_interview": unique_interview_count,
+                    "repeat_interview": repeat_interview_count,
                     "consultant_assigned": con_assigned if len(con_assigned) > 0 else None,
                 })
             return Response({"results": data, "total": total}, status=status.HTTP_200_OK)
@@ -719,8 +720,7 @@ class MarketingReportViewSets(GenericViewSet):
         try:
             end = request.query_params.get('end', None)
             start = request.query_params.get('start', None)
-            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
-                                                                                                 '%Y-%m-%d').date():
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end, '%Y-%m-%d').date():
                 return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
             if not start:
                 start = date.today() - timedelta(days=30)
@@ -788,11 +788,10 @@ class MarketingReportViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
         try:
+            first, last = get_page_limits(request)
             query = request.query_params.get('query', None)
             filter_by_team = request.query_params.get('filter_by_team', None)
-            page = int(request.query_params.get('page', 1))
-            page_size = int(request.query_params.get('page_size', 10))
-            last, first = page * page_size, page * page_size - page_size
+
             if query:
                 bench_consultant = Consultant.objects.filter(
                     marketing__status='open', name__istartswith=query.strip()

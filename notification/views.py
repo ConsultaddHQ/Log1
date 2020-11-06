@@ -14,9 +14,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, CreateModelMixin
 
-from notification.serializers import *
+from utils_app.utils import get_page_limits
+from notification.models import FCMDevice, Notification
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
+from notification.serializers import NotificationSerializer, NotificationListSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +87,7 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
 
     @never_cache
     def list(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        first, last = get_page_limits(request)
         try:
             queryset = Notification.objects.active(request.user, 'user')
             serializer = NotificationListSerializer(queryset[first:last], many=True)
@@ -159,9 +159,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
 
     @never_cache
     def list(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+        # first, last = get_page_limits(request)
         try:
             queryset = Notification.objects.active(request.user, 'consultant')
             total = queryset.count()
@@ -185,9 +183,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
 
     @action(methods=['get'], detail=True, url_name='mark_as_delete')
     def mark_as_delete(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+        # first, last = get_page_limits(request)
         try:
             notification = get_object_or_404(Notification, id=kwargs.get('pk'))
             notification.mark_as_deleted()
@@ -205,9 +201,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
 
     @action(methods=['get'], detail=True, url_name='mark_not_delete')
     def mark_not_delete(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+        # first, last = get_page_limits(request)
         try:
             notification = get_object_or_404(Notification, id=kwargs.get('pk'))
             notification.mark_not_deleted()
@@ -234,9 +228,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
 
     @action(methods=['get'], detail=True, url_name='mark_as_read')
     def mark_as_read(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+        # first, last = get_page_limits(request)
         try:
             notification = get_object_or_404(Notification, id=kwargs.get('pk'))
             notification.mark_as_read()

@@ -1,11 +1,12 @@
+from datetime import date
 from django.db.models import Q
 from rest_framework import serializers
-from datetime import date
 
-from project.models import *
+from consultant.models import Consultant
 from employee.serializers import UserSerializer
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
+from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -269,7 +270,6 @@ class ProjectGetSerializer(serializers.ModelSerializer):
 
 
 class SupportStatusSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = SupportStatus
         fields = '__all__'
