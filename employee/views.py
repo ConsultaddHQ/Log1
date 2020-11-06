@@ -162,6 +162,18 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"result": "password updated"}, status=status.HTTP_200_OK)
         return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(methods=['put'], detail=False, url_path='change_team')
+    def change_team(self, request):
+        user_id = request.data.get('user_id')
+        team_id = request.data.get('team_id')
+        if request.user.is_superuser:
+            user = get_object_or_404(User, id=user_id)
+            team = get_object_or_404(Team, id=team_id)
+            user.team = team
+            user.save()
+            return Response({"result": f"{user.employee_name}'s team update to {team.name}"}, status=202)
+        return Response({"error": "You dont have access"}, status=status.HTTP_401_UNAUTHORIZED)
+
     @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request, *args, **kwargs):
         """

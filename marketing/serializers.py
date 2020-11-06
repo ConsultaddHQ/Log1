@@ -38,7 +38,9 @@ class LeadSerializer(serializers.ModelSerializer):
         return obj.owner.employee_name
 
     def get_position_name(self, obj):
-        return obj.position.display_name
+        if obj.position:
+            return obj.position.display_name
+        return None
 
     class Meta:
         model = Lead

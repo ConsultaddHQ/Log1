@@ -21,25 +21,32 @@ class Command(BaseCommand):
             <th style="padding:5px 8px 5px 8px;">Deadline</th>
             </tr>"""
 
-        for index, test in enumerate(tests):
-            skills = ", ".join(skill for skill in test.skills)
-            if test.deadline:
-                deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B')
-            else:
-                deadline = 'NA'
-            text += f"""<tr>
-                            <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {test.created.strftime('%a, %d %B')} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {test.submission.created_by.employee_name} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {test.submission.consultant.name} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {skills} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {test.submission.client} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {"Yes" if test.is_video else "No"} </td>
-                            <td style="padding:5px 8px 5px 8px;"> {deadline} </td>
-                        </tr>"""
-        data = {
-            "title": "Pending Test &#128203;",
-            "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
-        }
+        if tests.count() > 0:
+            for index, test in enumerate(tests):
+                skills = ", ".join(skill for skill in test.skills)
+                if test.deadline:
+                    deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B')
+                else:
+                    deadline = 'NA'
+                text += f"""<tr>
+                                <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {test.created.strftime('%a, %d %B')} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {test.submission.created_by.employee_name} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {test.submission.consultant.name} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {skills} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {test.submission.client} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {"Yes" if test.is_video else "No"} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {deadline} </td>
+                            </tr>"""
+            data = {
+                "title": "Pending Test &#128203;",
+                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+            }
 
-        post_msg_using_webhook(config.test_team_url, data)
+            post_msg_using_webhook(config.test_team_url, data)
+        else:
+            data = {
+                "title": "Pending Test &#128203;",
+                "text": "No Pending test"
+            }
+            post_msg_using_webhook(config.test_team_url, data)
