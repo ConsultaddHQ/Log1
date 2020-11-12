@@ -193,8 +193,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
             return queryset.first().rate
         return None
 
-    @staticmethod
-    def send_mail(mail_data):
+    def send_mail(self, mail_data):
         try:
             res = send_email(mail_data, "admin@consultadd.com")
             return res, "ok"

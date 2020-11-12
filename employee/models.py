@@ -130,8 +130,7 @@ class User(AbstractUser, PermissionsMixin):
                 return consultant.first()
         return None
 
-    @staticmethod
-    def send_mail(mail_data):
+    def send_mail(self, mail_data):
         try:
             res = send_email(mail_data, "admin@log1.com")
             return res, "ok"

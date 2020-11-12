@@ -1,4 +1,3 @@
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -25,10 +24,10 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
                 if user_exists:
                     user = user_exists.first()
                     serializer = self.serializer_class(user)
-                    return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                    return Response({"result": serializer.data}, status=201)
                 else:
-                    return Response({"error": {'message': 'User not Exist'}}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": {'message': 'User not Exist'}}, status=400)
             else:
-                return Response({"error": {'message': 'Unauthorised Access'}}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"error": {'message': 'Unauthorised Access'}}, status=401)
         except Exception as error:
-            return Response({"error": {'success': False, 'message': str(error)}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": {'success': False, 'message': str(error)}}, status=400)

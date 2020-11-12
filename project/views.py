@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from datetime import datetime, date, timedelta
 
@@ -8,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
@@ -343,7 +344,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                                        + reporting_details) / 6 >= 1 else False
 
                 if not list_status:
-                    return Response({"error": "Complete all details"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Complete all details"}, status=400)
 
                 prev_status = project.statuses.filter(is_current=True).first()
                 po_type = 'created'
@@ -376,13 +377,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         if created:
                             prev_status.is_current = False
                             prev_status.save()
-                    return Response({"result": "mail sent", "message": res}, status=status.HTTP_200_OK)
-                return Response({"result": str(res)}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"result": "mail sent", "message": res}, status=200)
+                return Response({"result": str(res)}, status=400)
             else:
-                return Response({"error": "Invalid Id"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Invalid Id"}, status=400)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path="send_support_mail")
     def send_support_mail(self, request, *args, **kwargs):
@@ -399,23 +400,26 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if support_mail_error == 'error' or offer_mail_error == "error":
                 return Response({"support": str(support_mail_res), "offer": str(offer_mail_res)}, status=400)
 
-            return Response({"result": str(support_mail_res)}, status=status.HTTP_200_OK)
+            return Response({"result": str(support_mail_res)}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
             serializer = ProjectGetSerializer(project)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
+        version = request.query_params.get('version', 'v1')
+        sort_by = request.query_params.get('sort_by', None)
         filter_for = request.query_params.get('filter_for', None)
+        filter_json = request.query_params.get('filter_json', None)
         filter_by_time = request.query_params.get('filter_by_time', None)
         filter_by_lead = request.query_params.get('filter_by_lead', None)
         filter_by_status = request.query_params.get('filter_by_status', None)
@@ -433,7 +437,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = projects.filter(submission__lead__is_w2=True)
 
             if query:
-                query = query.strip()
+                query = query.lstrip().replace(':amp:', '&')
                 projects = projects.filter(
                     Q(city__istartswith=query) |
                     Q(consultant__name__istartswith=query) |
@@ -446,7 +450,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 projects = get_time_filter(projects, filter_by_time)
 
             # count of project by status
-            projects = projects.order_by('-modified').distinct('modified')
+            order_by = '-created'
+            if sort_by:
+                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
+                if field_name == 'created':
+                    order_by = "created" if order == "asc" else "-created"
+                elif field_name == 'modified':
+                    order_by = "modified" if order == "asc" else "-modified"
+                elif field_name == 'name':
+                    order_by = "consultant__name" if order == "asc" else "-consultant__name"
+
+            projects = projects.order_by('-modified', order_by).distinct('modified')
             data = {
                 "total": projects,
                 "new": projects.filter(statuses__status='new', statuses__is_current=True),
@@ -460,6 +474,30 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if filter_by_status:
                 projects = data[filter_by_status]
 
+            if version == 'v2' and filter_json:
+                filter_string = dict()
+                filters = json.loads(filter_json)
+
+                if 'client' in filters:
+                    filter_string["submission__client"] = filters["client"]
+
+                if 'consultant_id' in filters and len(filters["consultant_id"]) > 0:
+                    filter_string["consultant_id__in"] = filters["consultant_id"]
+
+                if 'marketer_id' in filters and len(filters["marketer_id"]) > 0:
+                    filter_string["submission__created_by_id__in"] = filters["marketer_id"]
+
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
+
+                if 'created' in filters:
+                    if 'lte' in filters["created"] and len(filters["created"]['lte']) > 0:
+                        filter_string["created__lte"] = filters["created"]['lte']
+                    if 'gte' in filters["created"] and len(filters["created"]['gte']) > 0:
+                        filter_string["created__gte"] = filters["created"]['gte']
+
+                projects = projects.filter(**filter_string)
+
             data_count = {
                 'new': data["new"].count(),
                 'total': data["total"].count(),
@@ -469,10 +507,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'not_joined': data["not_joined"].count(),
             }
             serializer = self.serializer_class(projects[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "counts": data_count}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -480,7 +518,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         try:
             sub = get_object_or_404(Submission, id=sub_id, created_by=request.user)
             if hasattr(sub, 'project'):
-                return Response({"error": "Project already exist"}, status=status.HTTP_406_NOT_ACCEPTABLE)
+                return Response({"error": "Project already exist"}, status=406)
 
             is_remote = request.data.get('is_remote', False)
             remote_consultant_id = request.data.get('remote_consultant_id', None)
@@ -534,18 +572,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         logger.error(support_mail_res)
                         logger.error(offer_mail_res)
                         return Response({"error": "error", "support_mail_error": str(support_mail_res),
-                                         "offer_mail_error": offer_mail_error}, status=status.HTTP_400_BAD_REQUEST)
+                                         "offer_mail_error": offer_mail_error}, status=400)
 
                 serializer = self.serializer_class(project)
                 return Response({
                     "result": serializer.data,
                     "support_mail": str(support_mail_res),
                     "offer_mail": str(offer_mail_res)
-                }, status=status.HTTP_201_CREATED)
+                }, status=201)
             logger.error(serializer.errors)
-            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         project_id = kwargs.get('pk')
@@ -569,7 +607,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             all_status = all_status + cancellation_status + termination_status
 
             if new_status not in all_status:
-                return Response({'error': 'Project status does not exist'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Project status does not exist'}, status=400)
 
             data = {
                 "city": request.data.get('city', project.city),
@@ -842,10 +880,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             serializer = self.serializer_class(project)
 
-            return Response({"result": serializer.data, "error": err}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data, "error": err}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
@@ -858,10 +896,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
         try:
             project = get_object_or_404(Project, id=request.query_params.get('project_id'))
             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -872,7 +910,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 support = get_object_or_404(User, id=user['id'])
                 support_names.append(support.employee_name)
                 if not user['start']:
-                    return Response({"error": "Start date can not be empty"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Start date can not be empty"}, status=400)
                 project_support = ProjectSupport.objects.create(
                     project=project,
                     support=support,
@@ -923,10 +961,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
             serializer = ProjectSupportSerializer(project.support.all(), many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -936,7 +974,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             primary_support = [user for user in all_support if user.is_primary is True]
 
             if len(primary_support) == 1 and primary_support[0] == support and request.data.get('is_primary') is False:
-                return Response({'error': 'At least one support should be primary'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'At least one support should be primary'}, status=400)
 
             support.is_primary = request.data.get('is_primary')
             support.save()
@@ -959,10 +997,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     frequency=new_freq,
                 )
             serializer = ProjectSupportSerializer(support)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path="remove")
     def remove_support(self, request, *args, **kwargs):
@@ -972,10 +1010,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             support.feedback = request.data.get('feedback', None)
             support.save()
             serializer = ProjectSupportSerializer(support)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
@@ -988,10 +1026,10 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
         try:
             project = get_object_or_404(Project, id=request.query_params.get('project_id'))
             serializer = ProjectOrderSerializer(project.order.all().order_by('-created'), many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1040,10 +1078,10 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
                     create_attachment(file_data)
             create_activity(order.id, 'projectorder', request.user, desc, 'created')
             serializer = self.serializer_class(project.order.all(), many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1066,11 +1104,11 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
 
                 desc = f"Project Order details updated by {request.user.employee_name}"
                 create_activity(order.id, 'projectorder', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-            return Response({"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"result": serializer.data}, status=202)
+            return Response({"error": serializer.errors}, status=400)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
@@ -1110,10 +1148,10 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
                 'consultant__phone_no', 'created', 'modified', 'recruiter', 'relation', 'marketer_name', 'job_title',
                 'marketer_email', 'vendor', 'location', 'end_date', 'job_desc', 'employer')
 
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"results": data}, status=200)
         except Exception as error:
             logger.error(str(error))
-            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": error}, status=400)
 
 
 class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1137,6 +1175,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 )
             )
             if query:
+                query = query.lstrip().replace(':amp:', '&')
                 projects = projects.filter(
                     Q(submission__client__istartswith=query) |
                     Q(submission__lead__vendor_company__name__istartswith=query)
@@ -1152,11 +1191,11 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)
-                return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
-            return Response({"error": "No Project Found"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"results": serializer.data, 'total': total}, status=200)
+            return Response({"error": "No Project Found"}, status=400)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -1186,20 +1225,21 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 ).exclude(status='archived').order_by('id').distinct('id')
 
             if query:
+                query = query.lstrip().replace(':amp:', '&')
                 consultants = Consultant.objects.filter(
                     Q(name__istartswith=query) |
-                    Q(projects__submission__client__icontains=query) |
                     Q(projects__employer__startswith=query) |
+                    Q(projects__submission__client__icontains=query) |
                     Q(projects__submission__lead__vendor_company__name__icontains=query)
                 ).order_by('id').distinct('id')
 
             queryset = consultants.order_by('name').distinct('name')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
-            return Response({"results": serializer.data, 'total': total}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, 'total': total}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1231,7 +1271,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
                                 f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
                     else:
-                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client" \
+                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
                                 f"{timesheet.project.submission.client}"
 
                     Notification.objects.create(
@@ -1263,22 +1303,23 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     }
                     object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
                     registration_ids = list(
-                        FCMDevice.objects.filter(object_id__in=list(object_ids), content_type__model='consultanttoken'
-                                                 ).values_list('device_id', flat=True))
+                        FCMDevice.objects.filter(
+                            object_id__in=list(object_ids), content_type__model='consultanttoken'
+                        ).values_list('device_id', flat=True))
                     push_notification_consultant(registration_ids, message_body)
                 serializer = self.serializer_class(timesheet)
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-            return Response({"error": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"result": serializer.data}, status=202)
+            return Response({"error": "You don't have access"}, status=400)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=["get"], detail=True, url_name="from_notification")
     def from_notification(self, request, *args, **kwargs):
         try:
             queryset = TimeSheet.objects.filter(id=kwargs.get('pk'))
             serializer = self.serializer_class(queryset, many=True)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)

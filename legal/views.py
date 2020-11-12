@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -88,7 +88,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     "category": i.doc_type.category,
                     "value": i.doc_type.display_name,
                 })
-        return Response({"results": data}, status=status.HTTP_200_OK)
+        return Response({"results": data}, status=200)
 
     @action(methods=['post'], detail=False, url_path='upload_doc')
     def upload_doc(self, request):
@@ -105,9 +105,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 )
             documents = Document.objects.filter(petition=petition_id)
             serializer = DocumentSerializer(documents, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=False, url_path='verify_doc')
     def verify_doc(self, request):
@@ -132,9 +132,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     else:
                         message = "mail sent"
             serializer = DocumentSerializer(documents, many=True)
-            return Response({"result": serializer.data, "message": message}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data, "message": message}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='doc_request')
     def doc_request(self, request, *args, **kwargs):
@@ -163,9 +163,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition.save()
             return Response({
                 "result": {"id": petition.id, "status": petition.status, "message": "mail sent"}
-            }, status=status.HTTP_200_OK)
+            }, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='doc_url')
     def doc_url(self, request, *args, **kwargs):
@@ -173,9 +173,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             document_id = request.query_params.get('document_id')
             document = get_object_or_404(Document, id=document_id)
             url = get_s3_object(document.file.name)
-            return Response({"result": url}, status=status.HTTP_200_OK)
+            return Response({"result": url}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
@@ -183,15 +183,15 @@ class PetitionViewSets(viewsets.ModelViewSet):
         object_id = request.data['object_id']
         object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
         response = presigned_post_url(object_name=object_name)
-        return Response({"result": response}, status=status.HTTP_200_OK)
+        return Response({"result": response}, status=200)
 
     def retrieve(self, request, *args, **kwargs):
         try:
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
             serializer = PetitionGetSerializer(petition)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -205,21 +205,22 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     Q(assigned_to=request.user)
                 )
             if query:
+                query = query.lstrip().replace(':amp:', '&')
                 queryset = queryset.filter(
-                    Q(beneficiary__name__istartswith=query.strip()) |
-                    Q(assigned_to__employee_name=query.strip())
+                    Q(assigned_to__employee_name=query) |
+                    Q(beneficiary__name__istartswith=query)
                 )
             total = queryset.count()
             serializer = self.serializer_class(queryset[first:last], many=True)
-            return Response({"results": serializer.data, "total": total}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "total": total}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
             petition = Petition.objects.filter(beneficiary_id=request.data['consultant'])
             if petition:
-                return Response({"error": "already exist"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "already exist"}, status=400)
             petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
@@ -240,9 +241,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             consultant.p_is_active = True
             consultant.save()
             serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -251,9 +252,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='lca')
     def lca(self, request, *args, **kwargs):
@@ -275,12 +276,12 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     petition_id=petition_id,
                 )
             else:
-                return Response({'error': 'Data is missing'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Data is missing'}, status=400)
 
             serializer = PetitionGetSerializer(petition)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='petition_file')
     def final_petition_file(self, request, *args, **kwargs):
@@ -304,14 +305,14 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 document = Document.objects.filter(petition=petition_id, doc_type_id='26').first()
                 if not document:
                     return Response({"error": "Please upload document before moving further"},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                                    status=400)
             if request_status in ['under_review', 'reviewed', 'print']:
                 petition.status = request_status
                 petition.save()
             serializer = PetitionGetSerializer(petition)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='petition_status')
     def petition_shipping_status(self, request, *args, **kwargs):
@@ -331,7 +332,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 if fedex_no:
                     petition.fedex_no = fedex_no
                 else:
-                    return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Data is missing"}, status=400)
 
             elif petition.status == 'shipped' and request_status == 'doc_acknowledged':
                 if file and receipt_no:
@@ -344,7 +345,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     )
                     petition.uscis_no = receipt_no
                 else:
-                    return Response({"error": "Data is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Data is missing"}, status=400)
 
             elif rfe_doc:
                 Document.objects.create(
@@ -365,7 +366,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                         petition_id=petition_id,
                     )
                 else:
-                    return Response({"error": "File is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "File is missing"}, status=400)
 
             elif denied_doc:
                 Document.objects.create(
@@ -396,9 +397,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition.status = request_status
             petition.save()
             serializer = PetitionGetSerializer(petition)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=True, url_path='document')
     def document(self, request, *args, **kwargs):
@@ -410,10 +411,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 doc = get_object_or_404(Document, id=doc_id)
                 doc.delete()
                 serializer = PetitionGetSerializer(petition)
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-            return Response({"error": "document id is missing"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"result": serializer.data}, status=202)
+            return Response({"error": "document id is missing"}, status=400)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='comment')
     def comment(self, request, *args, **kwargs):
@@ -421,15 +422,15 @@ class PetitionViewSets(viewsets.ModelViewSet):
         try:
             if request.method == 'GET':
                 if not ('legal' in request.user.roles or 'superadmin' in request.user.roles):
-                    return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
+                    return Response({"result": 'you don\'t have access'}, status=403)
                 petition = get_object_or_404(Petition, id=object_id)
                 comments = petition.consultant_comments.filter(parent_comment=None).order_by('-created')
                 serializer = ConsultantCommentGetSerializer(comments, many=True)
-                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+                return Response({'results': serializer.data}, status=200)
 
             elif request.method == 'POST':
                 if not ('legal' in request.user.roles):
-                    return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
+                    return Response({"result": 'you don\'t have access'}, status=403)
                 content_type = ContentType.objects.get(model='petition')
                 created_by_content_type = ContentType.objects.get(model='user')
                 comment = ConsultantComment.objects.create(
@@ -441,10 +442,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     parent_comment_id=request.data['parent_comment'],
                 )
                 serializer = ConsultantCommentGetSerializer(comment)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 # Api for Consultant
@@ -476,9 +477,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 },
             }
             send_email(mail_data, beneficiary.email)
-            return Response({"result": {"message": "mail sent"}}, status=status.HTTP_200_OK)
+            return Response({"result": {"message": "mail sent"}}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='comment')
     def comment(self, request, *args, **kwargs):
@@ -486,12 +487,12 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         try:
             petition = get_object_or_404(Petition, id=object_id)
             if petition.beneficiary != request.user:
-                return Response({"result": 'you don\'t have access'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": 'you don\'t have access'}, status=403)
 
             if request.method == 'GET':
                 comments = petition.consultant_comments.filter(parent_comment=None)
                 serializer = ConsultantCommentGetSerializer(comments, many=True)
-                return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+                return Response({'results': serializer.data}, status=200)
 
             elif request.method == 'POST':
                 content_type = ContentType.objects.get(model='petition')
@@ -541,17 +542,17 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 push_notification(object_ids, message_body)
 
                 serializer = ConsultantCommentGetSerializer(comment)
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='doc_types')
     def doc_types(self, request):
         data = dict()
         petition = Petition.objects.filter(beneficiary=request.user, is_active=True)
         if not petition:
-            return Response({"error": "Petition not found"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Petition not found"}, status=400)
         petition_id = petition.first().id
         doc_types = DocumentList.objects.filter(to_show=True, petition_id=petition_id)
         categories = Types.objects.all().order_by('category').distinct('category')
@@ -578,7 +579,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     "category": i.doc_type.category,
                     "value": i.doc_type.display_name,
                 })
-        return Response({"results": data}, status=status.HTTP_200_OK)
+        return Response({"results": data}, status=200)
 
     @action(methods=['get'], detail=False, url_path='doc_url')
     def doc_url(self, request, *args, **kwargs):
@@ -586,9 +587,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             document_id = request.query_params.get('document_id')
             document = get_object_or_404(Document, id=document_id, petition__beneficiary=request.user)
             url = get_s3_object(document.file.name)
-            return Response({"result": url}, status=status.HTTP_200_OK)
+            return Response({"result": url}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
@@ -596,7 +597,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         object_id = request.data['object_id']
         object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
         response = presigned_post_url(object_name=object_name)
-        return Response({"result": response}, status=status.HTTP_200_OK)
+        return Response({"result": response}, status=200)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -604,10 +605,10 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             if queryset:
                 petition = queryset.first()
                 serializer = self.serializer_class(petition.documents.all(), many=True)
-                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
-            return Response({"error": "Petition not available"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"results": serializer.data}, status=200)
+            return Response({"error": "Petition not available"}, status=400)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -657,15 +658,15 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 push_notification([petition.assigned_to.id], message_body)
 
             serializer = self.serializer_class(documents, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
         try:
             document_id = kwargs.get('pk')
             document = get_object_or_404(Document, id=document_id, verified=False)
             document.delete()
-            return Response({"result": "File deleted"}, status=status.HTTP_204_NO_CONTENT)
+            return Response({"result": "File deleted"}, status=204)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)

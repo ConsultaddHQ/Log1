@@ -4,6 +4,8 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 
+DONT_HAVE_ACCESS = 'You don\'t have access'
+
 
 def get_page_limits(request):
     page = int(request.query_params.get("page", 1))

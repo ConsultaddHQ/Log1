@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, Count
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
@@ -25,6 +25,7 @@ from constance import config
 from api_key.models import APIKey
 from marketing.models import Interview
 from utils_app.mailing import send_email
+from utils_app.utils import DONT_HAVE_ACCESS
 from employee.serializers import TeamSerializer
 from employee.models import tag_users, User, Team
 from project.models import Project, ProjectStatus
@@ -387,8 +388,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @staticmethod
-    def get_submission_data(queryset, filter_by_status, first, last):
+    def get_submission_data(self, queryset, filter_by_status, first, last):
         try:
             total = queryset.count()
             submission = queryset.filter(status='sub').count()
@@ -416,8 +416,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, "error"
 
-    @staticmethod
-    def get_interview_data(queryset, filter_by_status, first, last):
+    def get_interview_data(self, queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
             queryset = queryset.order_by('-modified').distinct('modified')
@@ -460,8 +459,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, 'error'
 
-    @staticmethod
-    def get_project_data(queryset, filter_by_status):
+    def get_project_data(self, queryset, filter_by_status):
         try:
             # count of project by status
             total = queryset.count()
@@ -530,14 +528,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.union(recruits)
 
             if query:
-                query = query.strip()
-                consultants = consultants.filter(name__istartswith=query)
+                consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
 
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -551,19 +548,19 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             else:
                 consultant = get_object_or_404(Consultant, id=consultant_id)
                 serializer = self.serializer_class(consultant)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
-            return Response({"result": "Consultant Already Exist"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"result": "Consultant Already Exist"}, status=400)
         try:
             consultant = Consultant.objects.create(
                 ssn=data['ssn'],
@@ -626,15 +623,15 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 start=data['employer_start_date'],
             )
 
-            return Response({"result": ConsultantSerializer(consultant).data}, status=status.HTTP_201_CREATED)
+            return Response({"result": ConsultantSerializer(consultant).data}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             serializer = ConsultantUpdateSerializer(consultant, data=request.data, partial=True)
@@ -675,10 +672,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             if changed_fields:
                 desc = f"{request.user.employee_name} updated following fields: {', '.join(changed_fields)}"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except KeyError as err:
             logger.error(err)
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": err}, status=400)
 
     @action(methods=['get'], detail=True, url_path='activities')
     def activities(self, request, *args, **kwargs):
@@ -688,9 +685,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 object_id=consultant_id, content_type__model='consultant'
             ).order_by('created')
             serializer = ActivitySerializer(activities, many=True)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='set_password')
     def set_consultant_password(self, request):
@@ -699,30 +696,32 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultant = get_object_or_404(Consultant, id=request.data['consultant_id'])
                 consultant.set_password(request.data['new_password'])
                 consultant.save()
-                return Response({'result': {'message': 'Password Changed Successfully'}}, status=status.HTTP_200_OK)
+                return Response({'result': {'message': 'Password Changed Successfully'}}, status=200)
             else:
-                return Response({'result': {'message': 'Unauthorized Access'}}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({'result': {'message': DONT_HAVE_ACCESS}}, status=401)
         except Exception as error:
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='search')
     def search(self, request, *args, **kwargs):
         try:
             query = request.query_params.get('query', None)
             if query:
-                consultants = Consultant.objects.filter(name__istartswith=query).order_by('name')
+                consultants = Consultant.objects.filter(
+                    name__istartswith=query.lstrip().replace(':amp:', '&')
+                ).order_by('name')
             else:
                 consultants = Consultant.objects.all().order_by('name')
             data = consultants[:10].values('id', 'name', 'email')
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"results": data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
 
         if request.method == 'POST':
             try:
@@ -745,10 +744,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} added Education details"
                 create_activity(education.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data}, status=201)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
         else:
             try:
                 education = get_object_or_404(Education, id=kwargs.get('pk'))
@@ -763,16 +762,16 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated Education details"
                 create_activity(education.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=202)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='experience')
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
 
         if request.method == 'POST':
             try:
@@ -796,10 +795,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} added Experience details"
                 create_activity(experience.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data}, status=201)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
         else:
             try:
                 experience = get_object_or_404(Experience, id=kwargs.get('pk'))
@@ -814,10 +813,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated Experience details"
                 create_activity(experience.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=202)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='marketing')
     def marketing(self, request, *args, **kwargs):
@@ -835,7 +834,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 )
                 data, counts = self.get_interview_data(interviews, filter_by_status, first, last)
                 if counts == "error":
-                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": str(data)}, status=400)
             else:
                 projects = Project.objects.filter(
                     Q(consultant_id=consultant_id) |
@@ -843,11 +842,11 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 )
                 data, counts = self.get_project_data(projects, filter_by_status)
                 if counts == "error":
-                    return Response({"error": str(data)}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": str(data)}, status=400)
             return Response({"results": data, "total": counts})
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, *args, **kwargs):
@@ -855,10 +854,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
             serializer = AttachmentSerializer(queryset, many=True)
-            return Response({'results': serializer.data}, status=status.HTTP_200_OK)
+            return Response({'results': serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post', 'put'], detail=True, url_path='payroll_employer')
     def payroll_employer(self, request, *args, **kwargs):
@@ -866,9 +865,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             try:
                 consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
                 serializer = PayrollEmployerSerializer(consultant.employers.all().order_by('-start'), many=True)
-                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+                return Response({"results": serializer.data}, status=200)
             except Exception as error:
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
         elif request.method == 'PUT':
             try:
                 employer = PayrollEmployer.objects.get(id=kwargs.get('pk'))
@@ -883,9 +882,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated Employer"
                 create_activity(employer.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"results": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"results": serializer.data}, status=202)
             except Exception as error:
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
         else:
             try:
                 consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
@@ -900,9 +899,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} added Employer"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"results": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"results": serializer.data}, status=201)
             except Exception as error:
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, *args, **kwargs):
@@ -910,10 +909,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             try:
                 rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk')).order_by('-id')
                 data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback', 'consultant')
-                return Response({"results": data}, status=status.HTTP_200_OK)
+                return Response({"results": data}, status=200)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
         else:
             try:
                 prev_rate_obj = ConsultantRateRevision.objects.filter(
@@ -941,10 +940,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {request.data['rate']}"
                 create_activity(rate_obj.id, 'consultantraterevision', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data}, status=201)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
 
 
 class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
@@ -958,7 +957,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         consultants = Consultant.objects.filter(
             marketing__status='open'
         ).values('current_city').annotate(total=Count('current_city')).order_by('current_city')
-        return Response({"results": consultants}, status=status.HTTP_200_OK)
+        return Response({"results": consultants}, status=200)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -973,7 +972,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         try:
             # Consultants search based on name, email, recruiter and location
             if query:
-                query = query.strip()
+                query = query.lstrip().replace(':amp:', '&')
                 consultants = Consultant.objects.filter(
                     Q(email__iexact=query) |
                     Q(name__icontains=query) |
@@ -1076,10 +1075,10 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
             ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
                      'marketing_start', 'previous_marketing_days', 'visa')
-            return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
+            return Response({"results": data, "count": count}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1096,10 +1095,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_id=request.query_params.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1157,10 +1156,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             # Activity
             desc = f"{request.user.employee_name} started Marketing from {consultant_marketing.start}"
             create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": "Cycle Created"}, status=status.HTTP_201_CREATED)
+            return Response({"result": "Cycle Created"}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1176,10 +1175,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             # Activity
             desc = f"{request.user.employee_name} updated marketing details"
             create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='stop_marketing')
     def stop_marketing(self, request, *args, **kwargs):
@@ -1192,9 +1191,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             # Activity
             desc = f"{request.user.employee_name} stopped marketing from {str(marketing.end)}"
             create_activity(marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": "marketing stopped"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": "marketing stopped"}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='remarketing')
     def remarketing(self, request, *args, **kwargs):
@@ -1203,10 +1202,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_id=request.query_params.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='previous_marketing')
     def previous_marketing(self, request, *args, **kwargs):
@@ -1215,10 +1214,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_id=request.query_params.get('consultant')
             ).latest('end')
             serializer = ConsultantMarketingCycleSerializer(marketing)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     # Marketer assignment
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
@@ -1247,12 +1246,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} assigned following marketer - {', '.join(marketers_name)}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=202)
             else:
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=403)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     # Team Assignment
     @action(methods=['put'], detail=True, url_path='team_assignment')
@@ -1278,12 +1277,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} is assigned to {teams_string}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=202)
             else:
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=403)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     # Remove assigned Marketer from Consultant
     @action(methods=['put'], detail=True, url_path='remove_marketer')
@@ -1312,12 +1311,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} removed following marketers - {', '.join(marketers_name)}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+                return Response({"result": serializer.data}, status=200)
             else:
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=403)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     # Remove team from Consultant
     @action(methods=['put'], detail=True, url_path='remove_team')
@@ -1344,12 +1343,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} removed from {team_string}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=202)
             else:
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=403)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class ConsultantProfileViewSets(viewsets.ModelViewSet):
@@ -1364,10 +1363,10 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             profile_id = kwargs.get('pk')
             profile = get_object_or_404(ConsultantProfile, id=profile_id)
             serializer = self.serializer_class(profile)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     # Return Consultant Profiles
     def list(self, request, *args, **kwargs):
@@ -1376,10 +1375,10 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             consultant = get_object_or_404(Consultant, id=consultant_id)
             profiles = consultant.profiles.all()
             serializer = self.serializer_class(profiles, many=True)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1411,10 +1410,10 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             # Activity
             desc = f"{request.user.employee_name} created {title} profile"
             create_activity(profile.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1431,11 +1430,11 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated {title} profile"
                 create_activity(profile.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
-            return Response({"error": str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"result": serializer.data}, status=202)
+            return Response({"error": str(serializer.errors)}, status=400)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1447,7 +1446,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
         try:
             queryset = ConsultantPOC.objects.filter(
                 poc_type=request.data['poc_type'], consultant=request.data['consultant'], end=None
@@ -1470,15 +1469,15 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} added {poc.poc.employee_name} as {poc.poc_type.title()}"
             create_activity(poc.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": "Created"}, status=status.HTTP_201_CREATED)
+            return Response({"result": "Created"}, status=201)
         except KeyError as err:
             logger.error(err)
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": err}, status=400)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
             serializer = self.serializer_class(instance, data=request.data, partial=True)
@@ -1492,10 +1491,10 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} updated {instance.poc.employee_name} as {instance.poc_type.title()}"
             create_activity(instance.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except KeyError as err:
             logger.error(err)
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": err}, status=400)
 
 
 class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1507,7 +1506,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
             if instance:
@@ -1538,15 +1537,15 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} added Work Authorization"
             create_activity(work_auth.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except KeyError as err:
             logger.error(err)
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": err}, status=400)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"result": dont_have_access}, status=403)
         try:
             work_auth = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
             serializer = self.serializer_class(work_auth, data=request.data, partial=True)
@@ -1569,10 +1568,10 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} updated Work Authorization details"
             create_activity(work_auth.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except KeyError as err:
             logger.error(err)
-            return Response({"error": err}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": err}, status=400)
 
 
 class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1591,6 +1590,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             # Consultants search based on name, email, recruiter and location
             if query:
+                query = query.lstrip().replace(':amp:', '&')
                 consultants = consultants.filter(
                     Q(email__iexact=query) |
                     Q(name__icontains=query) |
@@ -1625,17 +1625,17 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 last_date=Subquery(exit_obj.values('last_date')[:1]),
                 resign_date=Subquery(exit_obj.values('resign_date')[:1]),
             ).values('id', 'name', 'skills', 'type', 'last_date', 'rehire')
-            return Response({"results": data, "count": count}, status=status.HTTP_200_OK)
+            return Response({"results": data, "count": count}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=403)
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
             con_exit = ConsultantExit.objects.create(
@@ -1671,21 +1671,21 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     if error == 'error':
                         logger.error(res)
                         return Response({"error": "error", "exit_mail_error": str(res)},
-                                        status=status.HTTP_400_BAD_REQUEST)
+                                        status=400)
             serializer = self.serializer_class(consultant.exit.all().order_by('-created'), many=True)
 
             # Activity
             desc = f"{request.user.employee_name} started exit process"
             create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data, "exit_mail": str(res)}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data, "exit_mail": str(res)}, status=201)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=403)
 
             con_exit = get_object_or_404(ConsultantExit, id=kwargs.get('pk'))
 
@@ -1704,16 +1704,16 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
             create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='cancel')
     def cancel_termination(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
-                return Response({"result": dont_have_access}, status=status.HTTP_403_FORBIDDEN)
+                return Response({"result": dont_have_access}, status=403)
 
             exit_id = kwargs.get('pk')
             con_exit = get_object_or_404(ConsultantExit, id=exit_id)
@@ -1730,24 +1730,24 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     if error == 'error':
                         logger.error(res)
                         return Response({"error": "error", "exit_mail_error": str(res)},
-                                        status=status.HTTP_400_BAD_REQUEST)
+                                        status=400)
                 serializer = self.serializer_class(con_exit)
 
                 # Activity
                 desc = f"{request.user.employee_name} cancelled exit process"
                 create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data, "exit_mail": str(res)}, status=status.HTTP_202_ACCEPTED)
-            return Response({"error": "Exit process can not be cancelled "}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"result": serializer.data, "exit_mail": str(res)}, status=202)
+            return Response({"error": "Exit process can not be cancelled "}, status=400)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='reason')
     def termination_reason(self, request):
         try:
             reasons = ExitReason.objects.all().values('id', 'name')
-            return Response({'result': reasons}, status=status.HTTP_200_OK)
+            return Response({'result': reasons}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
@@ -1763,9 +1763,9 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             if feedback_type:
                 feedback = feedback.filter(feedback_type=feedback_type)
             serializer = self.serializer_class(feedback, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1830,9 +1830,9 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Activity
             desc = f"{request.user.employee_name} added {feedback.get_feedback_type_display()} feedback"
             create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1894,9 +1894,9 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Activity
             desc = f"{request.user.employee_name} updated {feedback.get_feedback_type_display()} feedback"
             create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 # API for Petition Web App
@@ -1916,20 +1916,20 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
         if email:
             consultant = get_object_or_404(Consultant, email=email)
         else:
-            return Response({"error": "Email is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Email is Empty"}, status=400)
         consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
         if consultant:
             consultant = consultant.first()
             if not consultant.p_is_active:
-                return Response({"error": "User account is not Active"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "User account is not Active"}, status=400)
             try:
                 serializer = self.serializer_class(consultant)
-                return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": serializer.data}, status=202)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
         logger.error("Incorrect Email Id OR Password")
-        return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
 def create_consultant(request, creator_id):
