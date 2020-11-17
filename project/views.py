@@ -449,18 +449,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             if filter_by_time:
                 projects = get_time_filter(projects, filter_by_time)
 
-            # count of project by status
-            order_by = '-created'
-            if sort_by:
-                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                if field_name == 'created':
-                    order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'modified':
-                    order_by = "modified" if order == "asc" else "-modified"
-                elif field_name == 'name':
-                    order_by = "consultant__name" if order == "asc" else "-consultant__name"
-
-            projects = projects.order_by('-modified', order_by).distinct('modified')
             data = {
                 "total": projects,
                 "new": projects.filter(statuses__status='new', statuses__is_current=True),
@@ -470,9 +458,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
                                               start_date__lt=date.today())
             }
-
-            if filter_by_status:
-                projects = data[filter_by_status]
 
             if version == 'v2' and filter_json:
                 filter_string = dict()
@@ -498,6 +483,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 projects = projects.filter(**filter_string)
 
+            if filter_by_status:
+                projects = data[filter_by_status]
+
+            projects = projects.order_by('id').distinct('id')
             data_count = {
                 'new': data["new"].count(),
                 'total': data["total"].count(),
@@ -506,6 +495,20 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'on_boarded': data["on_boarded"].count(),
                 'not_joined': data["not_joined"].count(),
             }
+
+            if version == 'v2' and filter_json:
+                # count of project by status
+                order_by = '-created'
+                if sort_by:
+                    field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
+                    if field_name == 'created':
+                        order_by = "created" if order == "asc" else "-created"
+                    elif field_name == 'modified':
+                        order_by = "modified" if order == "asc" else "-modified"
+                    elif field_name == 'name':
+                        order_by = "consultant__name" if order == "asc" else "-consultant__name"
+
+                projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
             serializer = self.serializer_class(projects[first:last], many=True)
             return Response({"results": serializer.data, "counts": data_count}, status=200)
         except Exception as error:
@@ -791,13 +794,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         [f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
                          for interview in interviews if interview.supervisor])
                     ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
-                    if project.is_remote and project.submission.lead.is_w2:
+                    if project.is_remote or project.submission.lead.is_w2:
                         con_str = f"**Remote Project** \n"
-                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
-                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Consultant: **{project.submission.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Remote Engineer: **{project.consultant.name}**\n"
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
-                    # Sending message on Mattermost
+                    # Sending message on Messaging Tool
                     data = {
                         "title": "Offer  &#129304;&#128516;&#129304;",
                         "text": f"""{con_str}<br>
