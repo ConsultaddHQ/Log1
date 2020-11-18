@@ -433,9 +433,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
             else:
                 projects = Project.objects.all()
 
-            if filter_by_lead == 'w2':
-                projects = projects.filter(submission__lead__is_w2=True)
-
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 projects = projects.filter(
@@ -446,34 +443,27 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
-            if filter_by_time:
-                projects = get_time_filter(projects, filter_by_time)
-
-            data = {
-                "total": projects,
-                "new": projects.filter(statuses__status='new', statuses__is_current=True),
-                "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
-                "received": projects.filter(statuses__status='received', statuses__is_current=True),
-                "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
-                "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                              start_date__lt=date.today())
-            }
-
             if version == 'v2' and filter_json:
                 filter_string = dict()
                 filters = json.loads(filter_json)
 
-                if 'client' in filters:
+                if 'remote' in filters:
+                    filter_string["is_remote"] = filters['remote']
+
+                if 'w2' in filters:
+                    filter_string["submission__lead__is_w2"] = filters['w2']
+
+                if 'client' in filters and len(filters["client"]) > 0:
                     filter_string["submission__client"] = filters["client"]
 
-                if 'consultant_id' in filters and len(filters["consultant_id"]) > 0:
-                    filter_string["consultant_id__in"] = filters["consultant_id"]
-
-                if 'marketer_id' in filters and len(filters["marketer_id"]) > 0:
-                    filter_string["submission__created_by_id__in"] = filters["marketer_id"]
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    filter_string["submission__created_by_id__in"] = filters["marketer"]
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
                     filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
+
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant"]
 
                 if 'created' in filters:
                     if 'lte' in filters["created"] and len(filters["created"]['lte']) > 0:
@@ -481,12 +471,41 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     if 'gte' in filters["created"] and len(filters["created"]['gte']) > 0:
                         filter_string["created__gte"] = filters["created"]['gte']
 
+                projects = projects.order_by('id').distinct('id')
+                data = {
+                    "total": projects,
+                    "new": projects.filter(statuses__status='new', statuses__is_current=True),
+                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
+                    "received": projects.filter(statuses__status='received', statuses__is_current=True),
+                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
+                    "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
+                                                  start_date__lt=date.today())
+                }
+
+                if 'status' in filters and len(filters["status"]) > 0:
+                    projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
                 projects = projects.filter(**filter_string)
+            else:
+                if filter_by_lead == 'w2':
+                    projects = projects.filter(submission__lead__is_w2=True)
 
-            if filter_by_status:
-                projects = data[filter_by_status]
+                if filter_by_time:
+                    projects = get_time_filter(projects, filter_by_time)
 
-            projects = projects.order_by('id').distinct('id')
+                projects = projects.order_by('id').distinct('id')
+                data = {
+                    "total": projects,
+                    "new": projects.filter(statuses__status='new', statuses__is_current=True),
+                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
+                    "received": projects.filter(statuses__status='received', statuses__is_current=True),
+                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
+                    "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
+                                                  start_date__lt=date.today())
+                }
+
+                if filter_by_status:
+                    projects = data[filter_by_status]
+
             data_count = {
                 'new': data["new"].count(),
                 'total': data["total"].count(),
@@ -505,12 +524,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         order_by = "created" if order == "asc" else "-created"
                     elif field_name == 'modified':
                         order_by = "modified" if order == "asc" else "-modified"
-                    elif field_name == 'name':
-                        order_by = "consultant__name" if order == "asc" else "-consultant__name"
+                    elif field_name == 'consultant':
+                        order_by = "submission__consultant_marketing__consultant__name" if order == "asc" \
+                            else "-submission__consultant_marketing__consultant__name"
 
                 projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
             serializer = self.serializer_class(projects[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count}, status=200)
+            return Response({"counts": data_count, "results": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)

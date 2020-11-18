@@ -187,6 +187,49 @@ class LeadViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, 'error'
 
+    def get_count_and_queryset(self, queryset, filter_by_status, sort_by, first, last):
+        try:
+            queryset = queryset.order_by('id').distinct('id')
+            data_counts = {
+                "total": queryset.count(),
+                "new": queryset.filter(status='new').count(),
+                "sub": queryset.filter(status='sub').count(),
+                "draft": queryset.filter(status='draft').count(),
+                "archive": queryset.filter(status='archived').count(),
+            }
+
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
+
+            order_by = '-created'
+            if sort_by:
+                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
+                if field_name == 'created':
+                    order_by = "created" if order == "asc" else "-created"
+                elif field_name == 'modified':
+                    order_by = "modified" if order == "asc" else "-modified"
+
+            queryset = Lead.objects.filter(id__in=queryset.values('id')).order_by(order_by)
+            if filter_by_status == 'archived':
+                data = queryset[first:last].annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                    position_name=F('position__display_name')
+                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
+            else:
+                data = queryset.exclude(status='archived')[first:last].annotate(
+                    company_name=F('vendor_company__name'),
+                    company_id=F('vendor_company__id'),
+                    position_name=F('position__display_name')
+                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
+                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
+
+            return data, data_counts
+        except Exception as error:
+            logger.error(error)
+            return error, 'error'
+
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.query_params.get('query', None)
@@ -209,63 +252,38 @@ class LeadViewSets(viewsets.ModelViewSet):
                 leads = Lead.objects.filter(
                     Q(owner=request.user) |
                     Q(shared_to=request.user)
-                ).annotate(submission_count=Count('submission')).order_by('-modified')
+                ).annotate(submission_count=Count('submission'))
 
             if version == 'v2' and filter_json:
-                order_by = '-created'
-                if sort_by:
-                    field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                    if field_name == 'created':
-                        order_by = "created" if order == "asc" else "-created"
-                    elif field_name == 'modified':
-                        order_by = "modified" if order == "asc" else "-modified"
-
+                filter_by_status = []
                 filter_string = dict()
                 filters = json.loads(filter_json)
-                if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    filter_string["vendor_company_id__in"] = filters["vendor"]
-                if 'date' in filters:
-                    if 'lte' in filters["date"] and len(filters["date"]['lte']) > 0:
-                        filter_string["created__lte"] = filters["date"]['lte']
-                    if 'gte' in filters["date"] and len(filters["date"]['gte']) > 0:
-                        filter_string["created__gte"] = filters["date"]['gte']
-                leads = leads.filter(**filter_string).order_by(order_by)
-
-                total = leads.count()
-                new = leads.filter(status='new').count()
-                sub = leads.filter(status='sub').count()
-                draft = leads.filter(status='draft').count()
-                archive = leads.filter(status='archived').count()
 
                 if 'status' in filters and len(filters["status"]) > 0:
-                    if filters["status"] == 'archived':
-                        leads = leads.filter(status__in=filters["status"])
-                    else:
-                        leads = leads.filter(status__in=filters["status"]).exclude(status='archived')
+                    filter_by_status = filters["status"]
 
-                data_counts = {
-                    "new": new,
-                    "sub": sub,
-                    "draft": draft,
-                    "total": total,
-                    "archive": archive,
-                }
-                data = leads[first:last].annotate(
-                    company_name=F('vendor_company__name'),
-                    company_id=F('vendor_company__id'),
-                ).values('id', 'job_desc', 'city', 'job_title', 'primary_skill', 'secondary_skills', 'company_id',
-                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    filter_string["vendor_company_id__in"] = filters["vendor"]
 
-                return Response({"results": data, "counts": data_counts}, status=200)
+                created = filters.get('created', None)
+                if created:
+                    lte = created.get('lte', None)
+                    gte = created.get('gte', None)
+                    if lte:
+                        filter_string["created__lte"] = lte
+                    if gte:
+                        filter_string["created__gte"] = gte
+
+                leads = leads.filter(**filter_string)
+                data, data_counts = self.get_count_and_queryset(leads, filter_by_status, sort_by, first, last)
             else:
                 leads = get_time_filter(leads, filter_by=filter_by_time)
-
                 data, data_counts = self.get_lead_data(leads, filter_by_status, first, last)
 
-                if data_counts == 'error':
-                    return Response({"error": str(data)}, status=400)
+            if data_counts == 'error':
+                return Response({"error": str(data)}, status=400)
 
-                return Response({"results": data, "counts": data_counts}, status=200)
+            return Response({"counts": data_counts, "results": data}, status=200)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -513,8 +531,19 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             logger.error(error)
             return error, "error"
 
-    def get_count_and_queryset(self, sub, sub_status, sort_by, first, last):
+    def get_count_and_queryset(self, queryset, sub_status, sort_by, first, last):
         try:
+            queryset = queryset.order_by('id').distinct('id')
+            data_counts = {
+                'total': queryset.count(),
+                'sub': queryset.filter(status='sub').count(),
+                'project': queryset.filter(status='project').count(),
+                'interview': queryset.filter(status='interview').count(),
+            }
+
+            if sub_status:
+                queryset = queryset.filter(status__in=sub_status)
+
             order_by = '-created'
             if sort_by:
                 field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
@@ -525,19 +554,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 elif field_name == 'name':
                     order_by = "consultant_marketing__consultant__name" if order == "asc" else "-consultant_marketing__consultant__name"
 
-            sub = sub.order_by('id').distinct('id')
-            data_counts = {
-                'total': sub.count(),
-                'sub': sub.filter(status='sub').count(),
-                'project': sub.filter(status='project').count(),
-                'interview': sub.filter(status='interview').count()
-            }
-
-            if sub_status:
-                sub = sub.filter(status__in=sub_status)
-
-            sub = Submission.objects.filter(id__in=sub.values('id')).order_by(order_by)
-            data = sub[first:last].annotate(
+            queryset = Submission.objects.filter(id__in=queryset.values('id')).order_by(order_by)
+            data = queryset[first:last].annotate(
                 city=F('lead__city'),
                 marketer_id=F('created_by'),
                 company_name=F('lead__vendor_company__name'),
@@ -642,8 +660,12 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = sub.filter(created_by__team=request.user.team)
 
             if version == 'v2' and filter_json:
+                filter_by_status = []
                 filter_string = dict()
                 filters = json.loads(filter_json)
+
+                if 'status' in filters and len(filters["status"]) > 0:
+                    filter_by_status = filters["status"]
 
                 if 'incomplete' in filters:
                     filter_string["is_complete"] = not filters["incomplete"]
@@ -666,9 +688,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     if gte:
                         filter_string["created__gte"] = gte
 
-                if 'status' in filters and len(filters["status"]) > 0:
-                    filter_by_status = filters["status"]
-
                 sub = sub.filter(**filter_string)
                 data, sub_data = self.get_count_and_queryset(sub, filter_by_status, sort_by, first, last)
             else:
@@ -687,7 +706,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if sub_data == "error":
                 return Response({"error": str(data)}, status=400)
 
-            return Response({"results": data, "counts": sub_data}, status=200)
+            return Response({"counts": sub_data, "results": data}, status=200)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -911,6 +930,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    # Change status of scheduled and rescheduled Interviews to feedback_due
+    def change_to_feedback_due(self):
+        try:
+            now = datetime.now() - timedelta(hours=4)
+            previous_interviews = Interview.objects.filter(end_time__lte=now, status__in=['scheduled', 'rescheduled'])
+            for interview in previous_interviews:
+                interview.status = 'feedback_due'
+                interview.save()
+        except Exception as error:
+            logger.error(error)
+            return Response({"error": str(error)}, status=400)
+
     def rank_interviews(self, interview, interview_status):
         try:
             submission = interview.submission
@@ -967,7 +998,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
 
-            data = queryset.order_by('-modified')[first:last].annotate(
+            data = queryset[first:last].annotate(
                 client=F('submission__client'),
                 project=F('submission__project'),
                 marketer_id=F('submission__created_by'),
@@ -986,42 +1017,32 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
     def get_count_and_queryset(self, queryset, filter_by_status, sort_by, first, last):
         try:
+            # Interview counts by status
+            queryset = queryset.order_by('id').distinct('id')
+            data_counts = {
+                'total': queryset.count(),
+                'offer': queryset.filter(status='offer').count(),
+                'failed': queryset.filter(status='failed').count(),
+                'scheduled': queryset.filter(status='scheduled').count(),
+                'cancelled': queryset.filter(status='cancelled').count(),
+                'rescheduled': queryset.filter(status='rescheduled').count(),
+                'feedback_due': queryset.filter(status=' feedback_due').count(),
+            }
+
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
             order_by = '-created'
             if sort_by:
                 field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
                 if field_name == 'created':
                     order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'modified':
-                    order_by = "modified" if order == "asc" else "-modified"
                 elif field_name == 'start_date':
                     order_by = "start_time" if order == "asc" else "-start_time"
-                elif field_name == 'name':
+                elif field_name == 'ctb':
+                    order_by = "supervisor__employee_name" if order == "asc" else "-supervisor__employee_name"
+                elif field_name == 'consultant':
                     order_by = "submission__consultant_marketing__consultant__name" if order == "asc" \
                         else "-submission__consultant_marketing__consultant__name"
-
-            # Interview counts by status
-            queryset = queryset.order_by('id').distinct('id')
-
-            total = queryset.count()
-            offer = queryset.filter(status='offer').count()
-            failed = queryset.filter(status='failed').count()
-            scheduled = queryset.filter(status='scheduled').count()
-            cancelled = queryset.filter(status='cancelled').count()
-            rescheduled = queryset.filter(status='rescheduled').count()
-            feedback_due = queryset.filter(status='feedback_due').count()
-
-            data_counts = {
-                'total': total,
-                'offer': offer,
-                'failed': failed,
-                'scheduled': scheduled,
-                'cancelled': cancelled,
-                'rescheduled': rescheduled,
-                'feedback_due': feedback_due,
-            }
-
-            if filter_by_status:
-                queryset = queryset.filter(status__in=filter_by_status)
 
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             data = queryset[first:last].annotate(
@@ -1040,18 +1061,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
         except Exception as error:
             logger.error(error)
             return error, 'error'
-
-    # Change status of scheduled and rescheduled Interviews to feedback_due
-    def change_to_feedback_due(self):
-        try:
-            now = datetime.now() - timedelta(hours=4)
-            previous_interviews = Interview.objects.filter(end_time__lte=now, status__in=['scheduled', 'rescheduled'])
-            for interview in previous_interviews:
-                interview.status = 'feedback_due'
-                interview.save()
-        except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -1135,29 +1144,36 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         Q(submission__consultant_marketing__marketer=request.user) |
                         Q(submission__created_by=request.user)
                     )
-
             if version == 'v2' and filter_json:
                 filter_string = dict()
                 filters = json.loads(filter_json)
 
-                if 'client' in filters and len(filters["status"]) > 0:
+                if 'status' in filters and len(filters["status"]) > 0:
+                    filter_by_status = filters["status"]
+
+                if 'ctb' in filters and len(filters["ctb"]) > 0:
+                    filter_string["supervisor_id__in"] = filters["ctb"]
+
+                if 'client' in filters and len(filters["client"]) > 0:
                     filter_string["submission__client__in"] = filters["client"]
+
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    filter_string["submission__created_by_id__in"] = filters["marketer"]
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
                     filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
 
-                if 'consultant_id' in filters and len(filters["consultant_id"]) > 0:
-                    filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant_id"]
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant"]
 
-                if 'created' in filters:
-                    if 'lte' in filters["created"] and len(filters["created"]['lte']) > 0:
-                        filter_string["created__lte"] = filters["created"]['lte']
-                    if 'gte' in filters["created"] and len(filters["created"]['gte']) > 0:
-                        filter_string["created__gte"] = filters["created"]['gte']
-
-                filter_by_status = None
-                if 'status' in filters and len(filters["status"]) > 0:
-                    filter_by_status = filters["status"]
+                start_time = filters.get('start_time', None)
+                if start_time:
+                    lte = start_time.get('lte', None)
+                    gte = start_time.get('gte', None)
+                    if lte:
+                        filter_string["created__lte"] = lte
+                    if gte:
+                        filter_string["created__gte"] = gte
 
                 queryset = queryset.filter(**filter_string)
                 data, screen_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
@@ -1168,7 +1184,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if screen_data == 'error':
                 return Response({"error": str(data)}, status=400)
 
-            return Response({"results": data, "counts": screen_data}, status=200)
+            return Response({"counts": screen_data, "results": data}, status=200)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -1956,25 +1972,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def get_count_and_queryset(self, queryset, filter_by_status, sort_by):
         try:
-            order_by = 'created'
-            if filter_by_status == 'failed':
-                order_by = 'modified'
-            if sort_by:
-                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                if field_name == 'created':
-                    order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'modified':
-                    order_by = "modified" if order == "asc" else "-modified"
-                elif field_name == 'name':
-                    order_by = "submission__consultant_marketing__consultant__name" if order == "asc" \
-                        else "-submission__consultant_marketing__consultant__name"
-
             # Interview counts by status
-            sort_by = 'created'
-            if filter_by_status == 'failed':
-                sort_by = 'modified'
-            queryset = queryset.order_by('-' + sort_by).distinct(sort_by)
-
+            queryset = queryset.order_by('id').distinct('id')
             data_counts = {
                 'total': queryset.count(),
                 'new': queryset.filter(status='new').count(),
@@ -1984,6 +1983,17 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'cancelled': queryset.filter(status='cancelled').count(),
                 'feedback_due': queryset.filter(status='feedback_due').count(),
             }
+
+            order_by = 'created'
+            if filter_by_status == 'failed':
+                order_by = 'modified'
+            if sort_by:
+                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
+                if field_name == 'created':
+                    order_by = "created" if order == "asc" else "-created"
+                elif field_name == 'deadline':
+                    order_by = "deadline" if order == "asc" else "-deadline"
+
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
 
@@ -2164,28 +2174,38 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
 
             if version == 'v2' and filter_json:
-                filter_string = dict()
-                if filter_json:
-                    filters = json.loads(filter_json)
-                    if 'status' in filters and len(filters["status"]) > 0:
-                        filter_string["status__in"] = filters["status"]
+                filter_string, filter_by_status = dict(), list()
+                filters = json.loads(filter_json)
 
-                    if 'client' in filters and len(filters["client"]) > 0:
-                        filter_string["submission__client__in"] = filters["client"]
+                if 'status' in filters and len(filters["status"]) > 0:
+                    filter_by_status = filters["status"]
 
-                    if 'vendor' in filters and len(filters["vendor"]) > 0:
-                        filter_string["submission__lead__vendor_company_id"] = filters["vendor"]
+                if 'client' in filters and len(filters["client"]) > 0:
+                    filter_string["submission__client__in"] = filters["client"]
 
-                    if 'consultant_id' in filters and len(filters["consultant_id"]) > 0:
-                        filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant_id"]
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    filter_string["submission__lead__vendor_company_id"] = filters["vendor"]
 
-                    if 'created' in filters:
-                        if 'lte' in filters["created"] and len(filters["created"]['lte']) > 0:
-                            filter_string["created__lte"] = filters["created"]['lte']
-                        if 'gte' in filters["created"] and len(filters["created"]['gte']) > 0:
-                            filter_string["created__gte"] = filters["created"]['gte']
+                created = filters.get('created', None)
+                deadline = filters.get('created', None)
 
-                    queryset = queryset.filter(**filter_string)
+                if created:
+                    lte = created.get('lte', None)
+                    gte = created.get('gte', None)
+                    if lte:
+                        filter_string["created__lte"] = lte
+                    if gte:
+                        filter_string["created__gte"] = gte
+
+                if deadline:
+                    lte = deadline.get('lte', None)
+                    gte = deadline.get('gte', None)
+                    if lte:
+                        filter_string["deadline__lte"] = lte
+                    if gte:
+                        filter_string["deadline__gte"] = gte
+
+                queryset = queryset.filter(**filter_string)
                 queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
             else:
                 queryset, counts = self.get_test_data(queryset, filter_by_status)
@@ -2194,7 +2214,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return Response({"error": str(queryset)}, status=400)
 
             data = TestListSerializer(queryset[first:last], many=True).data
-            return Response({"results": data, "counts": counts}, status=200)
+            return Response({"counts": counts, "results": data}, status=200)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
