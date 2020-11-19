@@ -64,15 +64,19 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
         try:
-            queryset = VendorCompany.objects.filter(name__iexact=request.data.get('name', None))
-            if queryset:
-                return Response({"result": "Company already exist"}, status=201)
-            company = VendorCompany.objects.create(
-                name=request.data.get('name', None),
-                created_by=str(request.user.employee_id) + " - " + request.user.employee_name
-            )
-            serializer = VendorCompanySerializer(company)
-            return Response({"result": serializer.data}, status=201)
+            name = request.data.get('name', None).strip().replace(':amp:', '&')
+            if name:
+                name = name.strip().replace(':amp:', '&')
+                queryset = VendorCompany.objects.filter(name__iexact=name)
+                if queryset:
+                    return Response({"result": "Company already exist"}, status=400)
+                company = VendorCompany.objects.create(
+                    name=request.data.get('name', None),
+                    created_by=str(request.user.employee_id) + " - " + request.user.employee_name
+                )
+                serializer = VendorCompanySerializer(company)
+                return Response({"result": serializer.data}, status=201)
+            return Response({"result": "Enter company name"}, status=400)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -105,16 +109,20 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
     def create(self, request, *args, **kwargs):
         email = request.data.get('email', None)
-        vendor = VendorContact.objects.filter(email=email, created_by=request.user, company_id=request.data['company'])
+        company = request.data.get('company', None)
+        if not company:
+            return Response({"error": "Provide company Id"}, status=400)
+
+        vendor = VendorContact.objects.filter(email=email, created_by=request.user, company_id=company)
         if vendor:
             return Response({"error": "already exists"}, status=400)
         try:
             vendor_contact = VendorContact.objects.create(
                 email=email,
+                company_id=company,
                 created_by=request.user,
                 name=request.data['name'],
                 number=request.data['number'],
-                company_id=request.data['company'],
             )
             data = {
                 "id": vendor_contact.id,
@@ -169,15 +177,17 @@ class LeadViewSets(viewsets.ModelViewSet):
 
             if filter_by_status == 'archived':
                 data = queryset[first:last].annotate(
-                    company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
+                    submission_count=Count('submission'),
+                    company_name=F('vendor_company__name'),
                     position_name=F('position__display_name')
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
-                    company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
+                    submission_count=Count('submission'),
+                    company_name=F('vendor_company__name'),
                     position_name=F('position__display_name')
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
@@ -212,15 +222,17 @@ class LeadViewSets(viewsets.ModelViewSet):
             queryset = Lead.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             if filter_by_status == 'archived':
                 data = queryset[first:last].annotate(
-                    company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
+                    submission_count=Count('submission'),
+                    company_name=F('vendor_company__name'),
                     position_name=F('position__display_name')
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
             else:
                 data = queryset.exclude(status='archived')[first:last].annotate(
-                    company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
+                    submission_count=Count('submission'),
+                    company_name=F('vendor_company__name'),
                     position_name=F('position__display_name')
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
                          'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
@@ -243,16 +255,16 @@ class LeadViewSets(viewsets.ModelViewSet):
                 query = query.lstrip().replace(':amp:', '&')
                 leads = Lead.objects.filter(
                     Q(owner=request.user) & (
-                            Q(city__icontains=query) |
-                            Q(job_title__icontains=query) |
+                            Q(city__istartswith=query) |
+                            Q(job_title__istartswith=query) |
                             Q(vendor_company__name__icontains=query)
                     )
-                ).annotate(submission_count=Count('submission'))
+                )
             else:
                 leads = Lead.objects.filter(
                     Q(owner=request.user) |
                     Q(shared_to=request.user)
-                ).annotate(submission_count=Count('submission'))
+                )
 
             if version == 'v2' and filter_json:
                 filter_by_status = []
@@ -261,6 +273,9 @@ class LeadViewSets(viewsets.ModelViewSet):
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    filter_string["position_id__in"] = filters["position"]
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
                     filter_string["vendor_company_id__in"] = filters["vendor"]
@@ -292,8 +307,8 @@ class LeadViewSets(viewsets.ModelViewSet):
         try:
             lead = Lead.objects.filter(id=kwargs.get('pk'))
             data = lead.annotate(submission_count=Count('submission')).annotate(
-                company_name=F('vendor_company__name'),
                 company_id=F('vendor_company__id'),
+                company_name=F('vendor_company__name'),
                 position_name=F('position__display_name')
             ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'created',
                      'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
@@ -315,8 +330,8 @@ class LeadViewSets(viewsets.ModelViewSet):
                 lead.owner = request.user
                 lead.save()
                 data = queryset.annotate(submission_count=Count('submission')).annotate(
-                    company_name=F('vendor_company__name'),
                     company_id=F('vendor_company__id'),
+                    company_name=F('vendor_company__name'),
                     position_name=F('position__display_name')
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'created',
                          'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
@@ -342,13 +357,12 @@ class LeadViewSets(viewsets.ModelViewSet):
                 if len(lead.job_desc) < 20:
                     submissions = lead.submission.all()
                     submissions.update(is_complete=False)
-                data = queryset.annotate(
-                    submission_count=Count('submission')
-                ).annotate(company_name=F('vendor_company__name'),
-                           company_id=F('vendor_company__id'),
-                           position_name=F('position__display_name')
-                           ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill',
-                                    'status', 'company_id', 'company_name', 'modified', 'submission_count', 'is_w2')
+                data = queryset.annotate(submission_count=Count('submission')).annotate(
+                    company_id=F('vendor_company__id'),
+                    company_name=F('vendor_company__name'),
+                    position_name=F('position__display_name')
+                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'is_w2',
+                         'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=202)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=400)
@@ -397,8 +411,8 @@ class LeadViewSets(viewsets.ModelViewSet):
             city = request.query_params.get('query', None)
 
             leads = Lead.objects.annotate(submission_count=Count('submission')).filter(
-                Q(owner=request.user, city__iexact=city) |
-                Q(shared_to=request.user, city__iexact=city)
+                Q(shared_to=request.user, city__iexact=city) |
+                Q(owner=request.user, city__iexact=city)
             ).order_by('-modified')
 
             data, data_counts = self.get_lead_data(leads, '', first, last)
@@ -551,8 +565,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     order_by = "created" if order == "asc" else "-created"
                 elif field_name == 'modified':
                     order_by = "modified" if order == "asc" else "-modified"
-                elif field_name == 'name':
-                    order_by = "consultant_marketing__consultant__name" if order == "asc" else "-consultant_marketing__consultant__name"
 
             queryset = Submission.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             data = queryset[first:last].annotate(
@@ -612,13 +624,13 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 sub = Submission.objects.filter(
-                    Q(client__icontains=query) |
-                    Q(lead__city__icontains=query) |
-                    Q(lead__job_title__icontains=query) |
+                    Q(client__istartswith=query) |
+                    Q(lead__city__istartswith=query) |
+                    Q(lead__job_title__istartswith=query) |
                     Q(lead__vendor_company__name__icontains=query) |
                     Q(created_by__employee_name__istartswith=query) |
                     Q(vendors__vendor_company__name__icontains=query) |
-                    Q(consultant_marketing__consultant__name__icontains=query)
+                    Q(consultant_marketing__consultant__name__istartswith=query)
                 ).exclude(status='draft')
             else:
                 sub = Submission.objects.exclude(
@@ -632,8 +644,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     Q(consultant_marketing__in_pool=True) |
                     Q(consultant_marketing__teams=request.user.team) |
                     Q(consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter'
-                      )
+                      consultant_marketing__consultant__pocs__poc_type='recruiter')
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
@@ -664,20 +675,23 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 filter_string = dict()
                 filters = json.loads(filter_json)
 
+                if 'client' in filters and len(filters["client"]) > 0:
+                    filter_string["client__in"] = filters["client"]
+
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
                 if 'incomplete' in filters:
                     filter_string["is_complete"] = not filters["incomplete"]
 
-                if 'client' in filters and len(filters["client"]) > 0:
-                    filter_string["client__in"] = filters["client"]
-
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
                     filter_string["lead__vendor_company_id__in"] = filters["vendor"]
 
-                if 'consultant_id' in filters and len(filters["consultant_id"]) > 0:
-                    filter_string["consultant_marketing__consultant_id__in"] = filters["consultant_id"]
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    filter_string["consultant_marketing__consultant_id__in"] = filters["consultant"]
+
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    filter_string["created_by_id__in"] = filters["marketer"]
 
                 created = filters.get('created', None)
                 if created:
@@ -804,7 +818,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 if client_name:
                     queryset = Submission.objects.filter(
                         Q(consultant_marketing__consultant_id=consultant_id) &
-                        (Q(client__icontains=client_name) | Q(lead__vendor_company=vendor_company))
+                        (Q(client__istartswith=client_name) | Q(lead__vendor_company=vendor_company))
                     )
                 else:
                     queryset = Submission.objects.filter(
@@ -816,7 +830,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 if client_name and client_name != 'null':
                     queryset = Submission.objects.filter(
                         Q(consultant_marketing__consultant_id=consultant_id) &
-                        (Q(client__icontains=client_name) | Q(lead__vendor_company=lead.vendor_company))
+                        (Q(client__istartswith=client_name) | Q(lead__vendor_company=lead.vendor_company))
                     )
                 else:
                     queryset = Submission.objects.filter(
@@ -1036,13 +1050,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
                 if field_name == 'created':
                     order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'start_date':
+                elif field_name == 'start_time':
                     order_by = "start_time" if order == "asc" else "-start_time"
-                elif field_name == 'ctb':
-                    order_by = "supervisor__employee_name" if order == "asc" else "-supervisor__employee_name"
-                elif field_name == 'consultant':
-                    order_by = "submission__consultant_marketing__consultant__name" if order == "asc" \
-                        else "-submission__consultant_marketing__consultant__name"
 
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             data = queryset[first:last].annotate(
@@ -1096,7 +1105,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 query = query.lstrip().replace(':amp:', '&')
                 queryset = Interview.objects.filter(
                     Q(submission__client__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__icontains=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__created_by__employee_name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__email__iexact=query) |
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
@@ -1170,6 +1179,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 if start_time:
                     lte = start_time.get('lte', None)
                     gte = start_time.get('gte', None)
+                    if lte:
+                        filter_string["start_time__lte"] = lte
+                    if gte:
+                        filter_string["start_time__gte"] = gte
+
+                created = filters.get('created', None)
+                if created:
+                    lte = created.get('lte', None)
+                    gte = created.get('gte', None)
                     if lte:
                         filter_string["created__lte"] = lte
                     if gte:
@@ -2124,8 +2142,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 query = query.lstrip().replace(':amp:', '&')
                 queryset = Test.objects.filter(
                     Q(submission__client__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__icontains=query) |
                     Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__email__istartswith=query)
                 )

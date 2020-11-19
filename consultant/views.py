@@ -44,7 +44,6 @@ from consultant.serializers import ConsultantSerializer, ConsultantProfileSerial
     ExitDetailConsultantSerializer, ConsultantPetitionLoginSerializer
 
 logger = logging.getLogger(__name__)
-dont_have_access = 'you don\'t have access'
 
 
 def create_activity(object_id, model, user, desc, activity_type):
@@ -390,25 +389,21 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
     def get_submission_data(self, queryset, filter_by_status, first, last):
         try:
-            total = queryset.count()
-            submission = queryset.filter(status='sub').count()
-            project = queryset.filter(status='project').count()
-            interview = queryset.filter(status='interview').count()
+            data_counts = {
+                'total': queryset.count(),
+                'sub': queryset.filter(status='sub').count(),
+                'project': queryset.filter(status='project').count(),
+                'interview': queryset.filter(status='interview').count()
+            }
 
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
 
-            data_counts = {
-                'total': total,
-                'sub': submission,
-                'project': project,
-                'interview': interview
-            }
             data = queryset[first:last].annotate(
-                consultant_name=F('consultant_marketing__consultant__name'),
+                city=F('lead__city'),
                 company_name=F('lead__vendor_company__name'),
                 marketer_name=F('created_by__employee_name'),
-                city=F('lead__city')
+                consultant_name=F('consultant_marketing__consultant__name'),
             ).values('id', 'rate', 'consultant_name', 'company_name', 'marketer_name', 'city', 'project', 'client')
 
             return data, data_counts
@@ -420,39 +415,31 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             # Interview counts by status
             queryset = queryset.order_by('-modified').distinct('modified')
-            total = queryset.count()
-            failed = queryset.filter(status='failed').count()
-            offer = queryset.filter(status='offer').count()
-            scheduled = queryset.filter(status='scheduled').count()
-            cancelled = queryset.filter(status='cancelled').count()
-            rescheduled = queryset.filter(status='rescheduled').count()
-            feedback_due = queryset.filter(status='feedback_due').count()
 
             data_counts = {
-                'total': total,
-                'offer': offer,
-                'failed': failed,
-                'scheduled': scheduled,
-                'cancelled': cancelled,
-                'rescheduled': rescheduled,
-                'feedback_due': feedback_due,
+                'total': queryset.count(),
+                'offer': queryset.filter(status='offer').count(),
+                'failed': queryset.filter(status='failed').count(),
+                'scheduled': queryset.filter(status='scheduled').count(),
+                'cancelled': queryset.filter(status='cancelled').count(),
+                'rescheduled': queryset.filter(status='rescheduled').count(),
+                'feedback_due': queryset.filter(status='feedback_due').count(),
             }
 
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
 
             data = queryset[first:last].annotate(
-                job_title=F('submission__lead__job_title'),
-                ctb=F('supervisor__employee_name'),
                 client=F('submission__client'),
                 project=F('submission__project'),
+                ctb=F('supervisor__employee_name'),
+                job_title=F('submission__lead__job_title'),
                 marketer_name=F('submission__created_by__employee_name'),
                 company_name=F('submission__lead__vendor_company__name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-
             ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'submission_id', 'status',
-                     'ctb', 'marketer_name', 'consultant_name', 'client', 'company_name',
-                     'project', 'job_title', 'modified', 'created')
+                     'ctb', 'marketer_name', 'consultant_name', 'client', 'company_name', 'project', 'job_title',
+                     'modified', 'created')
 
             return data, data_counts
         except Exception as error:
@@ -462,25 +449,19 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def get_project_data(self, queryset, filter_by_status):
         try:
             # count of project by status
-            total = queryset.count()
-            new = queryset.filter(statuses__status='new', statuses__is_current=True).count()
-            joined = queryset.filter(statuses__status='joined', statuses__is_current=True).count()
-            received = queryset.filter(statuses__status='received', statuses__is_current=True).count()
-            on_boarded = queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count()
-            not_joined = queryset.filter(statuses__status='not_joined', statuses__is_current=True).count()
+            data_counts = {
+                'total': queryset.count(),
+                'new': queryset.filter(statuses__status='new', statuses__is_current=True).count(),
+                'joined': queryset.filter(statuses__status='joined', statuses__is_current=True).count(),
+                'received': queryset.filter(statuses__status='received', statuses__is_current=True).count(),
+                'on_boarded': queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
+                'not_joined': queryset.filter(statuses__status='not_joined', statuses__is_current=True).count(),
+            }
 
             queryset = queryset.order_by('-start_date')
             if filter_by_status:
                 queryset = queryset.filter(statuses__status=filter_by_status, statuses__is_current=True)
 
-            data_counts = {
-                'new': new,
-                'total': total,
-                'joined': joined,
-                'received': received,
-                'on_boarded': on_boarded,
-                'not_joined': not_joined,
-            }
             project_status = ProjectStatus.objects.filter(
                 project=OuterRef("pk"), is_current=True)
 
@@ -522,9 +503,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 )
 
             if 'recruiter' in roles:
-                recruits = consultants.filter(
-                    pocs__poc=request.user
-                )
+                recruits = consultants.filter(pocs__poc=request.user)
                 consultants = consultants.union(recruits)
 
             if query:
@@ -556,7 +535,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
@@ -575,7 +554,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
-
             )
 
             # Creating Consultant Original Profile Consultant
@@ -631,7 +609,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             serializer = ConsultantUpdateSerializer(consultant, data=request.data, partial=True)
@@ -721,7 +699,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
         if request.method == 'POST':
             try:
@@ -771,7 +749,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
         if request.method == 'POST':
             try:
@@ -1248,7 +1226,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"result": serializer.data}, status=202)
             else:
-                return Response({"result": dont_have_access}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -1279,7 +1257,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"result": serializer.data}, status=202)
             else:
-                return Response({"result": dont_have_access}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -1313,7 +1291,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"result": serializer.data}, status=200)
             else:
-                return Response({"result": dont_have_access}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -1345,7 +1323,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"result": serializer.data}, status=202)
             else:
-                return Response({"result": dont_have_access}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             logger.error(error)
             return Response({"error": str(error)}, status=400)
@@ -1446,7 +1424,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
         try:
             queryset = ConsultantPOC.objects.filter(
                 poc_type=request.data['poc_type'], consultant=request.data['consultant'], end=None
@@ -1477,7 +1455,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
             serializer = self.serializer_class(instance, data=request.data, partial=True)
@@ -1506,7 +1484,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
             if instance:
@@ -1523,9 +1501,9 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             profiles = work_auth.consultant.profiles.filter(title__iexact='Original')
             if profiles:
                 profile = profiles.first()
-                profile.visa_start = work_auth.visa_start
                 profile.visa_end = work_auth.visa_end
                 profile.visa_type = work_auth.visa_type
+                profile.visa_start = work_auth.visa_start
                 profile.save()
 
             serializer = self.serializer_class(work_auth)
@@ -1545,7 +1523,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": dont_have_access}, status=403)
+            return Response({"result": DONT_HAVE_ACCESS}, status=403)
         try:
             work_auth = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
             serializer = self.serializer_class(work_auth, data=request.data, partial=True)
@@ -1635,7 +1613,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"result": dont_have_access}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
             con_exit = ConsultantExit.objects.create(
@@ -1685,7 +1663,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"result": dont_have_access}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
             con_exit = get_object_or_404(ConsultantExit, id=kwargs.get('pk'))
 
@@ -1713,7 +1691,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
-                return Response({"result": dont_have_access}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
             exit_id = kwargs.get('pk')
             con_exit = get_object_or_404(ConsultantExit, id=exit_id)

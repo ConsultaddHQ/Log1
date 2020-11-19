@@ -465,11 +465,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant"]
 
-                if 'created' in filters:
-                    if 'lte' in filters["created"] and len(filters["created"]['lte']) > 0:
-                        filter_string["created__lte"] = filters["created"]['lte']
-                    if 'gte' in filters["created"] and len(filters["created"]['gte']) > 0:
-                        filter_string["created__gte"] = filters["created"]['gte']
+                created = filters.get('created', None)
+                if created:
+                    lte = created.get('lte', None)
+                    gte = created.get('gte', None)
+                    if lte: filter_string["created__lte"] = lte
+                    if gte: filter_string["created__gte"] = gte
 
                 projects = projects.order_by('id').distinct('id')
                 data = {
@@ -738,8 +739,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     ).count()
                     if project.is_remote and project.submission.lead.is_w2:
                         con_str = f"**Remote Project** \n"
-                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
-                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}** <br>"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**"
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
 
@@ -816,8 +817,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
                     if project.is_remote or project.submission.lead.is_w2:
                         con_str = f"**Remote Project** \n"
-                        con_str += f"{consultant_gender_emoji} Consultant: **{project.submission.consultant.name}**\n"
-                        con_str += f"{consultant_gender_emoji} Remote Engineer: **{project.consultant.name}**\n"
+                        con_str += f"{consultant_gender_emoji} Consultant: **{project.submission.consultant.name}** <br>"
+                        con_str += f"{consultant_gender_emoji} Remote Engineer: **{project.consultant.name}**"
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
                     # Sending message on Messaging Tool
@@ -852,7 +853,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
 
-                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}**<br>
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
                         {employer_emoji} Employer :  {project.employer}<br>

@@ -18,8 +18,8 @@ from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
 from utils_app.mailing import send_email
-from utils_app.utils import get_page_limits
 from employee.token import get_token_generator
+from utils_app.utils import get_page_limits, DONT_HAVE_ACCESS
 from attachment.views import presigned_post_url, get_s3_object
 from notification.views import create_notification, push_notification
 from legal.models import Types, Petition, Reason, Document, DocumentList
@@ -422,7 +422,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
         try:
             if request.method == 'GET':
                 if not ('legal' in request.user.roles or 'superadmin' in request.user.roles):
-                    return Response({"result": 'you don\'t have access'}, status=403)
+                    return Response({"result": DONT_HAVE_ACCESS}, status=403)
                 petition = get_object_or_404(Petition, id=object_id)
                 comments = petition.consultant_comments.filter(parent_comment=None).order_by('-created')
                 serializer = ConsultantCommentGetSerializer(comments, many=True)
@@ -430,7 +430,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
             elif request.method == 'POST':
                 if not ('legal' in request.user.roles):
-                    return Response({"result": 'you don\'t have access'}, status=403)
+                    return Response({"result": DONT_HAVE_ACCESS}, status=403)
                 content_type = ContentType.objects.get(model='petition')
                 created_by_content_type = ContentType.objects.get(model='user')
                 comment = ConsultantComment.objects.create(
@@ -487,7 +487,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         try:
             petition = get_object_or_404(Petition, id=object_id)
             if petition.beneficiary != request.user:
-                return Response({"result": 'you don\'t have access'}, status=403)
+                return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
             if request.method == 'GET':
                 comments = petition.consultant_comments.filter(parent_comment=None)

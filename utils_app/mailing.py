@@ -44,3 +44,21 @@ def send_email_attachment_multiple(mail_data, from_email, reply_to=[]):
     except Exception as error:
         logger.error(error)
         return error
+
+
+@shared_task
+def send_email_without_template(mail_data, from_email):
+    try:
+        msg = EmailMultiAlternatives(
+            subject=mail_data["subject"],
+            body=mail_data["body"],
+            from_email=from_email,
+            bcc=mail_data["bcc"],
+            to=mail_data["to"],
+            cc=mail_data["cc"],
+        )
+        msg.send()
+        return "mail sent", True
+    except Exception as error:
+        logger.error(str(error))
+        return error, False
