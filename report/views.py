@@ -546,10 +546,10 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     serializer_class = ProjectSupportDetailSerializer
 
     def get_support_counts(self, supports):
-        supports = supports.order_by('project__id',
-                                     'project__consultant__id'
-                                     ).distinct('project__id', 'project__consultant__id')
         counts = dict()
+        supports = supports.order_by(
+            'project__id', 'project__consultant__id'
+        ).distinct('project__id', 'project__consultant__id')
         active = training = less_active = independent = 0
         terminated = supports.filter(project__statuses__status__istartswith='terminated').count()
         supports = supports.filter(end=None).exclude(project__statuses__status__istartswith='terminated')
@@ -728,28 +728,29 @@ class MarketingReportViewSets(GenericViewSet):
             total_bench = total_submissions = total_interviews = total_joined = total_offers = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
+                team_id = team.id
                 bench_consultant = Consultant.objects.filter(
-                    marketing__teams__name__iexact=team.name,
+                    marketing__teams__id=team_id,
                     marketing__status='open'
-                ).count()
+                ).order_by('id').distinct('id').count()
                 submission_count = Submission.objects.filter(
-                    created_by__team__name__iexact=team.name,
+                    created_by__team__id=team_id,
                     created__gte=start, created__lte=end,
-                ).exclude(status='draft').count()
+                ).exclude(status='draft').order_by('id').distinct('id').count()
                 interview_count = Interview.objects.filter(
                     created__gte=start, created__lte=end,
-                    submission__created_by__team__name__iexact=team.name
+                    submission__created_by__team__id=team_id
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
+                    submission__created_by__team__id=team_id,
                     statuses__status__in=['received', 'on_boarded'],
-                    submission__created_by__team__name__iexact=team.name,
                     statuses__created__gte=start, statuses__created__lte=end,
-                ).count()
+                ).order_by('id').distinct('id').count()
                 joined_count = Project.objects.filter(
                     statuses__status='joined',
+                    submission__created_by__team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
-                    submission__created_by__team__name__iexact=team.name,
-                ).count()
+                ).order_by('id').distinct('id').count()
                 scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
                 scrum_master = None
                 if scrum_masters:

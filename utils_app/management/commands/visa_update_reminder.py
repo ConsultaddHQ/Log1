@@ -8,7 +8,7 @@ from utils_app.mailing import send_email_without_template
 
 class Command(BaseCommand):
     # Show this when the user types help
-    help = "this command is for posting your payload to MatterMost app"
+    help = "This command is to send mail for Visa expiry reminder"
 
     # A command must define handle()
     def handle(self, *args, **options):
@@ -31,8 +31,9 @@ class Command(BaseCommand):
                         'bcc': [],
                         'cc': marketers,
                         'to': [config.RECRUITMENT, config.RELATIONS],
-                        'subject': f"{consultant.name}'s Visa expiry reminder",
-                        'body': f"Reminder: \n{visa.get_visa_type_display()} for {consultant.name} ({consultant.email})"
-                                f" is expiring on {expiry_date}"
+                        'subject': f"Reminder: Visa is expiring: {consultant.name}",
+                        'body': f"{consultant.name} {visa.get_visa_type_display()} is expiring on {expiry_date} "
+                                f"Update the work authorisation on log1."
                     }
-                    send_email_without_template(mail_data, "log1@consultadd.com")
+                    res = send_email_without_template(mail_data, "Log1")
+                    print(consultant.name, res)
