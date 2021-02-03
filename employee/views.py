@@ -1,4 +1,4 @@
-import logging
+import inspect
 from itertools import chain
 
 from django.utils import timezone
@@ -23,19 +23,21 @@ from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
-from utils_app.utils import DONT_HAVE_ACCESS
+from log1.utils import write_exception, DONT_HAVE_ACCESS
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, \
     get_password_reset_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer
-
-logger = logging.getLogger(__name__)
 
 
 class EmployeeAuthViewSets(GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     login_serializer_class = UserSerializerLogin
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
@@ -55,18 +57,15 @@ class EmployeeAuthViewSets(GenericViewSet):
 
             user = User.objects.filter(employee_id__exact=employee_id)
             if user:
-                logger.error("User already exist")
-                return Response({
-                    "result": "User already exist",
-                    "data": self.serializer_class(user, many=True).data[0]},
-                    status=406)
+                return Response({"result": "User already exist",
+                                 "data": self.serializer_class(user, many=True).data[0]['email']}, status=406)
             user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
             for i in role:
                 r = Role.objects.get(name=i)
                 user.role.add(r)
             return Response({"result": "success", "data": self.serializer_class(user).data}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='login')
@@ -94,7 +93,6 @@ class EmployeeAuthViewSets(GenericViewSet):
             fcm_token.save()
 
             return Response({"result": self.login_serializer_class(user).data}, status=202)
-        logger.error("Incorrect Employee Id/Password")
         return Response({"error": "Incorrect Employee Id/Password"}, status=400)
 
 
@@ -104,13 +102,17 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         try:
             user = get_object_or_404(User, id=kwargs.get('pk'))
             serializer = self.serializer_class(user)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -140,7 +142,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             data = users.values('id', 'employee_id', 'email', 'name')
             return Response({"results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='role')
@@ -202,6 +204,10 @@ class ResetPasswordViewSets(GenericViewSet):
     serializer_class = EmailSerializer
     pass_serializer_class = PasswordTokenSerializer
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -223,7 +229,6 @@ class ResetPasswordViewSets(GenericViewSet):
 
         # No active user found, raise a validation error
         if not active_user_found:
-            logger.info("User is not active")
             raise exceptions.ValidationError({
                 'email': [_(
                     "There is no active user associated with this e-mail address or the password can not be changed")],
@@ -254,7 +259,7 @@ class ResetPasswordViewSets(GenericViewSet):
                 }
                 res, error = user.send_mail(mail_data)
                 if error == 'error':
-                    logger.error(res)
+                    write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                     return Response({'error': str(res)}, status=200)
         return Response({'status': 'OK'}, status=200)
 
@@ -295,6 +300,10 @@ class AssetsViewSets(viewsets.ModelViewSet):
     field_list = ['id', 'email', 'number', 'username', 'password', 'provider', 'modified', 'tech',
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
         try:
@@ -302,7 +311,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(asset)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -326,7 +335,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             }
             return Response({"results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -345,7 +354,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 return Response({"result": serializer.data}, status=201)
             return Response({"error": str(serializer.errors)}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -375,7 +384,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -388,7 +397,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             create_activity(asset.id, 'asset', request.user, desc, 'deleted')
             return Response(status=204)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=False, url_path='share')
@@ -411,7 +420,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"result": "ok"}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='un_share')
@@ -427,7 +436,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(asset)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='bulk_upload')
@@ -462,7 +471,9 @@ class AssetsViewSets(viewsets.ModelViewSet):
                                 asset_type=row['Asset Type'].lower()
                             )
                         else:
-                            logger.error(row["Username"], request.user.employee_name, "Asset Type not found")
+                            write_exception(message=f"{row['Username']} {request.user.employee_name} "
+                                                    f"Asset Type not found", class_name=self.get_classname(),
+                                            function_name=inspect.stack()[0][3])
                             failed += 1
                             continue
                         asset.email = row['Email'] if not pd.isnull(row['Email']) else ""
@@ -481,7 +492,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
                             updated += 1
 
                     except Exception as e:
-                        logger.error(row["Username"], request.user.employee_name, e)
+                        write_exception(message=f"{row['Username']} {request.user.employee_name} {e}",
+                                        class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                         failed += 1
                         continue
                 mail_data = {
@@ -502,7 +514,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                                 status=201)
             return Response({"result": "Empty File"}, status=404)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -510,6 +522,10 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
     queryset = User.objects.all()
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         try:
@@ -526,4 +542,5 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             result_list = list(chain(consultants[:5], users[:5]))
             return Response({"results": result_list}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': str(error)}, status=400)

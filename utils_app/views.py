@@ -1,5 +1,3 @@
-import logging
-
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -8,9 +6,8 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from django.contrib.contenttypes.models import ContentType
 
+from log1.utils import write_exception
 from utils_app.models import City, Choice
-
-logger = logging.getLogger(__name__)
 
 
 class CityViewSets(ListModelMixin, GenericViewSet):
@@ -19,10 +16,14 @@ class CityViewSets(ListModelMixin, GenericViewSet):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
-        query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
-        city = City.objects.filter(name__istartswith=query)
-        data = city[:40].values('id', 'name', 'state')
-        return Response({"results": data}, status=200)
+        try:
+            query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
+            city = City.objects.filter(name__istartswith=query)
+            data = city[:40].values('id', 'name', 'state')
+            return Response({"results": data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name='CityViewSets', function_name='list')
+            return Response({"error": str(error)}, status=400)
 
 
 class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
@@ -41,7 +42,8 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             data = queryset.values('id', 'name', 'display_name', 'field', 'content_type__model')
             return Response({"results": data}, status=200)
         except Exception as error:
-            return Response({"error": error}, status=400)
+            write_exception(message=error, class_name='ChoiceViewSet', function_name='list')
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -56,4 +58,5 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             )
             return Response({'results': 'created'}, status=201)
         except Exception as error:
+            write_exception(message=error, class_name='ChoiceViewSet', function_name='create')
             return Response({"error": error}, status=400)

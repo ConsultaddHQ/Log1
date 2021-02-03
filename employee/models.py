@@ -1,4 +1,3 @@
-import logging
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -10,11 +9,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from api_key.models import APIKey
+from log1.utils import write_exception
 from utils_app.mailing import send_email
 from employee.token import get_token_generator
 from utils_app.models import TimeStampedModel
-
-logger = logging.getLogger(__name__)
 
 GENDER_CHOICE = (
     ('male', 'Male'),
@@ -244,5 +242,5 @@ def tag_users(data):
             tag.tagged_user.add(user)
         return True
     except Exception as error:
-        logger.error(error)
+        write_exception(message=error, class_name='None', function_name='tag_users')
         return False

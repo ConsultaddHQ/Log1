@@ -1,5 +1,5 @@
 import os
-import logging
+import inspect
 from datetime import datetime, timedelta
 
 from django.utils import timezone
@@ -13,6 +13,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
 from employee.models import User
+from log1.utils import write_exception
 from utils_app.mailing import send_email
 from attachment.views import get_s3_object
 from attachment.serializers import Attachment
@@ -22,8 +23,6 @@ from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer
 from notification.views import create_notification, push_notification, push_notification_consultant
 
-logger = logging.getLogger(__name__)
-
 
 # API for Mobile App (For Consultants)
 class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
@@ -31,6 +30,10 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
     serializer_class = TimeSheetSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     @action(methods=['GET'], detail=False, url_path='history')
     def history(self, request):
@@ -60,7 +63,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             serializer = self.serializer_class(data, many=True)
             return Response({"total": total, "result": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -88,7 +91,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 return Response({"result": serializer.data}, status=200)
             return Response({"result": "No Weeks"}, status=404)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -132,7 +135,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 if not screenshot:
                     return Response({"error": "Attachment is required"}, status=400)
             except Exception as error:
-                logger.error(error)
+                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                 return Response({"error": str(error)}, status=400)
             timesheet.submitted_at = datetime.now()
             timesheet.save()
@@ -170,7 +173,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -179,7 +182,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             timesheet.status = 'consultant_rejected'
             timesheet.save()
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -189,6 +192,10 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
     serializer_class = PayrollScheduleSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
@@ -201,6 +208,10 @@ class Test(GenericViewSet, ListModelMixin):
     serializer_class = PayrollScheduleSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         timesheet = request.query_params.get('timesheet')
@@ -232,6 +243,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     @action(methods=['GET'], detail=True, url_path='history')
     def history(self, request, *args, **kwargs):
         # page = int(request.query_params.get("page", 1))
@@ -249,7 +264,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(data, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['POST'], detail=False, url_path='contact_us')
@@ -321,7 +336,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
             return Response({"result": "mail sent"}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['PUT'], detail=True, url_path='cancel')
@@ -490,5 +505,5 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)

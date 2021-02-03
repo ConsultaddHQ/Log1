@@ -9,6 +9,8 @@ from logging.config import dictConfig
 
 logger = logging.getLogger(__name__)
 
+DONT_HAVE_ACCESS = 'You don\'t have access'
+
 
 def load_config(file_path):
     try:
@@ -21,8 +23,6 @@ def load_config(file_path):
 def write_exception(message, class_name, function_name):
     logger.error(f"Raise by Class: {class_name}, Function: {function_name}")
     logger.error(f"Type {type(message)}, Error Message: {message}")
-
-DONT_HAVE_ACCESS = 'You don\'t have access'
 
 
 def get_page_limits(request):
@@ -101,7 +101,7 @@ def post_msg_using_webhook(url, data):
         resp = requests.post(url, headers=headers, data=json.dumps(data))
         return resp
     except Exception as error:
-        logger.error(error)
+        write_exception(message=error, class_name='None', function_name='post_msg_using_webhook')
         return None
 
 

@@ -1,6 +1,6 @@
 import json
+import inspect
 import requests
-import logging
 
 from django.db.models import Q
 from rest_framework import viewsets
@@ -9,10 +9,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
+from log1.utils import write_exception
 from consultant.models import Consultant
 from ckiller.models import CkillerSubmission, CkillerVendorClient
-
-logger = logging.getLogger(__name__)
 
 
 class CkillerVendorClientSerializer(serializers.ModelSerializer):
@@ -47,6 +46,10 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def list(self, request, *args, **kwargs):
         try:
             query = request.query_params.get('query', None)
@@ -74,7 +77,7 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
             serializer = self.serializer_class(queryset[first:last], many=True)
             return Response({"results": serializer.data, "total": total}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -114,7 +117,8 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                         res = json.loads(res.text)
                         token = res["key"]
                     else:
-                        logger.error("Unable to Login")
+                        write_exception(message="Unable to Login", class_name=self.get_classname(),
+                                        function_name=inspect.stack()[0][3])
                         continue
                     header = {
                         'Content-Type': "application/json",
@@ -185,5 +189,5 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                 return Response({"result": result}, status=201)
             return Response({"error": "Please provide Email empty"}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
