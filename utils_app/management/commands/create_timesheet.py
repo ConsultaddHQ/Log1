@@ -1,11 +1,8 @@
-import logging
 from django.db.models import Max, Q
 from datetime import datetime, timedelta
 from django.core.management import BaseCommand
 
 from project.models import TimeSheet
-
-logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):

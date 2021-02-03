@@ -1,6 +1,6 @@
 import os
 import boto3
-import logging
+import inspect
 from datetime import datetime
 from botocore.exceptions import ClientError
 from rest_framework.decorators import action
@@ -14,10 +14,9 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
 
 from project.models import Project
+from log1.utils import write_exception
 from activity.views import create_activity
 from attachment.serializers import Attachment, AttachmentSerializer
-
-logger = logging.getLogger(__name__)
 
 
 def get_s3_object(key):
@@ -53,7 +52,7 @@ def delete_temp_file(paths):
         if os.path.exists(path):
             os.remove(path)
         else:
-            logger.error(path, "The file does not exist")
+            write_exception(message=path + " file does not exist", class_name='None', function_name='delete_temp_file')
 
 
 def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
@@ -68,7 +67,7 @@ def presigned_post_url(object_name, fields=None, conditions=None, expiration=360
             bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
         )
     except ClientError as e:
-        logging.error(e)
+        write_exception(message=e, class_name='None', function_name='presigned_post_url')
         return None
 
     return response
@@ -79,6 +78,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
     serializer_class = AttachmentSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         obj_type = request.query_params.get("obj_type", None)
@@ -95,7 +98,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -172,7 +175,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
 
                 return Response({"result": serializer.data, "check_list": check_list}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -245,7 +248,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 }
                 return Response({"result": "deleted", "check_list": check_list}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -255,6 +258,10 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         try:
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
@@ -262,6 +269,7 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             extension = attachment.attachment_file.name.split(".")[-1]
             return Response({"result": url, 'file_type': extension}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')

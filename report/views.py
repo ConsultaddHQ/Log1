@@ -541,8 +541,8 @@ command - {slash_command}\n
 
 class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     queryset = ProjectSupport.objects.all()
-    # permission_classes = (IsAuthenticated,)
-    # authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
     def get_support_counts(self, supports):

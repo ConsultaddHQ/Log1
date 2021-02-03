@@ -1,5 +1,4 @@
 import os
-import logging
 from datetime import date
 from datetime import timedelta
 from django.conf import settings
@@ -11,8 +10,6 @@ from marketing.models import Interview
 from utils_app.mailing import send_email_attachment_multiple
 
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 
 def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
@@ -61,9 +58,10 @@ class Command(BaseCommand):
 
             df.to_excel(writer, sheet_name='Sheet1')
             writer.save()
-            scrum_masters = list(User.objects.filter(team=team, role__name__in=['admin', 'proxy']).values_list('email', flat=True))
+            scrum_masters = list(
+                User.objects.filter(team=team, role__name__in=['admin', 'proxy']).values_list('email', flat=True))
             offers = Project.objects.filter(created__gte=today.replace(day=1), submission__created_by__team=team)
             yesterday = today - timedelta(days=1)
-            response, res = mail_to_scrum(yesterday, this_week, scrum_masters, team.name,  path, offers)
+            mail_to_scrum(yesterday, this_week, scrum_masters, team.name, path, offers)
             if os.path.exists(path):
                 os.remove(path)

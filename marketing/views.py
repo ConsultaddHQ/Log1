@@ -1,7 +1,7 @@
 import os
 import json
+import inspect
 import difflib
-import logging
 from django.conf import settings
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -23,23 +23,20 @@ from django.shortcuts import get_object_or_404
 
 from employee.models import User
 from project.serializers import Project
-from log1.utils import post_msg_using_webhook
 from attachment.serializers import AttachmentSerializer
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from attachment.views import presigned_post_url, download_s3_object
 from notification.views import create_notification, push_notification
-from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
-from utils_app.utils import get_time_filter, get_time_filter_by_start, get_page_limits, DONT_HAVE_ACCESS
+from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook,\
+    write_exception, DONT_HAVE_ACCESS
 from marketing.serializers import Lead, Submission, VendorCompany, VendorContact, VendorLayer, \
     Interview, Test, InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, \
     SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
     VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
     TestUpdateSerializer, TestListSerializer
-
-logger = logging.getLogger(__name__)
 
 
 class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
@@ -47,6 +44,10 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = VendorCompanySerializer
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -57,7 +58,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             data = queryset[first:last].values('id', 'name', 'created_by')
             return Response({"results": data, "total": total}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -79,7 +80,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
                 return Response({"result": serializer.data}, status=201)
             return Response({"result": "Enter company name"}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -89,13 +90,17 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
     serializer_class = VendorContactSerializer
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         try:
             queryset = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
             data = queryset.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
             return Response({"results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -105,7 +110,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             data = queryset.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
             return Response({"results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -135,7 +140,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             }
             return Response({"result": data}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -147,7 +152,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
                 return Response({"result": serializer.data}, status=202)
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -156,6 +161,10 @@ class LeadViewSets(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def get_lead_data(self, queryset, filter_by_status, first, last):
         try:
@@ -195,7 +204,7 @@ class LeadViewSets(viewsets.ModelViewSet):
 
             return data, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, 'error'
 
     def get_count_and_queryset(self, queryset, filter_by_status, sort_by, first, last):
@@ -240,7 +249,7 @@ class LeadViewSets(viewsets.ModelViewSet):
 
             return data, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, 'error'
 
     def list(self, request, *args, **kwargs):
@@ -301,7 +310,7 @@ class LeadViewSets(viewsets.ModelViewSet):
 
             return Response({"counts": data_counts, "results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
@@ -315,7 +324,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                      'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
             return Response({"result": data[0]}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -337,10 +346,11 @@ class LeadViewSets(viewsets.ModelViewSet):
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'created',
                          'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=201)
-            logger.error(serializer.errors)
+            write_exception(message=serializer.errors, class_name=self.get_classname(),
+                            function_name=inspect.stack()[0][3])
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -365,10 +375,11 @@ class LeadViewSets(viewsets.ModelViewSet):
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'is_w2',
                          'company_id', 'company_name', 'modified', 'submission_count')
                 return Response({"result": data[0]}, status=202)
-            logger.error(serializer.errors)
+            write_exception(message=serializer.errors, class_name=self.get_classname(),
+                            function_name=inspect.stack()[0][3])
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -378,7 +389,7 @@ class LeadViewSets(viewsets.ModelViewSet):
             lead.save()
             return Response(status=204)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='archived')
@@ -391,7 +402,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 return Response({"error": str(data)}, status=400)
             return Response({"results": data, "counts": data_counts}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='map')
@@ -402,7 +413,7 @@ class LeadViewSets(viewsets.ModelViewSet):
             ).values('city').annotate(total=Count('city')).order_by('city')
             return Response({"results": leads}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='leads_by_city')
@@ -423,7 +434,7 @@ class LeadViewSets(viewsets.ModelViewSet):
 
             return Response({"results": data, "counts": data_counts}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -503,7 +514,7 @@ def create_submission(request, lead_id):
 
         return sub
     except Exception as error:
-        logger.error(error)
+        write_exception(message=error, class_name=None, function_name=inspect.stack()[0][3])
         return False
 
 
@@ -512,6 +523,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def get_submission_data(self, sub, filter_by_status, first, last):
         try:
@@ -543,7 +558,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             return data, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname, function_name=inspect.stack()[0][3])
             return error, "error"
 
     def get_count_and_queryset(self, queryset, sub_status, sort_by, first, last):
@@ -580,7 +595,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             return data, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, "error"
 
     def retrieve(self, request, *args, **kwargs):
@@ -605,7 +620,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 serializer = self.serializer_class(sub)
                 return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -723,7 +738,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             return Response({"counts": sub_data, "results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @transaction.atomic
@@ -769,7 +784,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 return Response({"result": data}, status=201)
             return Response({"error": data}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": error}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -793,9 +808,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 submission.save()
                 return Response({"result": serializer.data}, status=202)
             else:
+                write_exception(message=serializer.errors, class_name=self.get_classname(),
+                                function_name=inspect.stack()[0][3])
                 return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='resume')
@@ -852,7 +869,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                      'job_title', 'city')
             return Response({"result": data, "total": total}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     # Suggestions for Client Name (Did you mean)
@@ -865,7 +882,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             result = difflib.get_close_matches(query, client_list, 1)
             return Response({"result": result}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='client')
@@ -877,7 +894,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             ).order_by('client').distinct('client').exclude(client=None).values_list('client', flat=True)
             return Response({"result": result[:10]}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -887,6 +904,10 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
     serializer_class = VendorLayerSerializer
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         try:
             submission_id = kwargs.get('pk', None)
@@ -894,7 +915,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             serializer = self.serializer_class(vendor_layer, many=True)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -914,7 +935,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             serializer = self.serializer_class(vendor_layer)
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -924,10 +945,9 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
                 vendor_layer = get_object_or_404(VendorLayer, id=data[index]['id'])
                 vendor_layer.level = index + 1
                 vendor_layer.save()
-
             return Response({"result": 'updated'}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -936,7 +956,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             vendor_layer.delete()
             return Response(status=204)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -945,6 +965,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
     serializer_class = InterviewSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     # Change status of scheduled and rescheduled Interviews to feedback_due
     def change_to_feedback_due(self):
@@ -955,7 +979,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.status = 'feedback_due'
                 interview.save()
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def rank_interviews(self, interview, interview_status):
@@ -987,6 +1011,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     inter.submission.save()
             return interview
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error
 
     def get_interview_data(self, queryset, filter_by_status, first, last):
@@ -1028,7 +1053,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                      'screening_type', 'project', 'job_title', 'modified', 'feedback')
             return data, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, 'error'
 
     def get_count_and_queryset(self, queryset, filter_by_status, sort_by, first, last):
@@ -1070,7 +1095,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                      'screening_type', 'project', 'job_title', 'modified', 'feedback')
             return data, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, 'error'
 
     def retrieve(self, request, *args, **kwargs):
@@ -1084,7 +1109,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -1207,7 +1232,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             return Response({"counts": screen_data, "results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -1340,10 +1365,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 }
                 # create_notification(user_list, notification_data)
                 return Response({"result": data[0], 'booking_response': booking_res}, status=201)
-            logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -1464,10 +1488,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 interview.save()
                             else:
                                 try:
-                                    cal_res = update_ms_calendar(event_id, event)
+                                    update_ms_calendar(event_id, event)
                                     booking_res = 'updated'
                                 except Exception as error:
-                                    logger.error(error)
+                                    write_exception(message="Booking update failed", class_name=self.get_classname(),
+                                                    function_name=inspect.stack()[0][3])
                                     return Response({"result": "Calendar event update failed", "error": str(error)},
                                                     status=400)
 
@@ -1494,10 +1519,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 }
                 # create_notification(user_list, notification_data)
                 return Response({"result": data[0], "booking_response": booking_res}, status=202)
-            logger.error(serializer.errors)
+            write_exception(message=serializer.errors, class_name=self.get_classname(),
+                            function_name=inspect.stack()[0][3])
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -1515,8 +1541,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         return Response({"result": "calendar id not found"}, status=404)
                 except Exception as error:
-                    logger.error(error)
-                    logger.error("Calendar event deletion failed")
+                    write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                    write_exception(message="Calendar event deletion failed", class_name=self.get_classname(),
+                                    function_name=inspect.stack()[0][3])
                     return Response({"result": "Calendar event deletion failed", "error": str(error)},
                                     status=400)
 
@@ -1551,7 +1578,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             # create_notification(user_list, notification_data)
             return Response(status=204)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='update_notes')
@@ -1569,6 +1596,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             else:
                 return Response({"error": "You are not allowed to upload"}, status=400)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put', 'delete'], detail=True, url_path='upload_recording')
@@ -1589,7 +1617,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.save()
                 return Response(status=204)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='recording')
@@ -1602,7 +1630,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 return Response({"result": url}, status=200)
             return Response({"error": "Recording not available"}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     # Suggestions for Interview
@@ -1643,7 +1671,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                      'consultant_name', 'start_time', 'end_time', 'company_name', 'client', 'interview_mode')
             return Response({"result": data, "total": total}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='repeat')
@@ -1669,6 +1697,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                      'consultant_name', 'start_time', 'end_time', 'location', 'company_name', 'interview_mode', )
             return Response({"result": data, "total": total}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': str(error)}, status=400)
 
 
@@ -1676,6 +1705,10 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     queryset = Submission.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         team_name = request.query_params.get("team", None)
@@ -1789,6 +1822,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ]
             return Response({'result': data, 'count': count, 'offer_count': offer_count}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': error}, status=400)
 
     @action(methods=['get'], detail=False, url_path='performance')
@@ -1908,6 +1942,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             }
             return Response({"result": result}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': error}, status=400)
 
     @action(methods=['get'], detail=False, url_path='history')
@@ -1947,6 +1982,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 last = last.replace(day=1) + relativedelta(months=2) - timedelta(days=1)
             return Response({"result": result}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': error}, status=400)
 
 
@@ -1956,7 +1992,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     authentication_classes = (TokenAuthentication,)
     serializer_class = TestCreateSerializer
 
-    def get_test_data(self, queryset, filter_by_status):
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
+    def get_test_data(self, queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
             sort_by = 'created'
@@ -1985,7 +2025,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             data = TestListSerializer(queryset[first:last], many=True).data
             return data, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, 'error'
 
     def get_count_and_queryset(self, queryset, filter_by_status, sort_by):
@@ -2018,7 +2058,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             queryset = Test.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             return queryset, data_counts
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, 'error'
 
     def send_test_mail(self, test, data, test_status):
@@ -2121,7 +2161,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
                 return res, "ok"
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, "error"
 
     def list(self, request, *args, **kwargs):
@@ -2235,7 +2275,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             data = TestListSerializer(queryset[first:last], many=True).data
             return Response({"counts": counts, "results": data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -2279,12 +2319,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'new')
                 if error == 'error':
-                    logger.error(res)
+                    write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                     return Response({"error": "error", "test_mail_error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data, "mail": res}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -2297,7 +2337,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             else:
                 return Response({"error": serializer.errors}, status=400)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='assign')
@@ -2366,7 +2406,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='submit')
@@ -2402,12 +2442,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'submit')
                 if error == 'error':
-                    logger.error(res)
+                    write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                     return Response({"error": "error", "test_mail_error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data, "mail": res}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='feedback')
@@ -2466,5 +2506,5 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             serializer = TestCreateSerializer(test)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)

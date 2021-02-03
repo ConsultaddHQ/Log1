@@ -1,4 +1,4 @@
-import logging
+import inspect
 from datetime import datetime
 from django.shortcuts import get_object_or_404
 
@@ -10,6 +10,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
 from legal.models import Petition
+from log1.utils import write_exception
 from consultant.models import Consultant
 from employee.models import User, tag_users
 from activity.models import Activity, Comment
@@ -18,8 +19,6 @@ from consultant.views import send_notification
 from marketing.models import Submission, Interview
 from notification.views import create_notification, push_notification
 from activity.serializers import ActivitySerializer, CommentGetSerializer
-
-logger = logging.getLogger(__name__)
 
 
 def create_activity(object_id, model, user, desc, activity_type):
@@ -41,6 +40,10 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         try:
             activity_id = kwargs.get('pk')
@@ -50,7 +53,7 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
                 return Response({"result": serializer.data}, status=200)
             return Response({"error": "No activity found"}, status=404)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -60,7 +63,7 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
             serializer = self.serializer_class(activity, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -69,6 +72,10 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     serializer_class = ActivitySerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
@@ -90,7 +97,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             serializer = CommentGetSerializer(comments.order_by('-created'), many=True)
             return Response({'results': serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -159,5 +166,5 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 send_notification(consultant, request.user, title)
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            logger.error(error)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
