@@ -2267,7 +2267,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 queryset = queryset.filter(**filter_string)
                 queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
             else:
-                queryset, counts = self.get_test_data(queryset, filter_by_status)
+                queryset, counts = self.get_test_data(queryset, filter_by_status, first, last)
 
             if counts == 'error':
                 return Response({"error": str(queryset)}, status=400)

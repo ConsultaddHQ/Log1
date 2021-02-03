@@ -473,8 +473,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if created:
                     lte = created.get('lte', None)
                     gte = created.get('gte', None)
-                    if lte: filter_string["created__lte"] = lte
-                    if gte: filter_string["created__gte"] = gte
+                    if lte:
+                        filter_string["created__lte"] = lte
+                    if gte:
+                        filter_string["created__gte"] = gte
 
                 projects = projects.order_by('id').distinct('id')
                 data = {
@@ -857,6 +859,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Termination')
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
+                        project.support.update(end=datetime.now())
 
                         text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
@@ -1080,8 +1083,8 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
 
             elif request.data.get('field') == 'employer':
                 project.employer = request.data.get('value')
-                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer changed to " \
-                       f"{request.data.get('value')} by {request.user.employee_name}"
+                desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer " \
+                       f"changed to {request.data.get('value')} by {request.user.employee_name}"
 
             elif request.data.get('field') == 'end_date':
                 effective_date = project.end_date

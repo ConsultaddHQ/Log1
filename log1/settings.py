@@ -197,19 +197,19 @@ logging.config.dictConfig({
             'stream': 'ext://sys.stdout'
         },
         'file': {
-            'level': 'DEBUG',
-'encoding': 'utf8',
-'backupCount': 20,
+            'level': 'ERROR',
+            'backupCount': 20,
+            'encoding': 'utf8',
+            'formatter': 'file',
             'maxBytes': 10485760,
             'class': 'logging.handlers.RotatingFileHandler',
-            'formatter': 'file',
-            'filename': os.path.join(BASE_DIR, 'logs/debug.log')
+            'filename': 'logs/debug.log'
         }
     },
     'loggers': {
-        'file': {
-            'level': 'DEBUG',
-            'handlers': ['console']
+        '': {
+            'level': 'ERROR',
+            'handlers': ['file']
         }
     }
 })
