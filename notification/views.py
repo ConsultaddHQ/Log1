@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, CreateModelMixin
 
-from utils_app.utils import get_page_limits
+from log1.utils import get_page_limits
 from notification.models import FCMDevice, Notification
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication

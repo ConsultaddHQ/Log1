@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 from constance import config
 from employee.models import User
 from marketing.models import Submission
-from utils_app.utils import post_msg_using_webhook
+from log1.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):

@@ -27,7 +27,7 @@ from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
 from notification.views import push_notification_consultant, create_notification, push_notification
-from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator, get_page_limits
+from log1.utils import get_time_filter, post_msg_using_webhook, password_generator, get_page_limits
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer

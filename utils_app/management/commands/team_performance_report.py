@@ -4,8 +4,8 @@ from django.core.management import BaseCommand
 from constance import config
 from employee.models import Team
 from project.models import Project
+from log1.utils import post_msg_using_webhook
 from marketing.models import Submission, Interview
-from utils_app.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):

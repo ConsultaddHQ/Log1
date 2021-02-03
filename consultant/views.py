@@ -31,7 +31,7 @@ from project.models import Project, ProjectStatus
 from activity.serializers import Activity, ActivitySerializer
 from attachment.serializers import Attachment, AttachmentSerializer
 from notification.views import create_notification, push_notification
-from utils_app.utils import post_msg_using_webhook, html_to_text, get_page_limits
+from log1.utils import post_msg_using_webhook, html_to_text, get_page_limits
 from consultant.models import EXIT_TYPE_CHOICE, Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, \
     ConsultantRateRevision, ConsultantPOC, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ExitReason
 
