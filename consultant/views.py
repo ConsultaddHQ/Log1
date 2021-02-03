@@ -995,7 +995,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 day_filter = dict()
                 day_filter["marketing__status"] = 'open'
                 if days == 'lt_12':
-                    day_filter["marketing__start__gte"] = timezone.now().date() - timedelta(days=12)
+                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=12)
                 elif days == 'lt_24':
                     day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
                 elif days == 'lt_36':

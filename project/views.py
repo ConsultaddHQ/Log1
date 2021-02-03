@@ -244,7 +244,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recruiter = consultant.recruiter
             retention = consultant.relation
 
-            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
+            cc = [marketer.email, config.SUPERADMIN, config.VENDOR_MANAGEMENT] + scrum_master_email
             if recruiter:
                 cc.append(recruiter.email)
             if retention:
@@ -675,10 +675,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         statuses__created__gte=day_one,
                         employer__iexact=project.employer,
                     ).count()
-                    if project.is_remote and project.submission.lead.is_w2:
-                        con_str = f"**Remote Project** \n"
-                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
-                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
+                    if project.is_remote or project.submission.lead.is_w2:
+                        con_str = f"**Remote Project** <br>"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}** <br>"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.consultant.name}**"
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
 
@@ -754,9 +754,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                          for interview in interviews if interview.supervisor])
                     ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
                     if project.is_remote and project.submission.lead.is_w2:
-                        con_str = f"**Remote Project** \n"
-                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**\n"
-                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**\n"
+                        con_str = f"**Remote Project** <br>"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**<br>"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**"
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
                     # Sending message on Mattermost

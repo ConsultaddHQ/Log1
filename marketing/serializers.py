@@ -285,11 +285,11 @@ class TestListSerializer(serializers.ModelSerializer):
         fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id',
                   'consultant_name', 'client', 'job_title', 'skills', 'created', 'modified', 'assigned_to')
 
-    def get_assigned_to(self, obj):
-        return obj.assign_to.all().values('id', 'employee_name')
-
     def get_client(self, obj):
         return obj.submission.client
+
+    def get_marketer_id(self, obj):
+        return obj.submission.created_by.id
 
     def get_job_title(self, obj):
         return obj.submission.lead.job_title
@@ -300,11 +300,11 @@ class TestListSerializer(serializers.ModelSerializer):
     def get_marketer_name(self, obj):
         return obj.submission.created_by.employee_name
 
+    def get_assigned_to(self, obj):
+        return obj.assign_to.all().values('id', 'employee_name')
+
     def get_consultant_name(self, obj):
         return obj.submission.consultant_marketing.consultant.name
-
-    def get_marketer_id(self, obj):
-        return obj.submission.created_by.id
 
 
 class TestCreateSerializer(serializers.ModelSerializer):

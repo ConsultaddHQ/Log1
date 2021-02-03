@@ -192,7 +192,7 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
     authentication_classes = (ConsultantTokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
-        queryset = PayrollSchedule.objects.all()
+        queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
         serializer = self.serializer_class(queryset, many=True)
         return Response({"results": serializer.data}, status=status.HTTP_200_OK)
 
