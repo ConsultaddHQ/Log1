@@ -6,7 +6,6 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
@@ -92,10 +91,10 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             queryset = Notification.objects.active(request.user, 'user')
             serializer = NotificationListSerializer(queryset[first:last], many=True)
             unread = Notification.objects.unread(request.user, 'user').count()
-            return Response({"results": serializer.data, "total": queryset.count(), "unread": unread}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data, "total": queryset.count(), "unread": unread}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='mark_as_read')
     def mark_as_read(self, request, *args, **kwargs):
@@ -103,29 +102,29 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             notification = get_object_or_404(Notification, id=kwargs.get('pk'))
             notification.mark_as_read()
             notification.save()
-            return Response({"result": 'read'}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": 'read'}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='mark_all_read')
     def mark_all_read(self, request):
         try:
             Notification.objects.mark_all_as_read(request.user, 'user')
-            return Response({"result": "success"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": "success"}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='count')
     def count(self, request):
         try:
             queryset = Notification.objects.unread(request.user, 'user')
             total = queryset.count()
-            return Response({"count": total}, status=status.HTTP_200_OK)
+            return Response({"count": total}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='push_notification')
     def push_notification(self, request):
@@ -145,10 +144,10 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
                 },
             }
             push_notification([request.user.id], message_body)
-            return Response({"result": "done"}, status=status.HTTP_200_OK)
+            return Response({"result": "done"}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
@@ -166,20 +165,20 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
             # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'title', 'deleted', 'unread', 'timestamp', 'category', 'target_object_id')
-            return Response({"results": data, "total": total}, status=status.HTTP_200_OK)
+            return Response({"results": data, "total": total}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='count')
     def count(self, request):
         try:
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = queryset.count()
-            return Response({"count": total}, status=status.HTTP_200_OK)
+            return Response({"count": total}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_delete')
     def mark_as_delete(self, request, *args, **kwargs):
@@ -194,10 +193,10 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
             )
-            return Response({"result": data, "total": total}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": data, "total": total}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_not_delete')
     def mark_not_delete(self, request, *args, **kwargs):
@@ -212,19 +211,19 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
             )
-            return Response({"result": data, "total": total}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": data, "total": total}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='mark_all_delete')
     def mark_all_delete(self, request):
         try:
             Notification.objects.mark_all_as_deleted(request.user, 'consultant')
-            return Response({"result": "deleted"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": "deleted"}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_read')
     def mark_as_read(self, request, *args, **kwargs):
@@ -239,16 +238,16 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
             )
-            return Response({"result": data, "total": total}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": data, "total": total}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='mark_all_read')
     def mark_all_read(self, request):
         try:
             Notification.objects.mark_all_as_read(request.user, 'consultant')
-            return Response({"result": "read"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": "read"}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)

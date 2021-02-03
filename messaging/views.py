@@ -5,7 +5,6 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef
 
-from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -33,9 +32,9 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             data = Asset.objects.filter(
                 asset_type='number', provider='twilio', owner=request.user, is_deleted=False
             ).values('id', 'number')
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"results": data}, status=200)
         except Exception as err:
-            return Response({'error': str(err)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(err)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -45,9 +44,9 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             ).order_by('created')
             data = messages.values('id', 'text', 'created', 'is_sent', 'conversation_id', 'read')
             messages.update(read=True)
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"results": data}, status=200)
         except Exception as err:
-            return Response({'error': str(err)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(err)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -60,9 +59,9 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             ).values(
                 'id', 'user2', 'created', 'modified', 'text', 'read'
             ).order_by('-id', '-messages__created').distinct('id')
-            return Response({"results": conversations}, status=status.HTTP_200_OK)
+            return Response({"results": conversations}, status=200)
         except Exception as err:
-            return Response({'error': str(err)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(err)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='send')
     def send_sms(self, request):
@@ -80,11 +79,11 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=to)
                 message = Message.objects.create(text=body, read=True, is_sent=True, conversation=conversation)
                 serializer = self.serializer_class(message)
-                return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+                return Response({"results": serializer.data}, status=200)
             else:
-                return Response({"error": "Message not sent, please try again."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Message not sent, please try again."}, status=400)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class ReceiveSMSViewSet(GenericViewSet):
@@ -140,9 +139,9 @@ class ReceiveSMSViewSet(GenericViewSet):
                 object_ids = [user1.owner.id]
                 push_notification(object_ids, message_body)
 
-                return HttpResponse(status=status.HTTP_201_CREATED)
+                return HttpResponse(status=201)
             else:
-                return HttpResponse(status=status.HTTP_401_UNAUTHORIZED)
+                return HttpResponse(status=401)
         except Exception as e:
             print(e)
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+            return HttpResponse(status=400)

@@ -22,6 +22,8 @@ def write_exception(message, class_name, function_name):
     logger.error(f"Raise by Class: {class_name}, Function: {function_name}")
     logger.error(f"Type {type(message)}, Error Message: {message}")
 
+DONT_HAVE_ACCESS = 'You don\'t have access'
+
 
 def get_page_limits(request):
     page = int(request.query_params.get("page", 1))

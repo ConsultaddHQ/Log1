@@ -7,7 +7,6 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -94,10 +93,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type
                                                      ).order_by('-created')
             serializer = self.serializer_class(queryset, many=True)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -107,7 +106,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 resume = Attachment.objects.filter(object_id=object_id, content_type=content_type,
                                                    attachment_type='resume')
                 if resume:
-                    return Response({"error": "you can't attache duplicate resume"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "You can't attach multiple resumes"}, status=400)
 
             attachment = Attachment.objects.create(
                 object_id=object_id,
@@ -119,7 +118,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             serializer = self.serializer_class(attachment)
 
             if content_type.model != 'project':
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data}, status=201)
             else:
                 project = get_object_or_404(Project, id=object_id)
 
@@ -171,10 +170,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "reporting_details": reporting_details
                 }
 
-                return Response({"result": serializer.data, "check_list": check_list}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data, "check_list": check_list}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -191,7 +190,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
-                return Response({"result": "deleted"}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": "deleted"}, status=202)
             else:
                 project = get_object_or_404(Project, id=attachment.object_id)
                 desc = f"{attachment.filename} deleted by {request.user.employee_name}"
@@ -244,10 +243,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "vendor_address": vendor_address,
                     "reporting_details": reporting_details,
                 }
-                return Response({"result": "deleted", "check_list": check_list}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": "deleted", "check_list": check_list}, status=202)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
@@ -261,9 +260,9 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
             url = get_s3_object(attachment.attachment_file.name)
             extension = attachment.attachment_file.name.split(".")[-1]
-            return Response({"result": url, 'file_type': extension}, status=status.HTTP_200_OK)
+            return Response({"result": url, 'file_type': extension}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
@@ -278,4 +277,4 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             filename=file_name,
         )
         response = presigned_post_url(object_name=object_name)
-        return Response({"result": response}, status=status.HTTP_200_OK)
+        return Response({"result": response}, status=200)

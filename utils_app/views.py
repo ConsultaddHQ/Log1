@@ -1,11 +1,10 @@
 import logging
 
-from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.mixins import ListModelMixin, CreateModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from django.contrib.contenttypes.models import ContentType
 
@@ -20,10 +19,10 @@ class CityViewSets(ListModelMixin, GenericViewSet):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
-        query = request.query_params.get('query')
+        query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
         city = City.objects.filter(name__istartswith=query)
         data = city[:40].values('id', 'name', 'state')
-        return Response({"results": data}, status=status.HTTP_200_OK)
+        return Response({"results": data}, status=200)
 
 
 class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
@@ -40,9 +39,9 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
                 content_type = ContentType.objects.get(model=model)
                 queryset = queryset.filter(content_type=content_type)
             data = queryset.values('id', 'name', 'display_name', 'field', 'content_type__model')
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"results": data}, status=200)
         except Exception as error:
-            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": error}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -55,6 +54,6 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
                 field=request.data.get('field'),
                 display_name=request.data.get('display_name'),
             )
-            return Response({'results': 'created'}, status=status.HTTP_201_CREATED)
+            return Response({'results': 'created'}, status=201)
         except Exception as error:
-            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": error}, status=400)

@@ -2,7 +2,6 @@ from datetime import datetime, date, timedelta
 
 from django.db.models import Q
 from django.db import transaction
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin
@@ -81,8 +80,8 @@ class ScrumMeetingReport(GenericViewSet):
                 "text": text,
             }
             post_msg_using_webhook(config.loud_speakers_url, data)
-            return Response({"results": "message sent"}, status=status.HTTP_200_OK)
-        return Response({"results": "Previous meeting not found"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"results": "message sent"}, status=200)
+        return Response({"results": "Previous meeting not found"}, status=400)
 
     @transaction.atomic
     @action(methods=['get'], detail=False, url_path='set_meeting')
@@ -92,7 +91,7 @@ class ScrumMeetingReport(GenericViewSet):
             meeting.previous = False
             meeting.save()
         ScrumMeeting.objects.get_or_create(held_on=datetime.today(), is_previous=True)
-        return Response({"results": "success"}, status=status.HTTP_201_CREATED)
+        return Response({"results": "success"}, status=201)
 
 
 class SlashCommandViewSets(GenericViewSet):
@@ -319,13 +318,13 @@ command - {command}\n\n
         try:
             api_key = request.query_params.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
+                return Response({"text": "Unauthorized"}, status=200)
 
             query = request.query_params.get('text', None)
             command = request.query_params.get('command', None)
 
             if not query and len(query) > 3:
-                return Response({"text": f"{command} {query} \n Bad Input"}, status=status.HTTP_200_OK)
+                return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
 
             data_type = query.split(" ")[0]
             name = query.split(" ")[1]
@@ -380,21 +379,21 @@ command - {command} {query}\n
 
                     text += f"| {consultant.name} | {days_on_bench} | {consultant.status} | {submission_count} | {interview_count} | {project_count} |\n"
 
-            return Response({"text": text}, status=status.HTTP_200_OK)
+            return Response({"text": text}, status=200)
         except Exception as error:
-            return Response({"text": "Bad Request", "error": str(error)}, status=status.HTTP_200_OK)
+            return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
             api_key = request.query_params.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
+                return Response({"text": "Unauthorized"}, status=200)
 
             query = request.query_params.get('text', None)
             command = request.query_params.get('command', None)
             if not query and len(query) < 3:
-                return Response({"text": f"{command} {query} \n Bad Input"}, status=status.HTTP_200_OK)
+                return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
 
             date_filter = query.split(" ")[0]
             name = query.split(" ")[1]
@@ -427,23 +426,23 @@ command - {command} {query}\n
                 consultant_assigned = con_assigned if len(con_assigned) > 0 else None
 
                 text += f"""| {user.employee_name} | {user.team.name} |  {submission_count} | {interview_count} | {offer_count} |  {consultant_assigned} |\n"""
-            return Response({"text": text}, status=status.HTTP_200_OK)
+            return Response({"text": text}, status=200)
         except Exception as error:
-            return Response({"text": "Bad Request", "error": str(error)}, status=status.HTTP_200_OK)
+            return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
             api_key = request.query_params.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"text": "Unauthorized"}, status=status.HTTP_200_OK)
+                return Response({"text": "Unauthorized"}, status=200)
 
             query = request.query_params.get('text', None)
             command = request.query_params.get('command', None)
             arguments = query.split()
             slash_command = f"{command} {query}"
             if not query and len(arguments) > 0:
-                return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
             text = slash_command
             arg1 = arguments[0]
 
@@ -458,7 +457,7 @@ command - {command} {query}\n
                     year = datetime.today().year
                     month = int(arg2) if arg2.isdigit() else None
                     if not month:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
                     if month > this_month:
                         year = datetime.today().year - 1
                     text = self.team_data_by_month(month, year, slash_command)
@@ -474,7 +473,7 @@ command - {command} {query}\n
                     arg2 = arguments[1]
                     day = int(arg2) if arg2.isdigit() else None
                     if not day:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
                     text = self.team_data_by_day(day, this_month, year, slash_command)
 
                 elif len(arguments) == 3:
@@ -483,9 +482,9 @@ command - {command} {query}\n
                     day = int(arg1) if arg1.isdigit() else None
                     month = int(arg2) if arg2.isdigit() else None
                     if not day:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
                     if not month:
-                        return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                        return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
                     if month > this_month:
                         year = datetime.today().year - 1
                     text = self.team_data_by_day(day, month, year, slash_command)
@@ -533,11 +532,11 @@ command - {slash_command}\n
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
             else:
-                return Response({"text": f"{slash_command} \n Bad Input"}, status=status.HTTP_200_OK)
+                return Response({"text": f"{slash_command} \n Bad Input"}, status=200)
 
-            return Response({"text": text}, status=status.HTTP_200_OK)
+            return Response({"text": text}, status=200)
         except Exception as error:
-            return Response({"text": "Bad request", "error": str(error)}, status=status.HTTP_200_OK)
+            return Response({"text": "Bad request", "error": str(error)}, status=200)
 
 
 class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
@@ -546,12 +545,11 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     # authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
-    @staticmethod
-    def get_support_counts(supports):
-        supports = supports.order_by('project__id',
-                                     'project__consultant__id'
-                                     ).distinct('project__id', 'project__consultant__id')
+    def get_support_counts(self, supports):
         counts = dict()
+        supports = supports.order_by(
+            'project__id', 'project__consultant__id'
+        ).distinct('project__id', 'project__consultant__id')
         active = training = less_active = independent = 0
         terminated = supports.filter(project__statuses__status__istartswith='terminated').count()
         supports = supports.filter(end=None).exclude(project__statuses__status__istartswith='terminated')
@@ -588,7 +586,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             supports = ProjectSupport.objects.all()
             if query:
-                query = query.strip()
+                query = query.lstrip().replace(':amp:', '&')
                 supports = supports.filter(
                     Q(support__employee_name__istartswith=query) |
                     Q(project__consultant__name__istartswith=query) |
@@ -649,7 +647,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                 supports.order_by('support__employee_name', '-start')[first:last], many=True)
             return Response({"results": serializer.data, "counts": data_count, "page_count": page_count}, status=200)
         except Exception as error:
-            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': error}, status=400)
 
 
 class MarketingReportViewSets(GenericViewSet):
@@ -668,14 +666,14 @@ class MarketingReportViewSets(GenericViewSet):
             filter_by_team = request.query_params.get('filter_by_team', None)
 
             if query:
-                employees = User.objects.filter(employee_name__istartswith=query.strip())
+                employees = User.objects.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             else:
                 employees = User.objects.filter(team__dept='Marketing', role__name='marketer', is_active=True)
             if filter_by_team:
                 employees = employees.filter(team__name=filter_by_team)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
                                                                                                  '%Y-%m-%d').date():
-                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid date filter'}, status=400)
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -710,9 +708,9 @@ class MarketingReportViewSets(GenericViewSet):
                     "repeat_interview": repeat_interview_count,
                     "consultant_assigned": con_assigned if len(con_assigned) > 0 else None,
                 })
-            return Response({"results": data, "total": total}, status=status.HTTP_200_OK)
+            return Response({"results": data, "total": total}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
@@ -720,7 +718,7 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.query_params.get('end', None)
             start = request.query_params.get('start', None)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end, '%Y-%m-%d').date():
-                return Response({'error': 'Invalid date filter'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'Invalid date filter'}, status=400)
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -729,28 +727,29 @@ class MarketingReportViewSets(GenericViewSet):
             total_bench = total_submissions = total_interviews = total_joined = total_offers = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
+                team_id = team.id
                 bench_consultant = Consultant.objects.filter(
-                    marketing__teams__name__iexact=team.name,
+                    marketing__teams__id=team_id,
                     marketing__status='open'
-                ).count()
+                ).order_by('id').distinct('id').count()
                 submission_count = Submission.objects.filter(
-                    created_by__team__name__iexact=team.name,
+                    created_by__team__id=team_id,
                     created__gte=start, created__lte=end,
-                ).exclude(status='draft').count()
+                ).exclude(status='draft').order_by('id').distinct('id').count()
                 interview_count = Interview.objects.filter(
                     created__gte=start, created__lte=end,
-                    submission__created_by__team__name__iexact=team.name
+                    submission__created_by__team__id=team_id
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
+                    submission__created_by__team__id=team_id,
                     statuses__status__in=['received', 'on_boarded'],
-                    submission__created_by__team__name__iexact=team.name,
                     statuses__created__gte=start, statuses__created__lte=end,
-                ).count()
+                ).order_by('id').distinct('id').count()
                 joined_count = Project.objects.filter(
                     statuses__status='joined',
+                    submission__created_by__team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
-                    submission__created_by__team__name__iexact=team.name,
-                ).count()
+                ).order_by('id').distinct('id').count()
                 scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
                 scrum_master = None
                 if scrum_masters:
@@ -780,9 +779,9 @@ class MarketingReportViewSets(GenericViewSet):
                 "interview_count": total_interviews,
                 "submission_count": total_submissions,
             })
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"results": data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
@@ -793,7 +792,7 @@ class MarketingReportViewSets(GenericViewSet):
 
             if query:
                 bench_consultant = Consultant.objects.filter(
-                    marketing__status='open', name__istartswith=query.strip()
+                    marketing__status='open', name__istartswith=query.lstrip().replace(':amp:', '&')
                 ).exclude(status__in=['archived', 'terminated'])
             else:
                 bench_consultant = Consultant.objects.filter(
@@ -832,6 +831,6 @@ class MarketingReportViewSets(GenericViewSet):
                     'submission_count': submission_count,
                     'preferred_location': preferred_location
                 })
-            return Response({'results': data, "total": total}, status=status.HTTP_200_OK)
+            return Response({'results': data, "total": total}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)

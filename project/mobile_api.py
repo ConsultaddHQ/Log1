@@ -6,7 +6,6 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, F, Max, Subquery, OuterRef
 
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
@@ -59,10 +58,10 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 data.append(i)
             total = len(data)
             serializer = self.serializer_class(data, many=True)
-            return Response({"total": total, "result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"total": total, "result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         page = int(request.query_params.get("page", 1))
@@ -86,11 +85,11 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 queryset = TimeSheet.objects.filter(project=project, status__in=['draft', 'rejected'],
                                                     is_active=True).order_by('end')
                 serializer = self.serializer_class(queryset, many=True)
-                return Response({"result": serializer.data}, status=status.HTTP_200_OK)
-            return Response({"result": "No Weeks"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"result": serializer.data}, status=200)
+            return Response({"result": "No Weeks"}, status=404)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -131,10 +130,10 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                     )
                     screenshot = True
                 if not screenshot:
-                    return Response({"error": "Attachment is required"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Attachment is required"}, status=400)
             except Exception as error:
                 logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
             timesheet.submitted_at = datetime.now()
             timesheet.save()
             user_list = User.objects.filter(Q(role__name='finance'))
@@ -169,10 +168,10 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             user_ids = list(user_list.values_list('id', flat=True))
             push_notification(user_ids, message_body)
             serializer = self.serializer_class(timesheet)
-            return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -181,7 +180,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             timesheet.save()
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
 
 # API for Mobile App (For Consultants)
@@ -194,7 +193,7 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
         serializer = self.serializer_class(queryset, many=True)
-        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        return Response({"results": serializer.data}, status=200)
 
 
 class Test(GenericViewSet, ListModelMixin):
@@ -223,8 +222,8 @@ class Test(GenericViewSet, ListModelMixin):
 
         result = push_notification_consultant([device_id], message_body)
         if result:
-            return Response({"result": str(result)}, status=status.HTTP_200_OK)
-        return Response({"result": "Success"}, status=status.HTTP_200_OK)
+            return Response({"result": str(result)}, status=200)
+        return Response({"result": "Success"}, status=200)
 
 
 class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
@@ -248,10 +247,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             for i in submitted:
                 data.append(i)
             serializer = self.serializer_class(data, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['POST'], detail=False, url_path='contact_us')
     def contact_us(self, request):
@@ -268,7 +267,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 bcc = []
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
-                return Response({"result": "Select correct option"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"result": "Select correct option"}, status=400)
 
             if os.environ.get('ENV', 'local') != 'prod':
                 to = ['sarang.m@consultadd.com', 'aditi.so@consultadd.in']
@@ -320,10 +319,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             user_ids = list(user_list.values_list('id', flat=True))
             push_notification(user_ids, message_body)
 
-            return Response({"result": "mail sent"}, status=status.HTTP_200_OK)
+            return Response({"result": "mail sent"}, status=200)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['PUT'], detail=True, url_path='cancel')
     def cancel_timesheet(self, request, *args, **kwargs):
@@ -336,9 +335,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             timesheet.additional_hours = 0
             timesheet.save()
             serializer = self.serializer_class(timesheet)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['GET'], detail=True, url_path='attachments')
     def attachments(self, request, *args, **kwargs):
@@ -357,9 +356,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     "file_name": attachment.filename,
                 })
 
-            return Response({"result": data}, status=status.HTTP_200_OK)
+            return Response({"result": data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -374,9 +373,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 client=F('submission__client'),
                 status=Subquery(project_status.values('status')[:1]),
             ).order_by('-start_date').values('id', 'start_date', 'client', 'employer', 'status')
-            return Response({'result': result}, status=status.HTTP_200_OK)
+            return Response({'result': result}, status=200)
         except Exception as error:
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         page = int(request.query_params.get("page", 1))
@@ -388,9 +387,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 project=project, status__in=['draft', 'rejected'], is_active=True
             ).order_by('end')
             serializer = self.serializer_class(queryset, many=True)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -437,9 +436,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     )
                     screenshot = True
                 if not screenshot:
-                    return Response({"error": "Attachment is required"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Attachment is required"}, status=400)
             except Exception as error:
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": str(error)}, status=400)
 
             timesheet.submitted_at = datetime.now()
             timesheet.save()
@@ -489,7 +488,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             push_notification(user_ids, message_body)
 
             serializer = self.serializer_class(timesheet)
-            return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=status.HTTP_201_CREATED)
+            return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)
         except Exception as error:
             logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(error)}, status=400)
