@@ -3,7 +3,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.utils import post_msg_using_webhook
+from log1.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
@@ -56,7 +56,7 @@ class Command(BaseCommand):
                             </tr>
                         </table>"""
         }
-        post_msg_using_webhook(config.offer_url, data)
+        post_msg_using_webhook(config.announcement_url, data)
 
         data = {
             "title": "Business Health for this month &#128221;",
@@ -83,4 +83,4 @@ class Command(BaseCommand):
                             </tr>
                         </table>"""
         }
-        post_msg_using_webhook(config.offer_url, data)
+        post_msg_using_webhook(config.announcement_url, data)

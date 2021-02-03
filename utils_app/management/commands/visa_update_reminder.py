@@ -1,5 +1,5 @@
-from django.core.management import BaseCommand
 from datetime import timedelta, date
+from django.core.management import BaseCommand
 
 from constance import config
 from consultant.models import Consultant
@@ -14,9 +14,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         thirty_days = date.today() + timedelta(days=30)
         fifteen_days = date.today() + timedelta(days=15)
-        consultants = Consultant.objects.filter(marketing__status='open').exclude(
-            status__in=['archived', 'terminated']
-        ).distinct()
+        consultants = Consultant.objects.filter(status='on_bench')
         for consultant in consultants:
             marketers = []
             queryset = consultant.marketing.filter(status='open')
@@ -29,11 +27,10 @@ class Command(BaseCommand):
                 if expiry_date == fifteen_days or expiry_date == thirty_days:
                     mail_data = {
                         'bcc': [],
-                        'cc': marketers,
+                        'cc': marketers + [config.SUPERADMIN],
                         'to': [config.RECRUITMENT, config.RELATIONS],
                         'subject': f"Reminder: Visa is expiring: {consultant.name}",
                         'body': f"{consultant.name} {visa.get_visa_type_display()} is expiring on {expiry_date} "
                                 f"Update the work authorisation on log1."
                     }
-                    res = send_email_without_template(mail_data, "Log1")
-                    print(consultant.name, res)
+                    send_email_without_template(mail_data, "Log1")

@@ -28,7 +28,7 @@ from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
 from notification.views import push_notification_consultant, create_notification, push_notification
-from utils_app.utils import get_time_filter, post_msg_using_webhook, password_generator, get_page_limits
+from log1.utils import get_time_filter, post_msg_using_webhook, password_generator, get_page_limits
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
@@ -245,7 +245,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             recruiter = consultant.recruiter
             retention = consultant.relation
 
-            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
+            cc = [marketer.email, config.SUPERADMIN, config.VENDOR_MANAGEMENT] + scrum_master_email
             if recruiter:
                 cc.append(recruiter.email)
             if retention:
@@ -737,10 +737,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         statuses__created__gte=day_one,
                         employer__iexact=project.employer,
                     ).count()
-                    if project.is_remote and project.submission.lead.is_w2:
-                        con_str = f"**Remote Project** \n"
+                    if project.is_remote or project.submission.lead.is_w2:
+                        con_str = f"**Remote Project** <br>"
                         con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}** <br>"
-                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.consultant.name}**"
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
 
@@ -815,10 +815,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         [f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
                          for interview in interviews if interview.supervisor])
                     ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
-                    if project.is_remote or project.submission.lead.is_w2:
-                        con_str = f"**Remote Project** \n"
-                        con_str += f"{consultant_gender_emoji} Consultant: **{project.submission.consultant.name}** <br>"
-                        con_str += f"{consultant_gender_emoji} Remote Engineer: **{project.consultant.name}**"
+                    if project.is_remote and project.submission.lead.is_w2:
+                        con_str = f"**Remote Project** <br>"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**<br>"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**"
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
                     # Sending message on Messaging Tool

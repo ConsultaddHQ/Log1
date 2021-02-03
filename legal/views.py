@@ -17,6 +17,7 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModel
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 
+from log1.utils import get_page_limits
 from utils_app.mailing import send_email
 from employee.token import get_token_generator
 from utils_app.utils import get_page_limits, DONT_HAVE_ACCESS

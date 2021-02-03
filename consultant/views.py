@@ -32,7 +32,7 @@ from project.models import Project, ProjectStatus
 from activity.serializers import Activity, ActivitySerializer
 from attachment.serializers import Attachment, AttachmentSerializer
 from notification.views import create_notification, push_notification
-from utils_app.utils import post_msg_using_webhook, html_to_text, get_page_limits
+from log1.utils import post_msg_using_webhook, html_to_text, get_page_limits
 from consultant.models import EXIT_TYPE_CHOICE, Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, \
     ConsultantRateRevision, ConsultantPOC, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ExitReason
 
@@ -972,7 +972,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 day_filter = dict()
                 day_filter["marketing__status"] = 'open'
                 if days == 'lt_12':
-                    day_filter["marketing__start__gte"] = timezone.now().date() - timedelta(days=12)
+                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=12)
                 elif days == 'lt_24':
                     day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
                 elif days == 'lt_36':

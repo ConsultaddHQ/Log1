@@ -23,13 +23,14 @@ from django.shortcuts import get_object_or_404
 
 from employee.models import User
 from project.serializers import Project
-from utils_app.utils import post_msg_using_webhook
+from log1.utils import post_msg_using_webhook
 from attachment.serializers import AttachmentSerializer
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from attachment.views import presigned_post_url, download_s3_object
 from notification.views import create_notification, push_notification
+from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
 from utils_app.utils import get_time_filter, get_time_filter_by_start, get_page_limits, DONT_HAVE_ACCESS
 from marketing.serializers import Lead, Submission, VendorCompany, VendorContact, VendorLayer, \
@@ -738,9 +739,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     owner=request.user,
                     city=request.data['city'],
                     job_desc=request.data['job_desc'],
-                    position_id=request.data['position'],
                     job_title=request.data['job_title'],
+                    position_id=request.data['position'],
                     vendor_company_id=request.data['vendor_company'],
+                    is_w2=True if request.data.get('is_w2', False) == 'true' else False,
                 )
                 lead_id = lead.id
             else:
@@ -1130,9 +1132,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
                     Q(supervisor=request.user) |
+                    Q(submission__created_by=request.user) |
+                    Q(submission__consultant_marketing__in_pool=True) |
                     Q(submission__consultant_marketing__teams=request.user.team,
-                      submission__consultant_marketing__in_pool=False) |
-                    Q(submission__consultant_marketing__in_pool=True)
+                      submission__consultant_marketing__in_pool=False)
                 )
 
             elif 'marketer' in roles:
@@ -1288,14 +1291,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 }
 
                 # Create new Event in Google Calendar
-                cal_res = {
-                    'id': 'error'
-                }
-
+                booking_res = 'error'
                 if os.environ.get('ENV', 'local') == 'prod':
                     try:
                         cal_res = book_ms_calendar(event)
                         interview.calendar_id = cal_res['id']
+                        booking_res = 'booked'
                         interview.save()
                     except Exception as error:
                         return Response({"result": "Calendar event creation failed", "error": str(error)},
@@ -1338,7 +1339,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'title': 'New Interview Created',
                 }
                 # create_notification(user_list, notification_data)
-                return Response({"result": data[0], 'event_id': cal_res['id']}, status=201)
+                return Response({"result": data[0], 'booking_response': booking_res}, status=201)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
@@ -1374,9 +1375,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     interview.submission.status = 'in_offer'
                 interview.submission.save()
 
-                cal_res = {
-                    'id': 'error'
-                }
+                booking_res = 'error'
                 scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
                 user_list = [user for user in interview.guest.all()]
                 user_list.append(interview.supervisor)
@@ -1461,13 +1460,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             if not event_id:
                                 cal_res = book_ms_calendar(event)
                                 interview.calendar_id = cal_res['id']
+                                booking_res = 'booked'
                                 interview.save()
                             else:
                                 try:
-                                    cal_res['id'] = update_ms_calendar(event_id, event)
+                                    cal_res = update_ms_calendar(event_id, event)
+                                    booking_res = 'updated'
                                 except Exception as error:
                                     logger.error(error)
-                                    logger.error(cal_res)
                                     return Response({"result": "Calendar event update failed", "error": str(error)},
                                                     status=400)
 
@@ -1493,7 +1493,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'recipient_user_type': 'user',
                 }
                 # create_notification(user_list, notification_data)
-                return Response({"result": data[0], "event_id": cal_res['id']}, status=202)
+                return Response({"result": data[0], "booking_response": booking_res}, status=202)
             logger.error(serializer.errors)
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
@@ -1982,8 +1982,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-
-            return queryset, data_counts
+            data = TestListSerializer(queryset[first:last], many=True).data
+            return data, data_counts
         except Exception as error:
             logger.error(error)
             return error, 'error'
@@ -2189,7 +2189,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                       submission__consultant_marketing__consultant__pocs__poc_type='relation')
                 )
 
-            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified').distinct('modified')
+            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified')
+            data, screen_data = self.get_test_data(queryset, filter_by_status, first, last)
 
             if version == 'v2' and filter_json:
                 filter_string, filter_by_status = dict(), list()

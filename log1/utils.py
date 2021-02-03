@@ -1,8 +1,26 @@
+import yaml
 import json
 import random
+import logging
 import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
+from logging.config import dictConfig
+
+logger = logging.getLogger(__name__)
+
+
+def load_config(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            dictConfig(yaml.safe_load(f))
+    except FileExistsError as error:
+        logger.error(error)
+
+
+def write_exception(message, class_name, function_name):
+    logger.error(f"Raise by Class: {class_name}, Function: {function_name}")
+    logger.error(f"Type {type(message)}, Error Message: {message}")
 
 DONT_HAVE_ACCESS = 'You don\'t have access'
 
@@ -83,7 +101,7 @@ def post_msg_using_webhook(url, data):
         resp = requests.post(url, headers=headers, data=json.dumps(data))
         return resp
     except Exception as error:
-        print(error)
+        logger.error(error)
         return None
 
 

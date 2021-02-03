@@ -181,6 +181,7 @@ MODELS_PATH = os.path.join(BASE_DIR, 'models')
 RESET_TOKEN_EXPIRY_TIME = 1
 
 # Logger Configuration
+LOGGING_CONFIG = None
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,
@@ -191,15 +192,17 @@ logging.config.dictConfig({
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'file'
+            'formatter': 'file',
+            'stream': 'ext://sys.stdout'
         },
         'file': {
             'level': 'DEBUG',
+'encoding': 'utf8',
+'backupCount': 20,
+            'maxBytes': 10485760,
             'class': 'logging.handlers.RotatingFileHandler',
             'formatter': 'file',
-            'maxBytes': 1024 * 1024 * 2,
             'filename': os.path.join(BASE_DIR, 'logs/debug.log')
         }
     },
@@ -233,12 +236,13 @@ CONSTANCE_CONFIG = OrderedDict([
                           'Android App Download Link')),
 
     ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
-    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
-    ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
     ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin email id')),
+    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'Booking Email id')),
+    ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
     ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
     ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
     ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
+    ('VENDOR_MANAGEMENT', ('vendormanagement@consultadd.com', 'Vendor Management email id')),
 
     ('general_url', ('URL', 'General Channel')),
     ('test_team_url', ('URL', 'Test Team channel')),
@@ -258,7 +262,8 @@ CONSTANCE_CONFIG = OrderedDict([
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': ('APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'),
-    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
+    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
+                  'VENDOR_MANAGEMENT'),
     'Web-Hooks': ('engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
                   'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
                   'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url'),

@@ -18,7 +18,7 @@ from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
-from utils_app.utils import post_msg_using_webhook, get_page_limits
+from log1.utils import post_msg_using_webhook, get_page_limits
 
 
 class ScrumMeetingReport(GenericViewSet):
@@ -541,8 +541,8 @@ command - {slash_command}\n
 
 class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     queryset = ProjectSupport.objects.all()
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated,)
+    # authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
     def get_support_counts(self, supports):
@@ -645,8 +645,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             serializer = ProjectSupportDetailSerializer(
                 supports.order_by('support__employee_name', '-start')[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count},
-                            status=200)
+            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count}, status=200)
         except Exception as error:
             return Response({'error': error}, status=400)
 
