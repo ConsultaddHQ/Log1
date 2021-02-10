@@ -1,3 +1,4 @@
+import inspect
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -5,6 +6,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, ListModelMixin
 
 from employee.models import User
+from log1.utils import write_exception
 from employee.serializers import UserSerializerLogin
 
 
@@ -14,6 +16,10 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     serializer_class = UserSerializerLogin
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def create(self, request, *args, **kwargs):
         try:
@@ -30,4 +36,5 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
             else:
                 return Response({"error": {'message': 'Unauthorised Access'}}, status=401)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": {'success': False, 'message': str(error)}}, status=400)

@@ -2230,7 +2230,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 )
 
             queryset = get_time_filter(queryset, filter_by_time).order_by('-modified')
-            data, screen_data = self.get_test_data(queryset, filter_by_status, first, last)
 
             if version == 'v2' and filter_json:
                 filter_string, filter_by_status = dict(), list()

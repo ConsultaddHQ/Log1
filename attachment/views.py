@@ -274,15 +274,19 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
-        content_object = ContentType.objects.get(model=request.data['obj_type'])
-        file_name = request.data['file_name']
-        object_id = request.data['object_id']
+        try:
+            content_object = ContentType.objects.get(model=request.data['obj_type'])
+            file_name = request.data['file_name']
+            object_id = request.data['object_id']
 
-        object_name = 'media/attachments/{app}_{model}/{pk}/{filename}'.format(
-            app=content_object.app_label,
-            model=content_object.model.lower(),
-            pk=object_id,
-            filename=file_name,
-        )
-        response = presigned_post_url(object_name=object_name)
-        return Response({"result": response}, status=200)
+            object_name = 'media/attachments/{app}_{model}/{pk}/{filename}'.format(
+                app=content_object.app_label,
+                model=content_object.model.lower(),
+                pk=object_id,
+                filename=file_name,
+            )
+            response = presigned_post_url(object_name=object_name)
+            return Response({"result": response}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)

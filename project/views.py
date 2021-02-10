@@ -406,6 +406,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             return Response({"result": str(support_mail_res)}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
@@ -614,6 +615,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                             function_name=inspect.stack()[0][3])
             return Response({"error": serializer.errors}, status=400)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):

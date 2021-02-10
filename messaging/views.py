@@ -1,4 +1,5 @@
 import os
+import inspect
 from datetime import datetime
 
 from django.http import HttpResponse
@@ -15,6 +16,7 @@ from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 from twilio.rest import Client
 from employee.models import Asset
 from api_key.permissions import APIKey
+from log1.utils import write_exception
 from messaging.models import Message, Conversation
 from notification.views import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
@@ -26,6 +28,10 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     @action(methods=['get'], detail=False, url_path='number_list')
     def number_list(self, request):
         try:
@@ -33,8 +39,9 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 asset_type='number', provider='twilio', owner=request.user, is_deleted=False
             ).values('id', 'number')
             return Response({"results": data}, status=200)
-        except Exception as err:
-            return Response({'error': str(err)}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -45,8 +52,9 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             data = messages.values('id', 'text', 'created', 'is_sent', 'conversation_id', 'read')
             messages.update(read=True)
             return Response({"results": data}, status=200)
-        except Exception as err:
-            return Response({'error': str(err)}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({'error': str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -60,8 +68,9 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 'id', 'user2', 'created', 'modified', 'text', 'read'
             ).order_by('-id', '-messages__created').distinct('id')
             return Response({"results": conversations}, status=200)
-        except Exception as err:
-            return Response({'error': str(err)}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({'error': str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='send')
     def send_sms(self, request):
@@ -83,6 +92,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             else:
                 return Response({"error": "Message not sent, please try again."}, status=400)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
 
@@ -142,6 +152,6 @@ class ReceiveSMSViewSet(GenericViewSet):
                 return HttpResponse(status=201)
             else:
                 return HttpResponse(status=401)
-        except Exception as e:
-            print(e)
+        except Exception as error:
+            write_exception(message=error, class_name='ReceiveSMSViewSet', function_name='receive_sms')
             return HttpResponse(status=400)

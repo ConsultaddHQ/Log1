@@ -273,6 +273,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(petition)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='lca')
@@ -434,7 +435,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 doc.delete()
                 serializer = PetitionGetSerializer(petition)
                 return Response({"result": serializer.data}, status=202)
-            write_exception(message="Id not found", class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": "document id is missing"}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
