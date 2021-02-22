@@ -184,6 +184,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             retention = consultant.relation
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
             cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
+            if project.employer == 'Consultadd':
+                to.append(config.VENDOR_MANAGEMENT)
             if recruiter:
                 cc.append(recruiter.email)
             if retention:
@@ -244,11 +246,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 vendor_number = None
 
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL, marketer.team.email]
+            if project.employer == 'Consultadd':
+                to.append(config.VENDOR_MANAGEMENT)
 
             recruiter = consultant.recruiter
             retention = consultant.relation
 
-            cc = [marketer.email, config.SUPERADMIN, config.VENDOR_MANAGEMENT] + scrum_master_email
+            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
             if recruiter:
                 cc.append(recruiter.email)
             if retention:

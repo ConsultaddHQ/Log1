@@ -1953,14 +1953,71 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
+def add_other_details(request, consultant):
+    work_auths = json.loads(request.data.get('work_auth', []))
+    for visa in work_auths:
+        WorkAuth.objects.create(
+            consultant=consultant,
+            visa_end=visa['end'],
+            visa_start=visa['start'],
+            is_current=visa['current'],
+            visa_type=visa['type']["name"],
+        )
+
+    # Adding Education
+    educations = json.loads(request.data.get('education', []))
+    for education in educations:
+        Education.objects.create(
+            city=education['city'],
+            major=education['major'],
+            remark=education['remark'],
+            org_name=education['org_name'],
+            edu_type=education['edu_type']['name'],
+            end_date=education['end_date'],
+            consultant_id=consultant.id,
+        )
+    experiences = json.loads(request.data.get('experience', []))
+    for experience in experiences:
+        Experience.objects.create(
+            city=experience['city'],
+            title=experience['title'],
+            remark=experience['remark'],
+            company=experience['company'],
+            exp_type=experience['exp_type']['name'],
+            end_date=experience['end_date'],
+            start_date=experience['start_date'],
+            consultant_id=consultant.id,
+        )
+    # Adding Documents
+    documents = json.loads(request.data.get('documents', []))
+    for document in documents:
+        res, res_data = beats_to_log1(
+            document['file_path'],
+            document['file_name'],
+            consultant.id,
+            'consultant'
+        )
+        if not res:
+            return res_data, "error"
+
+
 def create_consultant(request, creator_id):
     try:
-        links = ", ".join(request.data.get('links', []))
-        skills = ", ".join(request.data.get('skills', []))
-        phone_numbers = ", ".join(request.data.get('phone_numbers', []))
+        skills, links, phone_numbers = None, None, None
+        req_links = request.data.get('links', [])
+        req_skills = request.data.get('skills', [])
+        req_phone_numbers = request.data.get('phone_numbers', [])
+        if req_skills:
+            skills = ", ".join(req_skills)
+        if req_links:
+            links = ", ".join(req_links)
+        if req_phone_numbers:
+            phone_numbers = ", ".join(req_phone_numbers)
+
         qs = Consultant.objects.filter(email=request.data.get('email'))
         if qs:
             consultant = qs.first()
+            write_exception(message="Consultant already exist", class_name='None', function_name='create_consultant')
             return consultant, "exists"
         else:
             consultant = Consultant.objects.create(
@@ -1996,15 +2053,6 @@ def create_consultant(request, creator_id):
                     start=date.today(),
                     consultant=consultant
                 )
-            # Adding Work-Auth
-            for visa in request.data.get('work_auth', []):
-                WorkAuth.objects.create(
-                    consultant=consultant,
-                    visa_end=visa['end'],
-                    visa_start=visa['start'],
-                    is_current=visa['current'],
-                    visa_type=visa['type']["name"],
-                )
             # Creating Consultant Original Profile Consultant
             ConsultantProfile.objects.create(
                 title="Original",
@@ -2017,39 +2065,7 @@ def create_consultant(request, creator_id):
                 visa_start=request.data.get('visa_start'),
                 current_city=request.data.get('current_location'),
             )
-            # Adding Education
-            for education in request.data.get('education', []):
-                Education.objects.create(
-                    city=education['city'],
-                    major=education['major'],
-                    remark=education['remark'],
-                    org_name=education['org_name'],
-                    edu_type=education['edu_type']['name'],
-                    end_date=education['end_date'],
-                    consultant_id=consultant.id,
-                )
-            for experience in request.data.get('experience', []):
-                Experience.objects.create(
-                    city=experience['city'],
-                    title=experience['title'],
-                    remark=experience['remark'],
-                    company=experience['company'],
-                    exp_type=experience['exp_type']['name'],
-                    end_date=experience['end_date'],
-                    start_date=experience['start_date'],
-                    consultant_id=consultant.id,
-                )
-
-            # Adding Documents
-            for document in request.data.get('documents', []):
-                res, res_data = beats_to_log1(
-                    document['file_path'],
-                    document['file_name'],
-                    consultant.id,
-                    'consultant'
-                )
-                if not res:
-                    return res_data, "error"
+            add_other_details(request, consultant)
             return consultant, "ok"
     except Exception as error:
         write_exception(message=error, class_name='None', function_name='create_consultant')
