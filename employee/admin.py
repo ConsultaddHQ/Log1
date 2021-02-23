@@ -8,7 +8,7 @@ from import_export.admin import ExportActionModelAdmin
 
 from utils_app.admin import ExportCsvMixin
 from rest_framework.authtoken.models import Token
-from .models import User, Role, Team, ResetPasswordToken, Asset , Tagging
+from .models import User, Role, Team, ResetPasswordToken, Asset, Tagging
 
 admin.site.site_header = "Log1"
 

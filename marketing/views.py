@@ -23,6 +23,7 @@ from django.shortcuts import get_object_or_404
 
 from employee.models import User
 from project.serializers import Project
+from utils_app.models import ObjectGroup
 from attachment.serializers import AttachmentSerializer
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
@@ -30,13 +31,14 @@ from utils_app.mailing import send_email_attachment_multiple
 from attachment.views import presigned_post_url, download_s3_object
 from notification.views import create_notification, push_notification
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
-from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook,\
+from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
     write_exception, DONT_HAVE_ACCESS
 from marketing.serializers import Lead, Submission, VendorCompany, VendorContact, VendorLayer, \
     Interview, Test, InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, \
     SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
     VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
     TestUpdateSerializer, TestListSerializer
+from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
 
 
 class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
@@ -518,6 +520,79 @@ def create_submission(request, lead_id):
         return False
 
 
+class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
+    queryset = Submission.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = SubmissionSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            sub_id = kwargs.get('pk')
+            permission = {"update": False}
+
+            sub = get_object_or_404(Submission, id=sub_id)
+
+            if sub.created_by.id == request.user.id:
+                permission['update'] = True
+
+            if sub.created_by == request.user:
+                serializer = SubmissionV2DetailSerializer(sub)
+                return Response({"results": serializer.data, "permission": permission}, status=200)
+            else:
+                serializer = SubmissionV2Serializer(sub)
+                return Response({"results": serializer.data, "permission": permission}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='fields')
+    def fields(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            fields, group = [], None
+
+            if submission.created_by.id == request.user.id:
+                group = ObjectGroup.objects.filter(name='owner', model='submission', status=submission.status)
+
+            if group:
+                fields = group.first().fields.all().values_list('name', flat=True)
+            return Response({"result": fields}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='documents')
+    def documents(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            if hasattr(submission, 'project'):
+                project = submission.project
+                attachments = submission.attachments.all().union(project.attachments.all())
+            else:
+                attachments = submission.attachments.all()
+            serializer = AttachmentSerializer(attachments, many=True)
+            return Response({"result": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='profile')
+    def profile(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            consultant = submission.consultant
+            serializer = SubmissionConProfile(consultant, context={'submission': submission})
+            return Response({"result": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+
 class SubmissionViewSets(viewsets.ModelViewSet):
     queryset = Submission.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -600,25 +675,41 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            calendar_id = request.query_params.get('calendar', 'false')
-            if calendar_id == 'true':
-                interview = get_object_or_404(Interview, calendar_id=kwargs.get('pk'))
-                sub = interview.submission
-            else:
-                sub_id = kwargs.get('pk')
-                sub = get_object_or_404(Submission, id=sub_id)
 
-            interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
-            if interviews:
-                serializer = SubmissionDetailSerializer(sub)
-                return Response({"results": serializer.data}, status=200)
+            # calendar_id = request.query_params.get('calendar', 'false')
+            # if calendar_id == 'true':
+            #     interview = get_object_or_404(Interview, calendar_id=kwargs.get('pk'))
+            #     sub = interview.submission
+            # else:
 
-            if sub.created_by == request.user:
-                serializer = SubmissionDetailSerializer(sub)
-                return Response({"results": serializer.data}, status=200)
+            sub_id = kwargs.get('pk')
+            permission = {"update": False}
+            version = request.query_params.get('version', 'v1')
+
+            sub = get_object_or_404(Submission, id=sub_id)
+
+            if sub.created_by.id == request.user.id:
+                permission['update'] = True
+
+            if version == "v2":
+                if sub.created_by == request.user:
+                    serializer = SubmissionV2DetailSerializer(sub)
+                    return Response({"results": serializer.data, "permission": permission}, status=200)
+                else:
+                    serializer = SubmissionV2Serializer(sub)
+                    return Response({"results": serializer.data, "permission": permission}, status=200)
             else:
-                serializer = self.serializer_class(sub)
-                return Response({"results": serializer.data}, status=200)
+                # interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
+                # if interviews:
+                #     serializer = SubmissionDetailSerializer(sub)
+                #     return Response({"results": serializer.data, "permission": permission}, status=200)
+
+                if sub.created_by == request.user:
+                    serializer = SubmissionDetailSerializer(sub)
+                    return Response({"results": serializer.data, "permission": permission}, status=200)
+                else:
+                    serializer = self.serializer_class(sub)
+                    return Response({"results": serializer.data, "permission": permission}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -1101,13 +1192,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             self.change_to_feedback_due()
+            permission = {"update": False}
             interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+
+            if request.user in [interview.marketer, interview.supervisor]:
+                permission['update'] = True
+
             if request.user in [interview.marketer, interview.supervisor] + list(interview.guest.all()):
                 serializer = InterviewDetailSerializer(interview)
             else:
                 serializer = self.serializer_class(interview)
 
-            return Response({"results": serializer.data}, status=200)
+            return Response({"results": serializer.data, "permission": permission}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -1577,6 +1673,25 @@ class InterviewViewSets(viewsets.ModelViewSet):
             }
             # create_notification(user_list, notification_data)
             return Response(status=204)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='fields')
+    def fields(self, request, *args, **kwargs):
+        try:
+            interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+            fields, group = [], None
+
+            if interview.submission.created_by.id == request.user.id:
+                group = ObjectGroup.objects.filter(name='owner', model='interview', status=interview.status)
+
+            if request.user.id == interview.supervisor.id:
+                group = ObjectGroup.objects.filter(name='supervisor', model='interview', status=interview.status)
+
+            if group:
+                fields = group.first().fields.all().values_list('name', flat=True)
+            return Response({"result": fields}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -2335,6 +2450,25 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return Response({"result": serializer.data}, status=202)
             else:
                 return Response({"error": serializer.errors}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='fields')
+    def fields(self, request, *args, **kwargs):
+        try:
+            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            fields, group = [], None
+
+            if test.submission.created_by.id == request.user.id:
+                group = ObjectGroup.objects.filter(name='owner', model='test', status=test.status)
+
+            if request.user in [test.submitted_by] + [test.assign_to.all()] + [test.engineer.all()]:
+                group = ObjectGroup.objects.filter(name='assigned', model='test', status=test.status)
+
+            if group:
+                fields = group.first().fields.all().values_list('name', flat=True)
+            return Response({"result": fields}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)

@@ -18,6 +18,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
 
 from constance import config
+from utils_app.models import ObjectGroup
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
@@ -413,11 +414,31 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
-    def retrieve(self, request, *args, **kwargs):
+    @action(methods=['get'], detail=True, url_path='fields')
+    def fields(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
+            fields, group = [], None
+            status = project.statuses.filter(is_current=True).first().status
+            if project.submission.created_by.id == request.user.id:
+                group = ObjectGroup.objects.filter(name='owner', model='project', status=status)
+            if request.user.role.name == 'finance':
+                group = ObjectGroup.objects.filter(name='finance', model='project', status=status)
+            if group:
+                fields = group.first().fields.all().values_list('name', flat=True)
+            return Response({"result": fields}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            permission = {"update": False}
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            if project.submission.created_by.id == request.user.id:
+                permission['update'] = True
             serializer = ProjectGetSerializer(project)
-            return Response({"results": serializer.data}, status=200)
+            return Response({"results": serializer.data, "permission": permission}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
