@@ -22,8 +22,11 @@ from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
 
 from employee.models import User
+from activity.models import Activity
 from project.serializers import Project
 from utils_app.models import ObjectGroup
+from activity.views import create_activity
+from activity.serializers import ActivitySerializer
 from attachment.serializers import AttachmentSerializer
 from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
@@ -31,6 +34,7 @@ from utils_app.mailing import send_email_attachment_multiple
 from attachment.views import presigned_post_url, download_s3_object
 from notification.views import create_notification, push_notification
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
+from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
 from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
     write_exception, DONT_HAVE_ACCESS
 from marketing.serializers import Lead, Submission, VendorCompany, VendorContact, VendorLayer, \
@@ -38,7 +42,6 @@ from marketing.serializers import Lead, Submission, VendorCompany, VendorContact
     SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
     VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
     TestUpdateSerializer, TestListSerializer
-from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
 
 
 class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
@@ -592,6 +595,28 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=True, url_path='activities')
+    def activities(self, request, *args, **kwargs):
+        try:
+            activities = Activity.objects.filter(
+                object_id=kwargs.get('pk'), content_type__model='submission'
+            ).order_by('created')
+            serializer = ActivitySerializer(activities, many=True)
+            return Response({"results": serializer.data}, status=200)
+        except Exception as error:
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='resume')
+    def resume(self, request, *args, **kwargs):
+        try:
+            attachment_id = kwargs.get('pk')
+            attachment = get_object_or_404(Attachment, id=attachment_id)
+            serializer = AttachmentSerializer(attachment)
+            return Response({"result": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
 
 class SubmissionViewSets(viewsets.ModelViewSet):
     queryset = Submission.objects.all()
@@ -684,32 +709,22 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
             sub_id = kwargs.get('pk')
             permission = {"update": False}
-            version = request.query_params.get('version', 'v1')
-
             sub = get_object_or_404(Submission, id=sub_id)
 
             if sub.created_by.id == request.user.id:
                 permission['update'] = True
 
-            if version == "v2":
-                if sub.created_by == request.user:
-                    serializer = SubmissionV2DetailSerializer(sub)
-                    return Response({"results": serializer.data, "permission": permission}, status=200)
-                else:
-                    serializer = SubmissionV2Serializer(sub)
-                    return Response({"results": serializer.data, "permission": permission}, status=200)
-            else:
-                # interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
-                # if interviews:
-                #     serializer = SubmissionDetailSerializer(sub)
-                #     return Response({"results": serializer.data, "permission": permission}, status=200)
+            # interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
+            # if interviews:
+            #     serializer = SubmissionDetailSerializer(sub)
+            #     return Response({"results": serializer.data, "permission": permission}, status=200)
 
-                if sub.created_by == request.user:
-                    serializer = SubmissionDetailSerializer(sub)
-                    return Response({"results": serializer.data, "permission": permission}, status=200)
-                else:
-                    serializer = self.serializer_class(sub)
-                    return Response({"results": serializer.data, "permission": permission}, status=200)
+            if sub.created_by == request.user:
+                serializer = SubmissionDetailSerializer(sub)
+                return Response({"results": serializer.data, "permission": permission}, status=200)
+            else:
+                serializer = self.serializer_class(sub)
+                return Response({"results": serializer.data, "permission": permission}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -908,12 +923,16 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     @action(methods=['put'], detail=True, url_path='resume')
     def resume(self, request, *args, **kwargs):
-        attachment_id = kwargs.get('pk')
-        attachment = get_object_or_404(Attachment, id=attachment_id)
-        attachment.attachment_file = request.FILES.get('file')
-        attachment.save()
-        serializer = AttachmentSerializer(attachment)
-        return Response({"result": serializer.data}, status=202)
+        try:
+            attachment_id = kwargs.get('pk')
+            attachment = get_object_or_404(Attachment, id=attachment_id)
+            attachment.attachment_file = request.FILES.get('file')
+            attachment.save()
+            serializer = AttachmentSerializer(attachment)
+            return Response({"result": serializer.data}, status=202)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
     # Suggestions for Submission
     @action(methods=['get'], detail=False, url_path='suggestions')
@@ -1355,10 +1374,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
             serializer = InterviewCreateSerializer(data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+
                 queryset = Interview.objects.filter(id=serializer.data['id'])
                 interview = queryset.first()
                 interview.round = round_count + 1
                 interview.save()
+
+                desc = f"Round {interview.round} is scheduled for {interview.start_time} to {interview.end_time} "
+                create_activity(submission_id, 'submission', request.user, desc, 'created')
 
                 # Closing Submission for scheduling Interview
                 submission = submissions.first()
@@ -1499,6 +1522,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
                 user_list = [user for user in interview.guest.all()]
                 user_list.append(interview.supervisor)
+
                 for user in scrum_masters:
                     user_list.append(user)
                 title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R :: 
@@ -1528,9 +1552,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.interview_feedback_url, data)
 
                 if status_change == 'false':
+                    desc = f"Round {interview.round} is updated"
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
                         interview.save()
+                        desc = f"Round {interview.round} is rescheduled for {interview.start_time} to {interview.end_time}"
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date():
                             text = "*CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {} :: {}*".format(
@@ -1545,6 +1571,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 "text": text
                             }
                             post_msg_using_webhook(config.announcement_url, data)
+
+                    create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
                     supervisor_email = interview.supervisor.email
                     attendees = [
                         {'email': supervisor_email},
@@ -1645,14 +1673,20 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             interview.status = 'cancelled'
             interview.save()
+
+            desc = f"Round {interview.round} is cancelled"
+            create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+
             if interview.round == 1:
                 interview.submission.status = 'sub'
                 interview = self.rank_interviews(interview, 'cancel')
+
             interview.submission.is_active = True
             interview.submission.save()
             scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
             user_list = [user for user in interview.guest.all()]
             user_list.append(interview.supervisor)
+
             for user in scrum_masters:
                 user_list.append(user)
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
@@ -1706,6 +1740,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview = queryset.first()
                 interview.notes = request.data.get('notes')
                 interview.save()
+
+                desc = f"Notes update by {request.user.name}"
+                create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+
                 serializer = InterviewCreateSerializer(interview)
                 return Response({"result": serializer.data}, status=202)
             else:
@@ -1725,11 +1763,23 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 response = presigned_post_url(object_name=object_name)
                 interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
                 interview.save()
+
+                desc = f"Recording: {file_name} uploaded by {request.user.name}"
+                create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+
                 return Response({"result": response}, status=202)
             else:
                 interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+                if interview.attachment_link:
+                    file_name = interview.attachment_link.split("/")[-1]
+                else:
+                    file_name = ""
                 interview.attachment_link = None
                 interview.save()
+
+                desc = f"Recording: {file_name} deleted by {request.user.name}"
+                create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+
                 return Response(status=204)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
