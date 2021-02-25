@@ -366,6 +366,7 @@ class LeadViewSets(viewsets.ModelViewSet):
             else:
                 if queryset.first().owner != request.user:
                     return Response({"result": DONT_HAVE_ACCESS}, status=403)
+
             lead = queryset.first()
             serializer = LeadCreateSerializer(lead, data=request.data, partial=True)
             if serializer.is_valid():
@@ -393,6 +394,22 @@ class LeadViewSets(viewsets.ModelViewSet):
             lead.status = 'archived'
             lead.save()
             return Response(status=204)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='fields')
+    def fields(self, request, *args, **kwargs):
+        try:
+            lead = get_object_or_404(Lead, id=kwargs.get('pk'), owner=request.user)
+            fields, group = [], None
+
+            if lead.owner.id == request.user.id:
+                group = ObjectGroup.objects.filter(name='owner', model='lead', status=lead.status)
+
+            if group:
+                fields = group.first().fields.all().values_list('name', flat=True)
+            return Response({"result": fields}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -2444,8 +2461,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def create(self, request, *args, **kwargs):
         try:
-            submissions = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
-            if not submissions:
+            submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
+            if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
 
             data = {
@@ -2462,12 +2479,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 status='new',
                 link=data['link'],
                 skills=data['skills'],
-                submission=submissions,
+                submission=submission,
                 deadline=data['deadline'],
                 is_video=data['is_video'],
                 is_offline=data['is_offline'],
                 additional_details=data['additional_details'],
             )
+
+            desc = f"Test created with deadline {str(test.deadline)}"
+            create_activity(submission.id, 'submission', request.user, desc, 'created')
+
             # upload attachments
             for file in request.FILES.getlist('file'):
                 file_data = {
@@ -2478,7 +2499,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     "creator": request.user,
                 }
                 create_attachment(file_data)
-            # test email
+
+            # Test email to engineering team
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'new')
