@@ -35,6 +35,7 @@ from project.serializers import ProjectSerializer, ProjectGetSerializer, Project
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
 
+# Route - /project/
 class ProjectViewSets(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
@@ -945,6 +946,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /project_support/
 class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectSupport.objects.all()
     serializer_class = ProjectSupportSerializer
@@ -1079,6 +1081,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /project_order/
 class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectOrder.objects.all()
     serializer_class = ProjectOrderSerializer
@@ -1178,6 +1181,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /eng_project/
 class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
     authentication_classes = ()
     permission_classes = (HasAPIKey,)
@@ -1225,6 +1229,7 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
             return Response({"error": error}, status=400)
 
 
+# Route - /finance/
 class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = TimeSheet.objects.all()
     serializer_class = FinanceSerializer

@@ -76,6 +76,7 @@ def push_notification_consultant(registration_ids, message_body):
         return error
 
 
+# Route - /emp_notify/
 class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = Notification.objects.all()
@@ -152,6 +153,7 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /con_notify/
 class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer

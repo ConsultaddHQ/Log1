@@ -15,16 +15,16 @@ from rest_framework.viewsets import GenericViewSet
 from project.models import Project
 from log1.utils import write_exception
 from utils_app.mailing import send_email
-from consultant.auth import consultant_authenticate
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.serializers import ConsultantLoginSerializer
-from consultant.authentication import ConsultantTokenAuthentication
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
 from employee.models import clear_expired, get_password_reset_token_expiry_time
+from consultant.authentication import consultant_authenticate, ConsultantTokenAuthentication
 from consultant.models import Consultant, ConsultantToken, ConsultantResetPasswordToken, FCMDevice
 
 
 # API for Mobile App
+# Route - /consultant_auth/
 class ConsultantAuthViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
@@ -130,6 +130,7 @@ class ConsultantAuthViewSet(GenericViewSet):
 
 
 # API for Mobile App
+# Route - /consultant_app/
 class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
@@ -190,6 +191,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
 
 
 # API for Mobile App
+# Route - /consultant_password/
 class ConsultantResetPasswordViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()

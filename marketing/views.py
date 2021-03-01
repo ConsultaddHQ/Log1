@@ -21,18 +21,19 @@ from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
 
-from employee.models import User
 from activity.models import Activity
+from employee.models import User, Team
 from project.serializers import Project
+from consultant.models import Consultant
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from activity.serializers import ActivitySerializer
 from attachment.serializers import AttachmentSerializer
-from consultant.models import ConsultantProfile, Consultant
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from attachment.views import presigned_post_url, download_s3_object
 from notification.views import create_notification, push_notification
+from marketing.utils import change_to_feedback_due, create_submission
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
 from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
@@ -41,9 +42,10 @@ from marketing.serializers import Lead, Submission, VendorCompany, VendorContact
     Interview, Test, InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, \
     SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
     VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
-    TestUpdateSerializer, TestListSerializer
+    TestUpdateSerializer, TestListSerializer, InterviewV2Serializer, TestGetSerializer
 
 
+# Route - /vendor_company/
 class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     queryset = VendorCompany.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -89,6 +91,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /vendor_contact/
 class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = VendorContact.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -161,6 +164,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /lead/
 class LeadViewSets(viewsets.ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
@@ -460,86 +464,7 @@ class LeadViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
 
-def create_submission(request, lead_id):
-    try:
-        profile = get_object_or_404(ConsultantProfile, id=request.data['profile_id'])
-        vendor_contact = request.data.get('vendor_contact', None)
-        if vendor_contact:
-            sub, created = Submission.objects.get_or_create(
-                status='sub',
-                lead_id=lead_id,
-                created_by=request.user,
-                rate=request.data['rate'],
-                email=request.data['email'],
-                phone=request.data['phone'],
-                client=request.data['client'],
-                employer=request.data['employer'],
-                vendor_contact_id=request.data['vendor_contact'],
-                consultant_marketing_id=request.data['marketing_id'],
-
-                other_link=profile.links,
-                visa_end=profile.visa_end,
-                linkedin=profile.linkedin,
-                education=profile.education,
-                visa_type=profile.visa_type,
-                visa_start=profile.visa_start,
-                current_city=profile.current_city,
-                date_of_birth=profile.date_of_birth,
-            )
-        else:
-            sub, created = Submission.objects.get_or_create(
-                status='sub',
-                lead_id=lead_id,
-                created_by=request.user,
-                rate=request.data['rate'],
-                email=request.data['email'],
-                phone=request.data['phone'],
-                client=request.data['client'],
-                employer=request.data['employer'],
-                consultant_marketing_id=request.data['marketing_id'],
-
-                other_link=profile.links,
-                visa_end=profile.visa_end,
-                linkedin=profile.linkedin,
-                education=profile.education,
-                visa_type=profile.visa_type,
-                visa_start=profile.visa_start,
-                current_city=profile.current_city,
-                date_of_birth=profile.date_of_birth,
-            )
-
-        if sub.rate and sub.vendor and sub.client and (sub.lead.job_desc and len(sub.lead.job_desc) > 20):
-            sub.is_complete = True
-            sub.save()
-
-        resume = request.FILES.get('file_resume', None)
-        resume_data = {
-            "file": resume,
-            "type": 'resume',
-            "object_id": sub.id,
-            "model": "submission",
-            "creator": request.user,
-        }
-        if resume:
-            create_attachment(resume_data)
-
-        other = request.FILES.get('file_other', None)
-        other_file_data = {
-            "file": other,
-            "type": 'other',
-            "object_id": sub.id,
-            "model": "submission",
-            "creator": request.user,
-        }
-        if other:
-            create_attachment(other_file_data)
-
-        return sub
-    except Exception as error:
-        write_exception(message=error, class_name=None, function_name=inspect.stack()[0][3])
-        return False
-
-
+# Route - /v2/submission/
 class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     queryset = Submission.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -634,7 +559,49 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='employer')
+    def employer(self, request):
+        try:
+            role = request.user.roles
+            consultadd_emp = Team.objects.get(name='Consultadd')
+            if 'superadmin' in role:
+                employers = Team.objects.filter(
+                    Q(dept='Marketing') |
+                    Q(name='Consultadd')
+                ).order_by('name').values('id', 'name')
+            else:
+                employers = [
+                    {"id": request.user.team.id, "name": request.user.team.name},
+                    {"id": consultadd_emp.id, "name": consultadd_emp.name},
+                ]
+            return Response({"result": employers}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=True, url_path='interviews')
+    def interviews(self, request, *args, **kwargs):
+        try:
+            change_to_feedback_due()
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            serializer = InterviewV2Serializer(submission.screening.all(), many=True)
+            return Response({"results": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='tests')
+    def tests(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            serializer = TestGetSerializer(submission.test.all(), many=True)
+            return Response({"results": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+
+# Route - /submission/
 class SubmissionViewSets(viewsets.ModelViewSet):
     queryset = Submission.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -1025,6 +992,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /vendor_layer/
 class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin, GenericViewSet):
     queryset = VendorLayer.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -1087,6 +1055,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /interview/
 class InterviewViewSets(viewsets.ModelViewSet):
     queryset = Interview.objects.all()
     serializer_class = InterviewSerializer
@@ -1096,18 +1065,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
     @classmethod
     def get_classname(cls):
         return cls.__name__
-
-    # Change status of scheduled and rescheduled Interviews to feedback_due
-    def change_to_feedback_due(self):
-        try:
-            now = datetime.now() - timedelta(hours=4)
-            previous_interviews = Interview.objects.filter(end_time__lte=now, status__in=['scheduled', 'rescheduled'])
-            for interview in previous_interviews:
-                interview.status = 'feedback_due'
-                interview.save()
-        except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
 
     def rank_interviews(self, interview, interview_status):
         try:
@@ -1227,7 +1184,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            self.change_to_feedback_due()
+            change_to_feedback_due()
             permission = {"update": False}
             interview = get_object_or_404(Interview, id=kwargs.get('pk'))
 
@@ -1256,7 +1213,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
         try:
             # Change status of past Interview to feedback due
-            self.change_to_feedback_due()
+            change_to_feedback_due()
 
             # Search Interview by Client, VendorContact and Consultant
             roles = request.user.roles
@@ -1371,7 +1328,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
         submission_id = request.data['submission']
         try:
             # Change status of past Interview to feedback due
-            self.change_to_feedback_due()
+            change_to_feedback_due()
 
             submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
             if not submissions:
@@ -1509,7 +1466,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         try:
             # Change status of past Screening to feedback due
-            self.change_to_feedback_due()
+            change_to_feedback_due()
             interview_id = kwargs.get('pk')
             status_change = request.query_params.get('status_change', 'true')
             reschedule = request.query_params.get('reschedule', None)
@@ -1671,7 +1628,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
         interview_id = kwargs.get('pk')
         try:
             # Change status of past Screening to feedback due
-            self.change_to_feedback_due()
+            change_to_feedback_due()
 
             interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
             # Delete from google calendar
@@ -1883,6 +1840,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({'error': str(error)}, status=400)
 
 
+# Route - /dashboard/
 class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     queryset = Submission.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -2168,6 +2126,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             return Response({'error': error}, status=400)
 
 
+# Route - /test/
 class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
     queryset = Test.objects.all()
     permission_classes = (IsAuthenticated,)

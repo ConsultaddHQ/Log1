@@ -2,10 +2,10 @@ from rest_framework import serializers
 
 from project.models import Project
 from consultant.models import Consultant
-from employee.serializers import UserSerializer
 from activity.serializers import CommentGetSerializer
 from attachment.serializers import AttachmentSerializer
-from consultant.serializers import ConsultantSerializer, ConsultantProfileSerializer
+from consultant.serializers import ConsultantSerializer
+from employee.serializers import UserSerializer, UserDetailSerializer
 from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
 
 
@@ -401,3 +401,59 @@ class SubmissionConProfile(serializers.ModelSerializer):
             "current_city": submission.current_city,
             "date_of_birth": submission.date_of_birth,
         }
+
+
+class InterviewV2Serializer(serializers.ModelSerializer):
+    supervisor = UserDetailSerializer()
+    guest = UserDetailSerializer(many=True)
+    permission = serializers.SerializerMethodField()
+    attachment_link = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Interview
+        fields = '__all__'
+
+    def get_permission(self, obj):
+        user = self.context.get('user')
+        update = False
+        if user in [obj.marketer, obj.supervisor] + list(obj.guest.all()):
+            update = True
+        return {'update': update}
+
+    def get_attachment_link(self, obj):
+        if obj.attachment_link:
+            return obj.attachment_link.split('/')[-1]
+        return None
+
+
+class TestGetSerializer(serializers.ModelSerializer):
+    engineers = serializers.SerializerMethodField()
+    assigned_to = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Test
+        fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
+                  'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments',
+                  'cancel_reason', 'assigned_to')
+
+    def get_engineers(self, obj):
+        if obj.engineer.all():
+            return obj.engineer.all().values('id', 'employee_name', 'avatar')
+        return None
+
+    def get_assigned_to(self, obj):
+        return obj.assign_to.all().values('id', 'employee_name', 'avatar')
+
+    def get_submitted_by(self, obj):
+        if obj.submitted_by:
+            return {
+                "id": obj.submitted_by.id,
+                'avatar':obj.submitted_by.avatar,
+                "employee_name": obj.submitted_by.employee_name,
+            }
+        return None
+
+    def get_attachments(self, obj):
+        return AttachmentSerializer(obj.attachments.all(), many=True).data

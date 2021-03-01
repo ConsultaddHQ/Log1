@@ -17,6 +17,12 @@ class UserSerializer(serializers.ModelSerializer):
         return None
 
 
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'employee_name', 'avatar')
+
+
 # Login
 class UserSerializerLogin(UserSerializer):
     token = serializers.SerializerMethodField()
@@ -67,7 +73,6 @@ class AssetSerializer(serializers.ModelSerializer):
 
 
 class TaggedUserSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Tagging
         fields = '__all__'

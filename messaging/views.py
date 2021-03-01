@@ -22,6 +22,7 @@ from notification.views import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
 
 
+# Route - /twilio/
 class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     queryset = Conversation.objects.all()
     serializer_class = MessageSerializer
@@ -96,6 +97,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /twilio_receive/
 class ReceiveSMSViewSet(GenericViewSet):
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer

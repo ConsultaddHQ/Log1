@@ -30,6 +30,7 @@ from employee.serializers import UserSerializer, UserSerializerLogin, EmailSeria
     AssetSerializer
 
 
+# Route - /auth/
 class EmployeeAuthViewSets(GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -96,6 +97,7 @@ class EmployeeAuthViewSets(GenericViewSet):
         return Response({"error": "Incorrect Employee Id/Password"}, status=400)
 
 
+# Route - /employee/
 class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -197,6 +199,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": str(error)}, status=400)
 
 
+# Route - /password/
 class ResetPasswordViewSets(GenericViewSet):
     queryset = User.objects.all()
     permission_classes = ()
@@ -292,6 +295,7 @@ class ResetPasswordViewSets(GenericViewSet):
         return Response({'status': 'OK'}, status=200)
 
 
+# Route - /assets/
 class AssetsViewSets(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
@@ -518,6 +522,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /users/
 class AllUsersViewSet(GenericViewSet, ListModelMixin):
     queryset = User.objects.all()
     authentication_classes = (TokenAuthentication,)

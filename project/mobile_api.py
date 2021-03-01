@@ -25,6 +25,7 @@ from notification.views import create_notification, push_notification, push_noti
 
 
 # API for Mobile App (For Consultants)
+# Route - /timesheet/
 class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = TimeSheet.objects.all()
     serializer_class = TimeSheetSerializer
@@ -187,6 +188,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
 
 
 # API for Mobile App (For Consultants)
+# Route - /payroll/
 class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
     queryset = PayrollSchedule.objects.all()
     serializer_class = PayrollScheduleSerializer
@@ -203,6 +205,7 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
         return Response({"results": serializer.data}, status=200)
 
 
+# Route - /test/
 class Test(GenericViewSet, ListModelMixin):
     queryset = PayrollSchedule.objects.all()
     serializer_class = PayrollScheduleSerializer
@@ -237,6 +240,7 @@ class Test(GenericViewSet, ListModelMixin):
         return Response({"result": "Success"}, status=200)
 
 
+# Route - /timesheet_v2/
 class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
     queryset = TimeSheet.objects.all()
     serializer_class = TimeSheetSerializer

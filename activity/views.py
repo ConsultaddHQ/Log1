@@ -67,6 +67,7 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /comment/
 class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     queryset = Activity.objects.all()
     serializer_class = ActivitySerializer
