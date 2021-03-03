@@ -416,7 +416,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     def get_permission(self, obj):
         user = self.context.get('user')
         update = False
-        if user in [obj.marketer, obj.supervisor] + list(obj.guest.all()):
+        if user in [obj.marketer, obj.supervisor]:
             update = True
         return {'update': update}
 

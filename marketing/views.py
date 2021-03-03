@@ -584,7 +584,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             change_to_feedback_due()
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
-            serializer = InterviewV2Serializer(submission.screening.all(), many=True)
+            serializer = InterviewV2Serializer(submission.screening.all(), many=True, context={'user': request.user})
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
