@@ -30,6 +30,7 @@ TOKEN_GENERATOR_CLASS = get_token_generator()
 
 
 # Api for Legal Team
+# Route - /petition/
 class PetitionViewSets(viewsets.ModelViewSet):
     queryset = Petition.objects.all()
     serializer_class = PetitionSerializer
@@ -473,6 +474,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
 
 # Api for Consultant
+# Route - /petition_docs/
 class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, DestroyModelMixin):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer

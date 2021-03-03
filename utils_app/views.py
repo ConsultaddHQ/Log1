@@ -8,10 +8,13 @@ from django.contrib.contenttypes.models import ContentType
 
 from log1.utils import write_exception
 from utils_app.models import City, Choice
+from utils_app.serializers import UtilSerializer
 
 
+# Route - /city/
 class CityViewSets(ListModelMixin, GenericViewSet):
     queryset = City.objects.all()
+    serializer_class = UtilSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
@@ -26,8 +29,10 @@ class CityViewSets(ListModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /choice/
 class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
     queryset = Choice.objects.all()
+    serializer_class = UtilSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 

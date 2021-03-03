@@ -10,6 +10,7 @@ from log1.utils import write_exception
 from employee.serializers import UserSerializerLogin
 
 
+# Route - /impersonate/
 class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     # check if user is a superuser and has rights to impersonate
     queryset = User.objects.all()

@@ -52,3 +52,22 @@ class Choice(models.Model):
 
     def __str__(self):
         return f'{self.name}-{self.field}-{self.content_type}'
+
+
+class Field(models.Model):
+    name = models.CharField(_('Field Name'), max_length=100)
+    model = models.CharField(_('Model Name'), max_length=100)
+    app_label = models.CharField(_('App Label'), max_length=100)
+
+    def __str__(self):
+        return f'{self.model}-{self.name}'
+
+
+class ObjectGroup(models.Model):
+    fields = models.ManyToManyField(Field, blank=True)
+    name = models.CharField(_('Group Name'), max_length=100)
+    model = models.CharField(_('Model Name'), max_length=100)
+    status = models.CharField(_('Object Status'), max_length=100, blank=True)
+
+    def __str__(self):
+        return self.name

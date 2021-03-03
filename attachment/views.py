@@ -73,6 +73,7 @@ def presigned_post_url(object_name, fields=None, conditions=None, expiration=360
     return response
 
 
+# Route - /attachment/
 class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, GenericViewSet):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
@@ -252,6 +253,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /get_attachment/
 class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer

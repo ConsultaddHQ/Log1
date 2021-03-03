@@ -23,6 +23,7 @@ from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
 
 
+# Route - /report/
 class ScrumMeetingReport(GenericViewSet):
     queryset = ScrumMeeting.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -96,6 +97,7 @@ class ScrumMeetingReport(GenericViewSet):
         return Response({"results": "success"}, status=201)
 
 
+# Route - /cmd/
 class SlashCommandViewSets(GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -548,6 +550,7 @@ command - {slash_command}\n
             return Response({"text": "Bad request", "error": str(error)}, status=200)
 
 
+# Route - /support_report/
 class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     queryset = ProjectSupport.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -664,6 +667,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             return Response({'error': error}, status=400)
 
 
+# Route - /marketing_report/
 class MarketingReportViewSets(GenericViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
