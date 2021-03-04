@@ -1,4 +1,5 @@
 import os
+import json
 import boto3
 from django.utils import timezone
 from datetime import date, datetime
@@ -14,7 +15,8 @@ from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
 from notification.views import create_notification, push_notification
 from log1.utils import post_msg_using_webhook, html_to_text, write_exception
-from consultant.models import EXIT_TYPE_CHOICE, ConsultantMarketing
+from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
+    ConsultantRateRevision, Education, Experience, WorkAuth
 
 
 def create_activity(object_id, model, user, desc, activity_type):
@@ -349,4 +351,123 @@ def send_notification(consultant, sender, title):
         return "Notification sent"
     except Exception as error:
         write_exception(message=error, class_name='None', function_name='send_notification')
+        return error, "error"
+
+
+def add_other_details(request, consultant):
+    work_auths = json.loads(request.data.get('work_auth', []))
+    for visa in work_auths:
+        WorkAuth.objects.create(
+            consultant=consultant,
+            visa_end=visa['end'],
+            visa_start=visa['start'],
+            is_current=visa['current'],
+            visa_type=visa['type']["name"],
+        )
+
+    # Adding Education
+    educations = json.loads(request.data.get('education', []))
+    for education in educations:
+        Education.objects.create(
+            city=education['city'],
+            major=education['major'],
+            remark=education['remark'],
+            org_name=education['org_name'],
+            edu_type=education['edu_type']['name'],
+            end_date=education['end_date'],
+            consultant_id=consultant.id,
+        )
+    experiences = json.loads(request.data.get('experience', []))
+    for experience in experiences:
+        Experience.objects.create(
+            city=experience['city'],
+            title=experience['title'],
+            remark=experience['remark'],
+            company=experience['company'],
+            exp_type=experience['exp_type']['name'],
+            end_date=experience['end_date'],
+            start_date=experience['start_date'],
+            consultant_id=consultant.id,
+        )
+    # Adding Documents
+    documents = json.loads(request.data.get('documents', []))
+    for document in documents:
+        res, res_data = beats_to_log1(
+            document['file_path'],
+            document['file_name'],
+            consultant.id,
+            'consultant'
+        )
+        if not res:
+            return res_data, "error"
+
+
+def create_consultant(request, creator_id):
+    try:
+        skills, links, phone_numbers = None, None, None
+        req_links = request.data.get('links', [])
+        req_skills = request.data.get('skills', [])
+        req_phone_numbers = request.data.get('phone_numbers', [])
+        if req_skills:
+            skills = ", ".join(req_skills)
+        if req_links:
+            links = ", ".join(req_links)
+        if req_phone_numbers:
+            phone_numbers = ", ".join(req_phone_numbers)
+
+        qs = Consultant.objects.filter(email=request.data.get('email'))
+        if qs:
+            consultant = qs.first()
+            write_exception(message="Consultant already exist", class_name='None', function_name='create_consultant')
+            return consultant, "exists"
+        else:
+            consultant = Consultant.objects.create(
+                links=links,
+                skills=skills,
+                work_type='full_time',
+                phone_no=phone_numbers,
+                ssn=request.data.get('ssn'),
+                name=request.data.get('name'),
+                email=request.data.get('email'),
+                skype=request.data.get('skype'),
+                gender=request.data.get('gender'),
+                date_of_birth=request.data.get('dob'),
+                current_city=request.data.get('current_location')
+            )
+            # Adding Recruiter of Consultant
+            recruiter_employee_id = request.data.get('recruiter')
+            qs = User.objects.filter(email=recruiter_employee_id)
+            if qs:
+                recruiter = qs.first()
+                ConsultantPOC.objects.create(
+                    poc=recruiter,
+                    start=timezone.now(),
+                    poc_type='recruiter',
+                    consultant=consultant,
+                )
+            # Adding rate
+            rate = request.data.get('rate', None)
+            if rate:
+                ConsultantRateRevision.objects.create(
+                    previous_rate=0,
+                    rate=rate,
+                    start=date.today(),
+                    consultant=consultant
+                )
+            # Creating Consultant Original Profile Consultant
+            ConsultantProfile.objects.create(
+                title="Original",
+                consultant=consultant,
+                profile_owner_id=creator_id,
+                links=request.data.get('links'),
+                date_of_birth=request.data.get('dob'),
+                visa_end=request.data.get('visa_end'),
+                visa_type=request.data.get('visa_type'),
+                visa_start=request.data.get('visa_start'),
+                current_city=request.data.get('current_location'),
+            )
+            add_other_details(request, consultant)
+            return consultant, "ok"
+    except Exception as error:
+        write_exception(message=error, class_name='None', function_name='create_consultant')
         return error, "error"

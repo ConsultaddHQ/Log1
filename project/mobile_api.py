@@ -38,9 +38,9 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
 
     @action(methods=['GET'], detail=False, url_path='history')
     def history(self, request):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        # page = int(request.query_params.get("page", 1))
+        # page_size = int(request.query_params.get("page_size", 10))
+        # last, first = page * page_size, page * page_size - page_size
         try:
             project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
                               'terminated-resigned_rate_issue', 'terminated-resigned_location_issue',
@@ -68,9 +68,9 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        # page = int(request.query_params.get("page", 1))
+        # page_size = int(request.query_params.get("page_size", 10))
+        # last, first = page * page_size, page * page_size - page_size
         try:
             project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
                               'terminated-resigned_rate_issue', 'terminated-resigned_location_issue',
@@ -200,9 +200,13 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
         return cls.__name__
 
     def list(self, request, *args, **kwargs):
-        queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
-        serializer = self.serializer_class(queryset, many=True)
-        return Response({"results": serializer.data}, status=200)
+        try:
+            queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
+            serializer = self.serializer_class(queryset, many=True)
+            return Response({"results": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
 
 # Route - /test/
@@ -356,6 +360,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['GET'], detail=True, url_path='attachments')
@@ -377,6 +382,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
             return Response({"result": data}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -394,6 +400,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             ).order_by('-start_date').values('id', 'start_date', 'client', 'employer', 'status')
             return Response({'result': result}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
@@ -408,6 +415,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(queryset, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -457,6 +465,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 if not screenshot:
                     return Response({"error": "Attachment is required"}, status=400)
             except Exception as error:
+                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                 return Response({"error": str(error)}, status=400)
 
             timesheet.submitted_at = datetime.now()

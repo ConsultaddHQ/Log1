@@ -66,11 +66,10 @@ def presigned_post_url(object_name, fields=None, conditions=None, expiration=360
         response = s3.generate_presigned_post(
             bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
         )
+        return response
     except ClientError as e:
         write_exception(message=e, class_name='None', function_name='presigned_post_url')
         return None
-
-    return response
 
 
 # Route - /attachment/

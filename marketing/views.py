@@ -73,7 +73,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
         try:
-            name = request.data.get('name', None).strip().replace(':amp:', '&')
+            name = request.data.get('name', None)
             if name:
                 name = name.strip().replace(':amp:', '&')
                 queryset = VendorCompany.objects.filter(name__iexact=name)
