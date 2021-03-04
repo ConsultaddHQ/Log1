@@ -4,13 +4,14 @@ from django.core.management import BaseCommand
 from constance import config
 from marketing.models import Test
 from utils_app.models import CronJob
-from log1.utils import post_msg_using_webhook
+from log1.utils import post_msg_using_webhook, create_cron_error
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='assign_test_update')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             tests = Test.objects.filter(status__in=['new', 'assigned']).exclude(
                 submission__consultant_marketing__status='close'
@@ -56,11 +57,8 @@ class Command(BaseCommand):
                     "text": "No Pending test"
                 }
 
-            post_msg_using_webhook(config.engineering_url, data)
-            job.last_status = 'complete'
+            res, msg = post_msg_using_webhook(config.engineering_url, data)
+            if msg == 'error':
+                create_cron_error(job, res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)
