@@ -1,13 +1,12 @@
 import os
 import boto3
-import logging
+import inspect
 from datetime import datetime
 from botocore.exceptions import ClientError
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -15,10 +14,9 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
 
 from project.models import Project
+from log1.utils import write_exception
 from activity.views import create_activity
 from attachment.serializers import Attachment, AttachmentSerializer
-
-logger = logging.getLogger(__name__)
 
 
 def get_s3_object(key):
@@ -54,7 +52,7 @@ def delete_temp_file(paths):
         if os.path.exists(path):
             os.remove(path)
         else:
-            logger.error(path, "The file does not exist")
+            write_exception(message=path + " file does not exist", class_name='None', function_name='delete_temp_file')
 
 
 def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
@@ -68,18 +66,22 @@ def presigned_post_url(object_name, fields=None, conditions=None, expiration=360
         response = s3.generate_presigned_post(
             bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
         )
+        return response
     except ClientError as e:
-        logging.error(e)
+        write_exception(message=e, class_name='None', function_name='presigned_post_url')
         return None
 
-    return response
 
-
+# Route - /attachment/
 class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, GenericViewSet):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         obj_type = request.query_params.get("obj_type", None)
@@ -94,10 +96,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type
                                                      ).order_by('-created')
             serializer = self.serializer_class(queryset, many=True)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -107,7 +109,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 resume = Attachment.objects.filter(object_id=object_id, content_type=content_type,
                                                    attachment_type='resume')
                 if resume:
-                    return Response({"error": "you can't attache duplicate resume"}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "You can't attach multiple resumes"}, status=400)
 
             attachment = Attachment.objects.create(
                 object_id=object_id,
@@ -119,7 +121,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             serializer = self.serializer_class(attachment)
 
             if content_type.model != 'project':
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data}, status=201)
             else:
                 project = get_object_or_404(Project, id=object_id)
 
@@ -171,10 +173,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "reporting_details": reporting_details
                 }
 
-                return Response({"result": serializer.data, "check_list": check_list}, status=status.HTTP_201_CREATED)
+                return Response({"result": serializer.data, "check_list": check_list}, status=201)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -191,7 +193,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
-                return Response({"result": "deleted"}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": "deleted"}, status=202)
             else:
                 project = get_object_or_404(Project, id=attachment.object_id)
                 desc = f"{attachment.filename} deleted by {request.user.employee_name}"
@@ -244,38 +246,48 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "vendor_address": vendor_address,
                     "reporting_details": reporting_details,
                 }
-                return Response({"result": "deleted", "check_list": check_list}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": "deleted", "check_list": check_list}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
 
+# Route - /get_attachment/
 class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         try:
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
             url = get_s3_object(attachment.attachment_file.name)
             extension = attachment.attachment_file.name.split(".")[-1]
-            return Response({"result": url, 'file_type': extension}, status=status.HTTP_200_OK)
+            return Response({"result": url, 'file_type': extension}, status=200)
         except Exception as error:
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
-        content_object = ContentType.objects.get(model=request.data['obj_type'])
-        file_name = request.data['file_name']
-        object_id = request.data['object_id']
+        try:
+            content_object = ContentType.objects.get(model=request.data['obj_type'])
+            file_name = request.data['file_name']
+            object_id = request.data['object_id']
 
-        object_name = 'media/attachments/{app}_{model}/{pk}/{filename}'.format(
-            app=content_object.app_label,
-            model=content_object.model.lower(),
-            pk=object_id,
-            filename=file_name,
-        )
-        response = presigned_post_url(object_name=object_name)
-        return Response({"result": response}, status=status.HTTP_200_OK)
+            object_name = 'media/attachments/{app}_{model}/{pk}/{filename}'.format(
+                app=content_object.app_label,
+                model=content_object.model.lower(),
+                pk=object_id,
+                filename=file_name,
+            )
+            response = presigned_post_url(object_name=object_name)
+            return Response({"result": response}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)

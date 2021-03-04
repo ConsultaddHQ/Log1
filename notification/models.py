@@ -1,4 +1,3 @@
-import logging
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -18,11 +17,10 @@ DEVICE_TYPES = (
     (u'android', u'android'),
 )
 
-logger = logging.getLogger(__name__)
-
 
 class NotificationQuerySet(models.query.QuerySet):
     """ Notification QuerySet """
+
     def unread(self, user, user_type):
         """Return only unread items in the current queryset"""
         return self.filter(

@@ -38,6 +38,8 @@ from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, C
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets
 
+from marketing.views import SubmissionV2ViewSets
+
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     FeedbackViewSet, ConsultantImportViewSet
@@ -120,10 +122,14 @@ router.register(r'consultant_petition', ConsultantPetitionAuthViewSet)
 router.register(r'twilio', SMSViewSet)
 router.register(r'twilio_receive', ReceiveSMSViewSet)
 
+router_v2 = DefaultRouter()
+
+router_v2.register(r'submission', SubmissionV2ViewSets)
 
 urlpatterns = [
     path('api/', include(router.urls)),
     path('api/admin/', admin.site.urls),
+    path('api/v2/', include(router_v2.urls)),
     path('api/explorer/', include('explorer.urls')),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
