@@ -71,3 +71,21 @@ class ObjectGroup(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class CronJob(TimeStampedModel):
+    name = models.CharField(_('Name'), max_length=100)
+    enabled = models.BooleanField(_('Enabled'), default=True)
+    schedule = models.CharField(_('Schedule'), max_length=50)
+    description = models.TextField(_('Description'), blank=True, null=True)
+    last_status = models.CharField(_('Last Status'), max_length=30, blank=True, null=True)
+    last_triggered_at = models.DateTimeField(_('Last Triggered At'), blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(CronJob, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.name}-{self.last_status}'

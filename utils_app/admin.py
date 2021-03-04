@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.http import HttpResponse
 from import_export.admin import ExportActionModelAdmin
 
-from utils_app.models import City, ScrumMeeting, Choice, Field, ObjectGroup
+from utils_app.models import City, ScrumMeeting, Choice, Field, ObjectGroup, CronJob
 
 
 class ExportCsvMixin:
@@ -57,3 +57,9 @@ class FieldAdmin(admin.ModelAdmin):
 class ObjectGroupAdmin(admin.ModelAdmin):
     search_fields = ('name', 'model', 'status')
     list_display = ('id', 'name', 'model', 'status')
+
+
+@admin.register(CronJob)
+class CronJobAdmin(admin.ModelAdmin):
+    search_fields = ('name',)
+    list_display = ('id', 'name', 'enabled', 'last_triggered_at', 'last_status', 'schedule', 'description')
