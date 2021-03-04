@@ -440,17 +440,16 @@ class TestGetSerializer(serializers.ModelSerializer):
 
     def get_engineers(self, obj):
         if obj.engineer.all():
-            return obj.engineer.all().values('id', 'employee_name', 'avatar')
+            return obj.engineer.all().values('id', 'employee_name')
         return None
 
     def get_assigned_to(self, obj):
-        return obj.assign_to.all().values('id', 'employee_name', 'avatar')
+        return obj.assign_to.all().values('id', 'employee_name')
 
     def get_submitted_by(self, obj):
         if obj.submitted_by:
             return {
                 "id": obj.submitted_by.id,
-                'avatar':obj.submitted_by.avatar,
                 "employee_name": obj.submitted_by.employee_name,
             }
         return None

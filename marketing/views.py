@@ -23,7 +23,6 @@ from django.shortcuts import get_object_or_404
 
 from activity.models import Activity
 from employee.models import User, Team
-from project.serializers import Project
 from consultant.models import Consultant
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
@@ -31,6 +30,7 @@ from activity.serializers import ActivitySerializer
 from attachment.serializers import AttachmentSerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
+from project.serializers import Project, ProjectSupportSerializer
 from attachment.views import presigned_post_url, download_s3_object
 from notification.views import create_notification, push_notification
 from marketing.utils import change_to_feedback_due, create_submission
@@ -43,7 +43,6 @@ from marketing.serializers import Lead, Submission, VendorCompany, VendorContact
     SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
     VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
     TestUpdateSerializer, TestListSerializer, InterviewV2Serializer, TestGetSerializer
-
 
 # Route - /vendor_company/
 class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
@@ -596,6 +595,19 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             serializer = TestGetSerializer(submission.test.all(), many=True)
             return Response({"results": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='support')
+    def support(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            if hasattr(submission, 'project'):
+                serializer = ProjectSupportSerializer(submission.project.support.all().order_by('-created'), many=True)
+                return Response({"result": serializer.data}, status=200)
+            else:
+                return Response({"error": "project not found"}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
