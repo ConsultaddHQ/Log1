@@ -310,6 +310,10 @@ class Test(TimeStampedModel):
     def __str__(self):
         return f"{self.submission.consultant.name} :: {self.submission.created_by.employee_name}"
 
+    @property
+    def marketer(self):
+        return self.submission.created_by
+
 
 class Interview(TimeStampedModel):
     round = models.IntegerField(default=0)

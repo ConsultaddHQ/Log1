@@ -1,10 +1,10 @@
 from rest_framework import serializers
 
-from project.models import Project
 from consultant.models import Consultant
 from activity.serializers import CommentGetSerializer
-from attachment.serializers import AttachmentSerializer
+from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
 from consultant.serializers import ConsultantSerializer
+from project.models import Project, ProjectSupport, SupportStatus
 from employee.serializers import UserSerializer, UserDetailSerializer
 from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
 
@@ -428,15 +428,16 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
 class TestGetSerializer(serializers.ModelSerializer):
     engineers = serializers.SerializerMethodField()
+    permission = serializers.SerializerMethodField()
+    attachments = AttachmentGetSerializer(many=True)
     assigned_to = serializers.SerializerMethodField()
-    attachments = serializers.SerializerMethodField()
     submitted_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
                   'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments',
-                  'cancel_reason', 'assigned_to')
+                  'cancel_reason', 'assigned_to', 'permission')
 
     def get_engineers(self, obj):
         if obj.engineer.all():
@@ -454,5 +455,25 @@ class TestGetSerializer(serializers.ModelSerializer):
             }
         return None
 
-    def get_attachments(self, obj):
-        return AttachmentSerializer(obj.attachments.all(), many=True).data
+    def get_permission(self, obj):
+        user = self.context.get('user')
+        update = False
+        if user == obj.marketer:
+            update = True
+        return {'update': update}
+
+
+class SubmissionSupportSerializer(serializers.ModelSerializer):
+    support = UserDetailSerializer()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSupport
+        fields = '__all__'
+
+    def get_status(self, obj):
+        statuses = obj.statuses.filter(is_current=True)
+        if statuses:
+            support_status = statuses.first()
+            return {"id": support_status.id, "frequency": support_status.frequency}
+        return None
