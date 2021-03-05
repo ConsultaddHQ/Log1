@@ -78,14 +78,23 @@ class CronJob(TimeStampedModel):
     enabled = models.BooleanField(_('Enabled'), default=True)
     schedule = models.CharField(_('Schedule'), max_length=50)
     description = models.TextField(_('Description'), blank=True, null=True)
-    last_status = models.CharField(_('Last Status'), max_length=30, blank=True, null=True)
-    last_triggered_at = models.DateTimeField(_('Last Triggered At'), blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
             self.created = timezone.now()
-        self.modified = timezone.now()
         return super(CronJob, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.name}-{self.last_status}'
+        return f'{self.name}-{self.modified}'
+
+
+class CronError(models.Model):
+    description = models.TextField(_('Description'), blank=True, null=True)
+    job = models.ForeignKey(CronJob, on_delete=models.CASCADE, related_name='errors')
+    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
+
+    def save(self, *args, **kwargs):
+        return super(CronError, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.job.name}-{self.created}'

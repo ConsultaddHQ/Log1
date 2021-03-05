@@ -4,6 +4,7 @@ from django.core.management import BaseCommand
 from constance import config
 from utils_app.models import CronJob
 from consultant.models import Consultant
+from utils_app.utils import create_cron_error
 from utils_app.mailing import send_email_without_template
 
 
@@ -15,6 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='assign_test_update')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             thirty_days = date.today() + timedelta(days=30)
             fifteen_days = date.today() + timedelta(days=15)
@@ -38,10 +40,5 @@ class Command(BaseCommand):
                                     f"Update the work authorisation on log1."
                         }
                         send_email_without_template(mail_data, "Log1")
-            job.last_status = 'complete'
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

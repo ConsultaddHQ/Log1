@@ -5,6 +5,7 @@ from constance import config
 from utils_app.models import CronJob
 from consultant.models import Consultant
 from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
@@ -15,6 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='monday_consultant_marketing')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             end = date.today() - timedelta(days=1)
             start = date.today() - timedelta(days=7)
@@ -46,11 +48,8 @@ class Command(BaseCommand):
                                 </tr>
                             </table>"""
             }
-            post_msg_using_webhook(config.recruitment_url, data)
-            job.last_status = 'complete'
+            res, msg = post_msg_using_webhook(config.recruitment_url, data)
+            if msg == 'error':
+                raise Exception(res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

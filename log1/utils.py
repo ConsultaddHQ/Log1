@@ -99,10 +99,10 @@ def post_msg_using_webhook(url, data):
     try:
         headers = {'Content-Type': 'application/json'}
         resp = requests.post(url, headers=headers, data=json.dumps(data))
-        return resp
+        return resp, "ok"
     except Exception as error:
         write_exception(message=error, class_name='None', function_name='post_msg_using_webhook')
-        return None
+        return error, "error"
 
 
 def password_generator(password_length=10, strength=3):

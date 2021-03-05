@@ -5,6 +5,7 @@ from constance import config
 from utils_app.models import CronJob
 from marketing.models import Interview
 from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
@@ -15,6 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='interview_bot')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             from pytz import timezone
             tz = timezone('EST')
@@ -51,11 +53,9 @@ class Command(BaseCommand):
                 "title": "Interviews Scheduled for today &#128203;",
                 "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
             }
-            post_msg_using_webhook(config.announcement_url, data)
-            job.last_status = 'complete'
+            res, msg = post_msg_using_webhook(config.announcement_url, data)
+            if msg == 'error':
+                raise Exception(res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
+            create_cron_error(job, error)
 
-        finally:
-            job.save()

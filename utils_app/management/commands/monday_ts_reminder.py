@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from project.models import TimeSheet
 from utils_app.models import CronJob
+from utils_app.utils import create_cron_error
 from notification.models import Notification, FCMDevice
 from notification.views import push_notification_consultant
 
@@ -17,6 +18,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='monday_ts_reminder')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             queryset = TimeSheet.objects.filter(
                 is_active=True, status='draft', end=date.today() - timedelta(days=2),
@@ -58,10 +60,5 @@ class Command(BaseCommand):
                 tokens = list(consultant.consultant_token.all().values_list('key', flat=True))
                 device_ids = list(FCMDevice.objects.filter(object_id__in=tokens).values_list('device_id', flat=True))
                 push_notification_consultant(device_ids, message_body)
-            job.last_status = 'complete'
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

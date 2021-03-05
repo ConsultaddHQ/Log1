@@ -6,6 +6,7 @@ from employee.models import User
 from utils_app.models import CronJob
 from marketing.models import Submission
 from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
@@ -15,6 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='make_consultant_open')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             start = date.today() - timedelta(days=7)
             end = date.today() - timedelta(days=1)
@@ -59,10 +61,5 @@ class Command(BaseCommand):
                     last = first + 50
                 else:
                     break
-            job.last_status = 'complete'
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

@@ -5,6 +5,7 @@ from constance import config
 from project.models import Project
 from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
@@ -14,6 +15,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='joining_report')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             month = date.today().month
             year = date.today().year
@@ -74,11 +76,8 @@ class Command(BaseCommand):
                                 </tr>
                             </table>"""
             }
-            post_msg_using_webhook(config.joined_url, data)
-            job.last_status = 'complete'
+            res, msg = post_msg_using_webhook(config.joined_url, data)
+            if msg == 'error':
+                raise Exception(res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

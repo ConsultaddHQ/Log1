@@ -8,6 +8,7 @@ from utils_app.models import CronJob
 from marketing.models import Submission
 from consultant.models import Consultant
 from utils_app.mailing import send_email
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
@@ -18,6 +19,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='consultants_submissions')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             consultants = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
             submission_data = []
@@ -69,6 +71,8 @@ class Command(BaseCommand):
 
                 reply_to = [config.RELATIONS]
                 mail_res = send_email(mail_data, "marketing@consultadd.com", reply_to)
+                if mail_res != "mail sent":
+                    raise Exception(mail_res)
                 submission_data.append({
                     "scrum_masters": cc,
                     "mail_res": mail_res,
@@ -90,11 +94,8 @@ class Command(BaseCommand):
                     'days': days,
                 },
             }
-            send_email(mail_data, "marketing@consultadd.com")
-            job.last_status = 'complete'
+            mail_res = send_email(mail_data, "marketing@consultadd.com")
+            if mail_res != "mail sent":
+                raise Exception(mail_res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

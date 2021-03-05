@@ -5,6 +5,7 @@ from constance import config
 from utils_app.models import CronJob
 from consultant.models import Consultant
 from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
@@ -15,6 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='bench_count')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             queryset = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
             on_bench_con = queryset.count()
@@ -54,11 +56,8 @@ class Command(BaseCommand):
                             </table>"""
             }
 
-            post_msg_using_webhook(config.recruitment_url, data)
-            job.last_status = 'complete'
+            res, msg = post_msg_using_webhook(config.recruitment_url, data)
+            if msg == 'error':
+                raise Exception(res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

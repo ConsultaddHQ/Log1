@@ -4,6 +4,7 @@ from django.core.management import BaseCommand
 from constance import config
 from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 from consultant.models import ConsultantMarketing
 
 
@@ -15,6 +16,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='pool_candidates')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             in_pool_con = ConsultantMarketing.objects.filter(
                 in_pool=True,
@@ -66,7 +68,9 @@ class Command(BaseCommand):
                             "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
                         }
 
-                        post_msg_using_webhook(config.pool_channel_url, data)
+                        res2, msg2 = post_msg_using_webhook(config.pool_channel_url, data)
+                        if msg2 == 'error':
+                            create_cron_error(job, res2)
                         text = f"""<tr>
                                     <th style="padding:5px 8px 5px 8px;">#</th>
                                     <th style="padding:5px 8px 5px 8px;">Consultant</th>
@@ -82,11 +86,8 @@ class Command(BaseCommand):
                 "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
             }
 
-            post_msg_using_webhook(config.pool_channel_url, data)
-            job.last_status = 'complete'
+            res, msg = post_msg_using_webhook(config.pool_channel_url, data)
+            if msg == 'error':
+                raise Exception(res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)
