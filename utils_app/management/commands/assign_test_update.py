@@ -4,7 +4,8 @@ from django.core.management import BaseCommand
 from constance import config
 from marketing.models import Test
 from utils_app.models import CronJob
-from log1.utils import post_msg_using_webhook, create_cron_error
+from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
@@ -59,6 +60,6 @@ class Command(BaseCommand):
 
             res, msg = post_msg_using_webhook(config.engineering_url, data)
             if msg == 'error':
-                create_cron_error(job, res)
+                raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)

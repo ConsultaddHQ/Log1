@@ -6,8 +6,6 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 from logging.config import dictConfig
-from utils_app.models import CronError
-from utils_app.mailing import send_email_without_template
 
 logger = logging.getLogger(__name__)
 
@@ -136,14 +134,3 @@ def html_to_text(html):
     html = html.replace('<strong>', '**').replace('</strong>', '**').replace('<em>', '_').replace('</em>', '_')
     soup = BeautifulSoup(html, features="html.parser")
     return soup.get_text('\n')
-
-
-def create_cron_error(job, description):
-    CronError.objects.create(
-        description=description,
-        job=job
-    )
-    mail_data = {
-        'subject': f"{job.name}"
-    }
-    send_email_without_template(mail_data)
