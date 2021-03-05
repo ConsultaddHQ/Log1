@@ -16,7 +16,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='project_count')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',

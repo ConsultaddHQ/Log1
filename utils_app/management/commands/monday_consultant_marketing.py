@@ -15,7 +15,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='monday_consultant_marketing')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             end = date.today() - timedelta(days=1)

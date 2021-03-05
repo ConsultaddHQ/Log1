@@ -11,7 +11,7 @@ from utils_app.utils import create_cron_error
 class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='assign_test_update')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             tests = Test.objects.filter(status__in=['new', 'assigned']).exclude(

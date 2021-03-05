@@ -15,7 +15,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='interview_bot')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             from pytz import timezone
@@ -43,7 +43,8 @@ class Command(BaseCommand):
                                 <td style="padding:5px 8px 5px 8px;"> {interview.supervisor.employee_name} </td>
                                 <td style="padding:5px 8px 5px 8px; text-align: center;"> {interview.round} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.get_interview_mode_display()} </td>
-                                <td style="padding:5px 8px 5px 8px;"> {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} </td>
+                                <td style="padding:5px 8px 5px 8px;"> 
+                                        {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.consultant.name} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.submission.client} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.marketer.employee_name} </td>
@@ -58,4 +59,3 @@ class Command(BaseCommand):
                 raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)
-

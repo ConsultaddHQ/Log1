@@ -16,7 +16,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='terminate_consultant')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             queryset = ConsultantExit.objects.filter(last_date__lte=date.today(), status='in_process')

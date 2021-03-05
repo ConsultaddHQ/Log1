@@ -2,14 +2,14 @@ import os
 import logging.config
 from collections import OrderedDict
 
+from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
-# Reading env file
-PROJECT_FOLDER = os.path.expanduser(BASE_DIR)
-load_dotenv(os.path.join(PROJECT_FOLDER, '.env'))
+env_path = Path('.', '.env')
+load_dotenv(dotenv_path=env_path)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -144,7 +144,7 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'consultadd.com')
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'EST'
 
 USE_I18N = True
 
@@ -246,6 +246,7 @@ CONSTANCE_CONFIG = OrderedDict([
 
     ('general_url', ('URL', 'General Channel')),
     ('test_team_url', ('URL', 'Test Team channel')),
+    ('products_dev', ('URL', 'Products Dev Channel')),
     ('engineering_url', ('URL', 'Engineering channel')),
     ('recruitment_url', ('URL', 'Recruitment Channel')),
     ('pool_channel_url', ('URL', '45dayslimit Channel')),
@@ -261,10 +262,17 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'constants': ('APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'),
-    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
-                  'VENDOR_MANAGEMENT'),
-    'Web-Hooks': ('engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
-                  'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
-                  'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url'),
+    'constants': (
+        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'
+    ),
+    'Email Ids': (
+        'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
+        'VENDOR_MANAGEMENT'
+    ),
+    'Web-Hooks': (
+        'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
+        'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
+        'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
+        'products_dev'
+    ),
 }

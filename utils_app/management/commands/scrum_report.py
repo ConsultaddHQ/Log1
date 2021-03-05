@@ -44,7 +44,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='scrum_report')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             teams = Team.objects.filter(dept='Marketing')

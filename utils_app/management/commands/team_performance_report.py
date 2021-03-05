@@ -16,7 +16,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='assign_test_update')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             teams = Team.objects.filter(dept='Marketing').order_by('name')

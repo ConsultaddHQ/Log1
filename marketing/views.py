@@ -28,13 +28,12 @@ from consultant.models import Consultant
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from activity.serializers import ActivitySerializer
-from project.serializers import ProjectGetSerializer
 from attachment.serializers import AttachmentSerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
-from attachment.views import presigned_post_url, download_s3_object
 from notification.views import create_notification, push_notification
 from marketing.utils import change_to_feedback_due, create_submission
+from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
 from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
@@ -2294,6 +2293,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res = send_email_attachment_multiple(mail_data, created_by.email)
+                delete_temp_file(path)
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -2329,6 +2329,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
+                delete_temp_file(path)
                 return res, "ok"
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])

@@ -15,7 +15,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='assign_test_update')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             thirty_days = date.today() + timedelta(days=30)

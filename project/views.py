@@ -372,9 +372,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 res, error = 'development server', 'development server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     res, error = self.po_mail(project, path, scrum_masters, po_type)
-
+                delete_temp_file(path)
                 if not error == 'error':
-                    delete_temp_file(path)
                     project.submission.consultant_marketing.status = 'close'
                     project.submission.consultant_marketing.end = project.start_date
                     project.submission.consultant_marketing.save()

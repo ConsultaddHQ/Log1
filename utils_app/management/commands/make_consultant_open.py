@@ -16,7 +16,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='make_consultant_open')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             upper_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')))

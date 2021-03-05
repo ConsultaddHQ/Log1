@@ -1,11 +1,11 @@
 from rest_framework import serializers
 
 from consultant.models import Consultant
+from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
-from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
 from consultant.serializers import ConsultantSerializer
-from project.models import Project, ProjectSupport, SupportStatus
 from employee.serializers import UserSerializer, UserDetailSerializer
+from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
 from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
 
 
@@ -505,7 +505,7 @@ class ProjectV2Serializer(serializers.ModelSerializer):
         return {'update': update}
 
     def get_attachments(self, obj):
-        return AttachmentSerializer(obj.attachments.all(), many=True).data
+        return AttachmentGetSerializer(obj.attachments.all(), many=True).data
 
     def get_check_list(self, obj):
         msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0

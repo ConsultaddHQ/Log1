@@ -23,7 +23,7 @@ class AttachmentGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Attachment
-        fields = ('id', 'file_name')
+        fields = ('id', 'file_name', 'attachment_type')
 
 
 class AttachmentURLSerializer(serializers.ModelSerializer):
