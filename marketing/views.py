@@ -28,6 +28,7 @@ from consultant.models import Consultant
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from activity.serializers import ActivitySerializer
+from project.serializers import ProjectGetSerializer
 from attachment.serializers import AttachmentSerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
@@ -42,7 +43,8 @@ from marketing.serializers import Lead, Submission, VendorCompany, VendorContact
     Interview, Test, InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, \
     SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
     VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
-    TestUpdateSerializer, TestListSerializer, InterviewV2Serializer, TestGetSerializer, SubmissionSupportSerializer
+    TestUpdateSerializer, TestListSerializer, InterviewV2Serializer, TestGetSerializer, SubmissionSupportSerializer, \
+    ProjectV2Serializer
 
 
 # Route - /vendor_company/
@@ -609,7 +611,20 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 serializer = SubmissionSupportSerializer(queryset, many=True)
                 return Response({"result": serializer.data}, status=200)
             else:
-                return Response({"error": "project not found"}, status=400)
+                return Response({"error": "Project not found"}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='project')
+    def project(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            if hasattr(submission, 'project'):
+                serializer = ProjectV2Serializer(submission.project)
+                return Response({"result": serializer.data}, status=200)
+            else:
+                return Response({"error": "Project not found"}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
