@@ -7,6 +7,7 @@ from marketing.models import Interview
 from log1.utils import post_msg_using_webhook
 from utils_app.utils import create_cron_error
 
+
 class Command(BaseCommand):
     # Show this when the user types help
     help = "this command is for posting your payload to MatterMost app"

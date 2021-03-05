@@ -64,4 +64,3 @@ class Command(BaseCommand):
                 raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)
-

@@ -5,6 +5,7 @@ from django.utils import timezone
 from employee.models import User
 from utils_app.models import CronJob
 from consultant.models import ConsultantExit
+from utils_app.utils import create_cron_error
 from consultant.views import send_exit_process_mail
 from notification.views import push_notification, create_notification
 
@@ -16,6 +17,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='terminate_consultant')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             queryset = ConsultantExit.objects.filter(last_date__lte=date.today(), status='in_process')
             for terminate in queryset:
@@ -77,10 +79,5 @@ class Command(BaseCommand):
                 for user in user_list:
                     object_ids.append(user.id)
                 push_notification(object_ids, message_body)
-            job.last_status = 'complete'
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

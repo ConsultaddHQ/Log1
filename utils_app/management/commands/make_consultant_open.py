@@ -5,6 +5,7 @@ from datetime import timedelta, datetime
 from django.core.management import BaseCommand
 
 from utils_app.models import CronJob
+from utils_app.utils import create_cron_error
 from consultant.models import ConsultantMarketing
 
 
@@ -16,6 +17,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='make_consultant_open')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             upper_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')))
             lower_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')) + 1)
@@ -29,10 +31,5 @@ class Command(BaseCommand):
             for consultant_marketing in queryset:
                 consultant_marketing.in_pool = True
                 consultant_marketing.save()
-            job.last_status = 'complete'
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)

@@ -5,12 +5,14 @@ from constance import config
 from marketing.models import Test
 from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='new_test_update')
         job.last_triggered_at = datetime.now()
+        job.save()
         try:
             tests = Test.objects.filter(status='new').exclude(
                 submission__consultant_marketing__status='close').order_by('created')
@@ -52,11 +54,8 @@ class Command(BaseCommand):
                     "title": "Pending Test &#128203;",
                     "text": "No Pending test"
                 }
-            post_msg_using_webhook(config.test_team_url, data)
-            job.last_status = 'complete'
+            res, msg = post_msg_using_webhook(config.test_team_url, data)
+            if msg == 'error':
+                raise Exception(res)
         except Exception as error:
-            job.last_status = 'failed'
-            print(error)
-
-        finally:
-            job.save()
+            create_cron_error(job, error)
