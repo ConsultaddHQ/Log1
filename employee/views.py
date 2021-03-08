@@ -1,8 +1,8 @@
 import inspect
 from itertools import chain
+from datetime import timedelta, datetime
 
 from django.utils import timezone
-from datetime import timedelta, datetime
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404

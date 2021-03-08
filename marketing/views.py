@@ -105,8 +105,9 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            queryset = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
-            data = queryset.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
+            data = VendorContact.objects.filter(
+                company_id=kwargs.get('pk'), created_by=request.user
+            ).values('id', 'name', 'email', 'number', 'company__name', 'created_by')
             return Response({"results": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -115,8 +116,9 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
     def list(self, request, *args, **kwargs):
         try:
             company_id = request.query_params.get('company')
-            queryset = VendorContact.objects.filter(company_id=company_id, created_by=request.user)
-            data = queryset.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
+            data = VendorContact.objects.filter(
+                company_id=company_id, created_by=request.user
+            ).values('id', 'name', 'email', 'number', 'company__name', 'created_by')
             return Response({"results": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])

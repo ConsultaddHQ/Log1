@@ -80,7 +80,7 @@ def close_marketing():
         # Push Notification
         for marketing in queryset:
             title = f"{marketing.consultant.name}'s marketing cycle stopped by {admin.employee_name}"
-            send_notification(marketing.consultant, admin, title)
+            send_notification_for_user(marketing.consultant, admin, title, 'marketing')
         return None
     except Exception as error:
         return error
@@ -95,7 +95,7 @@ def start_marketing():
         # Push Notification
         for marketing in queryset:
             title = f"{marketing.consultant.name}'s new marketing cycle started by {admin.employee_name}"
-            send_notification(marketing.consultant, admin, title)
+            send_notification_for_user(marketing.consultant, admin, title, 'marketing')
         return None
     except Exception as error:
         return error
@@ -306,7 +306,7 @@ def send_exit_process_mail(terminate, exit_status):
         return error, "error"
 
 
-def send_notification(consultant, sender, title):
+def send_notification_for_user(consultant, sender, title, sub_target):
     try:
         # App Notification
         user_list = []
@@ -335,22 +335,23 @@ def send_notification(consultant, sender, title):
         message_body = {
             "body": title,
             "title": title,
-            "category": "alert",
+            "category": "info",
             "show_in_foreground": True,
             "click_action": "https://app.log1.com",
             "data": {
-                'target': 'user',
                 'is_read': False,
                 'is_deleted': False,
-                'timestamp': str(datetime.now()),
+                'target': 'consultant',
+                'sub_target': sub_target,
                 'target_id': consultant.id,
+                'timestamp': str(datetime.now()),
             },
         }
         object_ids = [user.id for user in user_list]
         push_notification(object_ids, message_body)
         return "Notification sent"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_notification')
+        write_exception(message=error, class_name='None', function_name='send_notification_for_user')
         return error, "error"
 
 

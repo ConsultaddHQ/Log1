@@ -15,8 +15,8 @@ from consultant.models import Consultant
 from employee.models import User, tag_users
 from activity.models import Activity, Comment
 from project.models import Project, TimeSheet
-from consultant.views import send_notification
 from marketing.models import Submission, Interview
+from consultant.utils import send_notification_for_user
 from notification.views import create_notification, push_notification
 from activity.serializers import ActivitySerializer, CommentGetSerializer
 
@@ -69,8 +69,8 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
 
 # Route - /comment/
 class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
-    queryset = Activity.objects.all()
-    serializer_class = ActivitySerializer
+    queryset = Comment.objects.all()
+    serializer_class = CommentGetSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
@@ -95,7 +95,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
 
             instance = get_object_or_404(models[model], id=object_id)
             comments = instance.comments.filter(parent_comment=None)
-            serializer = CommentGetSerializer(comments.order_by('-created'), many=True)
+            serializer = self.serializer_class(comments.order_by('-created'), many=True)
             return Response({'results': serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -130,28 +130,28 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             else:
                 title = f"{request.user.employee_name} tagged you in a comment"
             notification_data = {
-                'category': 'info',
-                'sender_user_type': 'user',
-                'target_type': model,
-                'recipient_user_type': 'user',
-                'description': title,
                 'title': title,
+                'category': 'info',
+                'description': title,
+                'target_type': model,
+                'sender_user_type': 'user',
                 'sender_id': request.user.id,
+                'recipient_user_type': 'user',
                 'target_id': request.data['id'],
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
+                    'target': model,
                     'is_read': False,
                     'is_deleted': False,
-                    'target': model,
                     'timestamp': str(datetime.now()),
                     'target_id': request.data['id'],
                 },
@@ -164,7 +164,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             if model == 'consultant':
                 consultant = Consultant.objects.get(id=request.data['id'])
                 title = f"Comment added on {consultant.name}'s profile by {request.user.employee_name}"
-                send_notification(consultant, request.user, title)
+                send_notification_for_user(consultant, request.user, title, 'comment')
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])

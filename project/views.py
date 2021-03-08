@@ -22,8 +22,8 @@ from utils_app.models import ObjectGroup
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
-from consultant.views import send_notification
 from attachment.models import create_attachment
+from consultant.utils import send_notification_for_user
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
@@ -751,7 +751,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.submission.consultant_marketing.status = 'open'
                     project.submission.consultant_marketing.save()
                     title = f"Project Cancelled :: {project.consultant.name} :: {project.submission.client}"
-                    send_notification(project.consultant, request.user, title)
+                    send_notification_for_user(project.consultant, request.user, title, 'project')
 
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
@@ -796,7 +796,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.joined_url, data)
 
                     title = f" Project Joined :: {project.consultant.name} :: {project.submission.client}"
-                    send_notification(project.consultant, request.user, title)
+                    send_notification_for_user(project.consultant, request.user, title, 'project')
 
                     consultant = project.consultant
 
@@ -874,7 +874,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.is_msg_sent = True
                     project.save()
                     title = f" Project Received :: {project.consultant.name} :: {project.submission.client}"
-                    send_notification(project.consultant, request.user, title)
+                    send_notification_for_user(project.consultant, request.user, title, 'project')
 
                 # Mail for Cancellation or Termination of Project
 
@@ -907,7 +907,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
                         title = f"Project Terminated :: {project.consultant.name} :: {project.submission.client}"
-                        send_notification(project.consultant, request.user, title)
+                        send_notification_for_user(project.consultant, request.user, title, 'project')
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
@@ -935,7 +935,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
                         title = f" Project Completed :: {project.consultant.name} :: {project.submission.client}"
-                        send_notification(project.consultant, request.user, title)
+                        send_notification_for_user(project.consultant, request.user, title, 'project')
 
             serializer = self.serializer_class(project)
 
