@@ -48,12 +48,12 @@ class Command(BaseCommand):
                 title = f"""{consultant.name} got terminated on {last_date}"""
 
                 notification_data = {
+                    'title': title,
                     'category': 'info',
                     'sender_user_type': 'user',
                     'target_type': 'consultant',
                     'recipient_user_type': 'user',
                     'description': terminate.type,
-                    'title': title,
                     'sender_id': terminate.created_by.id,
                     'target_id': terminate.consultant.id,
                 }
@@ -70,8 +70,10 @@ class Command(BaseCommand):
                         'is_read': False,
                         'is_deleted': False,
                         'target': 'consultant',
-                        'timestamp': str(timezone.now().strftime('%m/%d/%Y')),
+                        'sub_target': 'terminate',
+                        'sub_target_id': terminate.id,
                         'target_id': terminate.consultant.id,
+                        'timestamp': str(timezone.now().strftime('%m/%d/%Y')),
                     },
                 }
 

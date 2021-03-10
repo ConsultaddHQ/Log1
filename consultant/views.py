@@ -1484,30 +1484,32 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
 
             title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
             notification_data = {
+                'title': title,
                 'category': 'info',
+                'description': title,
+                'target_id': feedback.id,
                 'sender_user_type': 'user',
                 'target_type': 'consultant',
-                'recipient_user_type': 'user',
-                'description': title,
-                'title': title,
                 'sender_id': request.user.id,
-                'target_id': feedback.id,
+                'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target': 'consultant',
+                    'sub_target': 'feedback',
+                    'sub_target_id': feedback.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': feedback.id,
+                    'target_id': feedback.consultant.id,
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -1551,30 +1553,33 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                     user_tag.tagged_user.add(user)
             title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
             notification_data = {
+                'title': title,
                 'category': 'info',
+                'description': title,
+                'target_id': feedback.id,
                 'sender_user_type': 'user',
                 'target_type': 'consultant',
-                'recipient_user_type': 'user',
-                'description': title,
-                'title': title,
                 'sender_id': request.user.id,
-                'target_id': feedback.id,
+                'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
+
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target': 'consultant',
+                    'sub_target': 'feedback',
+                    'sub_target_id': feedback.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': feedback.id,
+                    'target_id': feedback.consultant.id,
                 },
             }
             object_ids = [user.id for user in user_list]

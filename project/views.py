@@ -1015,11 +1015,12 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
                 "data": {
-                    'target': 'project',
                     'is_read': False,
                     'is_deleted': False,
-                    'timestamp': str(datetime.now()),
+                    'target': 'project',
+                    'sub_target': 'support',
                     'target_id': project.id,
+                    'timestamp': str(datetime.now()),
                 },
             }
             object_ids = [user.id for user in user_list]

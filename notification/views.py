@@ -131,19 +131,21 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
 
     @action(methods=['get'], detail=False, url_name='push_notification')
     def push_notification(self, request):
+        consultant_id = request.query_params.get('consultant_id')
         try:
             message_body = {
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": "Test Push Notification",
-                "title": "Test Push Notification",
+                "title": "Test Feedback creation alert",
+                "body": "Feedback is added by Admin on Consultant Name",
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target': 'consultant',
+                    'sub_target': 'feedback',
+                    'target_id': consultant_id,
                     'timestamp': str(datetime.now()),
-                    'target_id': request.user.id,
                 },
             }
             push_notification([request.user.id], message_body)

@@ -124,47 +124,54 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                     "tags": tags
                 }
                 tag_users(tag_data)
-            if content_type.model == 'consultant':
-                consultant = get_object_or_404(Consultant, id=request.data['id'])
-                title = f"{request.user.employee_name} tagged you in a comment on {consultant.name}'s profile"
-            else:
-                title = f"{request.user.employee_name} tagged you in a comment"
-            notification_data = {
-                'title': title,
-                'category': 'info',
-                'description': title,
-                'target_type': model,
-                'sender_user_type': 'user',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'target_id': request.data['id'],
-            }
-            create_notification(user_list, notification_data)
 
-            # Push Notification
-            message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "data": {
-                    'target': model,
-                    'is_read': False,
-                    'is_deleted': False,
-                    'timestamp': str(datetime.now()),
+                # Notification for tagging
+                if content_type.model == 'consultant':
+                    consultant = get_object_or_404(Consultant, id=request.data['id'])
+                    title = f"{request.user.employee_name} tagged you in a comment on {consultant.name}'s profile"
+                else:
+                    title = f"{request.user.employee_name} tagged you in a comment"
+                notification_data = {
+                    'title': title,
+                    'category': 'info',
+                    'description': title,
+                    'target_type': model,
+                    'sender_user_type': 'user',
+                    'sender_id': request.user.id,
+                    'recipient_user_type': 'user',
                     'target_id': request.data['id'],
-                },
-            }
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
+                }
+                create_notification(user_list, notification_data)
+
+                # Push Notification
+                message_body = {
+                    "body": title,
+                    "title": title,
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "https://app.log1.com",
+                    "data": {
+                        'target': model,
+                        'is_read': False,
+                        'is_deleted': False,
+                        'sub_target': 'comment',
+                        'sub_target_id': comment.id,
+                        'target_id': request.data['id'],
+                        'timestamp': str(datetime.now()),
+                    },
+                }
+                object_ids = [user.id for user in user_list]
+                push_notification(object_ids, message_body)
+
+            # Notification to consultant's POCs
+            if model == 'consultant':
+                consultant = Consultant.objects.filter(id=request.data['id'])
+                if consultant:
+                    consultant = consultant.first()
+                    title = f"Comment added on {consultant.name}'s profile by {request.user.employee_name}"
+                    send_notification_for_user(consultant, request.user, title, 'comment')
 
             serializer = CommentGetSerializer(comment)
-            # notification to consultant poc
-            if model == 'consultant':
-                consultant = Consultant.objects.get(id=request.data['id'])
-                title = f"Comment added on {consultant.name}'s profile by {request.user.employee_name}"
-                send_notification_for_user(consultant, request.user, title, 'comment')
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])

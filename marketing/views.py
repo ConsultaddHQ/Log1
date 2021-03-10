@@ -2557,32 +2557,33 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_type = "Video"
             if test.is_offline:
                 test_type = 'Offline'
-            title = f"Test assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {test_type} :: {skills}"
+            title = f"Test assigned :: {test.submission.consultant.name} :: {test.submission.client} ::" \
+                    f" {test_type} :: {skills}"
             notification_data = {
-                'category': 'info',
-                'sender_user_type': 'user',
-                'target_type': 'test',
-                'recipient_user_type': 'user',
-                'description': title,
                 'title': title,
-                'sender_id': request.user.id,
+                'category': 'info',
+                'description': title,
                 'target_id': test.id,
+                'target_type': 'test',
+                'sender_user_type': 'user',
+                'sender_id': request.user.id,
+                'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
-                    'is_deleted': False,
                     'target': 'test',
-                    'timestamp': str(datetime.now()),
+                    'is_deleted': False,
                     'target_id': test.id,
+                    'timestamp': str(datetime.now()),
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -2669,30 +2670,30 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             title = f"Feedback Added for Test :: {test.submission.consultant.name}"
 
             notification_data = {
-                'category': 'alert',
-                'sender_user_type': 'user',
-                'target_type': 'user',
-                'recipient_user_type': 'user',
-                'description': title,
                 'title': title,
+                'category': 'alert',
+                'description': title,
+                'target_type': 'user',
+                'sender_user_type': 'user',
                 'sender_id': request.user.id,
+                'recipient_user_type': 'user',
                 'target_id': test.submitted_by.id,
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
+                    'target': 'test',
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target_id': test.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': test.submitted_by.id,
                 },
             }
 

@@ -314,9 +314,9 @@ class Education(models.Model):
     title = models.CharField(_('Education Title'), max_length=300)
     remark = models.TextField(_('Additional Details'), null=True, blank=True)
     city = models.CharField(_('City'), max_length=100, blank=True, null=True)
-    major = models.CharField(_('Field of Study'), max_length=50, null=True, blank=True)
-    org_name = models.CharField(_('Organization Name'), max_length=50, null=True, blank=True)
-    edu_type = models.CharField(_('Education Type'), max_length=50, choices=EDUCATION_CHOICES, null=True, blank=True)
+    major = models.CharField(_('Field of Study'), max_length=200, null=True, blank=True)
+    org_name = models.CharField(_('Organization Name'), max_length=200, null=True, blank=True)
+    edu_type = models.CharField(_('Education Type'), max_length=100, choices=EDUCATION_CHOICES, null=True, blank=True)
     start_date = models.DateField(
         _('Start Date'),
         null=True, blank=True,
@@ -338,8 +338,8 @@ class Experience(models.Model):
     title = models.CharField(_('Title'), max_length=300)
     remark = models.TextField(_('Additional Details'), null=True, blank=True)
     city = models.CharField(_('City'), max_length=100, blank=True, null=True)
-    company = models.CharField(_('Company name'), max_length=100, null=True, blank=True)
-    exp_type = models.CharField(_('Experience Type'), max_length=50, null=True, blank=True)
+    company = models.CharField(_('Company name'), max_length=200, null=True, blank=True)
+    exp_type = models.CharField(_('Experience Type'), max_length=100, null=True, blank=True)
     start_date = models.DateField(
         _('Start Date'),
         null=True, blank=True,
