@@ -1,11 +1,22 @@
 import os
 from pyfcm import FCMNotification
-
 from django.contrib.contenttypes.models import ContentType
 
 from notification.models import Notification, FCMDevice
 
 push_service = FCMNotification(api_key=os.environ.get('FCM_SERVER_KEY'))
+
+parent_model_classes = [
+    ('submission', ['interview', 'test', 'project', 'projectsupport']),
+    ('consultant', ['consultantraterevision', 'consultantmarketing', 'terminate', 'feedback'])
+]
+
+
+def get_parent_model(model_name):
+    for tab in parent_model_classes:
+        if model_name in tab[1]:
+            return tab[0]
+    return None
 
 
 def create_notification(user_list, data):

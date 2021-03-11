@@ -1017,10 +1017,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'project',
+                    'target': 'submission',
                     'sub_target': 'support',
-                    'target_id': project.id,
                     'timestamp': str(datetime.now()),
+                    'target_id': project.submission.id,
                 },
             }
             object_ids = [user.id for user in user_list]

@@ -147,37 +147,30 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({'error': str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='me')
+    def me(self, request):
+        try:
+            return Response({"data": UserSerializer(request.user).data}, status=200)
+        except Exception as error:
+            return Response({"message": str(error)}, status=400)
+
     @action(methods=['get'], detail=False, url_path='role')
     def role(self, request):
-        roles = Role.objects.all().values('id', 'name')
-        return Response({"results": roles}, status=200)
+        try:
+            roles = Role.objects.all().values('id', 'name')
+            return Response({"results": roles}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
-        teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
-        return Response({"results": teams}, status=200)
-
-    @action(methods=['post'], detail=False, url_path='change_password')
-    def change_password(self, request):
-        current_password = request.data.get('cur_password')
-        new_password = request.data.get('new_password')
-        if request.user.check_password(current_password):
-            request.user.set_password(new_password)
-            request.user.save()
-            return Response({"result": "password updated"}, status=200)
-        return Response({"error": "Wrong Password"}, status=400)
-
-    @action(methods=['put'], detail=False, url_path='change_team')
-    def change_team(self, request):
-        user_id = request.data.get('user_id')
-        team_id = request.data.get('team_id')
-        if request.user.is_superuser:
-            user = get_object_or_404(User, id=user_id)
-            team = get_object_or_404(Team, id=team_id)
-            user.team = team
-            user.save()
-            return Response({"result": f"{user.employee_name}'s team update to {team.name}"}, status=202)
-        return Response({"error": DONT_HAVE_ACCESS}, status=401)
+        try:
+            teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
+            return Response({"results": teams}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request, *args, **kwargs):
@@ -191,12 +184,35 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             fcm_token.delete()
         return Response(status=204)
 
-    @action(methods=['get'], detail=False, url_path='me')
-    def me(self, request):
+    @action(methods=['put'], detail=False, url_path='change_team')
+    def change_team(self, request):
         try:
-            return Response({"data": UserSerializer(request.user).data}, status=200)
+            user_id = request.data.get('user_id')
+            team_id = request.data.get('team_id')
+            if request.user.is_superuser:
+                user = get_object_or_404(User, id=user_id)
+                team = get_object_or_404(Team, id=team_id)
+                user.team = team
+                user.save()
+                return Response({"result": f"{user.employee_name}'s team update to {team.name}"}, status=202)
+            return Response({"error": DONT_HAVE_ACCESS}, status=401)
         except Exception as error:
-            return Response({"message": str(error)}, status=400)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({'error': str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='change_password')
+    def change_password(self, request):
+        try:
+            current_password = request.data.get('cur_password')
+            new_password = request.data.get('new_password')
+            if request.user.check_password(current_password):
+                request.user.set_password(new_password)
+                request.user.save()
+                return Response({"result": "password updated"}, status=200)
+            return Response({"error": "Wrong Password"}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({'error': str(error)}, status=400)
 
 
 # Route - /password/
