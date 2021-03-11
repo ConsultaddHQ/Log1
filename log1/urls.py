@@ -23,7 +23,7 @@ from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringRe
 
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 
-from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet
+from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectSupportViewSet, ProjectOrderViewSet
@@ -99,11 +99,12 @@ router.register(r'impersonate', ImpersonateViewSets)
 
 router.register(r'ckiller_data', CkillerSubmissionViewSet)
 
+router.register(r'fcm', FCMDeviceViewSet)
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)
 
 
-# Mobile Application routes
+# Mobile App routes
 router.register(r'consultant_app', ConsultantAppViewSet)
 router.register(r'consultant_auth', ConsultantAuthViewSet)
 router.register(r'consultant_password', ConsultantResetPasswordViewSet)
@@ -114,11 +115,12 @@ router.register(r'timesheet_v2', TimeSheetV2ViewSets)
 
 router.register(r'test', Test)
 
-# Legal App APIs
+# Legal App routes
 router.register(r'petition', PetitionViewSets)
 router.register(r'petition_docs', PetitionDocsViewSets)
 router.register(r'consultant_petition', ConsultantPetitionAuthViewSet)
 
+# Twilio messaging app routes
 router.register(r'twilio', SMSViewSet)
 router.register(r'twilio_receive', ReceiveSMSViewSet)
 

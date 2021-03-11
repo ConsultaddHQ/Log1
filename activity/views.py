@@ -17,7 +17,7 @@ from activity.models import Activity, Comment
 from project.models import Project, TimeSheet
 from marketing.models import Submission, Interview
 from consultant.utils import send_notification_for_user
-from notification.views import create_notification, push_notification
+from notification.utils import create_notification, push_notification
 from activity.serializers import ActivitySerializer, CommentGetSerializer
 
 

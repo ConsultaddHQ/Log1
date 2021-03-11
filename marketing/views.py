@@ -31,7 +31,7 @@ from activity.serializers import ActivitySerializer
 from attachment.serializers import AttachmentSerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
-from notification.views import create_notification, push_notification
+from notification.utils import create_notification, push_notification
 from marketing.utils import change_to_feedback_due, create_submission
 from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar

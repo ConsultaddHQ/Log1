@@ -1,7 +1,6 @@
-import os
 import inspect
 from datetime import datetime
-from pyfcm import FCMNotification
+
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.contrib.contenttypes.models import ContentType
@@ -13,67 +12,37 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, CreateModelMixin
 
+from notification.utils import push_notification
 from log1.utils import get_page_limits, write_exception
 from notification.models import FCMDevice, Notification
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
-from notification.serializers import NotificationSerializer, NotificationListSerializer
-
-push_service = FCMNotification(api_key=os.environ.get('FCM_SERVER_KEY'))
+from notification.serializers import NotificationSerializer, NotificationListSerializer, FCMDeviceSerializer
 
 
-def create_notification(user_list, data):
-    try:
-        recipient_content_type = ContentType.objects.get(model=data['recipient_user_type'])
-        sender_content_type = ContentType.objects.get(model=data['sender_user_type'])
-        target_content_type = ContentType.objects.get(model=data['target_type'])
-        for user in user_list:
-            Notification.objects.create(
-                title=data["title"],
-                recipient_object_id=user.id,
-                description=data["description"],
-                category=data["category"].lower(),
-                sender_object_id=data["sender_id"],
-                target_object_id=data["target_id"],
-                sender_content_type=sender_content_type,
-                target_content_type=target_content_type,
-                recipient_content_type=recipient_content_type,
+class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
+    queryset = FCMDevice.objects.all()
+    serializer_class = FCMDeviceSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
+    def create(self, request, *args, **kwargs):
+        try:
+            content_type = ContentType.objects.get(model='user')
+            FCMDevice.objects.get_or_create(
+                type='web',
+                object_id=request.user.id,
+                content_type=content_type,
+                device_id=request.data.get('fcm_token')
             )
-        return False
-    except Exception as error:
-        return error
-
-
-def push_notification(object_ids, message_body):
-    try:
-        for obj_id in object_ids:
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id=obj_id, content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            message_body['data']['count'] = Notification.objects.filter(recipient_object_id=obj_id, unread=True,
-                                                                        deleted=False).count()
-            push_service.notify_multiple_devices(
-                registration_ids=registration_ids,
-                message_title=message_body['title'],
-                message_body=message_body['body'],
-                data_message=message_body,
-            )
-        return False
-    except Exception as error:
-        return error
-
-
-def push_notification_consultant(registration_ids, message_body):
-    try:
-        push_service.notify_multiple_devices(
-            registration_ids=registration_ids,
-            message_title=message_body['title'],
-            message_body=message_body['body'],
-            data_message=message_body,
-        )
-        return False
-    except Exception as error:
-        return error
+            return Response({"message": "Token updated"}, status=201)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": str(error)}, status=400)
 
 
 # Route - /emp_notify/

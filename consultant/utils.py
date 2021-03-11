@@ -13,7 +13,7 @@ from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
-from notification.views import create_notification, push_notification
+from notification.utils import create_notification, push_notification
 from log1.utils import post_msg_using_webhook, html_to_text, write_exception
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth

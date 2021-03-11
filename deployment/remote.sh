@@ -34,7 +34,10 @@ branch=$(git branch | sed -n -e 's/^\* \(.*\)/\1/p')
 
 git pull origin "$branch"
 
+echo "Running Makemigrations command"
 python manage.py makemigrations
+
+echo "Running migrate command"
 python manage.py migrate
 
 if [ "$env" = "dev" ]

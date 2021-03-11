@@ -18,7 +18,7 @@ from employee.models import Asset
 from api_key.permissions import APIKey
 from log1.utils import write_exception
 from messaging.models import Message, Conversation
-from notification.views import create_notification, push_notification
+from notification.utils import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
 
 

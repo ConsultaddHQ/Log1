@@ -7,7 +7,7 @@ from utils_app.models import CronJob
 from consultant.models import ConsultantExit
 from utils_app.utils import create_cron_error
 from consultant.views import send_exit_process_mail
-from notification.views import push_notification, create_notification
+from notification.utils import push_notification, create_notification
 
 
 class Command(BaseCommand):

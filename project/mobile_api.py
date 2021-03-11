@@ -21,7 +21,7 @@ from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer
-from notification.views import create_notification, push_notification, push_notification_consultant
+from notification.utils import create_notification, push_notification, push_notification_consultant
 
 
 # API for Mobile App (For Consultants)
@@ -404,9 +404,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        # page = int(request.query_params.get("page", 1))
+        # page_size = int(request.query_params.get("page_size", 10))
+        # last, first = page * page_size, page * page_size - page_size
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
             queryset = TimeSheet.objects.filter(

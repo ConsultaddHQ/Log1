@@ -7,7 +7,7 @@ from project.models import TimeSheet
 from utils_app.models import CronJob
 from utils_app.utils import create_cron_error
 from notification.models import Notification, FCMDevice
-from notification.views import push_notification_consultant
+from notification.utils import push_notification_consultant
 
 
 class Command(BaseCommand):

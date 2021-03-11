@@ -28,7 +28,7 @@ from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from notification.views import push_notification_consultant, create_notification, push_notification
+from notification.utils import create_notification, push_notification, push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from log1.utils import get_time_filter, post_msg_using_webhook, password_generator, get_page_limits, write_exception
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
