@@ -577,7 +577,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                     {"id": request.user.team.id, "name": request.user.team.name},
                     {"id": consultadd_emp.id, "name": consultadd_emp.name},
                 ]
-            return Response({"result": employers}, status=200)
+            return Response({"results": employers}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -610,7 +610,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             if hasattr(submission, 'project'):
                 queryset = submission.project.support.all().order_by('-created')
                 serializer = SubmissionSupportSerializer(queryset, many=True)
-                return Response({"result": serializer.data}, status=200)
+                return Response({"results": {"data": serializer.data, "project": submission.project.id}}, status=200)
             else:
                 return Response({"error": "Project not found"}, status=400)
         except Exception as error:
@@ -623,7 +623,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             if hasattr(submission, 'project'):
                 serializer = ProjectV2Serializer(submission.project)
-                return Response({"result": serializer.data}, status=200)
+                return Response({"results": serializer.data}, status=200)
             else:
                 return Response({"error": "Project not found"}, status=400)
         except Exception as error:
