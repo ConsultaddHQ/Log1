@@ -11,7 +11,8 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone')
 
-    def get_team(self, obj):
+    @staticmethod
+    def get_team(obj):
         if obj.team:
             return obj.team.name
         return None
@@ -32,11 +33,13 @@ class UserSerializerLogin(UserSerializer):
         model = User
         fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'is_superuser')
 
-    def get_token(self, user):
-        token, created = Token.objects.get_or_create(user=user)
+    @staticmethod
+    def get_token(obj):
+        token, created = Token.objects.get_or_create(user=obj)
         return token.key
 
-    def get_team(self, obj):
+    @staticmethod
+    def get_team(obj):
         return obj.team.name
 
 
@@ -65,10 +68,12 @@ class AssetSerializer(serializers.ModelSerializer):
         fields = ('id', 'email', 'number', 'username', 'password', 'owner_id', 'provider', 'modified', 'tech',
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner_name', 'shared_to')
 
-    def get_owner_id(self, obj):
+    @staticmethod
+    def get_owner_id(obj):
         return obj.owner.id
 
-    def get_owner_name(self, obj):
+    @staticmethod
+    def get_owner_name(obj):
         return obj.owner.employee_name
 
 

@@ -162,10 +162,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 )
 
             elif 'marketer' in request.user.roles:
+                recruits = Consultant.objects.none()
+                if 'recruiter' in roles:
+                    recruits = consultants.filter(pocs__poc=request.user)
                 consultants = consultants.filter(
                     Q(marketing__in_pool=True, marketing__status='open') |
                     Q(marketing__marketer=request.user, marketing__status='open')
-                )
+                ).union(recruits)
 
             if 'recruiter' in roles:
                 recruits = consultants.filter(pocs__poc=request.user)

@@ -192,9 +192,9 @@ logging.config.dictConfig({
     },
     'handlers': {
         'console': {
-            'class': 'logging.StreamHandler',
             'formatter': 'file',
-            'stream': 'ext://sys.stdout'
+            'stream': 'ext://sys.stdout',
+            'class': 'logging.StreamHandler',
         },
         'file': {
             'level': 'ERROR',
@@ -203,7 +203,7 @@ logging.config.dictConfig({
             'formatter': 'file',
             'maxBytes': 10485760,
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'logs/debug.log'
+            'filename': f"{os.path.join(BASE_DIR, 'logs/debug.log')}",
         }
     },
     'loggers': {

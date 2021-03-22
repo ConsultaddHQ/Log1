@@ -7,7 +7,8 @@ from attachment.models import Attachment
 class AttachmentSerializer(serializers.ModelSerializer):
     file_name = serializers.SerializerMethodField()
 
-    def get_file_name(self, obj):
+    @staticmethod
+    def get_file_name(obj):
         return os.path.split(obj.attachment_file.name)[1]
 
     class Meta:
@@ -18,7 +19,8 @@ class AttachmentSerializer(serializers.ModelSerializer):
 class AttachmentGetSerializer(serializers.ModelSerializer):
     file_name = serializers.SerializerMethodField()
 
-    def get_file_name(self, obj):
+    @staticmethod
+    def get_file_name(obj):
         return os.path.split(obj.attachment_file.name)[1]
 
     class Meta:
@@ -29,7 +31,8 @@ class AttachmentGetSerializer(serializers.ModelSerializer):
 class AttachmentURLSerializer(serializers.ModelSerializer):
     file_type = serializers.SerializerMethodField()
 
-    def get_file_type(self, obj):
+    @staticmethod
+    def get_file_type(obj):
         if len(os.path.split(obj.attachment_file.name)[1].split('.')) > 1:
             return os.path.split(obj.attachment_file.name)[1].split('.')[1]
         return None
@@ -37,4 +40,3 @@ class AttachmentURLSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attachment
         fields = ('id', 'object_id', 'creator', 'attachment_type', 'attachment_file', 'file_type', 'is_active')
-
