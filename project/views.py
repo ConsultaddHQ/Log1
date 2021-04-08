@@ -888,7 +888,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.save()
                         project.support.update(end=datetime.now())
 
-                        text = f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} ** <br>
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
                         {employer_emoji} Employer :  {project.employer}<br>
@@ -899,7 +899,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         &#128221; End Date :  {project_end_date}<br>
                         &#10060; Status :   {str(p_status.get_status_display())}<br>"""
 
-                        text += "**Reason:**" + project.feedback if project.feedback else "None"
+                        text += "**Reason:**" + " " + project.feedback if project.feedback else "None"
 
                         data = {
                             "title": "Offer Termination Feedback",

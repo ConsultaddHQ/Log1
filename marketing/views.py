@@ -554,10 +554,15 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='resume')
     def resume(self, request, *args, **kwargs):
         try:
-            attachment_id = kwargs.get('pk')
-            attachment = get_object_or_404(Attachment, id=attachment_id)
+            visibility = False
+            attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
             serializer = AttachmentSerializer(attachment)
-            return Response({"result": serializer.data}, status=200)
+
+            submission = get_object_or_404(Submission, id=attachment.object_id)
+            supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
+            if submission.created_by.id == request.user.id or request.user.id in supervisors:
+                visibility = True
+            return Response({"result": serializer.data, "visibility": visibility}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -714,24 +719,12 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-
-            # calendar_id = request.query_params.get('calendar', 'false')
-            # if calendar_id == 'true':
-            #     interview = get_object_or_404(Interview, calendar_id=kwargs.get('pk'))
-            #     sub = interview.submission
-            # else:
-
             sub_id = kwargs.get('pk')
             permission = {"update": False}
             sub = get_object_or_404(Submission, id=sub_id)
 
             if sub.created_by.id == request.user.id:
                 permission['update'] = True
-
-            # interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
-            # if interviews:
-            #     serializer = SubmissionDetailSerializer(sub)
-            #     return Response({"results": serializer.data, "permission": permission}, status=200)
 
             if sub.created_by == request.user:
                 serializer = SubmissionDetailSerializer(sub)

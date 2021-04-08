@@ -12,7 +12,7 @@ from .models import User, Role, Team, ResetPasswordToken, Asset, Tagging
 
 admin.site.site_header = "Log1"
 
-admin.site.unregister(Token)
+# admin.site.unregister(Token)
 
 
 @admin.register(User)

@@ -530,12 +530,20 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     permission = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
+    remote_consultant = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'feedback', 'check_list', 'attachments', 'created', 'city',
+        fields = ('id', 'status', 'feedback', 'check_list', 'attachments', 'created', 'city', 'remote_consultant',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
                   'start_date', 'end_date', 'rate', 'employer', 'reporting_details', 'is_remote', 'permission')
+
+    @staticmethod
+    def get_remote_consultant(obj):
+        return {
+            "id": obj.consultant.id,
+            "name": obj.consultant.name
+        }
 
     @staticmethod
     def get_status(obj):
