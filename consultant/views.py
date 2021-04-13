@@ -28,7 +28,7 @@ from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
 from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
-    terminate_consultant, create_consultant, create_activity, send_notification_for_user
+    terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
 
 from consultant.models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, \
     ConsultantRateRevision, ConsultantPOC, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ExitReason
@@ -39,6 +39,157 @@ from consultant.serializers import ConsultantSerializer, ConsultantProfileSerial
     ConsultantUpdateSerializer, EducationSerializer, ExperienceSerializer, ConsultantFeedbackSerializer, \
     PayrollEmployerSerializer, POCSerializer, WorkAuthSerializer, ConsultantSubmissionSerializer, \
     ExitDetailConsultantSerializer, ConsultantPetitionLoginSerializer
+
+
+# Route - v2/consultant/
+class ConsultantV2ViewSets(viewsets.ModelViewSet):
+    queryset = Consultant.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ConsultantBenchSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
+    def list(self, request, *args, **kwargs):
+        try:
+            close_marketing()
+            start_marketing()
+            query = request.query_params.get('query', None)
+            sort_by = request.query_params.get('sort_by', None)
+            con_status = request.query_params.get('status', None)
+            filter_json = request.query_params.get('filter_json', None)
+            con_sub_status = request.query_params.get('sub_status', None)
+
+            if con_status == 'on_project':
+                consultants = Consultant.objects.filter(status='on_project')
+
+            elif con_status == 'on_bench':
+                consultants = Consultant.objects.filter(status='on_bench')
+
+                if con_sub_status == 'non_pool':
+                    consultants = consultants.filter(marketing__in_pool=False, marketing__status='open')
+
+                elif con_sub_status == 'in_pool':
+                    consultants = consultants.filter(marketing__in_pool=True, marketing__status='open')
+
+                if con_sub_status == 'marketing_candidate':
+                    consultants = consultants.filter(marketing__status='close')
+
+            elif con_status == 'offer':
+                consultants = Consultant.objects.filter(
+                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                    projects__statuses__is_current=True,
+                )
+
+                if con_sub_status == 'in_offer':
+                    consultants = consultants.filter(projects__statuses__status__in=['new', 'received'],
+                                                     projects__statuses__is_current=True)
+
+                elif con_sub_status == 'onboarded':
+                    consultants = consultants.filter(projects__statuses__status='on_boarded',
+                                                     projects__statuses__is_current=True)
+
+            elif con_status == 'terminated':
+                consultants = Consultant.objects.filter(status__in=['archived', 'terminated'])
+
+                if con_sub_status == 'fired':
+                    consultants = consultants.filter(exit__type='fired')
+
+                elif con_sub_status == 'resigned':
+                    consultants = consultants.filter(exit__type='resigned')
+
+                elif con_sub_status == 'absconded':
+                    consultants = consultants.filter(exit__type='absconded')
+
+            else:
+                consultants = Consultant.objects.all()
+
+            if filter_json:
+                filters = json.loads(filter_json)
+
+                if 'days' in filters:
+                    day_filter = marketing_days_filter(filters['days'])
+                    consultants = consultants.filter(**day_filter)
+
+                if 'gender' in filters:
+                    consultants = consultants.filter(gender=filters['gender'])
+
+                if 'team' in filters:
+                    consultants = consultants.filter(marketing__teams__name=filters['team'])
+
+                if 'visa' in filters:
+                    consultants = consultants.filter(
+                        work_auth__visa_type__in=filters['visa'], work_auth__is_current=True
+                    )
+
+                if 'rtg' in filters:
+                    consultants = consultants.filter(marketing__rtg=filters['rtg'], marketing__status='open')
+
+                if 'skills' in filters and len(filters["vendor"]) > 0:
+                    consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in filters['skills']]))
+
+                if 'dob' in filters:
+                    if 'lte' in filters['dob']:
+                        consultants = consultants.filter(
+                            date_of_birth__year__lte=filters['dob']
+                        )
+                    elif 'gte' in filters['dob']:
+                        consultants = consultants.filter(
+                            date_of_birth__year__gte=filters['dob']
+                        )
+
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                consultants = consultants.filter(
+                    Q(name__istartswith=query) |
+                    Q(email__iexact=query)
+                )
+
+            if sort_by in ['name', 'created']:
+                consultants = consultants.order_by(sort_by)
+
+            serializer = ConsultantListSerializer(consultants, many=True)
+            return Response({"results": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='filters')
+    def filters(self, request, *args, **kwargs):
+        try:
+            status = request.query_params.get('status', 'on_bench')
+            sub_filters = []
+            if status == 'on_bench':
+                sub_filters = [
+                    {"display_name": "In Pool", "name": "in_pool"},
+                    {"display_name": "Non Pool", "name": "non_pool"},
+                    {"display_name": "Marketing Candidates", "name": "marketing_candidate"},
+                ]
+
+            elif status == 'offer':
+                sub_filters = [
+                    {"display_name": "In Offer", "name": "in_offer"},
+                    {"display_name": "Onboarded", "name": "onboarded"},
+                ]
+
+            elif status == 'on_project':
+                sub_filters = [
+                    {"display_name": "On Project", "name": "on_project"},
+                ]
+
+            elif status == 'terminated':
+                sub_filters = [
+                    {"display_name": "Fired", "name": "fired"},
+                    {"display_name": "Resigned", "name": "resigned"},
+                    {"display_name": "Absconded", "name": "absconded"},
+                ]
+
+            return Response({"data": {"sub_filter": sub_filters}}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
 
 # Route - /consultant/
@@ -647,16 +798,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 consultants = consultants.filter(gender=gender)
 
             if days:
-                day_filter = dict()
-                day_filter["marketing__status"] = 'open'
-                if days == 'lt_12':
-                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=12)
-                elif days == 'lt_24':
-                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
-                elif days == 'lt_36':
-                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=36)
-                elif days == 'gt_36':
-                    day_filter['marketing__start__lte'] = timezone.now().date() - timedelta(days=36)
+                day_filter = marketing_days_filter(days)
                 consultants = consultants.filter(**day_filter)
 
             skills = json.loads(skills)

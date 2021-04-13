@@ -191,7 +191,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         queryset = self.rates.filter(end=None)
         if queryset:
             return queryset.first().rate
-        return None
+        return 0
 
     def send_mail(self, mail_data):
         try:
@@ -230,9 +230,6 @@ def clear_expired(expiry_time):
 
 
 class ConsultantToken(models.Model):
-    """
-    The default authorization token model.
-    """
     fcm_tokens = GenericRelation(FCMDevice)
     key = models.CharField(_("Key"), max_length=40, primary_key=True)
     uuid = models.CharField(_("Universally Unique Identifier"), max_length=64, db_index=True, default='UUID')
@@ -259,9 +256,6 @@ class ConsultantToken(models.Model):
 
 
 class ConsultantPetitionToken(models.Model):
-    """
-    The default authorization token model.
-    """
     key = models.CharField(_("Key"), max_length=40, primary_key=True)
     consultant = models.ForeignKey(
         Consultant, related_name='petition_token',

@@ -240,7 +240,7 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
 
 
 class ConsultantBenchSerializer(serializers.ModelSerializer):
-    rate = serializers.SerializerMethodField()
+    rate = serializers.ReadOnlyField()
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
     relation = serializers.SerializerMethodField()
@@ -277,13 +277,6 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_experience(obj):
         return ExperienceSerializer(obj.experiences.all(), many=True).data
-
-    @staticmethod
-    def get_rate(obj):
-        rate_revision = obj.rates.filter(end=None)
-        if rate_revision:
-            return rate_revision.first().rate
-        return 0
 
     @staticmethod
     def get_payroll_employer(obj):

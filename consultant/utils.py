@@ -2,7 +2,7 @@ import os
 import json
 import boto3
 from django.utils import timezone
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
@@ -495,3 +495,17 @@ def create_consultant(request, creator_id):
     except Exception as error:
         write_exception(message=error, class_name='None', function_name='create_consultant')
         return error, "error"
+
+
+def marketing_days_filter(days):
+    day_filter = dict()
+    day_filter["marketing__status"] = 'open'
+    if days == 'lt_12':
+        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=12)
+    elif days == 'lt_24':
+        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
+    elif days == 'lt_36':
+        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=36)
+    elif days == 'gt_36':
+        day_filter['marketing__start__lte'] = timezone.now().date() - timedelta(days=36)
+    return day_filter

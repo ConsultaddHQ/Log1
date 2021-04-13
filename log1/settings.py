@@ -209,7 +209,7 @@ logging.config.dictConfig({
     'loggers': {
         '': {
             'level': 'ERROR',
-            'handlers': ['file']
+            'handlers': ['console', 'file']
         }
     }
 })

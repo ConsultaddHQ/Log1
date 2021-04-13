@@ -11,7 +11,6 @@ from rest_framework.documentation import include_docs_urls
 from ckiller.views import CkillerSubmissionViewSet
 
 from activity.views import CommentViewSet
-from marketing.views import SubmissionV2ViewSets
 from impersonate.views import ImpersonateViewSets
 from utils_app.views import CityViewSets, ChoiceViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
@@ -29,11 +28,11 @@ from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSet
     AllUsersViewSet
 
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets
+    InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets, SubmissionV2ViewSets
 
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
-    FeedbackViewSet, ConsultantImportViewSet
+    FeedbackViewSet, ConsultantImportViewSet, ConsultantV2ViewSets
 
 router = DefaultRouter()
 
@@ -114,6 +113,7 @@ router.register(r'twilio_receive', ReceiveSMSViewSet)
 router_v2 = DefaultRouter()
 
 router_v2.register(r'submission', SubmissionV2ViewSets)
+router_v2.register(r'consultant', ConsultantV2ViewSets)
 
 urlpatterns = [
     path('api/', include(router.urls)),
