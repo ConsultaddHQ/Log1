@@ -56,55 +56,14 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
         try:
             close_marketing()
             start_marketing()
+            first, last = get_page_limits(request)
             query = request.query_params.get('query', None)
             sort_by = request.query_params.get('sort_by', None)
             con_status = request.query_params.get('status', None)
             filter_json = request.query_params.get('filter_json', None)
             con_sub_status = request.query_params.get('sub_status', None)
 
-            if con_status == 'on_project':
-                consultants = Consultant.objects.filter(status='on_project')
-
-            elif con_status == 'on_bench':
-                consultants = Consultant.objects.filter(status='on_bench')
-
-                if con_sub_status == 'non_pool':
-                    consultants = consultants.filter(marketing__in_pool=False, marketing__status='open')
-
-                elif con_sub_status == 'in_pool':
-                    consultants = consultants.filter(marketing__in_pool=True, marketing__status='open')
-
-                if con_sub_status == 'marketing_candidate':
-                    consultants = consultants.filter(marketing__status='close')
-
-            elif con_status == 'offer':
-                consultants = Consultant.objects.filter(
-                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                    projects__statuses__is_current=True,
-                )
-
-                if con_sub_status == 'in_offer':
-                    consultants = consultants.filter(projects__statuses__status__in=['new', 'received'],
-                                                     projects__statuses__is_current=True)
-
-                elif con_sub_status == 'onboarded':
-                    consultants = consultants.filter(projects__statuses__status='on_boarded',
-                                                     projects__statuses__is_current=True)
-
-            elif con_status == 'terminated':
-                consultants = Consultant.objects.filter(status__in=['archived', 'terminated'])
-
-                if con_sub_status == 'fired':
-                    consultants = consultants.filter(exit__type='fired')
-
-                elif con_sub_status == 'resigned':
-                    consultants = consultants.filter(exit__type='resigned')
-
-                elif con_sub_status == 'absconded':
-                    consultants = consultants.filter(exit__type='absconded')
-
-            else:
-                consultants = Consultant.objects.all()
+            consultants = Consultant.objects.all()
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -133,11 +92,11 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 if 'dob' in filters:
                     if 'lte' in filters['dob']:
                         consultants = consultants.filter(
-                            date_of_birth__year__lte=filters['dob']
+                            date_of_birth__year__lte=filters['dob']['lte']
                         )
                     elif 'gte' in filters['dob']:
                         consultants = consultants.filter(
-                            date_of_birth__year__gte=filters['dob']
+                            date_of_birth__year__gte=filters['dob']['gte']
                         )
 
             if query:
@@ -147,11 +106,132 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                     Q(email__iexact=query)
                 )
 
+            status_obj = {
+                "all": consultants,
+                "marketing_candidate": consultants.filter(marketing__status='close'),
+                "terminated": consultants.filter(status__in=['archived', 'terminated']),
+                "on_project": consultants.filter(projects__statuses__status='joined',
+                                                 projects__statuses__is_current=True),
+                "offer": consultants.filter(projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                                            projects__statuses__is_current=True),
+                "on_bench": consultants.filter(marketing__status='open').exclude(
+                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                    projects__statuses__is_current=True),
+            }
+
+            def queryset_filter_by_status(queryset, sub_status):
+                if sub_status == 'non_pool':
+                    return queryset.filter(marketing__in_pool=False, marketing__status='open')
+
+                elif sub_status == 'in_pool':
+                    return queryset.filter(marketing__in_pool=True, marketing__status='open')
+
+                elif sub_status == 'on_boarded':
+                    return queryset.filter(projects__statuses__status='on_boarded',
+                                           projects__statuses__is_current=True)
+
+                elif sub_status == 'in_offer':
+                    return queryset.filter(projects__statuses__status__in=['new', 'received'],
+                                           projects__statuses__is_current=True)
+
+                elif sub_status == 'fired':
+                    return queryset.filter(exit__type='fired')
+
+                elif sub_status == 'resigned':
+                    return queryset.filter(exit__type='resigned')
+
+                elif sub_status == 'absconded':
+                    return queryset.filter(exit__type='absconded')
+
+                return queryset
+
+            if con_status:
+                consultants = status_obj[con_status]
+
+            sub_status_obj = dict()
+            if con_status == 'on_bench':
+                sub_status_obj = {
+                    'in_pool': queryset_filter_by_status(consultants, 'in_pool').count(),
+                    'non_pool': queryset_filter_by_status(consultants, 'non_pool').count(),
+                }
+
+            elif con_status == 'offer':
+                print(consultants.count())
+                sub_status_obj = {
+                    'in_offer': queryset_filter_by_status(consultants, 'in_offer').count(),
+                    'on_boarded': queryset_filter_by_status(consultants, 'on_boarded').count(),
+                }
+
+            elif con_status == 'terminated':
+                sub_status_obj = {
+                    'fired': queryset_filter_by_status(consultants, 'fired').count(),
+                    'resigned': queryset_filter_by_status(consultants, 'resigned').count(),
+                    'absconded': queryset_filter_by_status(consultants, 'absconded').count(),
+                }
+
+            consultants = queryset_filter_by_status(consultants, con_sub_status)
+
             if sort_by in ['name', 'created']:
                 consultants = consultants.order_by(sort_by)
 
-            serializer = ConsultantListSerializer(consultants, many=True)
-            return Response({"results": serializer.data}, status=200)
+            count = {
+                "total": consultants.count(),
+                "offer": status_obj['offer'].count(),
+                "on_bench": status_obj['on_bench'].count(),
+                "on_project": status_obj['on_project'].count(),
+                "terminated": status_obj['terminated'].count(),
+                "marketing_candidate": status_obj['marketing_candidate'].count(),
+                "sub_status": sub_status_obj
+            }
+
+            poc = ConsultantPOC.objects.filter(
+                consultant=OuterRef("pk"), end=None, poc_type='recruiter')
+
+            rate = ConsultantRateRevision.objects.filter(
+                consultant=OuterRef("pk"), end=None)
+
+            marketing = ConsultantMarketing.objects.filter(
+                consultant=OuterRef("pk"), status='open')
+
+            work_auth = WorkAuth.objects.filter(
+                consultant=OuterRef("pk"), is_current=True
+            )
+
+            termination = ConsultantExit.objects.filter(
+                consultant=OuterRef("pk")
+            )
+
+            if con_status == 'terminated':
+                data = consultants[first:last].annotate(
+                    rate=Subquery(rate.values('rate')[:1]),
+                    rtg=Subquery(marketing.values('rtg')[:1]),
+                    rehire=Subquery(termination.values('rehire')[:1]),
+                    in_pool=Subquery(marketing.values('in_pool')[:1]),
+                    visa_end=Subquery(work_auth.values('visa_end')[:1]),
+                    visa_type=Subquery(work_auth.values('visa_type')[:1]),
+                    exit_status=Subquery(termination.values('status')[:1]),
+                    marketing_start=Subquery(marketing.values('start')[:1]),
+                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
+                    exit_last_date=Subquery(termination.values('last_date')[:1]),
+                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
+                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
+                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
+                         'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end', 'rehire',
+                         'exit_last_date', 'exit_status')
+            else:
+                data = consultants[first:last].annotate(
+                    rate=Subquery(rate.values('rate')[:1]),
+                    rtg=Subquery(marketing.values('rtg')[:1]),
+                    in_pool=Subquery(marketing.values('in_pool')[:1]),
+                    visa_end=Subquery(work_auth.values('visa_end')[:1]),
+                    visa_type=Subquery(work_auth.values('visa_type')[:1]),
+                    marketing_start=Subquery(marketing.values('start')[:1]),
+                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
+                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
+                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
+                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
+                         'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end')
+            return Response({"count": count, "results": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -159,34 +239,24 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='filters')
     def filters(self, request, *args, **kwargs):
         try:
-            status = request.query_params.get('status', 'on_bench')
-            sub_filters = []
-            if status == 'on_bench':
-                sub_filters = [
+            filters = {
+                "on_project": [],
+                "marketing_candidate": [],
+                "on_bench": [
+                    {"display_name": "Bench", "name": "non_pool"},
                     {"display_name": "In Pool", "name": "in_pool"},
-                    {"display_name": "Non Pool", "name": "non_pool"},
-                    {"display_name": "Marketing Candidates", "name": "marketing_candidate"},
-                ]
-
-            elif status == 'offer':
-                sub_filters = [
+                ],
+                "offer": [
                     {"display_name": "In Offer", "name": "in_offer"},
-                    {"display_name": "Onboarded", "name": "onboarded"},
-                ]
-
-            elif status == 'on_project':
-                sub_filters = [
-                    {"display_name": "On Project", "name": "on_project"},
-                ]
-
-            elif status == 'terminated':
-                sub_filters = [
+                    {"display_name": "On-boarded", "name": "on_boarded"},
+                ],
+                "terminated": [
                     {"display_name": "Fired", "name": "fired"},
                     {"display_name": "Resigned", "name": "resigned"},
                     {"display_name": "Absconded", "name": "absconded"},
                 ]
-
-            return Response({"data": {"sub_filter": sub_filters}}, status=200)
+            }
+            return Response({"data": filters}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
