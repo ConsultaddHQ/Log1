@@ -50,7 +50,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             customer_mail_data = {
                 'to': [email],
                 'cc': [],
-                'bcc': ['aditi.so@consultadd.in'],
+                'bcc': ['aditi.so@consultadd.com'],
                 'subject': 'Signup on Consultadd Time Track App',
                 'template': '../templates/con_signup_mail.html',
                 'context': {
@@ -61,7 +61,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             send_email(customer_mail_data, "log1@consultadd.com")
 
             mail_data = {
-                'to': ['aditi.so@consultadd.in'],
+                'to': ['aditi.so@consultadd.com'],
                 'cc': [],
                 'bcc': [],
                 'subject': f'{name} Signed up on Consultadd Time Track App',
@@ -88,7 +88,7 @@ class ConsultantAuthViewSet(GenericViewSet):
         """
         email = request.data.get('email').lower()
         if email:
-            consultant = get_object_or_404(Consultant, email=email)
+            consultant = get_object_or_404(Consultant, email__iexact=email)
         else:
             return Response({"error": "Email is Empty"}, status=400)
         consultant = consultant_authenticate(email=consultant.email, password=request.data.get('password').strip())

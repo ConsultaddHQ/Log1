@@ -156,7 +156,6 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 }
 
             elif con_status == 'offer':
-                print(consultants.count())
                 sub_status_obj = {
                     'in_offer': queryset_filter_by_status(consultants, 'in_offer').count(),
                     'on_boarded': queryset_filter_by_status(consultants, 'on_boarded').count(),
