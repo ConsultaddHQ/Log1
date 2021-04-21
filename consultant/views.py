@@ -83,6 +83,11 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                         work_auth__visa_type__in=filters['visa'], work_auth__is_current=True
                     )
 
+                if 'visa_end' in filters:
+                    consultants = consultants.filter(
+                        work_auth__visa_end__lte=filters['visa_end'], work_auth__is_current=True
+                    )
+
                 if 'rtg' in filters:
                     consultants = consultants.filter(marketing__rtg=filters['rtg'], marketing__status='open')
 

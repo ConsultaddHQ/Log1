@@ -517,12 +517,25 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, *args, **kwargs):
         try:
+            visibility = False
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
+
+            if submission.created_by.id == request.user.id or request.user.id in supervisors:
+                visibility = True
+
+            attachments = Attachment.objects.none()
+            if visibility:
+                attachments = submission.attachments.all()
+
             if hasattr(submission, 'project'):
                 project = submission.project
-                attachments = submission.attachments.all().union(project.attachments.all())
-            else:
-                attachments = submission.attachments.all()
+                attachments = attachments.union(project.attachments.all())
+
+            if submission.test.exists():
+                for test in submission.test.all():
+                    attachments = attachments.union(test.attachments.all())
+
             serializer = AttachmentSerializer(attachments, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
@@ -554,15 +567,16 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='resume')
     def resume(self, request, *args, **kwargs):
         try:
+            data = list()
             visibility = False
-            attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
-            serializer = AttachmentSerializer(attachment)
-
-            submission = get_object_or_404(Submission, id=attachment.object_id)
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
-            if submission.created_by.id == request.user.id or request.user.id in supervisors:
+            if submission.created_by.id == request.user.id or request.user.id in supervisors or \
+                    'engineer' in request.user.roles:
                 visibility = True
-            return Response({"result": serializer.data, "visibility": visibility}, status=200)
+                queryset = submission.attachments.all()
+                data = AttachmentSerializer(queryset, many=True).data
+            return Response({"result": data, "visibility": visibility}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -574,8 +588,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             consultadd_emp = Team.objects.get(name='Consultadd')
             if 'superadmin' in role:
                 employers = Team.objects.filter(
-                    Q(dept='Marketing') |
-                    Q(name='Consultadd')
+                    Q(dept='Marketing') | Q(name='Consultadd')
                 ).order_by('name').values('id', 'name')
             else:
                 employers = [

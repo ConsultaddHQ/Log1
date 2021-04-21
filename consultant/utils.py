@@ -190,6 +190,7 @@ def terminate_consultant(terminate):
         scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
         for user in scrum_masters:
             user_list.append(user)
+
         last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b. %d, %Y")
         title = f"""{consultant.name} got terminated on {last_date}"""
 
@@ -207,19 +208,19 @@ def terminate_consultant(terminate):
 
         # Push Notification
         message_body = {
+            "body": title,
+            "title": title,
             "category": "alert",
             "show_in_foreground": True,
             "click_action": "https://app.log1.com",
-            "body": title,
-            "title": title,
             "data": {
                 'is_read': False,
                 'is_deleted': False,
                 'target': 'consultant',
                 'sub_target': 'terminate',
                 'sub_target_id': terminate.id,
-                'timestamp': str(timezone.now()),
                 'target_id': terminate.consultant.id,
+                'timestamp': str(timezone.now().strftime('%m/%d/%Y')),
             },
         }
 
