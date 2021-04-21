@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 
+from constance import config
 from project.models import Project
 from log1.utils import write_exception
 from utils_app.mailing import send_email
@@ -50,7 +51,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             customer_mail_data = {
                 'to': [email],
                 'cc': [],
-                'bcc': ['aditi.so@consultadd.com'],
+                'bcc': [config.TIMESHEET_APP_ADMIN],
                 'subject': 'Signup on Consultadd Time Track App',
                 'template': '../templates/con_signup_mail.html',
                 'context': {
@@ -61,7 +62,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             send_email(customer_mail_data, "log1@consultadd.com")
 
             mail_data = {
-                'to': ['aditi.so@consultadd.com'],
+                'to': [config.TIMESHEET_APP_ADMIN],
                 'cc': [],
                 'bcc': [],
                 'subject': f'{name} Signed up on Consultadd Time Track App',

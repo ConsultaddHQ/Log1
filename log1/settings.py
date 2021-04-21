@@ -235,14 +235,16 @@ CONSTANCE_CONFIG = OrderedDict([
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
 
-    ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
-    ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin email id')),
-    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'Booking Email id')),
-    ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
-    ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
-    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
-    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
-    ('VENDOR_MANAGEMENT', ('vendormanagement@consultadd.com', 'Vendor Management email id')),
+    ('LEGAL', ('legal@consultadd.com', 'Legal team Email ID')),
+    ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin Email ID')),
+    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'Booking Email ID')),
+    ('FINANCE', ('finance@consultadd.com', 'Finance team Email ID')),
+    ('APP_ADMIN', ('sarang.m@consultadd.com', 'Log1 App Admin Email ID')),
+    ('RELATIONS', ('relations@consultadd.com', 'Relations team Email ID')),
+    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team Email ID')),
+    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team Email ID')),
+    ('TIMESHEET_APP_ADMIN', ('aditi.so@consultadd.com', 'Timesheet Admin Email ID')),
+    ('VENDOR_MANAGEMENT', ('vendormanagement@consultadd.com', 'Vendor Management Email ID')),
 
     ('general_url', ('URL', 'General Channel')),
     ('test_team_url', ('URL', 'Test Team channel')),
@@ -266,8 +268,8 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'
     ),
     'Email Ids': (
-        'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
-        'VENDOR_MANAGEMENT'
+        'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
+        'VENDOR_MANAGEMENT', 'TIMESHEET_APP_ADMIN'
     ),
     'Web-Hooks': (
         'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',

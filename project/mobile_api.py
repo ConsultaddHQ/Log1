@@ -12,6 +12,7 @@ from rest_framework.viewsets import GenericViewSet
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
+from constance import config
 from employee.models import User
 from log1.utils import write_exception
 from utils_app.mailing import send_email
@@ -286,14 +287,14 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 bcc = ['sarang.m@consultadd.com']
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
-                to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.com']
+                to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
                 bcc = []
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)
 
             if os.environ.get('ENV', 'local') != 'prod':
-                to = ['sarang.m@consultadd.com', 'aditi.so@consultadd.in']
+                to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
                 bcc = []
                 subject += "Development server"
 
