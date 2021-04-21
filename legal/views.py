@@ -19,7 +19,7 @@ from utils_app.mailing import send_email
 from employee.token import get_token_generator
 from attachment.views import presigned_post_url, get_s3_object
 from consultant.permissions import ConsultantPetitionIsAuthenticated
-from notification.views import create_notification, push_notification
+from notification.utils import create_notification, push_notification
 from legal.models import Types, Petition, Reason, Document, DocumentList
 from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS
 from consultant.authentication import ConsultantPetitionTokenAuthentication

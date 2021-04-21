@@ -15,15 +15,15 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='pool_candidates')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
+            count = 1
             in_pool_con = ConsultantMarketing.objects.filter(
                 in_pool=True,
                 status='open'
             ).order_by('consultant_id', '-start').distinct('consultant_id')
 
-            count = 1
             text = f"""<tr>
                         <th style="padding:5px 8px 5px 8px;">#</th>
                         <th style="padding:5px 8px 5px 8px;">Consultant</th>
@@ -34,7 +34,6 @@ class Command(BaseCommand):
                         <th style="padding:5px 8px 5px 8px;">Skills</th>
                         <th style="padding:5px 8px 5px 8px;">Open Offer</th>
                         </tr>"""
-            total = in_pool_con.count()
 
             for con in in_pool_con:
                 if con.consultant.status != 'archived':
@@ -49,7 +48,6 @@ class Command(BaseCommand):
                     open_offer_count = con.consultant.projects.filter(
                         statuses__is_current=True, statuses__status__in=['on_boarding', 'received']
                     ).count()
-                    count += 1
 
                     text += f"""<tr>
 <td style="padding:5px 8px 5px 8px;text-align: center;">{count}</td>
@@ -81,6 +79,8 @@ class Command(BaseCommand):
                                     <th style="padding:5px 8px 5px 8px;">Skills</th>
                                     <th style="padding:5px 8px 5px 8px;">Open Offer</th>
                                     </tr>"""
+
+                    count += 1
             data = {
                 "title": "Pool Candidates &#127958;",
                 "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""

@@ -9,13 +9,16 @@ class DocumentSerializer(serializers.ModelSerializer):
     file_name = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
 
-    def get_category(self, obj):
+    @staticmethod
+    def get_category(obj):
         return obj.doc_type.category
 
-    def get_doc_type_name(self, obj):
+    @staticmethod
+    def get_doc_type_name(obj):
         return obj.doc_type.name
 
-    def get_file_name(self, obj):
+    @staticmethod
+    def get_file_name(obj):
         return os.path.split(obj.file.name)[1]
 
     class Meta:
@@ -33,10 +36,12 @@ class DocumentURLSerializer(serializers.ModelSerializer):
     doc_type_name = serializers.SerializerMethodField()
     category = serializers.SerializerMethodField()
 
-    def get_category(self, obj):
+    @staticmethod
+    def get_category(obj):
         return obj.doc_type.category
 
-    def get_doc_type_name(self, obj):
+    @staticmethod
+    def get_doc_type_name(obj):
         return obj.doc_type.name
 
     class Meta:
@@ -61,20 +66,24 @@ class PetitionSerializer(serializers.ModelSerializer):
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'status',
                   'total_documents', 'uploaded_documents')
 
-    def get_consultant(self, obj):
+    @staticmethod
+    def get_consultant(obj):
         return {
             "id": obj.beneficiary.id,
             "name": obj.beneficiary.name,
             "email": obj.beneficiary.email,
         }
 
-    def get_assigned_to(self, obj):
+    @staticmethod
+    def get_assigned_to(obj):
         return obj.assigned_to.employee_name
 
-    def get_total_documents(self, obj):
+    @staticmethod
+    def get_total_documents(obj):
         return DocumentList.objects.filter(petition=obj).count()
 
-    def get_uploaded_documents(self, obj):
+    @staticmethod
+    def get_uploaded_documents(obj):
         return Document.objects.filter(petition=obj).count()
 
 
@@ -90,24 +99,29 @@ class PetitionGetSerializer(serializers.ModelSerializer):
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'docs', 'reasons',
                   'status', 'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active', 'rfe')
 
-    def get_rfe(self, obj):
+    @staticmethod
+    def get_rfe(obj):
         rfe = obj.reasons.filter(petition_status='rfe')
         if rfe:
             return True
         return False
 
-    def get_docs(self, obj):
+    @staticmethod
+    def get_docs(obj):
         return DocumentSerializer(obj.documents.all(), many=True).data
 
-    def get_reasons(self, obj):
+    @staticmethod
+    def get_reasons(obj):
         return ReasonSerializer(obj.reasons.all(), many=True).data
 
-    def get_consultant(self, obj):
+    @staticmethod
+    def get_consultant(obj):
         return {
             "id": obj.beneficiary.id,
             "name": obj.beneficiary.name,
             "email": obj.beneficiary.email,
         }
 
-    def get_assigned_to(self, obj):
+    @staticmethod
+    def get_assigned_to(obj):
         return obj.assigned_to.employee_name

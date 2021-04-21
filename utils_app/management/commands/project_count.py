@@ -16,7 +16,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='project_count')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
@@ -29,19 +29,21 @@ class Command(BaseCommand):
                           'terminated-fired_security_issue', 'terminated-resigned_location_issue',
                           'terminated-fired_performance_issue', 'terminated-resigned_full_time_offer']
 
-            month = date.today().month
+            last = date.today()
+            first = date.today().replace(day=1)
             new_offer = Project.objects.filter(statuses__status='new', statuses__is_current=True).count()
             received_projects = Project.objects.filter(statuses__status='received', statuses__is_current=True).count()
             on_boarded_projects = Project.objects.filter(statuses__status='on_boarded',
                                                          statuses__is_current=True).count()
             joined_projects = Project.objects.filter(statuses__status='joined', statuses__is_current=True,
-                                                     statuses__created__month=month).count()
+                                                     statuses__created__range=[first, last]).count()
             cancelled_projects = Project.objects.filter(statuses__status__in=cancelled, statuses__is_current=True,
-                                                        created__month=month).count()
+                                                        created__range=[first, last]).count()
             terminated_projects = Project.objects.filter(statuses__status__in=terminated, statuses__is_current=True,
-                                                         created__month=month).count()
-            total_projects = Project.objects.filter(statuses__created__month=month, statuses__is_current=True).exclude(
-                statuses__status__in=['new']).count()
+                                                         created__range=[first, last]).count()
+            total_projects = Project.objects.filter(
+                statuses__created__range=[first, last], statuses__is_current=True
+            ).exclude(statuses__status__in=['new']).count()
 
             data = {
                 "title": "Project Details &#128221;",

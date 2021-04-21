@@ -3,8 +3,8 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from consultant.models import Consultant
-from employee.serializers import UserSerializer
 from marketing.serializers import SubmissionSerializer
+from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule
 
@@ -204,18 +204,22 @@ class ProjectGetSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ('id', 'status', 'submission', 'feedback', 'check_list', 'attachments', 'created', 'city',
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
-                  'start_date', 'end_date', 'rate', 'employer', 'reporting_details', 'is_remote')
+                  'start_date', 'end_date', 'rate', 'employer', 'reporting_details', 'is_remote', 'marketer_name')
 
     def get_status(self, obj):
         status = obj.statuses.filter(is_current=True)
         if status:
             return status.first().status
         return None
+
+    def get_marketer_name(self, obj):
+        return obj.submission.created_by.employee_name
 
     def get_attachments(self, obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data

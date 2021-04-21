@@ -31,9 +31,9 @@ from activity.serializers import ActivitySerializer
 from attachment.serializers import AttachmentSerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
-from attachment.views import presigned_post_url, download_s3_object
-from notification.views import create_notification, push_notification
+from notification.utils import create_notification, push_notification
 from marketing.utils import change_to_feedback_due, create_submission
+from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
 from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
@@ -42,7 +42,8 @@ from marketing.serializers import Lead, Submission, VendorCompany, VendorContact
     Interview, Test, InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, \
     SubmissionDetailSerializer, SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, \
     VendorCompanySerializer, VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, \
-    TestUpdateSerializer, TestListSerializer, InterviewV2Serializer, TestGetSerializer, SubmissionSupportSerializer
+    TestUpdateSerializer, TestListSerializer, InterviewV2Serializer, TestGetSerializer, SubmissionSupportSerializer, \
+    ProjectV2Serializer
 
 
 # Route - /vendor_company/
@@ -104,8 +105,9 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            queryset = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
-            data = queryset.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
+            data = VendorContact.objects.filter(
+                company_id=kwargs.get('pk'), created_by=request.user
+            ).values('id', 'name', 'email', 'number', 'company__name', 'created_by')
             return Response({"results": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -114,8 +116,9 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
     def list(self, request, *args, **kwargs):
         try:
             company_id = request.query_params.get('company')
-            queryset = VendorContact.objects.filter(company_id=company_id, created_by=request.user)
-            data = queryset.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
+            data = VendorContact.objects.filter(
+                company_id=company_id, created_by=request.user
+            ).values('id', 'name', 'email', 'number', 'company__name', 'created_by')
             return Response({"results": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -514,12 +517,25 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, *args, **kwargs):
         try:
+            visibility = False
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
+
+            if submission.created_by.id == request.user.id or request.user.id in supervisors:
+                visibility = True
+
+            attachments = Attachment.objects.none()
+            if visibility:
+                attachments = submission.attachments.all()
+
             if hasattr(submission, 'project'):
                 project = submission.project
-                attachments = submission.attachments.all().union(project.attachments.all())
-            else:
-                attachments = submission.attachments.all()
+                attachments = attachments.union(project.attachments.all())
+
+            if submission.test.exists():
+                for test in submission.test.all():
+                    attachments = attachments.union(test.attachments.all())
+
             serializer = AttachmentSerializer(attachments, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
@@ -551,10 +567,16 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='resume')
     def resume(self, request, *args, **kwargs):
         try:
-            attachment_id = kwargs.get('pk')
-            attachment = get_object_or_404(Attachment, id=attachment_id)
-            serializer = AttachmentSerializer(attachment)
-            return Response({"result": serializer.data}, status=200)
+            data = list()
+            visibility = False
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
+            if submission.created_by.id == request.user.id or request.user.id in supervisors or \
+                    'engineer' in request.user.roles:
+                visibility = True
+                queryset = submission.attachments.all()
+                data = AttachmentSerializer(queryset, many=True).data
+            return Response({"result": data, "visibility": visibility}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -566,15 +588,14 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             consultadd_emp = Team.objects.get(name='Consultadd')
             if 'superadmin' in role:
                 employers = Team.objects.filter(
-                    Q(dept='Marketing') |
-                    Q(name='Consultadd')
+                    Q(dept='Marketing') | Q(name='Consultadd')
                 ).order_by('name').values('id', 'name')
             else:
                 employers = [
                     {"id": request.user.team.id, "name": request.user.team.name},
                     {"id": consultadd_emp.id, "name": consultadd_emp.name},
                 ]
-            return Response({"result": employers}, status=200)
+            return Response({"results": employers}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -607,9 +628,22 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             if hasattr(submission, 'project'):
                 queryset = submission.project.support.all().order_by('-created')
                 serializer = SubmissionSupportSerializer(queryset, many=True)
-                return Response({"result": serializer.data}, status=200)
+                return Response({"results": {"data": serializer.data, "project": submission.project.id}}, status=200)
             else:
-                return Response({"error": "project not found"}, status=400)
+                return Response({"error": "Project not found"}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='project')
+    def project(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            if hasattr(submission, 'project'):
+                serializer = ProjectV2Serializer(submission.project)
+                return Response({"results": serializer.data}, status=200)
+            else:
+                return Response({"error": "Project not found"}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
@@ -698,24 +732,12 @@ class SubmissionViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-
-            # calendar_id = request.query_params.get('calendar', 'false')
-            # if calendar_id == 'true':
-            #     interview = get_object_or_404(Interview, calendar_id=kwargs.get('pk'))
-            #     sub = interview.submission
-            # else:
-
             sub_id = kwargs.get('pk')
             permission = {"update": False}
             sub = get_object_or_404(Submission, id=sub_id)
 
             if sub.created_by.id == request.user.id:
                 permission['update'] = True
-
-            # interviews = Interview.objects.filter(submission=sub.id, supervisor=request.user)
-            # if interviews:
-            #     serializer = SubmissionDetailSerializer(sub)
-            #     return Response({"results": serializer.data, "permission": permission}, status=200)
 
             if sub.created_by == request.user:
                 serializer = SubmissionDetailSerializer(sub)
@@ -2279,6 +2301,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res = send_email_attachment_multiple(mail_data, created_by.email)
+                delete_temp_file(path)
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -2314,6 +2337,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
+                delete_temp_file(path)
                 return res, "ok"
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -2539,32 +2563,33 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_type = "Video"
             if test.is_offline:
                 test_type = 'Offline'
-            title = f"Test assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {test_type} :: {skills}"
+            title = f"Test assigned :: {test.submission.consultant.name} :: {test.submission.client} ::" \
+                    f" {test_type} :: {skills}"
             notification_data = {
-                'category': 'info',
-                'sender_user_type': 'user',
-                'target_type': 'test',
-                'recipient_user_type': 'user',
-                'description': title,
                 'title': title,
-                'sender_id': request.user.id,
+                'category': 'info',
+                'description': title,
                 'target_id': test.id,
+                'target_type': 'test',
+                'sender_user_type': 'user',
+                'sender_id': request.user.id,
+                'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
-                    'is_deleted': False,
                     'target': 'test',
-                    'timestamp': str(datetime.now()),
+                    'is_deleted': False,
                     'target_id': test.id,
+                    'timestamp': str(datetime.now()),
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -2651,30 +2676,30 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             title = f"Feedback Added for Test :: {test.submission.consultant.name}"
 
             notification_data = {
-                'category': 'alert',
-                'sender_user_type': 'user',
-                'target_type': 'user',
-                'recipient_user_type': 'user',
-                'description': title,
                 'title': title,
+                'category': 'alert',
+                'description': title,
+                'target_type': 'user',
+                'sender_user_type': 'user',
                 'sender_id': request.user.id,
+                'recipient_user_type': 'user',
                 'target_id': test.submitted_by.id,
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
+                    'target': 'test',
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target_id': test.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': test.submitted_by.id,
                 },
             }
 

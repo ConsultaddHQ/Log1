@@ -20,16 +20,15 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 
 from api_key.models import APIKey
 from marketing.models import Interview
-from consultant.utils import create_activity
 from employee.serializers import TeamSerializer
 from employee.models import tag_users, User, Team
 from project.models import Project, ProjectStatus
-from activity.serializers import Activity, ActivitySerializer
 from attachment.serializers import AttachmentSerializer
-from notification.views import create_notification, push_notification
+from activity.serializers import Activity, ActivitySerializer
+from notification.utils import create_notification, push_notification
 from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
-    terminate_consultant, send_notification, create_consultant
+    terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
 
 from consultant.models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, \
     ConsultantRateRevision, ConsultantPOC, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ExitReason
@@ -40,6 +39,231 @@ from consultant.serializers import ConsultantSerializer, ConsultantProfileSerial
     ConsultantUpdateSerializer, EducationSerializer, ExperienceSerializer, ConsultantFeedbackSerializer, \
     PayrollEmployerSerializer, POCSerializer, WorkAuthSerializer, ConsultantSubmissionSerializer, \
     ExitDetailConsultantSerializer, ConsultantPetitionLoginSerializer
+
+
+# Route - v2/consultant/
+class ConsultantV2ViewSets(viewsets.ModelViewSet):
+    queryset = Consultant.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ConsultantBenchSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
+    def list(self, request, *args, **kwargs):
+        try:
+            close_marketing()
+            start_marketing()
+            first, last = get_page_limits(request)
+            query = request.query_params.get('query', None)
+            sort_by = request.query_params.get('sort_by', None)
+            con_status = request.query_params.get('status', None)
+            filter_json = request.query_params.get('filter_json', None)
+            con_sub_status = request.query_params.get('sub_status', None)
+
+            consultants = Consultant.objects.all()
+
+            if filter_json:
+                filters = json.loads(filter_json)
+
+                if 'days' in filters:
+                    day_filter = marketing_days_filter(filters['days'])
+                    consultants = consultants.filter(**day_filter)
+
+                if 'gender' in filters:
+                    consultants = consultants.filter(gender=filters['gender'])
+
+                if 'team' in filters:
+                    consultants = consultants.filter(marketing__teams__name=filters['team'])
+
+                if 'visa' in filters:
+                    consultants = consultants.filter(
+                        work_auth__visa_type__in=filters['visa'], work_auth__is_current=True
+                    )
+
+                if 'visa_end' in filters:
+                    consultants = consultants.filter(
+                        work_auth__visa_end__lte=filters['visa_end'], work_auth__is_current=True
+                    )
+
+                if 'rtg' in filters:
+                    consultants = consultants.filter(marketing__rtg=filters['rtg'], marketing__status='open')
+
+                if 'skills' in filters and len(filters["vendor"]) > 0:
+                    consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in filters['skills']]))
+
+                if 'dob' in filters:
+                    if 'lte' in filters['dob']:
+                        consultants = consultants.filter(
+                            date_of_birth__year__lte=filters['dob']['lte']
+                        )
+                    elif 'gte' in filters['dob']:
+                        consultants = consultants.filter(
+                            date_of_birth__year__gte=filters['dob']['gte']
+                        )
+
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                consultants = consultants.filter(
+                    Q(name__istartswith=query) |
+                    Q(email__iexact=query)
+                )
+
+            status_obj = {
+                "all": consultants,
+                "marketing_candidate": consultants.filter(marketing__status='close'),
+                "terminated": consultants.filter(status__in=['archived', 'terminated']),
+                "on_project": consultants.filter(projects__statuses__status='joined',
+                                                 projects__statuses__is_current=True),
+                "offer": consultants.filter(projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                                            projects__statuses__is_current=True),
+                "on_bench": consultants.filter(marketing__status='open').exclude(
+                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                    projects__statuses__is_current=True),
+            }
+
+            def queryset_filter_by_status(queryset, sub_status):
+                if sub_status == 'non_pool':
+                    return queryset.filter(marketing__in_pool=False, marketing__status='open')
+
+                elif sub_status == 'in_pool':
+                    return queryset.filter(marketing__in_pool=True, marketing__status='open')
+
+                elif sub_status == 'on_boarded':
+                    return queryset.filter(projects__statuses__status='on_boarded',
+                                           projects__statuses__is_current=True)
+
+                elif sub_status == 'in_offer':
+                    return queryset.filter(projects__statuses__status__in=['new', 'received'],
+                                           projects__statuses__is_current=True)
+
+                elif sub_status == 'fired':
+                    return queryset.filter(exit__type='fired')
+
+                elif sub_status == 'resigned':
+                    return queryset.filter(exit__type='resigned')
+
+                elif sub_status == 'absconded':
+                    return queryset.filter(exit__type='absconded')
+
+                return queryset
+
+            if con_status:
+                consultants = status_obj[con_status]
+
+            sub_status_obj = dict()
+            if con_status == 'on_bench':
+                sub_status_obj = {
+                    'in_pool': queryset_filter_by_status(consultants, 'in_pool').count(),
+                    'non_pool': queryset_filter_by_status(consultants, 'non_pool').count(),
+                }
+
+            elif con_status == 'offer':
+                sub_status_obj = {
+                    'in_offer': queryset_filter_by_status(consultants, 'in_offer').count(),
+                    'on_boarded': queryset_filter_by_status(consultants, 'on_boarded').count(),
+                }
+
+            elif con_status == 'terminated':
+                sub_status_obj = {
+                    'fired': queryset_filter_by_status(consultants, 'fired').count(),
+                    'resigned': queryset_filter_by_status(consultants, 'resigned').count(),
+                    'absconded': queryset_filter_by_status(consultants, 'absconded').count(),
+                }
+
+            consultants = queryset_filter_by_status(consultants, con_sub_status)
+
+            if sort_by in ['name', 'created']:
+                consultants = consultants.order_by(sort_by)
+
+            count = {
+                "total": consultants.count(),
+                "offer": status_obj['offer'].count(),
+                "on_bench": status_obj['on_bench'].count(),
+                "on_project": status_obj['on_project'].count(),
+                "terminated": status_obj['terminated'].count(),
+                "marketing_candidate": status_obj['marketing_candidate'].count(),
+                "sub_status": sub_status_obj
+            }
+
+            poc = ConsultantPOC.objects.filter(
+                consultant=OuterRef("pk"), end=None, poc_type='recruiter')
+
+            rate = ConsultantRateRevision.objects.filter(
+                consultant=OuterRef("pk"), end=None)
+
+            marketing = ConsultantMarketing.objects.filter(
+                consultant=OuterRef("pk"), status='open')
+
+            work_auth = WorkAuth.objects.filter(
+                consultant=OuterRef("pk"), is_current=True
+            )
+
+            termination = ConsultantExit.objects.filter(
+                consultant=OuterRef("pk")
+            )
+
+            if con_status == 'terminated':
+                data = consultants[first:last].annotate(
+                    rate=Subquery(rate.values('rate')[:1]),
+                    rtg=Subquery(marketing.values('rtg')[:1]),
+                    rehire=Subquery(termination.values('rehire')[:1]),
+                    in_pool=Subquery(marketing.values('in_pool')[:1]),
+                    visa_end=Subquery(work_auth.values('visa_end')[:1]),
+                    visa_type=Subquery(work_auth.values('visa_type')[:1]),
+                    exit_status=Subquery(termination.values('status')[:1]),
+                    marketing_start=Subquery(marketing.values('start')[:1]),
+                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
+                    exit_last_date=Subquery(termination.values('last_date')[:1]),
+                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
+                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
+                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
+                         'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end', 'rehire',
+                         'exit_last_date', 'exit_status')
+            else:
+                data = consultants[first:last].annotate(
+                    rate=Subquery(rate.values('rate')[:1]),
+                    rtg=Subquery(marketing.values('rtg')[:1]),
+                    in_pool=Subquery(marketing.values('in_pool')[:1]),
+                    visa_end=Subquery(work_auth.values('visa_end')[:1]),
+                    visa_type=Subquery(work_auth.values('visa_type')[:1]),
+                    marketing_start=Subquery(marketing.values('start')[:1]),
+                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
+                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
+                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
+                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
+                         'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end')
+            return Response({"count": count, "results": data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='filters')
+    def filters(self, request, *args, **kwargs):
+        try:
+            filters = {
+                "on_project": [],
+                "marketing_candidate": [],
+                "on_bench": [
+                    {"display_name": "Bench", "name": "non_pool"},
+                    {"display_name": "In Pool", "name": "in_pool"},
+                ],
+                "offer": [
+                    {"display_name": "In Offer", "name": "in_offer"},
+                    {"display_name": "On-boarded", "name": "on_boarded"},
+                ],
+                "terminated": [
+                    {"display_name": "Fired", "name": "fired"},
+                    {"display_name": "Resigned", "name": "resigned"},
+                    {"display_name": "Absconded", "name": "absconded"},
+                ]
+            }
+            return Response({"data": filters}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
 
 
 # Route - /consultant/
@@ -163,10 +387,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 )
 
             elif 'marketer' in request.user.roles:
+                recruits = Consultant.objects.none()
+                if 'recruiter' in roles:
+                    recruits = consultants.filter(pocs__poc=request.user)
                 consultants = consultants.filter(
                     Q(marketing__in_pool=True, marketing__status='open') |
                     Q(marketing__marketer=request.user, marketing__status='open')
-                )
+                ).union(recruits)
 
             if 'recruiter' in roles:
                 recruits = consultants.filter(pocs__poc=request.user)
@@ -311,7 +538,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             # Push Notification
             title = f"{consultant.name}'s details updated by {request.user.employee_name}"
-            send_notification(consultant, request.user, title)
+            send_notification_for_user(consultant, request.user, title, 'consultant')
 
             # Activity
             if changed_fields:
@@ -386,7 +613,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{education.consultant.name}'s education added by {request.user.employee_name}"
-                send_notification(education.consultant, request.user, title)
+                send_notification_for_user(education.consultant, request.user, title, 'education')
 
                 # Activity
                 desc = f"{request.user.employee_name} added Education details"
@@ -404,7 +631,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{education.consultant.name}'s education details updated by {request.user.employee_name}"
-                send_notification(education.consultant, request.user, title)
+                send_notification_for_user(education.consultant, request.user, title, 'education')
 
                 # Activity
                 desc = f"{request.user.employee_name} updated Education details"
@@ -437,7 +664,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{experience.consultant.name}'s experience added by {request.user.employee_name}"
-                send_notification(experience.consultant, request.user, title)
+                send_notification_for_user(experience.consultant, request.user, title, 'experience')
 
                 # Activity
                 desc = f"{request.user.employee_name} added Experience details"
@@ -455,7 +682,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{experience.consultant.name}'s experience details updated by {request.user.employee_name}"
-                send_notification(experience.consultant, request.user, title)
+                send_notification_for_user(experience.consultant, request.user, title, 'experience')
 
                 # Activity
                 desc = f"{request.user.employee_name} updated Experience details"
@@ -524,7 +751,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{employer.consultant.name}'s employer updated by {request.user.employee_name}"
-                send_notification(employer.consultant, request.user, title)
+                send_notification_for_user(employer.consultant, request.user, title, 'employer')
 
                 # Activity
                 desc = f"{request.user.employee_name} updated Employer"
@@ -542,7 +769,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{consultant.name}'s employer added by {request.user.employee_name}"
-                send_notification(consultant, request.user, title)
+                send_notification_for_user(consultant, request.user, title, 'employer')
 
                 # Activity
                 desc = f"{request.user.employee_name} added Employer"
@@ -584,7 +811,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{rate_obj.consultant.name}'s rate revised by {request.user.employee_name}"
-                send_notification(rate_obj.consultant, request.user, title)
+                send_notification_for_user(rate_obj.consultant, request.user, title, 'rate_revision')
 
                 # Activity
                 desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {request.data['rate']}"
@@ -645,16 +872,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 consultants = consultants.filter(gender=gender)
 
             if days:
-                day_filter = dict()
-                day_filter["marketing__status"] = 'open'
-                if days == 'lt_12':
-                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=12)
-                elif days == 'lt_24':
-                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
-                elif days == 'lt_36':
-                    day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=36)
-                elif days == 'gt_36':
-                    day_filter['marketing__start__lte'] = timezone.now().date() - timedelta(days=36)
+                day_filter = marketing_days_filter(days)
                 consultants = consultants.filter(**day_filter)
 
             skills = json.loads(skills)
@@ -829,7 +1047,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
             # Push Notification
             title = f"{consultant_marketing.consultant.name}'s marketing detail updated by {request.user.employee_name}"
-            send_notification(consultant_marketing.consultant, request.user, title)
+            send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
 
             # Activity
             desc = f"{request.user.employee_name} updated marketing details"
@@ -902,7 +1120,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name}'s marketing details updated by " \
                         f"{request.user.employee_name}"
-                send_notification(consultant_marketing.consultant, request.user, title)
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} assigned following marketer - {', '.join(marketers_name)}"
@@ -933,7 +1151,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name} is assigned to {teams_string}"
-                send_notification(consultant_marketing.consultant, request.user, title)
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} is assigned to {teams_string}"
@@ -967,7 +1185,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name}'s assigned marketer removed"
-                send_notification(consultant_marketing.consultant, request.user, title)
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} removed following marketers - {', '.join(marketers_name)}"
@@ -999,7 +1217,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name}'s marketing team removed"
-                send_notification(consultant_marketing.consultant, request.user, title)
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} removed from {team_string}"
@@ -1071,7 +1289,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
 
             # Push Notification
             title = f"{profile.consultant.name}'s profile created by {request.user.employee_name}"
-            send_notification(profile.consultant, request.user, title)
+            send_notification_for_user(profile.consultant, request.user, title, 'profile')
 
             # Activity
             desc = f"{request.user.employee_name} created {title} profile"
@@ -1091,7 +1309,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{profile.consultant.name}'s profile updated by {request.user.employee_name}"
-                send_notification(profile.consultant, request.user, title)
+                send_notification_for_user(profile.consultant, request.user, title, 'profile')
 
                 # Activity
                 desc = f"{request.user.employee_name} updated {title} profile"
@@ -1135,7 +1353,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
             # Push Notification
             title = f"{poc.poc.employee_name} is added as {poc.poc_type.title()} on {poc.consultant.name}"
-            send_notification(poc.consultant, request.user, title)
+            send_notification_for_user(poc.consultant, request.user, title, 'consultant')
 
             # Activity
             desc = f"{request.user.employee_name} added {poc.poc.employee_name} as {poc.poc_type.title()}"
@@ -1158,7 +1376,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Push Notification
             title = f"{instance.poc.employee_name} is updated as {instance.poc_type.title()} on " \
                     f"{instance.consultant.name}"
-            send_notification(instance.consultant, request.user, title)
+            send_notification_for_user(instance.consultant, request.user, title, 'consultant')
 
             # Activity
             desc = f"{request.user.employee_name} updated {instance.poc.employee_name} as {instance.poc_type.title()}"
@@ -1209,7 +1427,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
             # Push Notification
             title = f"{work_auth.consultant.name}'s work authorization is added by {request.user.employee_name}"
-            send_notification(work_auth.consultant, request.user, title)
+            send_notification_for_user(work_auth.consultant, request.user, title, 'work_auth')
 
             # Activity
             desc = f"{request.user.employee_name} added Work Authorization"
@@ -1240,7 +1458,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
             # Push Notification
             title = f"{work_auth.consultant.name}'s work authorization is updated by {request.user.employee_name}"
-            send_notification(work_auth.consultant, request.user, title)
+            send_notification_for_user(work_auth.consultant, request.user, title, 'work_auth')
 
             # Activity
             desc = f"{request.user.employee_name} updated Work Authorization details"
@@ -1485,30 +1703,32 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
 
             title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
             notification_data = {
+                'title': title,
                 'category': 'info',
+                'description': title,
+                'target_id': feedback.id,
                 'sender_user_type': 'user',
                 'target_type': 'consultant',
-                'recipient_user_type': 'user',
-                'description': title,
-                'title': title,
                 'sender_id': request.user.id,
-                'target_id': feedback.id,
+                'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target': 'consultant',
+                    'sub_target': 'feedback',
+                    'sub_target_id': feedback.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': feedback.id,
+                    'target_id': feedback.consultant.id,
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -1519,7 +1739,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Push Notification
             poc_title = f"{serializer.data['feedback_type']} feedback added for {feedback.consultant.name} " \
                         f"by {request.user.employee_name}"
-            send_notification(feedback.consultant, request.user, poc_title)
+            send_notification_for_user(feedback.consultant, request.user, poc_title, 'feedback')
 
             # Activity
             desc = f"{request.user.employee_name} added {feedback.get_feedback_type_display()} feedback"
@@ -1552,30 +1772,33 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                     user_tag.tagged_user.add(user)
             title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
             notification_data = {
+                'title': title,
                 'category': 'info',
+                'description': title,
+                'target_id': feedback.id,
                 'sender_user_type': 'user',
                 'target_type': 'consultant',
-                'recipient_user_type': 'user',
-                'description': title,
-                'title': title,
                 'sender_id': request.user.id,
-                'target_id': feedback.id,
+                'recipient_user_type': 'user',
             }
             create_notification(user_list, notification_data)
 
             # Push Notification
+
             message_body = {
+                "body": title,
+                "title": title,
                 "category": "alert",
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
-                "body": title,
-                "title": title,
                 "data": {
                     'is_read': False,
                     'is_deleted': False,
-                    'target': 'user',
+                    'target': 'consultant',
+                    'sub_target': 'feedback',
+                    'sub_target_id': feedback.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': feedback.id,
+                    'target_id': feedback.consultant.id,
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -1584,7 +1807,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Push Notification
             title = f"{serializer.data['feedback_type']} feedback updated for {feedback.consultant.name} " \
                     f"by {request.user.employee_name}"
-            send_notification(feedback.consultant, request.user, title)
+            send_notification_for_user(feedback.consultant, request.user, title, 'feedback')
 
             # Activity
             desc = f"{request.user.employee_name} updated {feedback.get_feedback_type_display()} feedback"

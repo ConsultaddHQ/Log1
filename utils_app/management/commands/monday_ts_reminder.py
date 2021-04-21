@@ -7,7 +7,7 @@ from project.models import TimeSheet
 from utils_app.models import CronJob
 from utils_app.utils import create_cron_error
 from notification.models import Notification, FCMDevice
-from notification.views import push_notification_consultant
+from notification.utils import push_notification_consultant
 
 
 class Command(BaseCommand):
@@ -17,7 +17,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='monday_ts_reminder')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             queryset = TimeSheet.objects.filter(

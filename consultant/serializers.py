@@ -19,7 +19,8 @@ class ConsultantLoginSerializer(UserSerializer):
         model = Consultant
         fields = ('id', 'token', 'email', 'name', 'is_active', 'project', 'first_login')
 
-    def get_project(self, obj):
+    @staticmethod
+    def get_project(obj):
         if hasattr(obj, 'projects'):
             return obj.projects.filter(end_date=None).annotate(
                 client=F('submission__client'),
@@ -27,7 +28,8 @@ class ConsultantLoginSerializer(UserSerializer):
             ).values('id', 'start_date', 'client', 'employer')
         return False
 
-    def get_token(self, obj):
+    @staticmethod
+    def get_token(obj):
         token, created = ConsultantToken.objects.get_or_create(consultant=obj)
         return token.key
 
@@ -40,7 +42,8 @@ class ConsultantPetitionLoginSerializer(UserSerializer):
         model = Consultant
         fields = ('id', 'token', 'email', 'name', 'petition')
 
-    def get_petition(self, obj):
+    @staticmethod
+    def get_petition(obj):
         petitions = obj.petitions.filter(is_active=True)
         if petitions:
             petition = petitions.first()
@@ -51,7 +54,8 @@ class ConsultantPetitionLoginSerializer(UserSerializer):
             }
         return None
 
-    def get_token(self, obj):
+    @staticmethod
+    def get_token(obj):
         token, created = ConsultantPetitionToken.objects.get_or_create(consultant=obj)
         return token.key
 
@@ -85,7 +89,8 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
     teams = TeamSerializer(many=True)
     marketer = serializers.SerializerMethodField()
 
-    def get_marketer(self, obj):
+    @staticmethod
+    def get_marketer(obj):
         return obj.marketer.all().annotate(name=F('employee_name')).values('id', 'name')
 
     class Meta:
@@ -103,22 +108,28 @@ class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
     current_city = serializers.SerializerMethodField()
     teams = TeamSerializer(many=True)
 
-    def get_primary_marketer(self, obj):
+    @staticmethod
+    def get_primary_marketer(obj):
         return obj.primary_marketer.employee_name if obj.primary_marketer else None
 
-    def get_primary_marketer_team(self, obj):
+    @staticmethod
+    def get_primary_marketer_team(obj):
         return obj.primary_marketer.team.name if obj.primary_marketer else None
 
-    def get_submission_count(self, obj):
+    @staticmethod
+    def get_submission_count(obj):
         return obj.submissions.count()
 
-    def get_current_city(self, obj):
+    @staticmethod
+    def get_current_city(obj):
         return obj.consultant.current_city
 
-    def get_project_count(self, obj):
+    @staticmethod
+    def get_project_count(obj):
         return Project.objects.filter(submission__consultant_marketing=obj).count()
 
-    def get_interview_count(self, obj):
+    @staticmethod
+    def get_interview_count(obj):
         return Interview.objects.filter(
             submission__consultant_marketing=obj
         ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
@@ -175,10 +186,12 @@ class ExitDetailConsultantSerializer(serializers.ModelSerializer):
         fields = ('id', 'created', 'type', 'status', 'rehire', 'created_by', 'last_date', 'resign_date', 'exit_details',
                   'reasons', 'notice_period', 'legal_action', 'legal_status', 'tagged_user', 'cancel_reason')
 
-    def get_reasons(self, obj):
+    @staticmethod
+    def get_reasons(obj):
         return obj.reasons.all().values('id', 'name')
 
-    def get_tagged_user(self, obj):
+    @staticmethod
+    def get_tagged_user(obj):
         return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
 
 
@@ -214,10 +227,12 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
         model = Consultant
         fields = ('id', 'name', 'email', 'status', 'profiles', 'marketing_id')
 
-    def get_profiles(self, obj):
+    @staticmethod
+    def get_profiles(obj):
         return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
-    def get_marketing_id(self, obj):
+    @staticmethod
+    def get_marketing_id(obj):
         queryset = obj.marketing.filter(status='open')
         if queryset:
             return queryset.first().id
@@ -225,7 +240,7 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
 
 
 class ConsultantBenchSerializer(serializers.ModelSerializer):
-    rate = serializers.SerializerMethodField()
+    rate = serializers.ReadOnlyField()
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
     relation = serializers.SerializerMethodField()
@@ -243,41 +258,43 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
                   'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation', 'rate',
                   'support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer')
 
-    def get_work_auth(self, obj):
+    @staticmethod
+    def get_work_auth(obj):
         return WorkAuthSerializer(obj.work_auth.all(), many=True).data
 
-    def get_profiles(self, obj):
+    @staticmethod
+    def get_profiles(obj):
         return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
-    def get_education(self, obj):
+    @staticmethod
+    def get_education(obj):
         return EducationSerializer(obj.academics.all(), many=True).data
 
-    def get_terminate(self, obj):
+    @staticmethod
+    def get_terminate(obj):
         return ExitDetailConsultantSerializer(obj.exit.all().order_by('-created'), many=True).data
 
-    def get_experience(self, obj):
+    @staticmethod
+    def get_experience(obj):
         return ExperienceSerializer(obj.experiences.all(), many=True).data
 
-    def get_rate(self, obj):
-        rate_revision = obj.rates.filter(end=None)
-        if rate_revision:
-            return rate_revision.first().rate
-        return 0
-
-    def get_payroll_employer(self, obj):
+    @staticmethod
+    def get_payroll_employer(obj):
         employers = obj.employers.all().order_by('-start')
         if employers:
             return PayrollEmployerSerializer(employers.first()).data
         return None
 
-    def get_marketing(self, obj):
+    @staticmethod
+    def get_marketing(obj):
         marketing = obj.marketing.filter(status='open')
         if marketing:
             return ConsultantMarketingSerializer(marketing, many=True).data[0]
         else:
             return None
 
-    def get_recruiter(self, obj):
+    @staticmethod
+    def get_recruiter(obj):
         queryset = obj.pocs.filter(end=None, poc_type='recruiter')
         if queryset:
             poc = queryset.first().poc
@@ -291,7 +308,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return data
         return None
 
-    def get_relation(self, obj):
+    @staticmethod
+    def get_relation(obj):
         queryset = obj.pocs.filter(end=None, poc_type='relation')
         if queryset:
             poc = queryset.first().poc
@@ -305,7 +323,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return data
         return None
 
-    def get_support(self, obj):
+    @staticmethod
+    def get_support(obj):
         projects = Project.objects.filter(submission__consultant_marketing__consultant=obj)
         if projects:
             active_po = projects.filter(statuses__status='joined', statuses__is_current=True)
@@ -333,7 +352,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 class ConsultantListSerializer(serializers.ModelSerializer):
     profiles = serializers.SerializerMethodField()
 
-    def get_profiles(self, obj):
+    @staticmethod
+    def get_profiles(obj):
         return ConsultantProfileSerializer(obj.profiles.all(), many=True).data
 
     class Meta:
@@ -350,8 +370,10 @@ class ConsultantFeedbackSerializer(serializers.ModelSerializer):
         fields = ('id', 'created', 'feedback_text', 'feedback_type', 'rating', 'consultant', 'created_by',
                   'tagged_user')
 
-    def get_created_by(self, obj):
+    @staticmethod
+    def get_created_by(obj):
         return obj.created_by.employee_name
 
-    def get_tagged_user(self, obj):
+    @staticmethod
+    def get_tagged_user(obj):
         return TaggedUserSerializer(obj.tagged_user.all(), many=True).data

@@ -22,13 +22,13 @@ from utils_app.models import ObjectGroup
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
-from consultant.views import send_notification
 from attachment.models import create_attachment
+from consultant.utils import send_notification_for_user
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from notification.views import push_notification_consultant, create_notification, push_notification
+from notification.utils import create_notification, push_notification, push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from log1.utils import get_time_filter, post_msg_using_webhook, password_generator, get_page_limits, write_exception
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
@@ -372,9 +372,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 res, error = 'development server', 'development server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     res, error = self.po_mail(project, path, scrum_masters, po_type)
-
+                delete_temp_file(path)
                 if not error == 'error':
-                    delete_temp_file(path)
                     project.submission.consultant_marketing.status = 'close'
                     project.submission.consultant_marketing.end = project.start_date
                     project.submission.consultant_marketing.save()
@@ -752,7 +751,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.submission.consultant_marketing.status = 'open'
                     project.submission.consultant_marketing.save()
                     title = f"Project Cancelled :: {project.consultant.name} :: {project.submission.client}"
-                    send_notification(project.consultant, request.user, title)
+                    send_notification_for_user(project.consultant, request.user, title, 'project')
 
                 if new_status == 'joined':
                     project.consultant.status = 'on_project'
@@ -797,7 +796,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     post_msg_using_webhook(config.joined_url, data)
 
                     title = f" Project Joined :: {project.consultant.name} :: {project.submission.client}"
-                    send_notification(project.consultant, request.user, title)
+                    send_notification_for_user(project.consultant, request.user, title, 'project')
 
                     consultant = project.consultant
 
@@ -875,7 +874,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.is_msg_sent = True
                     project.save()
                     title = f" Project Received :: {project.consultant.name} :: {project.submission.client}"
-                    send_notification(project.consultant, request.user, title)
+                    send_notification_for_user(project.consultant, request.user, title, 'project')
 
                 # Mail for Cancellation or Termination of Project
 
@@ -889,7 +888,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.save()
                         project.support.update(end=datetime.now())
 
-                        text = f"""{consultant_gender_emoji} Consultant :  ** {project.consultant.name} ** <br>
+                        text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
                         {employer_emoji} Employer :  {project.employer}<br>
@@ -900,7 +899,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         &#128221; End Date :  {project_end_date}<br>
                         &#10060; Status :   {str(p_status.get_status_display())}<br>"""
 
-                        text += "**Reason:**" + project.feedback if project.feedback else "None"
+                        text += "**Reason:**" + " " + project.feedback if project.feedback else "None"
 
                         data = {
                             "title": "Offer Termination Feedback",
@@ -908,7 +907,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         }
                         post_msg_using_webhook(config.project_termination_url, data)
                         title = f"Project Terminated :: {project.consultant.name} :: {project.submission.client}"
-                        send_notification(project.consultant, request.user, title)
+                        send_notification_for_user(project.consultant, request.user, title, 'project')
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                         resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
@@ -936,7 +935,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
                         title = f" Project Completed :: {project.consultant.name} :: {project.submission.client}"
-                        send_notification(project.consultant, request.user, title)
+                        send_notification_for_user(project.consultant, request.user, title, 'project')
 
             serializer = self.serializer_class(project)
 
@@ -1016,11 +1015,12 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
                 "data": {
-                    'target': 'project',
                     'is_read': False,
                     'is_deleted': False,
+                    'target': 'submission',
+                    'sub_target': 'support',
                     'timestamp': str(datetime.now()),
-                    'target_id': project.id,
+                    'target_id': project.submission.id,
                 },
             }
             object_ids = [user.id for user in user_list]

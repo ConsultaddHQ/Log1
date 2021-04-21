@@ -18,7 +18,7 @@ class Command(BaseCommand):
     # A command must define handle()
     def handle(self, *args, **options):
         job = CronJob.objects.get(name='consultants_submissions')
-        job.last_triggered_at = datetime.now()
+        job.modified = datetime.now()
         job.save()
         try:
             consultants = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()

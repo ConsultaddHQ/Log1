@@ -5,14 +5,10 @@ from django.contrib.auth.forms import UserCreationForm
 from django.utils.translation import ugettext_lazy as _
 from import_export.admin import ExportActionModelAdmin
 
-
 from utils_app.admin import ExportCsvMixin
-from rest_framework.authtoken.models import Token
 from .models import User, Role, Team, ResetPasswordToken, Asset, Tagging
 
 admin.site.site_header = "Log1"
-
-admin.site.unregister(Token)
 
 
 @admin.register(User)
@@ -52,12 +48,6 @@ UserAdmin.add_fieldsets = (
         'fields': ('employee_id', 'username', 'email', 'gender', 'password1', 'password2',)
     }),
 )
-
-
-@admin.register(Token)
-class TokenAdmin(admin.ModelAdmin):
-    search_fields = ('user__employee_name',)
-    list_display = ('user', 'key', 'created')
 
 
 @admin.register(Team)

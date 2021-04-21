@@ -38,11 +38,11 @@ def get_s3_object(key):
 
 def download_s3_object(key):
     file_name = key.split('/')[1] + "_" + str(datetime.now()) + "_" + key.split('/')[3]
-    s3 = boto3.client('s3',
-                      region_name=os.getenv('AWS_REGION_NAME'),
-                      aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                      aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-                      )
+    s3 = boto3.client(
+        's3', region_name=os.getenv('AWS_REGION_NAME'),
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+    )
     s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME'), f'media/{key}', f'media/{file_name}')
     return f'media/{file_name}'
 
@@ -58,10 +58,10 @@ def delete_temp_file(paths):
 def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
     bucket_name = os.getenv('AWS_STORAGE_BUCKET_NAME')
     s3 = boto3.client(
-            's3', region_name=os.getenv('AWS_REGION_NAME'),
-            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-        )
+        's3', region_name=os.getenv('AWS_REGION_NAME'),
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+    )
     try:
         response = s3.generate_presigned_post(
             bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration

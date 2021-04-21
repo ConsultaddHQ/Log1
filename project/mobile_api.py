@@ -12,6 +12,7 @@ from rest_framework.viewsets import GenericViewSet
 from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, UpdateModelMixin, DestroyModelMixin, RetrieveModelMixin
 
+from constance import config
 from employee.models import User
 from log1.utils import write_exception
 from utils_app.mailing import send_email
@@ -21,7 +22,7 @@ from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer
-from notification.views import create_notification, push_notification, push_notification_consultant
+from notification.utils import create_notification, push_notification, push_notification_consultant
 
 
 # API for Mobile App (For Consultants)
@@ -286,14 +287,14 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 bcc = ['sarang.m@consultadd.com']
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
-                to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.com']
+                to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
                 bcc = []
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)
 
             if os.environ.get('ENV', 'local') != 'prod':
-                to = ['sarang.m@consultadd.com', 'aditi.so@consultadd.in']
+                to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
                 bcc = []
                 subject += "Development server"
 
@@ -404,9 +405,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        # page = int(request.query_params.get("page", 1))
+        # page_size = int(request.query_params.get("page_size", 10))
+        # last, first = page * page_size, page * page_size - page_size
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
             queryset = TimeSheet.objects.filter(
