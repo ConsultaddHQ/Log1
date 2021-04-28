@@ -498,6 +498,20 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=True, url_path='tabs')
+    def tabs(self, request, *args, **kwargs):
+        try:
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            data = {
+                "test": submission.test.exists(),
+                "project": hasattr(submission, 'project'),
+                "interview": submission.screening.exists(),
+            }
+            return Response({"result": data}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"error": str(error)}, status=400)
+
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, *args, **kwargs):
         try:
@@ -1267,10 +1281,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             if filter_for == 'my':
                 if 'interviewee' in roles:
-                    queryset = queryset.filter(
-                        Q(submission__created_by=request.user) |
-                        Q(supervisor=request.user)
-                    )
+                    queryset = queryset.filter(Q(submission__created_by=request.user) | Q(supervisor=request.user))
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
 
