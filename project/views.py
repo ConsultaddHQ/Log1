@@ -899,7 +899,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         &#128221; End Date :  {project_end_date}<br>
                         &#10060; Status :   {str(p_status.get_status_display())}<br>"""
 
-                        text += "**Reason:**" + " " + project.feedback if project.feedback else "None"
+                        text += " **Reason:** " + " " + project.feedback if project.feedback else "None"
 
                         data = {
                             "title": "Offer Termination Feedback",
@@ -922,7 +922,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         {role_emoji} Role :  {project.submission.lead.job_title}<br>
                         &#128221; Joining Date :  {project_start_date}<br>"""
 
-                        text += "**Reason:**" + project.feedback if project.feedback else "None"
+                        text += " **Reason:** " + project.feedback if project.feedback else "None"
 
                         data = {
                             "title": "Offer Cancellation Feedback ",

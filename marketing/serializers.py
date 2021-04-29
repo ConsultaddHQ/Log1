@@ -383,13 +383,12 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     vendor_layer = serializers.SerializerMethodField()
-    tabs = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer', 'tabs')
+                  'marketer_name', 'is_complete', 'vendor_layer')
 
     @staticmethod
     def get_vendor_layer(obj):
@@ -403,26 +402,17 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     def get_marketer_name(obj):
         return obj.created_by.employee_name
 
-    @staticmethod
-    def get_tabs(obj):
-        return {
-            "test": obj.test.exists(),
-            "project": hasattr(obj, 'project'),
-            "interview": obj.screening.exists(),
-        }
-
 
 class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     vendor_layer = VendorLayerSerializer(read_only=True)
     vendor_contact = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
-    tabs = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer', 'tabs')
+                  'marketer_name', 'is_complete', 'vendor_layer')
 
     @staticmethod
     def get_vendor_contact(obj):
@@ -431,14 +421,6 @@ class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_marketer_name(obj):
         return obj.created_by.employee_name
-
-    @staticmethod
-    def get_tabs(obj):
-        return {
-            "test": obj.test.exists(),
-            "project": hasattr(obj, 'project'),
-            "interview": obj.screening.exists(),
-        }
 
 
 class SubmissionConProfile(serializers.ModelSerializer):
