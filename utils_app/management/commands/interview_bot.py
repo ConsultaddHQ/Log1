@@ -2,10 +2,9 @@ from datetime import datetime
 from django.core.management import BaseCommand
 
 from constance import config
-from utils_app.models import CronJob
 from marketing.models import Interview
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -14,9 +13,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='interview_bot')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='interview_bot')
         try:
             from pytz import timezone
             tz = timezone('EST')

@@ -143,9 +143,6 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
 
     USERNAME_FIELD = 'email'
 
-    class Meta:
-        ordering = ('name',)
-
     def save(self, *args, **kwargs):
         """
             On save timestamps

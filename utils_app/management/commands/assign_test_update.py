@@ -3,16 +3,13 @@ from django.core.management import BaseCommand
 
 from constance import config
 from marketing.models import Test
-from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='assign_test_update')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='assign_test_update')
         try:
             tests = Test.objects.filter(status__in=['new', 'assigned']).exclude(
                 submission__consultant_marketing__status='close'

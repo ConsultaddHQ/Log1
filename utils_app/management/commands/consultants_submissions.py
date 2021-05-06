@@ -4,11 +4,10 @@ from django.core.management import BaseCommand
 from constance import config
 
 from employee.models import User
-from utils_app.models import CronJob
 from marketing.models import Submission
 from consultant.models import Consultant
 from utils_app.mailing import send_email
-from utils_app.utils import create_cron_error
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -17,9 +16,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='consultants_submissions')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='consultants_submissions')
         try:
             consultants = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
             submission_data = []

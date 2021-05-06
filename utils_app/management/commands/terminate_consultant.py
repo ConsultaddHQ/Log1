@@ -1,10 +1,9 @@
-from datetime import date, datetime
+from datetime import date
 from django.core.management import BaseCommand
 
-from utils_app.models import CronJob
 from consultant.models import ConsultantExit
-from utils_app.utils import create_cron_error
 from consultant.utils import terminate_consultant
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -12,9 +11,7 @@ class Command(BaseCommand):
     help = "this command is for posting your payload to Messaging app"
 
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='terminate_consultant')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='terminate_consultant')
         try:
             queryset = ConsultantExit.objects.filter(last_date__lte=date.today(), status='in_process')
             for terminate in queryset:

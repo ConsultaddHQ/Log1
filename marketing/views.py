@@ -1935,7 +1935,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client',
                      'job_title')
 
-            upcoming_joinings = projects.filter(
+            upcoming_joining = projects.filter(
                 statuses__status='on_boarded', statuses__is_current=True
             ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
@@ -1957,7 +1957,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             data = {
                 "new_offers": new_offers,
-                "joining": upcoming_joinings,
+                "joining": upcoming_joining,
                 "interviews": upcoming_interviews
             }
             if filter_by_time == 'last_month':
@@ -1990,10 +1990,12 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 'total_offers': total,
                 'offer': projects.filter(created__range=[first, last]).count(),
                 'submission': sub.filter(created__range=[first, last]).count(),
-                'interview': interviews.filter(created__range=[first, last]).count(),
                 'on_project': Consultant.objects.filter(status='on_project').count(),
                 'ba_bench': Consultant.objects.filter(skills__contains='BA', status='on_bench').count(),
                 'dev_bench': Consultant.objects.filter(status='on_bench').exclude(skills__exact='BA').count(),
+                'interview': interviews.filter(
+                    created__range=[first, last], status__in=['offer', 'feedback_due', 'failed']
+                ).count(),
             }
 
             offer_count = [
@@ -2039,21 +2041,31 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 prev_first, prev_last = None, None
 
             if filter_for == 'my':
-                new_po = Project.objects.filter(statuses__status='joined', statuses__created__range=[first, last],
-                                                submission__created_by=request.user).count()
+                new_po = Project.objects.filter(
+                    statuses__status='joined',
+                    submission__created_by=request.user,
+                    statuses__created__range=[first, last],
+                ).count()
 
-                offers_count = Project.objects.filter(submission__created__range=[first, last],
-                                                      submission__created_by=request.user).count()
+                offers_count = Project.objects.filter(
+                    submission__created__range=[first, last], submission__created_by=request.user
+                ).count()
 
-                submissions_count = Submission.objects.filter(created__range=[first, last],
-                                                              created_by=request.user).count()
+                submissions_count = Submission.objects.filter(
+                    created__range=[first, last], created_by=request.user
+                ).count()
 
-                interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1',
-                                                            submission__created_by=request.user).count()
+                interviews_count = Interview.objects.filter(
+                    submission__created_by=request.user,
+                    submission__created__range=[first, last],
+                    status__in=['offer', 'failed', 'feedback_due'],
+                ).count()
 
-                joining_count = Project.objects.filter(statuses__status='joined',
-                                                       submission__created__range=[first, last],
-                                                       submission__created_by=request.user).count()
+                joining_count = Project.objects.filter(
+                    statuses__status='joined',
+                    submission__created_by=request.user,
+                    submission__created__range=[first, last],
+                ).count()
 
             elif filter_for == 'team':
                 if not team_name:
@@ -2074,9 +2086,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).count()
 
                 interviews_count = Interview.objects.filter(
-                    round='1',
                     submission__created__range=[first, last],
-                    submission__created_by__team__name=team_name
+                    submission__created_by__team__name=team_name,
+                    status__in=['offer', 'failed', 'feedback_due'],
                 ).count()
 
                 joining_count = Project.objects.filter(
@@ -2086,10 +2098,11 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).count()
 
             else:
-
                 submissions_count = Submission.objects.filter(created__range=[first, last]).count()
                 offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
-                interviews_count = Interview.objects.filter(submission__created__range=[first, last], round='1').count()
+                interviews_count = Interview.objects.filter(
+                    submission__created__range=[first, last], status__in=['offer', 'failed', 'feedback_due']
+                ).count()
                 new_po = Project.objects.filter(
                     statuses__status='joined', statuses__created__range=[first, last]
                 ).count()

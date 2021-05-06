@@ -1,23 +1,17 @@
-from datetime import datetime
 from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
     # Show this when the user types help
     help = "this command is for posting your payload to MatterMost app"
 
-    # A command must define handle()
-
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='open_offer_status')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='open_offer_status')
         try:
             new = Project.objects.filter(
                 statuses__is_current=True, statuses__status__iexact='new'

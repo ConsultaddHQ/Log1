@@ -3,9 +3,8 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -13,9 +12,7 @@ class Command(BaseCommand):
     help = "this command is for posting your payload to MatterMost app"
 
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='joining_announcement')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='joining_announcement')
         try:
             month = date.today().month
             year = date.today().year
