@@ -10,11 +10,11 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
 from legal.models import Petition
-from log1.utils import write_exception
 from consultant.models import Consultant
 from employee.models import User, tag_users
 from activity.models import Activity, Comment
 from project.models import Project, TimeSheet
+from log1.utils import write_exception, ERROR_MSG
 from marketing.models import Submission, Interview
 from consultant.utils import send_notification_for_user
 from notification.utils import create_notification, push_notification
@@ -50,21 +50,21 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
             activity = Activity.objects.filter(id=activity_id, user=request.user)
             if activity:
                 serializer = self.serializer_class(activity)
-                return Response({"result": serializer.data}, status=200)
-            return Response({"error": "No activity found"}, status=404)
+                return Response({"data": serializer.data}, status=200)
+            return Response({"message": "No activity found"}, status=404)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         object_id = request.query_params.get('object_id')
         try:
             activity = Activity.objects.filter(object_id=object_id, user=request.user)
             serializer = self.serializer_class(activity, many=True)
-            return Response({"result": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /comment/
@@ -91,15 +91,15 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 "consultant": Consultant,
             }
             if model not in models.keys():
-                return Response({"error": "Selected Model is not valid"}, status=400)
+                return Response({"message": ERROR_MSG, "error": "Selected Model is not valid"}, status=400)
 
             instance = get_object_or_404(models[model], id=object_id)
             comments = instance.comments.filter(parent_comment=None)
             serializer = self.serializer_class(comments.order_by('-created'), many=True)
-            return Response({'results': serializer.data}, status=200)
+            return Response({'data': serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         model = request.data.get('model', None)
@@ -172,7 +172,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                     send_notification_for_user(consultant, request.user, title, 'comment')
 
             serializer = CommentGetSerializer(comment)
-            return Response({"result": serializer.data}, status=201)
+            return Response({"message": ERROR_MSG, "data": serializer.data}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

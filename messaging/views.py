@@ -16,7 +16,7 @@ from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 from twilio.rest import Client
 from employee.models import Asset
 from api_key.permissions import APIKey
-from log1.utils import write_exception
+from log1.utils import write_exception, ERROR_MSG
 from messaging.models import Message, Conversation
 from notification.utils import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
@@ -39,10 +39,10 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             data = Asset.objects.filter(
                 asset_type='number', provider='twilio', owner=request.user, is_deleted=False
             ).values('id', 'number')
-            return Response({"results": data}, status=200)
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({'error': str(error)}, status=400)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -52,10 +52,10 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             ).order_by('created')
             data = messages.values('id', 'text', 'created', 'is_sent', 'conversation_id', 'read')
             messages.update(read=True)
-            return Response({"results": data}, status=200)
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({'error': str(error)}, status=400)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -68,10 +68,10 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             ).values(
                 'id', 'user2', 'created', 'modified', 'text', 'read'
             ).order_by('-id', '-messages__created').distinct('id')
-            return Response({"results": conversations}, status=200)
+            return Response({"data": conversations}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({'error': str(error)}, status=400)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='send')
     def send_sms(self, request):
@@ -89,12 +89,12 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1, user2=to)
                 message = Message.objects.create(text=body, read=True, is_sent=True, conversation=conversation)
                 serializer = self.serializer_class(message)
-                return Response({"results": serializer.data}, status=200)
+                return Response({"data": serializer.data}, status=200)
             else:
-                return Response({"error": "Message not sent, please try again."}, status=400)
+                return Response({"message": "Message not sent, please try again."}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /twilio_receive/

@@ -31,11 +31,11 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
                 if user_exists:
                     user = user_exists.first()
                     serializer = self.serializer_class(user)
-                    return Response({"result": serializer.data}, status=201)
+                    return Response({"data": serializer.data, "message": "User is impersonated"}, status=201)
                 else:
-                    return Response({"error": {'message': 'User not Exist'}}, status=400)
+                    return Response({"message": 'User not Exist'}, status=400)
             else:
-                return Response({"error": {'message': 'Unauthorised Access'}}, status=401)
+                return Response({"message": 'Unauthorised Access'}, status=401)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": {'success': False, 'message': str(error)}}, status=400)
+            return Response({"message": {'success': False, 'message': str(error)}}, status=400)

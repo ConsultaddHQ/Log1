@@ -14,8 +14,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
 
 from project.models import Project
-from log1.utils import write_exception
 from activity.views import create_activity
+from log1.utils import write_exception, ERROR_MSG
 from attachment.serializers import Attachment, AttachmentSerializer
 
 
@@ -90,16 +90,18 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
         try:
             obj_content_type = ContentType.objects.get(model=obj_type)
             if attachment_type:
-                queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type,
-                                                     attachment_type=attachment_type).order_by('-created')
+                queryset = Attachment.objects.filter(
+                    object_id=object_id, content_type=obj_content_type, attachment_type=attachment_type
+                ).order_by('-created')
             else:
-                queryset = Attachment.objects.filter(object_id=object_id, content_type=obj_content_type
-                                                     ).order_by('-created')
+                queryset = Attachment.objects.filter(
+                    object_id=object_id, content_type=obj_content_type
+                ).order_by('-created')
             serializer = self.serializer_class(queryset, many=True)
-            return Response({"results": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -109,7 +111,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 resume = Attachment.objects.filter(object_id=object_id, content_type=content_type,
                                                    attachment_type='resume')
                 if resume:
-                    return Response({"error": "You can't attach multiple resumes"}, status=400)
+                    return Response({"message": "You can't attach multiple resumes"}, status=400)
 
             attachment = Attachment.objects.create(
                 object_id=object_id,
@@ -121,7 +123,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             serializer = self.serializer_class(attachment)
 
             if content_type.model != 'project':
-                return Response({"result": serializer.data}, status=201)
+                return Response({"data": serializer.data}, status=201)
             else:
                 project = get_object_or_404(Project, id=object_id)
 
@@ -157,8 +159,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 if project.reporting_details and len(project.reporting_details.strip()) > 0:
                     reporting_details = 1
 
-                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
-                                       + reporting_details) / 6 >= 1 else False
+                total = s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
+                list_status = True if (total / 6) >= 1 else False
 
                 check_list = {
                     "total": 6,
@@ -173,10 +175,12 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "reporting_details": reporting_details
                 }
 
-                return Response({"result": serializer.data, "check_list": check_list}, status=201)
+                return Response(
+                    {"data": serializer.data, "check_list": check_list, "message": "Attachment added"}, status=201
+                )
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -193,7 +197,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
-                return Response({"result": "deleted"}, status=202)
+                return Response({"data": "deleted"}, status=202)
             else:
                 project = get_object_or_404(Project, id=attachment.object_id)
                 desc = f"{attachment.filename} deleted by {request.user.employee_name}"
@@ -233,8 +237,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 if project.reporting_details and len(project.reporting_details.strip()) > 0:
                     reporting_details = 1
 
-                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
-                                       + reporting_details) / 6 >= 1 else False
+                total = s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
+                list_status = True if (total / 6) >= 1 else False
 
                 check_list = {
                     "total": 6,
@@ -246,10 +250,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     "vendor_address": vendor_address,
                     "reporting_details": reporting_details,
                 }
-                return Response({"result": "deleted", "check_list": check_list}, status=202)
+                return Response({"check_list": check_list, "message": "Attachment deleted"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /get_attachment/
@@ -268,10 +272,10 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
             url = get_s3_object(attachment.attachment_file.name)
             extension = attachment.attachment_file.name.split(".")[-1]
-            return Response({"result": url, 'file_type': extension}, status=200)
+            return Response({"data": url, 'file_type': extension}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
@@ -287,7 +291,7 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
                 filename=file_name,
             )
             response = presigned_post_url(object_name=object_name)
-            return Response({"result": response}, status=200)
+            return Response({"data": response, "message": "Attachment uploaded"}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
