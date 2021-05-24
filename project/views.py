@@ -781,10 +781,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     ).count()
                     if project.is_remote or project.submission.lead.is_w2:
                         con_str = f"**Remote Project** <br>"
-                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}** <br>"
-                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.consultant.name}**"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name.strip()}** <br>"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.consultant.name.strip()}** "
                     else:
-                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
+                        con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name.strip()}** "
 
                     # Sending message on Mattermost on joined status
                     data = {
@@ -859,14 +859,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
                     if project.is_remote and project.submission.lead.is_w2:
                         con_str = f"**Remote Project** <br>"
-                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}**<br>"
-                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}**"
+                        con_str += f"{consultant_gender_emoji} Consultant Joined: **{project.consultant.name}** <br>"
+                        con_str += f"{consultant_gender_emoji} Submitted On: **{project.submission.consultant.name}** "
                     else:
                         con_str = f"{consultant_gender_emoji} Consultant :  **{project.consultant.name}**"
                     # Sending message on Messaging Tool
                     data = {
                         "title": "Offer  &#129304;&#128516;&#129304;",
-                        "text": f"""{con_str}<br>
+                        "text": f"""{con_str} <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
                         {employer_emoji} Employer :  {project.employer}<br>

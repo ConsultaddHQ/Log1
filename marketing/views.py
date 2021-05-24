@@ -422,15 +422,23 @@ class LeadViewSets(viewsets.ModelViewSet):
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='archived')
+    @action(methods=['get', 'put'], detail=False, url_path='archived')
     def archived(self, request):
         try:
-            first, last = get_page_limits(request)
-            leads = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
-            data, data_counts = self.get_lead_data(leads, 'archived', first, last)
-            if data_counts == 'error':
-                return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
-            return Response({"data": data, "counts": data_counts}, status=200)
+            if request.method == 'PUT':
+                lead_ids = request.data["lead_ids"]
+                leads = Lead.objects.filter(owner=request.user, id__in=lead_ids, status="new")
+                if leads:
+                    leads.update(status='archived')
+                    return Response({"message": "Leads Archived"}, status=202)
+                return Response({"message": "Data not found"}, status=404)
+            else:
+                first, last = get_page_limits(request)
+                leads = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
+                data, data_counts = self.get_lead_data(leads, 'archived', first, last)
+                if data_counts == 'error':
+                    return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
+                return Response({"data": data, "counts": data_counts}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1318,6 +1326,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         Q(submission__consultant_marketing__marketer=request.user) |
                         Q(submission__created_by=request.user)
                     )
+
+            elif 'superadmin' in roles:
+                queryset = queryset
+
             if version == 'v2' and filter_json:
                 filter_string = dict()
                 filters = json.loads(filter_json)
@@ -1529,7 +1541,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 serializer.save()
 
                 # Setting Submission is_active value
-                if interview.status == 'cancelled' and not interview.submission.exclude(status='cancelled'):
+                if interview.status == 'cancelled' and not interview.submission.screening.exclude(status='cancelled'):
                     interview.submission.status = 'sub'
                     # clear rank for cancelled interview
                     if interview.round == 1:
@@ -1685,7 +1697,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             change_to_feedback_due()
 
             interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
-            # Delete from google calendar
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
@@ -1767,7 +1778,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.notes = request.data.get('notes')
                 interview.save()
 
-                desc = f"Notes update by {request.user.name}"
+                desc = f"Notes updated by {request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 serializer = InterviewCreateSerializer(interview)
@@ -1790,7 +1801,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
                 interview.save()
 
-                desc = f"Recording: {file_name} uploaded by {request.user.name}"
+                desc = f"Recording: {file_name} uploaded by {request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response({"data": response, "message": "Recording uploaded"}, status=202)
@@ -1803,7 +1814,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.attachment_link = None
                 interview.save()
 
-                desc = f"Recording: {file_name} deleted by {request.user.name}"
+                desc = f"Recording: {file_name} deleted by {request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response(status=204)

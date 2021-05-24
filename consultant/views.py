@@ -1739,7 +1739,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             serializer = self.serializer_class(feedback)
 
             # Push Notification
-            poc_title = f"{serializer.data['feedback_type']} feedback added for {feedback.consultant.name} " \
+            poc_title = f"{feedback.get_feedback_type_display()} feedback added for {feedback.consultant.name} " \
                         f"by {request.user.employee_name}"
             send_notification_for_user(feedback.consultant, request.user, poc_title, 'feedback')
 
