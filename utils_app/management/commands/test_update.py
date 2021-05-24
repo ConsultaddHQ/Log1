@@ -1,18 +1,14 @@
-from datetime import datetime
 from django.core.management import BaseCommand
 
 from constance import config
 from marketing.models import Test
-from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='test_update')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='test_update')
         try:
             new = Test.objects.filter(status__iexact='new').count()
             feedback_due = Test.objects.filter(status__iexact='feedback_due').count()

@@ -26,7 +26,7 @@ from project.models import Project, ProjectStatus
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
-from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS
+from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
     terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
 
@@ -235,10 +235,10 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                     previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
                 ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
                          'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end')
-            return Response({"count": count, "results": data}, status=200)
+            return Response({"count": count, "data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='filters')
     def filters(self, request, *args, **kwargs):
@@ -263,7 +263,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             return Response({"data": filters}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /consultant/
@@ -404,10 +404,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
-            return Response({"results": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -421,19 +421,19 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             else:
                 consultant = get_object_or_404(Consultant, id=consultant_id)
                 serializer = self.serializer_class(consultant)
-            return Response({"result": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
-            return Response({"result": "Consultant Already Exist"}, status=400)
+            return Response({"message": "Consultant Already Exist"}, status=400)
         try:
             consultant = Consultant.objects.create(
                 ssn=data['ssn'],
@@ -495,15 +495,15 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 start=data['employer_start_date'],
             )
 
-            return Response({"result": ConsultantSerializer(consultant).data}, status=201)
+            return Response({"data": ConsultantSerializer(consultant).data}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             serializer = ConsultantUpdateSerializer(consultant, data=request.data, partial=True)
@@ -544,10 +544,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             if changed_fields:
                 desc = f"{request.user.employee_name} updated following fields: {', '.join(changed_fields)}"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=202)
+            return Response({"data": serializer.data, "message": "Consultant Updated"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": error}, status=400)
+            return Response({"message": error}, status=400)
 
     @action(methods=['get'], detail=True, url_path='activities')
     def activities(self, request, *args, **kwargs):
@@ -557,10 +557,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 object_id=consultant_id, content_type__model='consultant'
             ).order_by('created')
             serializer = ActivitySerializer(activities, many=True)
-            return Response({"results": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='set_password')
     def set_consultant_password(self, request):
@@ -569,11 +569,11 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultant = get_object_or_404(Consultant, id=request.data['consultant_id'])
                 consultant.set_password(request.data['new_password'])
                 consultant.save()
-                return Response({'result': {'message': 'Password Changed Successfully'}}, status=200)
+                return Response({'message': 'Password Changed Successfully'}, status=200)
             else:
-                return Response({'result': {'message': DONT_HAVE_ACCESS}}, status=401)
+                return Response({'message': DONT_HAVE_ACCESS}, status=401)
         except Exception as error:
-            return Response({'error': str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='search')
     def search(self, request, *args, **kwargs):
@@ -586,16 +586,16 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             else:
                 consultants = Consultant.objects.all().order_by('name')
             data = consultants[:10].values('id', 'name', 'email')
-            return Response({"results": data}, status=200)
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
         if request.method == 'POST':
             try:
@@ -618,10 +618,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} added Education details"
                 create_activity(education.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=201)
+                return Response({"data": serializer.data, "message": "Education details added"}, status=201)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
                 education = get_object_or_404(Education, id=kwargs.get('pk'))
@@ -636,16 +636,16 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated Education details"
                 create_activity(education.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=202)
+                return Response({"data": serializer.data, "message": "Education details updated"}, status=202)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='experience')
     def experience(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
         if request.method == 'POST':
             try:
@@ -669,10 +669,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} added Experience details"
                 create_activity(experience.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=201)
+                return Response({"data": serializer.data, "message": "Experience details added"}, status=201)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
                 experience = get_object_or_404(Experience, id=kwargs.get('pk'))
@@ -687,10 +687,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated Experience details"
                 create_activity(experience.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=202)
+                return Response({"data": serializer.data, "message": "Experience details updated"}, status=202)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='marketing')
     def marketing(self, request, *args, **kwargs):
@@ -717,10 +717,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 data, counts = self.get_project_data(projects, filter_by_status)
                 if counts == "error":
                     return Response({"error": str(data)}, status=400)
-            return Response({"results": data, "total": counts}, status=200)
+            return Response({"data": data, "total": counts}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, *args, **kwargs):
@@ -728,10 +728,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             queryset = consultant.attachments.all()
             serializer = AttachmentSerializer(queryset, many=True)
-            return Response({'results': serializer.data}, status=200)
+            return Response({'data': serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get', 'post', 'put'], detail=True, url_path='payroll_employer')
     def payroll_employer(self, request, *args, **kwargs):
@@ -739,9 +739,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             try:
                 consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
                 serializer = PayrollEmployerSerializer(consultant.employers.all().order_by('-start'), many=True)
-                return Response({"results": serializer.data}, status=200)
+                return Response({"data": serializer.data}, status=200)
             except Exception as error:
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         elif request.method == 'PUT':
             try:
                 employer = PayrollEmployer.objects.get(id=kwargs.get('pk'))
@@ -756,10 +756,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated Employer"
                 create_activity(employer.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"results": serializer.data}, status=202)
+                return Response({"data": serializer.data, "message": "Employer updated"}, status=202)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
                 consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
@@ -774,10 +774,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} added Employer"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"results": serializer.data}, status=201)
+                return Response({"data": serializer.data, "message": "Employer added"}, status=201)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, *args, **kwargs):
@@ -785,10 +785,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             try:
                 rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk')).order_by('-id')
                 data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback', 'consultant')
-                return Response({"results": data}, status=200)
+                return Response({"data": data}, status=200)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
                 prev_rate_obj = ConsultantRateRevision.objects.filter(
@@ -816,10 +816,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {request.data['rate']}"
                 create_activity(rate_obj.id, 'consultantraterevision', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=201)
+                return Response({"data": serializer.data, "message": "Rate revised"}, status=201)
             except Exception as error:
                 write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                return Response({"error": str(error)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /consultant_bench/
@@ -838,7 +838,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
         consultants = Consultant.objects.filter(
             marketing__status='open'
         ).values('current_city').annotate(total=Count('current_city')).order_by('current_city')
-        return Response({"results": consultants}, status=200)
+        return Response({"data": consultants}, status=200)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -947,10 +947,10 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                 previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
             ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
                      'marketing_start', 'previous_marketing_days', 'visa')
-            return Response({"results": data, "count": count}, status=200)
+            return Response({"data": data, "count": count}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /consultant_marketing/
@@ -972,10 +972,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_id=request.query_params.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
-            return Response({"result": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1033,10 +1033,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             # Activity
             desc = f"{request.user.employee_name} started Marketing from {consultant_marketing.start}"
             create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": "Cycle Created"}, status=201)
+            return Response({"message": "Cycle Created"}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1052,10 +1052,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             # Activity
             desc = f"{request.user.employee_name} updated marketing details"
             create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=202)
+            return Response({"data": serializer.data, "message": "Marketing cycle updated"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='stop_marketing')
     def stop_marketing(self, request, *args, **kwargs):
@@ -1068,10 +1068,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             # Activity
             desc = f"{request.user.employee_name} stopped marketing from {str(marketing.end)}"
             create_activity(marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": "marketing stopped"}, status=202)
+            return Response({"message": "Marketing cycle stopped"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='remarketing')
     def remarketing(self, request, *args, **kwargs):
@@ -1080,10 +1080,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_id=request.query_params.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
-            return Response({"result": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='previous_marketing')
     def previous_marketing(self, request, *args, **kwargs):
@@ -1092,10 +1092,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_id=request.query_params.get('consultant')
             ).latest('end')
             serializer = ConsultantMarketingCycleSerializer(marketing)
-            return Response({"result": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Marketer assignment
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
@@ -1105,7 +1105,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             if queryset:
                 consultant_marketing = queryset.first()
             else:
-                return Response({"result": "Consultant is not in Marketing"})
+                return Response({"message": "Consultant is not in Marketing"})
             roles = request.user.roles
             if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
                                          in consultant_marketing.teams.all()):
@@ -1125,12 +1125,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} assigned following marketer - {', '.join(marketers_name)}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=202)
+                return Response({"data": serializer.data, "message": "marketers assigned"}, status=202)
             else:
-                return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Team Assignment
     @action(methods=['put'], detail=True, url_path='team_assignment')
@@ -1140,7 +1140,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             if queryset:
                 consultant_marketing = queryset.first()
             else:
-                return Response({"result": "Consultant is not in Marketing"})
+                return Response({"message": "Consultant is not in Marketing"})
             if 'superadmin' in request.user.roles:
                 team_ids = request.data.get('teams')
                 for team_id in team_ids:
@@ -1156,12 +1156,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} is assigned to {teams_string}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=202)
+                return Response({"data": serializer.data, "message": "Team added"}, status=202)
             else:
-                return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Remove assigned Marketer from Consultant
     @action(methods=['put'], detail=True, url_path='remove_marketer')
@@ -1171,7 +1171,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             if queryset:
                 consultant_marketing = queryset.first()
             else:
-                return Response({"result": "Consultant is not in Marketing"})
+                return Response({"message": "Consultant is not in Marketing"})
             roles = request.user.roles
             if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
                                          in consultant_marketing.teams.all()):
@@ -1190,12 +1190,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} removed following marketers - {', '.join(marketers_name)}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=200)
+                return Response({"data": serializer.data, "message": "Marketers removed"}, status=202)
             else:
-                return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Remove team from Consultant
     @action(methods=['put'], detail=True, url_path='remove_team')
@@ -1205,7 +1205,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             if queryset:
                 consultant_marketing = queryset.first()
             else:
-                return Response({"result": "Consultant is not in Marketing"})
+                return Response({"message": "Consultant is not in Marketing"})
             if 'superadmin' in request.user.roles:
                 team_ids = request.data.get('teams')
                 team_string = []
@@ -1222,12 +1222,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Activity
                 desc = f"{request.user.employee_name} removed from {team_string}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=202)
+                return Response({"data": serializer.data, "message": "Team removed"}, status=202)
             else:
-                return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /consultant_profile/
@@ -1247,10 +1247,10 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             profile_id = kwargs.get('pk')
             profile = get_object_or_404(ConsultantProfile, id=profile_id)
             serializer = self.serializer_class(profile)
-            return Response({"result": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Return Consultant Profiles
     def list(self, request, *args, **kwargs):
@@ -1259,10 +1259,10 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             consultant = get_object_or_404(Consultant, id=consultant_id)
             profiles = consultant.profiles.all()
             serializer = self.serializer_class(profiles, many=True)
-            return Response({"results": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1294,10 +1294,10 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             # Activity
             desc = f"{request.user.employee_name} created {title} profile"
             create_activity(profile.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=201)
+            return Response({"data": serializer.data, "message": "Profile created"}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1314,11 +1314,11 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name} updated {title} profile"
                 create_activity(profile.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data}, status=202)
-            return Response({"error": str(serializer.errors)}, status=400)
+                return Response({"data": serializer.data, "message": "Profile updated"}, status=202)
+            return Response({"message": ERROR_MSG, "error": str(serializer.errors)}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /consultant_poc/
@@ -1335,7 +1335,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             queryset = ConsultantPOC.objects.filter(
                 poc_type=request.data['poc_type'], consultant=request.data['consultant'], end=None
@@ -1358,15 +1358,15 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} added {poc.poc.employee_name} as {poc.poc_type.title()}"
             create_activity(poc.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": "Created"}, status=201)
+            return Response({"message": "POC added"}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": error}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
             serializer = self.serializer_class(instance, data=request.data, partial=True)
@@ -1381,10 +1381,10 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} updated {instance.poc.employee_name} as {instance.poc_type.title()}"
             create_activity(instance.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=202)
+            return Response({"data": serializer.data, "message": "POC updated"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": error}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /consultant_work_auth/
@@ -1401,7 +1401,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
             if instance:
@@ -1432,15 +1432,15 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} added Work Authorization"
             create_activity(work_auth.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=201)
+            return Response({"data": serializer.data, "message": "Work Auth added"}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": error}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-            return Response({"result": DONT_HAVE_ACCESS}, status=403)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             work_auth = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
             serializer = self.serializer_class(work_auth, data=request.data, partial=True)
@@ -1463,10 +1463,10 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             # Activity
             desc = f"{request.user.employee_name} updated Work Authorization details"
             create_activity(work_auth.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=202)
+            return Response({"data": serializer.data, "message": "Work Auth added"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": error}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /consultant_exit/
@@ -1525,17 +1525,17 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 last_date=Subquery(exit_obj.values('last_date')[:1]),
                 resign_date=Subquery(exit_obj.values('resign_date')[:1]),
             ).values('id', 'name', 'skills', 'type', 'last_date', 'rehire')
-            return Response({"results": data, "count": count}, status=200)
+            return Response({"data": data, "count": count}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
             con_exit = ConsultantExit.objects.create(
@@ -1571,23 +1571,24 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     if error == 'error':
                         write_exception(message=res, class_name=self.get_classname(),
                                         function_name=inspect.stack()[0][3])
-                        return Response({"error": "error", "exit_mail_error": str(res)},
-                                        status=400)
+                        return Response({"message": "Exit process mail not sent", "error": str(res)}, status=400)
             serializer = self.serializer_class(consultant.exit.all().order_by('-created'), many=True)
 
             # Activity
             desc = f"{request.user.employee_name} started exit process"
             create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data, "exit_mail": str(res)}, status=201)
+            return Response(
+                {"data": serializer.data, "exit_mail": str(res), "message": "Exit process created"}, status=201
+            )
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
-                return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             con_exit = get_object_or_404(ConsultantExit, id=kwargs.get('pk'))
 
@@ -1606,17 +1607,17 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
             create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=202)
+            return Response({"data": serializer.data, "message": "Exit process updated"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='cancel')
     def cancel_termination(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
-                return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             exit_id = kwargs.get('pk')
             con_exit = get_object_or_404(ConsultantExit, id=exit_id)
@@ -1633,27 +1634,28 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     if error == 'error':
                         write_exception(message=res, class_name=self.get_classname(),
                                         function_name=inspect.stack()[0][3])
-                        return Response({"error": "error", "exit_mail_error": str(res)},
-                                        status=400)
+                        return Response({"message": "Cancel Termination main not sent", "error": str(res)}, status=400)
                 serializer = self.serializer_class(con_exit)
 
                 # Activity
                 desc = f"{request.user.employee_name} cancelled exit process"
                 create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
-                return Response({"result": serializer.data, "exit_mail": str(res)}, status=202)
-            return Response({"error": "Exit process can not be cancelled "}, status=400)
+                return Response(
+                    {"data": serializer.data, "exit_mail": str(res), "message": "Exit process cancelled"}, status=202
+                )
+            return Response({"message": "Exit process can not be cancelled "}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='reason')
     def termination_reason(self, request):
         try:
             reasons = ExitReason.objects.all().values('id', 'name')
-            return Response({'result': reasons}, status=200)
+            return Response({'data': reasons}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /feedback/
@@ -1674,10 +1676,10 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             if feedback_type:
                 feedback = feedback.filter(feedback_type=feedback_type)
             serializer = self.serializer_class(feedback, many=True)
-            return Response({"result": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1737,17 +1739,17 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             serializer = self.serializer_class(feedback)
 
             # Push Notification
-            poc_title = f"{serializer.data['feedback_type']} feedback added for {feedback.consultant.name} " \
+            poc_title = f"{feedback.get_feedback_type_display()} feedback added for {feedback.consultant.name} " \
                         f"by {request.user.employee_name}"
             send_notification_for_user(feedback.consultant, request.user, poc_title, 'feedback')
 
             # Activity
             desc = f"{request.user.employee_name} added {feedback.get_feedback_type_display()} feedback"
             create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=201)
+            return Response({"data": serializer.data, "message": "Feedback added"}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1812,10 +1814,10 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Activity
             desc = f"{request.user.employee_name} updated {feedback.get_feedback_type_display()} feedback"
             create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=202)
+            return Response({"data": serializer.data, "message": "Feedback updated"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # API for Petition Web App

@@ -9,7 +9,8 @@ from logging.config import dictConfig
 
 logger = logging.getLogger(__name__)
 
-DONT_HAVE_ACCESS = 'You don\'t have access'
+DONT_HAVE_ACCESS = "You don't have access"
+ERROR_MSG = "Something went wrong. Please contact support"
 
 
 def load_config(file_path):

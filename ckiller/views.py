@@ -9,8 +9,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
-from log1.utils import write_exception
 from consultant.models import Consultant
+from log1.utils import write_exception, ERROR_MSG
 from ckiller.models import CkillerSubmission, CkillerVendorClient
 
 
@@ -76,10 +76,10 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
 
             total = queryset.count()
             serializer = self.serializer_class(queryset[first:last], many=True)
-            return Response({"results": serializer.data, "total": total}, status=200)
+            return Response({"data": serializer.data, "total": total}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -187,8 +187,8 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                             "results": data
                         }
                         result.append(res)
-                return Response({"result": result}, status=201)
-            return Response({"error": "Please provide Email empty"}, status=400)
+                return Response({"data": result}, status=201)
+            return Response({"message": "Please provide Email"}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

@@ -68,6 +68,7 @@ FAILURE_CHOICES = (
     ('resume_error', 'Error In Resume'),
     ('hired_else', 'Hired Someone Else'),
     ('internal_hiring', 'Internal Hiring'),
+    ('system_updated', 'System Auto Update'),
     ('caught_mimicking', 'Caught us Mimicking'),
     ('insufficient_skills', 'Insufficient Skills'),
     ('test_failed', 'Test Failed during Interview'),

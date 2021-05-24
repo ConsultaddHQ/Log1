@@ -1,11 +1,10 @@
-from datetime import timedelta, date, datetime
+from datetime import timedelta, date
 from django.core.management import BaseCommand
 
 from constance import config
-from utils_app.models import CronJob
 from consultant.models import Consultant
-from utils_app.utils import create_cron_error
 from utils_app.mailing import send_email_without_template
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -14,9 +13,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='assign_test_update')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='assign_test_update')
         try:
             thirty_days = date.today() + timedelta(days=30)
             fifteen_days = date.today() + timedelta(days=15)

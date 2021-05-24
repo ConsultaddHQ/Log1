@@ -1,13 +1,12 @@
 from django.utils import timezone
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from django.core.management import BaseCommand
 from django.contrib.contenttypes.models import ContentType
 
 from project.models import TimeSheet
-from utils_app.models import CronJob
-from utils_app.utils import create_cron_error
 from notification.models import Notification, FCMDevice
 from notification.utils import push_notification_consultant
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -16,9 +15,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='monday_ts_reminder')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='monday_ts_reminder')
         try:
             queryset = TimeSheet.objects.filter(
                 is_active=True, status='draft', end=date.today() - timedelta(days=2),

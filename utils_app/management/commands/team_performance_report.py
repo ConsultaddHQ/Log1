@@ -1,13 +1,12 @@
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta
 from django.core.management import BaseCommand
 
 from constance import config
 from employee.models import Team
 from project.models import Project
-from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
 from marketing.models import Submission, Interview
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -15,9 +14,7 @@ class Command(BaseCommand):
     help = "this command is for posting your payload to MatterMost app"
 
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='assign_test_update')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='team_performance_report')
         try:
             teams = Team.objects.filter(dept='Marketing').order_by('name')
             start = date.today() - timedelta(days=7)

@@ -1,11 +1,10 @@
-from datetime import date, datetime
+from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
-from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
 from consultant.models import ConsultantMarketing
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -14,9 +13,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='pool_candidates')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='pool_candidates')
         try:
             count = 1
             in_pool_con = ConsultantMarketing.objects.filter(

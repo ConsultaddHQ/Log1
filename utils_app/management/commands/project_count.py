@@ -1,11 +1,10 @@
-from datetime import date, datetime
+from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.models import CronJob
 from log1.utils import post_msg_using_webhook
-from utils_app.utils import create_cron_error
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -15,9 +14,7 @@ class Command(BaseCommand):
     # A command must define handle()
 
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='project_count')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='project_count')
         try:
             cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
                          'cancelled-contract_conflicts',

@@ -6,9 +6,9 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from django.contrib.contenttypes.models import ContentType
 
-from log1.utils import write_exception
 from utils_app.models import City, Choice
 from utils_app.serializers import UtilSerializer
+from log1.utils import write_exception, ERROR_MSG
 
 
 # Route - /city/
@@ -23,10 +23,10 @@ class CityViewSets(ListModelMixin, GenericViewSet):
             query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
             city = City.objects.filter(name__istartswith=query)
             data = city[:40].values('id', 'name', 'state')
-            return Response({"results": data}, status=200)
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name='CityViewSets', function_name='list')
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /choice/
@@ -45,10 +45,10 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
                 content_type = ContentType.objects.get(model=model)
                 queryset = queryset.filter(content_type=content_type)
             data = queryset.values('id', 'name', 'display_name', 'field', 'content_type__model')
-            return Response({"results": data}, status=200)
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name='ChoiceViewSet', function_name='list')
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -61,7 +61,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
                 field=request.data.get('field'),
                 display_name=request.data.get('display_name'),
             )
-            return Response({'results': 'created'}, status=201)
+            return Response({'message': 'Choice Created'}, status=201)
         except Exception as error:
             write_exception(message=error, class_name='ChoiceViewSet', function_name='create')
-            return Response({"error": error}, status=400)
+            return Response({"message": ERROR_MSG, "error": error}, status=400)

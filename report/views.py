@@ -12,10 +12,10 @@ from rest_framework.authentication import TokenAuthentication
 
 from constance import config
 from api_key.models import APIKey
-from log1.utils import write_exception
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from employee.serializers import UserSerializer
+from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
@@ -83,8 +83,8 @@ class ScrumMeetingReport(GenericViewSet):
                 "text": text,
             }
             post_msg_using_webhook(config.loud_speakers_url, data)
-            return Response({"results": "message sent"}, status=200)
-        return Response({"results": "Previous meeting not found"}, status=400)
+            return Response({"message": "message sent"}, status=200)
+        return Response({"message": "Previous meeting not found"}, status=400)
 
     @transaction.atomic
     @action(methods=['get'], detail=False, url_path='set_meeting')
@@ -94,7 +94,7 @@ class ScrumMeetingReport(GenericViewSet):
             meeting.previous = False
             meeting.save()
         ScrumMeeting.objects.get_or_create(held_on=datetime.today(), is_previous=True)
-        return Response({"results": "success"}, status=201)
+        return Response({"message": "success"}, status=201)
 
 
 # Route - /cmd/
@@ -661,10 +661,10 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
 
             serializer = ProjectSupportDetailSerializer(
                 supports.order_by('support__employee_name', '-start')[first:last], many=True)
-            return Response({"results": serializer.data, "counts": data_count, "page_count": page_count}, status=200)
+            return Response({"data": serializer.data, "counts": data_count, "page_count": page_count}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({'error': error}, status=400)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
 
 # Route - /marketing_report/
@@ -695,7 +695,7 @@ class MarketingReportViewSets(GenericViewSet):
                 employees = employees.filter(team__name=filter_by_team)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
                                                                                                  '%Y-%m-%d').date():
-                return Response({'error': 'Invalid date filter'}, status=400)
+                return Response({'message': 'Invalid date filter'}, status=400)
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -730,18 +730,19 @@ class MarketingReportViewSets(GenericViewSet):
                     "repeat_interview": repeat_interview_count,
                     "consultant_assigned": con_assigned if len(con_assigned) > 0 else None,
                 })
-            return Response({"results": data, "total": total}, status=200)
+            return Response({"data": data, "total": total}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
             end = request.query_params.get('end', None)
             start = request.query_params.get('start', None)
-            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end, '%Y-%m-%d').date():
-                return Response({'error': 'Invalid date filter'}, status=400)
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'message': 'Invalid date filter'}, status=400)
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
@@ -802,10 +803,10 @@ class MarketingReportViewSets(GenericViewSet):
                 "interview_count": total_interviews,
                 "submission_count": total_submissions,
             })
-            return Response({"results": data}, status=200)
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
@@ -855,7 +856,7 @@ class MarketingReportViewSets(GenericViewSet):
                     'submission_count': submission_count,
                     'preferred_location': preferred_location
                 })
-            return Response({'results': data, "total": total}, status=200)
+            return Response({'data': data, "total": total}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

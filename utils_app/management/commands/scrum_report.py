@@ -7,11 +7,10 @@ from django.core.management import BaseCommand
 import pandas as pd
 
 from project.models import Project
-from utils_app.models import CronJob
 from employee.models import User, Team
 from marketing.models import Interview
-from utils_app.utils import create_cron_error
 from utils_app.mailing import send_email_attachment_multiple
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
@@ -43,9 +42,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='scrum_report')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='scrum_report')
         try:
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:

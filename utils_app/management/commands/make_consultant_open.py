@@ -1,12 +1,11 @@
 import os
 from django.db.models import Q
+from datetime import timedelta
 from django.utils import timezone
-from datetime import timedelta, datetime
 from django.core.management import BaseCommand
 
-from utils_app.models import CronJob
-from utils_app.utils import create_cron_error
 from consultant.models import ConsultantMarketing
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -15,9 +14,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = CronJob.objects.get(name='make_consultant_open')
-        job.modified = datetime.now()
-        job.save()
+        job = create_cron_object(name='make_consultant_open')
         try:
             upper_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')))
             lower_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')) + 1)
