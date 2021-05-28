@@ -77,9 +77,12 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         employee_id = request.data.get('employee_id')
         if employee_id:
-            user = get_object_or_404(User, employee_id=employee_id)
+            queryset = User.objects.filter(employee_id=employee_id)
+            if not queryset:
+                return Response({"error": "Employee Id not found"}, status=400)
         else:
             return Response({"message": "Employee Id is Empty"}, status=400)
+        user = queryset.first()
         user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
         if user:
             user.last_login = datetime.now()
@@ -94,7 +97,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             fcm_token.save()
 
             return Response({"data": self.login_serializer_class(user).data}, status=202)
-        return Response({"message": ERROR_MSG, "error": "Incorrect Employee Id/Password"}, status=400)
+        return Response({"error": "Incorrect Password"}, status=400)
 
 
 # Route - /employee/

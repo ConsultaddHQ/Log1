@@ -614,7 +614,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{education.consultant.name}'s education added by {request.user.employee_name}"
-                send_notification_for_user(education.consultant, request.user, title, 'education')
+                send_notification_for_user(education.consultant, request.user, title, 'education', education.id)
 
                 # Activity
                 desc = f"{request.user.employee_name} added Education details"
@@ -632,7 +632,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{education.consultant.name}'s education details updated by {request.user.employee_name}"
-                send_notification_for_user(education.consultant, request.user, title, 'education')
+                send_notification_for_user(education.consultant, request.user, title, 'education', education.id)
 
                 # Activity
                 desc = f"{request.user.employee_name} updated Education details"
@@ -665,7 +665,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{experience.consultant.name}'s experience added by {request.user.employee_name}"
-                send_notification_for_user(experience.consultant, request.user, title, 'experience')
+                send_notification_for_user(experience.consultant, request.user, title, 'experience', experience.id)
 
                 # Activity
                 desc = f"{request.user.employee_name} added Experience details"
@@ -683,7 +683,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{experience.consultant.name}'s experience details updated by {request.user.employee_name}"
-                send_notification_for_user(experience.consultant, request.user, title, 'experience')
+                send_notification_for_user(experience.consultant, request.user, title, 'experience', experience.id)
 
                 # Activity
                 desc = f"{request.user.employee_name} updated Experience details"
@@ -752,7 +752,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{employer.consultant.name}'s employer updated by {request.user.employee_name}"
-                send_notification_for_user(employer.consultant, request.user, title, 'employer')
+                send_notification_for_user(employer.consultant, request.user, title, 'payrollemployer')
 
                 # Activity
                 desc = f"{request.user.employee_name} updated Employer"
@@ -770,7 +770,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{consultant.name}'s employer added by {request.user.employee_name}"
-                send_notification_for_user(consultant, request.user, title, 'employer')
+                send_notification_for_user(consultant, request.user, title, 'payrollemployer')
 
                 # Activity
                 desc = f"{request.user.employee_name} added Employer"
@@ -812,7 +812,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{rate_obj.consultant.name}'s rate revised by {request.user.employee_name}"
-                send_notification_for_user(rate_obj.consultant, request.user, title, 'rate_revision')
+                send_notification_for_user(rate_obj.consultant, request.user, title, 'consultantraterevision')
 
                 # Activity
                 desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {request.data['rate']}"
@@ -1048,7 +1048,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
             # Push Notification
             title = f"{consultant_marketing.consultant.name}'s marketing detail updated by {request.user.employee_name}"
-            send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
+            send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
             # Activity
             desc = f"{request.user.employee_name} updated marketing details"
@@ -1121,7 +1121,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name}'s marketing details updated by " \
                         f"{request.user.employee_name}"
-                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} assigned following marketer - {', '.join(marketers_name)}"
@@ -1152,7 +1152,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name} is assigned to {teams_string}"
-                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} is assigned to {teams_string}"
@@ -1186,7 +1186,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name}'s assigned marketer removed"
-                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} removed following marketers - {', '.join(marketers_name)}"
@@ -1218,7 +1218,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 # Push Notification
                 title = f"{consultant_marketing.consultant.name}'s marketing team removed"
-                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'marketing')
+                send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
                 desc = f"{request.user.employee_name} removed from {team_string}"
@@ -1290,7 +1290,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
 
             # Push Notification
             title = f"{profile.consultant.name}'s profile created by {request.user.employee_name}"
-            send_notification_for_user(profile.consultant, request.user, title, 'profile')
+            send_notification_for_user(profile.consultant, request.user, title, 'consultantprofile')
 
             # Activity
             desc = f"{request.user.employee_name} created {title} profile"
@@ -1309,7 +1309,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
 
                 # Push Notification
                 title = f"{profile.consultant.name}'s profile updated by {request.user.employee_name}"
-                send_notification_for_user(profile.consultant, request.user, title, 'profile')
+                send_notification_for_user(profile.consultant, request.user, title, 'consultantprofile')
 
                 # Activity
                 desc = f"{request.user.employee_name} updated {title} profile"
@@ -1427,7 +1427,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
             # Push Notification
             title = f"{work_auth.consultant.name}'s work authorization is added by {request.user.employee_name}"
-            send_notification_for_user(work_auth.consultant, request.user, title, 'work_auth')
+            send_notification_for_user(work_auth.consultant, request.user, title, 'workauth')
 
             # Activity
             desc = f"{request.user.employee_name} added Work Authorization"
@@ -1458,7 +1458,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
             # Push Notification
             title = f"{work_auth.consultant.name}'s work authorization is updated by {request.user.employee_name}"
-            send_notification_for_user(work_auth.consultant, request.user, title, 'work_auth')
+            send_notification_for_user(work_auth.consultant, request.user, title, 'workauth')
 
             # Activity
             desc = f"{request.user.employee_name} updated Work Authorization details"
@@ -1741,7 +1741,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Push Notification
             poc_title = f"{feedback.get_feedback_type_display()} feedback added for {feedback.consultant.name} " \
                         f"by {request.user.employee_name}"
-            send_notification_for_user(feedback.consultant, request.user, poc_title, 'feedback')
+            send_notification_for_user(feedback.consultant, request.user, poc_title, 'feedback', feedback.id)
 
             # Activity
             desc = f"{request.user.employee_name} added {feedback.get_feedback_type_display()} feedback"
@@ -1809,7 +1809,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Push Notification
             title = f"{serializer.data['feedback_type']} feedback updated for {feedback.consultant.name} " \
                     f"by {request.user.employee_name}"
-            send_notification_for_user(feedback.consultant, request.user, title, 'feedback')
+            send_notification_for_user(feedback.consultant, request.user, title, 'feedback', feedback.id)
 
             # Activity
             desc = f"{request.user.employee_name} updated {feedback.get_feedback_type_display()} feedback"

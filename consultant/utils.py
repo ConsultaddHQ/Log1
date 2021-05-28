@@ -311,7 +311,7 @@ def send_exit_process_mail(terminate, exit_status):
         return error, "error"
 
 
-def send_notification_for_user(consultant, sender, title, sub_target):
+def send_notification_for_user(consultant, sender, title, sub_target, target_id=None):
     try:
         # App Notification
         user_list = []
@@ -329,10 +329,10 @@ def send_notification_for_user(consultant, sender, title, sub_target):
             'category': 'info',
             'description': title,
             'sender_id': sender.id,
-            'target_id': consultant.id,
+            'target_type': sub_target,
             'sender_user_type': 'user',
-            'target_type': 'consultant',
             'recipient_user_type': 'user',
+            'target_id': target_id if target_id else consultant.id,
         }
         create_notification(user_list, notification_data)
 
