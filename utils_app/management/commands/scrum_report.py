@@ -1,7 +1,7 @@
 import os
+from datetime import date
 from datetime import timedelta
 from django.conf import settings
-from datetime import date, datetime
 from django.core.management import BaseCommand
 
 import pandas as pd

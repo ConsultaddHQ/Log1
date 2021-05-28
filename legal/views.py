@@ -166,7 +166,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                         'pin': beneficiary.pin,
                         'name': beneficiary.name,
                         'petitioner_name': petition.assigned_to.employee_name,
-                        'link': f"{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
+                        'link': f"https://{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
                     },
                 }
                 send_email(mail_data, petition.assigned_to.email)

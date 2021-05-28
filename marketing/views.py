@@ -1468,7 +1468,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     "call_details": interview.call_details,
                 }
 
-                # Create new Event in Google Calendar
+                # Booking MS calendar
                 booking_res = 'error'
                 if os.environ.get('ENV', 'local') == 'prod':
                     try:
@@ -1637,7 +1637,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             "call_details": request.data["call_details"]
                         }
 
-                        # Update interview on Google Calendar
+                        # Updating calendar Booking
                         if os.environ.get('ENV', 'local') == 'prod':
                             event_id = interview.calendar_id
                             if not event_id:

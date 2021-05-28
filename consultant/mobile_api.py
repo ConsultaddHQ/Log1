@@ -87,7 +87,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             Normal Login
             :param request, email, password, uuid, fcm_token, device_type
         """
-        email = request.data.get('email').lower()
+        email = request.data.get('email').lower().strip()
         if email:
             consultant = get_object_or_404(Consultant, email__iexact=email)
         else:

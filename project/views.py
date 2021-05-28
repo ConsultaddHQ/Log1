@@ -905,13 +905,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
                         {recruiter_gender_emoji} Recruiter :  {recruiter} <br>
-                        {employer_emoji} Employer :  {project.employer}<br>
-                        {employer_emoji} Team :  {project.submission.created_by.team.name}<br>
-                        {client_emoji} Client :  {project.submission.client}<br>
-                        {role_emoji} Role :  {project.submission.lead.job_title}<br>
-                        &#128221; Start Date :  {project_start_date}<br>
-                        &#128221; End Date :  {project_end_date}<br>
-                        &#10060; Status :   {str(p_status.get_status_display())}<br>"""
+                        {employer_emoji} Employer :  {project.employer} <br>
+                        {employer_emoji} Team :  {project.submission.created_by.team.name} <br>
+                        {client_emoji} Client :  {project.submission.client} <br>
+                        {role_emoji} Role :  {project.submission.lead.job_title} <br>
+                        &#128221; Start Date :  {project_start_date} <br>
+                        &#128221; End Date :  {project_end_date} <br>
+                        &#10060; Status :  {str(p_status.get_status_display())} <br>"""
 
                         text += " **Reason:** " + " " + project.feedback if project.feedback else "None"
 
