@@ -8,7 +8,8 @@ push_service = FCMNotification(api_key=os.environ.get('FCM_SERVER_KEY'))
 
 parent_model_classes = [
     ('submission', ['interview', 'test', 'project', 'projectsupport']),
-    ('consultant', ['consultantraterevision', 'consultantmarketing', 'terminate', 'feedback'])
+    ('consultant', ['consultantraterevision', 'consultantmarketing', 'consultantexit', 'feedback', 'workauth'
+                    'education', 'experience', 'payrollemployer', 'consultantprofile', 'consultantexit'])
 ]
 
 

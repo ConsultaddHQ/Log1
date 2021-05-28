@@ -1,6 +1,5 @@
 from django.apps import apps
 from rest_framework import serializers
-from django.shortcuts import get_object_or_404
 
 from employee.models import User
 from consultant.models import Consultant
@@ -50,22 +49,40 @@ class NotificationListSerializer(serializers.ModelSerializer):
             }
             return payload
 
-        model_class = apps.get_model(obj.target_content_type.app_label, obj.target_content_type.model)
-        parent_obj = get_object_or_404(model_class, id=obj.target_object_id)
+        model_name = obj.target_content_type.model
 
-        if parent_model == 'consultant':
-            payload = {
-                "name": 'consultant',
-                "id": parent_obj.consultant.id,
-                "sub_id": obj.target_object_id,
-                "sub_name": obj.target_content_type.model
-            }
-        elif parent_model == 'submission':
-            payload = {
-                "name": 'submission',
-                "id": parent_obj.submission.id,
-                "sub_id": obj.target_object_id,
-                "sub_name": obj.target_content_type.model
-            }
+        model_class = apps.get_model(obj.target_content_type.app_label, model_name)
+        parent_obj = model_class.objects.filter(id=obj.target_object_id)
+        if parent_obj:
+            if parent_model == 'consultant':
+                payload = {
+                    "name": 'consultant',
+                    "sub_id": obj.target_object_id,
+                    "id": parent_obj.first().consultant.id,
+                    "sub_name": obj.target_content_type.model
+                }
+            elif parent_model == 'submission':
+                payload = {
+                    "name": 'submission',
+                    "sub_id": obj.target_object_id,
+                    "id": parent_obj.first().submission.id,
+                    "sub_name": obj.target_content_type.model
+                }
+
+        else:
+            if parent_model == 'consultant':
+                payload = {
+                    "sub_id": None,
+                    "name": 'consultant',
+                    "sub_name": model_name,
+                    "id": obj.target_object_id,
+                }
+            elif parent_model == 'submission':
+                payload = {
+                    "sub_id": None,
+                    "name": 'submission',
+                    "sub_name": model_name,
+                    "id": obj.target_object_id,
+                }
 
         return payload
