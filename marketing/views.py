@@ -242,7 +242,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     order_by = "modified" if order == "asc" else "-modified"
 
             queryset = Lead.objects.filter(id__in=queryset.values('id')).order_by(order_by)
-            if filter_by_status == 'archived':
+            if 'archived' in filter_by_status:
                 data = queryset[first:last].annotate(
                     company_id=F('vendor_company__id'),
                     submission_count=Count('submission'),
@@ -1757,7 +1757,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if interview.submission.created_by.id == request.user.id:
                 group = ObjectGroup.objects.filter(name='owner', model='interview', status=interview.status)
 
-            if request.user.id == interview.supervisor.id:
+            elif request.user.id == interview.supervisor.id:
                 group = ObjectGroup.objects.filter(name='supervisor', model='interview', status=interview.status)
 
             if group:
@@ -2460,8 +2460,17 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if 'client' in filters and len(filters["client"]) > 0:
                     filter_string["submission__client__in"] = filters["client"]
 
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    filter_string["submission__created_by_id__in"] = filters["marketer"]
+
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
                     filter_string["submission__lead__vendor_company_id"] = filters["vendor"]
+
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
+
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant"]
 
                 created = filters.get('created', None)
                 deadline = filters.get('created', None)

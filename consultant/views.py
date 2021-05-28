@@ -393,16 +393,17 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.filter(
                     Q(marketing__in_pool=True, marketing__status='open') |
                     Q(marketing__marketer=request.user, marketing__status='open')
-                ).union(recruits)
+                )
+                consultants = (consultants | recruits).distinct()
 
             if 'recruiter' in roles:
                 recruits = consultants.filter(pocs__poc=request.user)
-                consultants = consultants.union(recruits)
+                consultants = (consultants | recruits).distinct()
 
             if query:
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
 
-            consultants = consultants.order_by('id').distinct('id')
+            consultants = consultants.order_by('id').distinct('id')[:50]
             serializer = ConsultantListSerializer(consultants, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -1301,8 +1302,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         try:
-            consultant_profile_id = kwargs.get('pk')
-            profile = get_object_or_404(ConsultantProfile, id=consultant_profile_id)
+            profile = get_object_or_404(ConsultantProfile, id=kwargs.get('pk'))
             serializer = self.serializer_class(profile, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()

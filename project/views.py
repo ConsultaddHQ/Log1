@@ -367,8 +367,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                                                          ).values_list('email', flat=True))
 
                 for i in project.attachments.filter(
-                        attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
-                    path.append(download_s3_object(i.attachment_file.name))
+                        attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']
+                ):
+                    try:
+                        path.append(download_s3_object(i.attachment_file.name))
+                    except Exception as error:
+                        write_exception(message=error, class_name=self.get_classname(),
+                                        function_name=inspect.stack()[0][3])
 
                 res, error = 'development server', 'development server'
                 if os.environ.get('ENV', 'local') == 'prod':
@@ -510,6 +515,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         filter_string["created__gte"] = gte
 
                 projects = projects.order_by('id').distinct('id')
+                projects = projects.filter(**filter_string)
                 data = {
                     "total": projects,
                     "new": projects.filter(statuses__status='new', statuses__is_current=True),
@@ -522,7 +528,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
-                projects = projects.filter(**filter_string)
+
             else:
                 if filter_by_lead == 'w2':
                     projects = projects.filter(submission__lead__is_w2=True)
