@@ -1,10 +1,11 @@
 import os
-from datetime import timedelta
 from django.db.models import Q
+from datetime import timedelta
 from django.utils import timezone
 from django.core.management import BaseCommand
 
 from consultant.models import ConsultantMarketing
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -13,15 +14,19 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        upper_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')))
-        lower_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS'))+1)
+        job = create_cron_object(name='make_consultant_open')
+        try:
+            upper_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')))
+            lower_limit = timezone.now().date() - timedelta(days=int(os.environ.get('DAYS')) + 1)
 
-        queryset = ConsultantMarketing.objects.filter(
-            Q(status='open') &
-            Q(start__lte=upper_limit) &
-            Q(start__gte=lower_limit)
-        ).exclude(status='archived')
+            queryset = ConsultantMarketing.objects.filter(
+                Q(status='open') &
+                Q(start__lte=upper_limit) &
+                Q(start__gte=lower_limit)
+            ).exclude(status='archived')
 
-        for consultant_marketing in queryset:
-            consultant_marketing.in_pool = True
-            consultant_marketing.save()
+            for consultant_marketing in queryset:
+                consultant_marketing.in_pool = True
+                consultant_marketing.save()
+        except Exception as error:
+            create_cron_error(job, error)

@@ -2,14 +2,14 @@ import os
 import logging.config
 from collections import OrderedDict
 
+from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
-# Reading env file
-PROJECT_FOLDER = os.path.expanduser(BASE_DIR)
-load_dotenv(os.path.join(PROJECT_FOLDER, '.env'))
+env_path = Path('.', '.env')
+load_dotenv(dotenv_path=env_path)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
@@ -132,19 +132,19 @@ CORS_ALLOW_HEADERS = [
 
 # Send Grid Configuration
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_USE_TLS = True
 EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)
 EMAIL_HOST = os.environ.get('EMAIL_HOST', None)
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', None)
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_API_KEY', None)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', None)
 
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'consultadd.com')
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'EST'
 
 USE_I18N = True
 
@@ -181,6 +181,7 @@ MODELS_PATH = os.path.join(BASE_DIR, 'models')
 RESET_TOKEN_EXPIRY_TIME = 1
 
 # Logger Configuration
+LOGGING_CONFIG = None
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,
@@ -191,22 +192,24 @@ logging.config.dictConfig({
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'formatter': 'file',
+            'stream': 'ext://sys.stdout',
             'class': 'logging.StreamHandler',
-            'formatter': 'file'
         },
         'file': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'level': 'ERROR',
+            'backupCount': 20,
+            'encoding': 'utf8',
             'formatter': 'file',
-            'maxBytes': 1024 * 1024 * 2,
-            'filename': os.path.join(BASE_DIR, 'logs/debug.log')
+            'maxBytes': 10485760,
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': f"{os.path.join(BASE_DIR, 'logs/debug.log')}",
         }
     },
     'loggers': {
-        'file': {
-            'level': 'DEBUG',
-            'handlers': ['console']
+        '': {
+            'level': 'ERROR',
+            'handlers': ['console', 'file']
         }
     }
 })
@@ -232,16 +235,20 @@ CONSTANCE_CONFIG = OrderedDict([
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
                           'Android App Download Link')),
 
-    ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
-    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
-    ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
-    ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin email id')),
-    ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
-    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
-    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
+    ('LEGAL', ('legal@consultadd.com', 'Legal team Email ID')),
+    ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin Email ID')),
+    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'Booking Email ID')),
+    ('FINANCE', ('finance@consultadd.com', 'Finance team Email ID')),
+    ('APP_ADMIN', ('sarang.m@consultadd.com', 'Log1 App Admin Email ID')),
+    ('RELATIONS', ('relations@consultadd.com', 'Relations team Email ID')),
+    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team Email ID')),
+    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team Email ID')),
+    ('TIMESHEET_APP_ADMIN', ('aditi.so@consultadd.com', 'Timesheet Admin Email ID')),
+    ('VENDOR_MANAGEMENT', ('vendormanagement@consultadd.com', 'Vendor Management Email ID')),
 
     ('general_url', ('URL', 'General Channel')),
     ('test_team_url', ('URL', 'Test Team channel')),
+    ('products_dev', ('URL', 'Products Dev Channel')),
     ('engineering_url', ('URL', 'Engineering channel')),
     ('recruitment_url', ('URL', 'Recruitment Channel')),
     ('pool_channel_url', ('URL', '45dayslimit Channel')),
@@ -257,9 +264,17 @@ CONSTANCE_CONFIG = OrderedDict([
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'constants': ('APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'),
-    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
-    'Web-Hooks': ('engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
-                  'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
-                  'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url'),
+    'constants': (
+        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'
+    ),
+    'Email Ids': (
+        'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
+        'VENDOR_MANAGEMENT', 'TIMESHEET_APP_ADMIN'
+    ),
+    'Web-Hooks': (
+        'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
+        'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
+        'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
+        'products_dev'
+    ),
 }

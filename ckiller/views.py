@@ -1,18 +1,17 @@
 import json
+import inspect
 import requests
-import logging
 
 from django.db.models import Q
+from rest_framework import viewsets
 from rest_framework import serializers
-from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from consultant.models import Consultant
+from log1.utils import write_exception, ERROR_MSG
 from ckiller.models import CkillerSubmission, CkillerVendorClient
-
-logger = logging.getLogger(__name__)
 
 
 class CkillerVendorClientSerializer(serializers.ModelSerializer):
@@ -26,17 +25,14 @@ class CkillerSubmissionSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
 
-    @staticmethod
-    def get_consultant(self):
-        return "{} {}".format(self.consultant.name, self.consultant.email)
+    def get_consultant(self, obj):
+        return "{} {}".format(obj.consultant.name, obj.consultant.email)
 
-    @staticmethod
-    def get_client(self):
-        return CkillerVendorClientSerializer(self.vendors.filter(type='client'), many=True).data
+    def get_client(self, obj):
+        return CkillerVendorClientSerializer(obj.vendors.filter(type='client'), many=True).data
 
-    @staticmethod
-    def get_vendor(self):
-        return CkillerVendorClientSerializer(self.vendors.filter(type='vendor'), many=True).data
+    def get_vendor(self, obj):
+        return CkillerVendorClientSerializer(obj.vendors.filter(type='vendor'), many=True).data
 
     class Meta:
         model = CkillerSubmission
@@ -44,11 +40,16 @@ class CkillerSubmissionSerializer(serializers.ModelSerializer):
                   'marketer', 'consultant', 'created', 'vendor', 'client', 'rate', 'marketing_email', 'marketing_phone')
 
 
+# Route - /ckiller_data/
 class CkillerSubmissionViewSet(viewsets.ModelViewSet):
     queryset = CkillerSubmission.objects.all()
     serializer_class = CkillerSubmissionSerializer
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         try:
@@ -69,14 +70,16 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
             if consultant:
                 queryset = queryset.filter(consultant__id=consultant).order_by('sub_created')
             if query:
-                queryset = queryset.filter(vendors__name__icontains=query).order_by('sub_created')
+                queryset = queryset.filter(
+                    vendors__name__icontains=query.lstrip().replace(':amp:', '&')
+                ).order_by('sub_created')
 
             total = queryset.count()
             serializer = self.serializer_class(queryset[first:last], many=True)
-            return Response({"results": serializer.data, "total": total}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data, "total": total}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -97,7 +100,7 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
             if email:
                 consultant = Consultant.objects.filter(email=email.lower())
                 if not consultant:
-                    return Response({"error": "Consultant not in your bench"}, status=status.HTTP_404_NOT_FOUND)
+                    return Response({"error": "Consultant not on your bench"}, status=404)
 
                 result = []
                 for tenant, employer in tenants.items():
@@ -115,7 +118,8 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                         res = json.loads(res.text)
                         token = res["key"]
                     else:
-                        logger.error("Unable to Login")
+                        write_exception(message="Unable to Login", class_name=self.get_classname(),
+                                        function_name=inspect.stack()[0][3])
                         continue
                     header = {
                         'Content-Type': "application/json",
@@ -183,8 +187,8 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                             "results": data
                         }
                         result.append(res)
-                return Response({"result": result}, status=status.HTTP_201_CREATED)
-            return Response({"error": "Email is empty"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"data": result}, status=201)
+            return Response({"message": "Please provide Email"}, status=400)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

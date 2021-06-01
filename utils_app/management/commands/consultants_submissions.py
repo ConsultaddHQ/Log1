@@ -7,6 +7,7 @@ from employee.models import User
 from marketing.models import Submission
 from consultant.models import Consultant
 from utils_app.mailing import send_email
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
@@ -15,75 +16,83 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        consultants = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
-        submission_data = []
-        today = datetime.today()
-        if today.weekday() == 0:
-            days = 3
-            last_2_days = today - timedelta(days=5)
-        else:
-            days = 2
-            last_2_days = today - timedelta(days=2)
-        for consultant in consultants:
-            submission_ids = []
-            scrum_masters = []
-            queryset = Submission.objects.filter(consultant_marketing__consultant=consultant, created__gte=last_2_days,
-                                                 is_complete=True)
-            submissions = []
-            if not queryset:
-                continue
-            count = 1
-            for submission in queryset:
-                submissions.append(
-                    {
-                        "no": count,
-                        "location": submission.lead.city,
-                        "job_title": submission.lead.job_title,
-                        "skill": submission.lead.primary_skill,
-                        "job_desc": submission.lead.job_desc.replace("\n", " ;newline; "),
-                    }
-                )
-                count += 1
-                users = User.objects.filter(team=submission.created_by.team, role__name__in=['admin', 'proxy'])
-                for user in users:
-                    scrum_masters.append(user.email)
-                submission_ids.append(submission.id)
-            cc = list(set(scrum_masters))
+        job = create_cron_object(name='consultants_submissions')
+        try:
+            consultants = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
+            submission_data = []
+            today = datetime.today()
+            if today.weekday() == 0:
+                days = 3
+                last_2_days = today - timedelta(days=5)
+            else:
+                days = 2
+                last_2_days = today - timedelta(days=2)
+            for consultant in consultants:
+                submission_ids = []
+                scrum_masters = []
+                queryset = Submission.objects.filter(consultant_marketing__consultant=consultant,
+                                                     created__gte=last_2_days,
+                                                     is_complete=True)
+                submissions = []
+                if not queryset:
+                    continue
+                count = 1
+                for submission in queryset:
+                    submissions.append(
+                        {
+                            "no": count,
+                            "location": submission.lead.city,
+                            "job_title": submission.lead.job_title,
+                            "skill": submission.lead.primary_skill,
+                            "job_desc": submission.lead.job_desc.replace("\n", " ;newline; "),
+                        }
+                    )
+                    count += 1
+                    users = User.objects.filter(team=submission.created_by.team, role__name__in=['admin', 'proxy'])
+                    for user in users:
+                        scrum_masters.append(user.email)
+                    submission_ids.append(submission.id)
+                cc = list(set(scrum_masters))
+                mail_data = {
+                    'bcc': [],
+                    'to': [consultant.email],
+                    'cc': cc + [config.RELATIONS, config.RECRUITMENT],
+                    'subject': '{} - Submissions - {}'.format(consultant.name, str(date.today())),
+                    'template': '../templates/consultants_submissions.html',
+                    'context': {
+                        'consultant': consultant.name,
+                        'submissions': submissions,
+                        'days': days,
+                    },
+                }
+
+                reply_to = [config.RELATIONS]
+                mail_res = send_email(mail_data, "marketing@consultadd.com", reply_to)
+                if mail_res != "mail sent":
+                    raise Exception(mail_res)
+                submission_data.append({
+                    "scrum_masters": cc,
+                    "mail_res": mail_res,
+                    "consultant": consultant.id,
+                    "submissions": submission_ids,
+                    "consultant_name": consultant.name,
+                    "consultant_email": consultant.email,
+                })
+
             mail_data = {
+                'cc': [],
                 'bcc': [],
-                'to': [consultant.email],
-                'cc': cc + [config.RELATIONS, config.RECRUITMENT],
-                'subject': '{} - Submissions - {}'.format(consultant.name, str(date.today())),
-                'template': '../templates/consultants_submissions.html',
+                'to': ['sarang.m@consultadd.com'],
+                'subject': f"Consultant submission data {str(last_2_days.strftime('%m/%d/%Y'))} -"
+                           f" {str(date.today().strftime('%m/%d/%Y'))}",
+                'template': '../templates/consultants_submissions_admin_report.html',
                 'context': {
-                    'consultant': consultant.name,
-                    'submissions': submissions,
+                    "data": submission_data,
                     'days': days,
                 },
             }
-
-            reply_to = [config.RELATIONS]
-            mail_res = send_email(mail_data, "marketing@consultadd.com", reply_to)
-            submission_data.append({
-                "scrum_masters": cc,
-                "mail_res": mail_res,
-                "consultant": consultant.id,
-                "submissions": submission_ids,
-                "consultant_name": consultant.name,
-                "consultant_email": consultant.email,
-            })
-
-        mail_data = {
-            'cc': [],
-            'bcc': [],
-            'to': ['sarang.m@consultadd.com'],
-            'subject': f"Consultant submission data {str(last_2_days.strftime('%m/%d/%Y'))} -"
-                       f" {str(date.today().strftime('%m/%d/%Y'))}",
-            'template': '../templates/consultants_submissions_admin_report.html',
-            'context': {
-                "data": submission_data,
-                'days': days,
-            },
-        }
-        send_email(mail_data, "marketing@consultadd.com")
-
+            mail_res = send_email(mail_data, "marketing@consultadd.com")
+            if mail_res != "mail sent":
+                raise Exception(mail_res)
+        except Exception as error:
+            create_cron_error(job, error)

@@ -12,10 +12,16 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone')
 
     @staticmethod
-    def get_team(self):
-        if self.team:
-            return self.team.name
+    def get_team(obj):
+        if obj.team:
+            return obj.team.name
         return None
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'employee_name')
 
 
 # Login
@@ -27,13 +33,14 @@ class UserSerializerLogin(UserSerializer):
         model = User
         fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'is_superuser')
 
-    def get_token(self, user):
-        token, created = Token.objects.get_or_create(user=user)
+    @staticmethod
+    def get_token(obj):
+        token, created = Token.objects.get_or_create(user=obj)
         return token.key
 
     @staticmethod
-    def get_team(self):
-        return self.team.name
+    def get_team(obj):
+        return obj.team.name
 
 
 class TeamSerializer(serializers.ModelSerializer):
@@ -62,16 +69,15 @@ class AssetSerializer(serializers.ModelSerializer):
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner_name', 'shared_to')
 
     @staticmethod
-    def get_owner_id(self):
-        return self.owner.id
+    def get_owner_id(obj):
+        return obj.owner.id
 
     @staticmethod
-    def get_owner_name(self):
-        return self.owner.employee_name
+    def get_owner_name(obj):
+        return obj.owner.employee_name
 
 
 class TaggedUserSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Tagging
         fields = '__all__'

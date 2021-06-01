@@ -143,9 +143,6 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
 
     USERNAME_FIELD = 'email'
 
-    class Meta:
-        ordering = ('name',)
-
     def save(self, *args, **kwargs):
         """
             On save timestamps
@@ -191,10 +188,9 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         queryset = self.rates.filter(end=None)
         if queryset:
             return queryset.first().rate
-        return None
+        return 0
 
-    @staticmethod
-    def send_mail(mail_data):
+    def send_mail(self, mail_data):
         try:
             res = send_email(mail_data, "admin@consultadd.com")
             return res, "ok"
@@ -231,9 +227,6 @@ def clear_expired(expiry_time):
 
 
 class ConsultantToken(models.Model):
-    """
-    The default authorization token model.
-    """
     fcm_tokens = GenericRelation(FCMDevice)
     key = models.CharField(_("Key"), max_length=40, primary_key=True)
     uuid = models.CharField(_("Universally Unique Identifier"), max_length=64, db_index=True, default='UUID')
@@ -260,9 +253,6 @@ class ConsultantToken(models.Model):
 
 
 class ConsultantPetitionToken(models.Model):
-    """
-    The default authorization token model.
-    """
     key = models.CharField(_("Key"), max_length=40, primary_key=True)
     consultant = models.ForeignKey(
         Consultant, related_name='petition_token',
@@ -315,9 +305,9 @@ class Education(models.Model):
     title = models.CharField(_('Education Title'), max_length=300)
     remark = models.TextField(_('Additional Details'), null=True, blank=True)
     city = models.CharField(_('City'), max_length=100, blank=True, null=True)
-    major = models.CharField(_('Field of Study'), max_length=50, null=True, blank=True)
-    org_name = models.CharField(_('Organization Name'), max_length=50, null=True, blank=True)
-    edu_type = models.CharField(_('Education Type'), max_length=50, choices=EDUCATION_CHOICES, null=True, blank=True)
+    major = models.CharField(_('Field of Study'), max_length=200, null=True, blank=True)
+    org_name = models.CharField(_('Organization Name'), max_length=200, null=True, blank=True)
+    edu_type = models.CharField(_('Education Type'), max_length=100, choices=EDUCATION_CHOICES, null=True, blank=True)
     start_date = models.DateField(
         _('Start Date'),
         null=True, blank=True,
@@ -339,8 +329,8 @@ class Experience(models.Model):
     title = models.CharField(_('Title'), max_length=300)
     remark = models.TextField(_('Additional Details'), null=True, blank=True)
     city = models.CharField(_('City'), max_length=100, blank=True, null=True)
-    company = models.CharField(_('Company name'), max_length=100, null=True, blank=True)
-    exp_type = models.CharField(_('Experience Type'), max_length=50, null=True, blank=True)
+    company = models.CharField(_('Company name'), max_length=200, null=True, blank=True)
+    exp_type = models.CharField(_('Experience Type'), max_length=100, null=True, blank=True)
     start_date = models.DateField(
         _('Start Date'),
         null=True, blank=True,

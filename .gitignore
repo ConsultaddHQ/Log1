@@ -12,3 +12,4 @@
 **/migrations/*
 **/media/*
 models
+/fixtures

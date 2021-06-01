@@ -47,7 +47,7 @@ class WorkAuthAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('is_current', 'visa_type')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'visa_type')
-    list_display = ('id', 'consultant', 'visa_type', 'visa_start', 'visa_end', 'is_current')
+    list_display = ('id', 'consultant', 'visa_type', 'visa_start', 'visa_end', 'is_current', 'created')
 
 
 @admin.register(Education)

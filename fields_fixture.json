@@ -1,0 +1,938 @@
+{
+  "fields": [
+    {
+      "name": "is_w2",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "is_active",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "remote_only",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "email",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "name",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "ssn",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "date_of_birth",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "links",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "domain",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "skills",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "skype",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "phone_no",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "current_city",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "gender",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "status",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "work_type",
+      "model": "consultant",
+      "app_label": "consultant"
+    },
+    {
+      "name": "rtg",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "cycle",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "in_pool",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "end",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "start",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "previous_marketing_days",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "preferred_location",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "status",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "primary_marketer",
+      "model": "consultantmarketing",
+      "app_label": "consultant"
+    },
+    {
+      "name": "name",
+      "model": "vendorcontact",
+      "app_label": "marketing"
+    },
+    {
+      "name": "email",
+      "model": "vendorcontact",
+      "app_label": "marketing"
+    },
+    {
+      "name": "number",
+      "model": "vendorcontact",
+      "app_label": "marketing"
+    },
+    {
+      "name": "is_w2",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "job_desc",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "city",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "job_title",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "primary_skill",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "status",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "secondary_skills",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "position",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "vendor_company",
+      "model": "lead",
+      "app_label": "marketing"
+    },
+    {
+      "name": "rank",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "employer",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "rate",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "is_active",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "is_complete",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "email",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "client",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "phone",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "status",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "consultant_marketing",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "vendor_contact",
+      "model": "submission",
+      "app_label": "marketing"
+    },
+    {
+      "name": "link",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "is_video",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "is_offline",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "feedback",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "deadline",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "cancel_reason",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "engineer_remarks",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "status",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "submit_date",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "additional_details",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "skills",
+      "model": "test",
+      "app_label": "marketing"
+    },
+    {
+      "name": "round",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "feedback",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "end_time",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "notes",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "description",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "start_time",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "call_details",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "attachment_link",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "interview_mode",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "screening_type",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "status",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "failure_reason",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "supervisor",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "guest",
+      "model": "interview",
+      "app_label": "marketing"
+    },
+    {
+      "name": "rate",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "end_date",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "start_date",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "feedback",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "payment_term",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "client_address",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "vendor_address",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "is_remote",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "employer",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "city",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "duration",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "reporting_details",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "invoicing_period",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "is_msg_sent",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "consultant",
+      "model": "project",
+      "app_label": "project"
+    },
+    {
+      "name": "value",
+      "model": "projectorder",
+      "app_label": "project"
+    },
+    {
+      "name": "effective_date",
+      "model": "projectorder",
+      "app_label": "project"
+    },
+    {
+      "name": "is_primary",
+      "model": "projectsupport",
+      "app_label": "project"
+    },
+    {
+      "name": "feedback",
+      "model": "projectsupport",
+      "app_label": "project"
+    },
+    {
+      "name": "end",
+      "model": "projectsupport",
+      "app_label": "project"
+    },
+    {
+      "name": "start",
+      "model": "projectsupport",
+      "app_label": "project"
+    },
+    {
+      "name": "support",
+      "model": "projectsupport",
+      "app_label": "project"
+    },
+    {
+      "name": "frequency",
+      "model": "supportstatus",
+      "app_label": "project"
+    },
+    {
+      "name": "is_current",
+      "model": "supportstatus",
+      "app_label": "project"
+    },
+    {
+      "name": "change_date",
+      "model": "supportstatus",
+      "app_label": "project"
+    }
+  ],
+  "group": [
+    {
+      "name": "owner",
+      "model": "submission",
+      "status": "sub",
+      "fields": [
+        {
+          "name": "is_w2",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "job_desc",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "city",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "secondary_skills",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "position",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "employer",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "rate",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "email",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "client",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "phone",
+          "model": "submission",
+          "app_label": "marketing"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "submission",
+      "status": "draft",
+      "fields": [
+        {
+          "name": "is_w2",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "job_desc",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "city",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "job_title",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "primary_skill",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "secondary_skills",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "vendor_company",
+          "model": "lead",
+          "app_label": "marketing"
+        },
+        {
+          "name": "employer",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "rate",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "email",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "client",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "phone",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "consultant_marketing",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "vendor_contact",
+          "model": "submission",
+          "app_label": "marketing"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "submission",
+      "status": "interview",
+      "fields": [
+        {
+          "name": "employer",
+          "model": "submission",
+          "app_label": "marketing"
+        },
+        {
+          "name": "rate",
+          "model": "submission",
+          "app_label": "marketing"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "interview",
+      "status": "scheduled",
+      "fields": [
+        {
+          "name": "feedback",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "end_time",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "notes",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "description",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "start_time",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "call_details",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "attachment_link",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "interview_mode",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "screening_type",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "failure_reason",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "supervisor",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "guest",
+          "model": "interview",
+          "app_label": "marketing"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "interview",
+      "status": "next_round",
+      "fields": []
+    },
+    {
+      "name": "owner",
+      "model": "interview",
+      "status": "rescheduled",
+      "fields": [
+        {
+          "name": "feedback",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "end_time",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "notes",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "description",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "start_time",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "call_details",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "attachment_link",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "interview_mode",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "screening_type",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "failure_reason",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "supervisor",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "guest",
+          "model": "interview",
+          "app_label": "marketing"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "interview",
+      "status": "cancelled",
+      "fields": [
+        {
+          "name": "feedback",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "end_time",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "notes",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "description",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "start_time",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "call_details",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "attachment_link",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "interview_mode",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "screening_type",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "failure_reason",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "supervisor",
+          "model": "interview",
+          "app_label": "marketing"
+        },
+        {
+          "name": "guest",
+          "model": "interview",
+          "app_label": "marketing"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "test",
+      "status": "new",
+      "fields": [
+        {
+          "name": "link",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "is_video",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "is_offline",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "deadline",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "submit_date",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "additional_details",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "skills",
+          "model": "test",
+          "app_label": "marketing"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "test",
+      "status": "assigned",
+      "fields": [
+        {
+          "name": "link",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "is_video",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "is_offline",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "deadline",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "submit_date",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "additional_details",
+          "model": "test",
+          "app_label": "marketing"
+        },
+        {
+          "name": "skills",
+          "model": "test",
+          "app_label": "marketing"
+        }
+      ]
+    }
+  ]
+}

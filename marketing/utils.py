@@ -1,0 +1,103 @@
+import inspect
+from datetime import datetime, timedelta
+from django.shortcuts import get_object_or_404
+
+
+from consultant.models import ConsultantProfile
+from attachment.models import create_attachment
+from marketing.models import Submission, Interview
+
+from log1.utils import write_exception
+
+
+# Change status of scheduled and rescheduled Interviews to feedback_due
+def change_to_feedback_due():
+    try:
+        now = datetime.now() - timedelta(hours=4)
+        previous_interviews = Interview.objects.filter(end_time__lte=now, status__in=['scheduled', 'rescheduled'])
+        for interview in previous_interviews:
+            interview.status = 'feedback_due'
+            interview.save()
+    except Exception as error:
+        write_exception(message=error, class_name=None, function_name="change_to_feedback_due")
+        return None
+
+
+def create_submission(request, lead_id):
+    try:
+        profile = get_object_or_404(ConsultantProfile, id=request.data['profile_id'])
+        vendor_contact = request.data.get('vendor_contact', None)
+        if vendor_contact:
+            sub, created = Submission.objects.get_or_create(
+                status='sub',
+                lead_id=lead_id,
+                created_by=request.user,
+                rate=request.data['rate'],
+                email=request.data['email'],
+                phone=request.data['phone'],
+                client=request.data['client'],
+                employer=request.data['employer'],
+                vendor_contact_id=request.data['vendor_contact'],
+                consultant_marketing_id=request.data['marketing_id'],
+
+                other_link=profile.links,
+                visa_end=profile.visa_end,
+                linkedin=profile.linkedin,
+                education=profile.education,
+                visa_type=profile.visa_type,
+                visa_start=profile.visa_start,
+                current_city=profile.current_city,
+                date_of_birth=profile.date_of_birth,
+            )
+        else:
+            sub, created = Submission.objects.get_or_create(
+                status='sub',
+                lead_id=lead_id,
+                created_by=request.user,
+                rate=request.data['rate'],
+                email=request.data['email'],
+                phone=request.data['phone'],
+                client=request.data['client'],
+                employer=request.data['employer'],
+                consultant_marketing_id=request.data['marketing_id'],
+
+                other_link=profile.links,
+                visa_end=profile.visa_end,
+                linkedin=profile.linkedin,
+                education=profile.education,
+                visa_type=profile.visa_type,
+                visa_start=profile.visa_start,
+                current_city=profile.current_city,
+                date_of_birth=profile.date_of_birth,
+            )
+
+        if sub.rate and sub.vendor and sub.client and (sub.lead.job_desc and len(sub.lead.job_desc) > 20):
+            sub.is_complete = True
+            sub.save()
+
+        resume = request.FILES.get('file_resume', None)
+        resume_data = {
+            "file": resume,
+            "type": 'resume',
+            "object_id": sub.id,
+            "model": "submission",
+            "creator": request.user,
+        }
+        if resume:
+            create_attachment(resume_data)
+
+        other = request.FILES.get('file_other', None)
+        other_file_data = {
+            "file": other,
+            "type": 'other',
+            "object_id": sub.id,
+            "model": "submission",
+            "creator": request.user,
+        }
+        if other:
+            create_attachment(other_file_data)
+
+        return sub
+    except Exception as error:
+        write_exception(message=error, class_name=None, function_name="create_submission")
+        return False

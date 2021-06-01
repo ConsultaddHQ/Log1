@@ -1,8 +1,8 @@
-import logging
+import inspect
 from itertools import chain
+from datetime import timedelta, datetime
 
 from django.utils import timezone
-from datetime import timedelta, datetime
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
@@ -12,10 +12,10 @@ from django.contrib.contenttypes.models import ContentType
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework import exceptions, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status, exceptions, viewsets
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
@@ -23,18 +23,22 @@ from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
+from log1.utils import write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, \
     get_password_reset_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer
 
-logger = logging.getLogger(__name__)
 
-
+# Route - /auth/
 class EmployeeAuthViewSets(GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     login_serializer_class = UserSerializerLogin
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
@@ -54,19 +58,16 @@ class EmployeeAuthViewSets(GenericViewSet):
 
             user = User.objects.filter(employee_id__exact=employee_id)
             if user:
-                logger.error("User already exist")
-                return Response({
-                    "result": "User already exist",
-                    "data": self.serializer_class(user, many=True).data[0]},
-                    status=status.HTTP_406_NOT_ACCEPTABLE)
+                return Response({"message": "User already exist",
+                                 "data": self.serializer_class(user, many=True).data[0]['email']}, status=406)
             user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
             for i in role:
                 r = Role.objects.get(name=i)
                 user.role.add(r)
-            return Response({"result": "success", "data": self.serializer_class(user).data}, status=201)
+            return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
         except Exception as error:
-            logger.error(error)
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
@@ -76,9 +77,12 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         employee_id = request.data.get('employee_id')
         if employee_id:
-            user = get_object_or_404(User, employee_id=employee_id)
+            queryset = User.objects.filter(employee_id=employee_id)
+            if not queryset:
+                return Response({"error": "Employee Id not found"}, status=400)
         else:
-            return Response({"error": "Employee Id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Employee Id is Empty"}, status=400)
+        user = queryset.first()
         user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
         if user:
             user.last_login = datetime.now()
@@ -92,25 +96,29 @@ class EmployeeAuthViewSets(GenericViewSet):
             fcm_token.object_id = user.id
             fcm_token.save()
 
-            return Response({"result": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
-        logger.error("Incorrect Employee Id/Password")
-        return Response({"error": "Incorrect Employee Id/Password"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"data": self.login_serializer_class(user).data}, status=202)
+        return Response({"error": "Incorrect Password"}, status=400)
 
 
+# Route - /employee/
 class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         try:
             user = get_object_or_404(User, id=kwargs.get('pk'))
             serializer = self.serializer_class(user)
-            return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -137,30 +145,35 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             users = users.filter(employee_name__istartswith=query)
             users = users.annotate(name=F('employee_name')).order_by(Lower('name'))
             data = users.values('id', 'employee_id', 'email', 'name')
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"data": data}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='me')
+    def me(self, request):
+        try:
+            return Response({"data": UserSerializer(request.user).data}, status=200)
+        except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='role')
     def role(self, request):
-        roles = Role.objects.all().values('id', 'name')
-        return Response({"results": roles}, status=status.HTTP_200_OK)
+        try:
+            roles = Role.objects.all().values('id', 'name')
+            return Response({"data": roles}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
-        teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
-        return Response({"results": teams}, status=status.HTTP_200_OK)
-
-    @action(methods=['post'], detail=False, url_path='change_password')
-    def change_password(self, request):
-        current_password = request.data.get('cur_password')
-        new_password = request.data.get('new_password')
-        if request.user.check_password(current_password):
-            request.user.set_password(new_password)
-            request.user.save()
-            return Response({"result": "password updated"}, status=status.HTTP_200_OK)
-        return Response({"error": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
+            return Response({"data": teams}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request, *args, **kwargs):
@@ -172,22 +185,50 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         fcm_token = FCMDevice.objects.filter(object_id=token.user.id, content_type__model='user')
         if fcm_token:
             fcm_token.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(status=204)
 
-    @action(methods=['get'], detail=False, url_path='me')
-    def me(self, request):
+    @action(methods=['put'], detail=False, url_path='change_team')
+    def change_team(self, request):
         try:
-            return Response({"data": UserSerializer(request.user).data}, status=200)
+            user_id = request.data.get('user_id')
+            team_id = request.data.get('team_id')
+            if request.user.is_superuser:
+                user = get_object_or_404(User, id=user_id)
+                team = get_object_or_404(Team, id=team_id)
+                user.team = team
+                user.save()
+                return Response({"message": f"{user.employee_name}'s team update to {team.name}"}, status=202)
+            return Response({"message": DONT_HAVE_ACCESS}, status=401)
         except Exception as error:
-            return Response({"message": str(error)}, status=400)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='change_password')
+    def change_password(self, request):
+        try:
+            current_password = request.data.get('cur_password')
+            new_password = request.data.get('new_password')
+            if request.user.check_password(current_password):
+                request.user.set_password(new_password)
+                request.user.save()
+                return Response({"message": "password updated"}, status=200)
+            return Response({"message": "Wrong Password"}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+# Route - /password/
 class ResetPasswordViewSets(GenericViewSet):
     queryset = User.objects.all()
     permission_classes = ()
     authentication_classes = ()
     serializer_class = EmailSerializer
     pass_serializer_class = PasswordTokenSerializer
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
@@ -210,7 +251,6 @@ class ResetPasswordViewSets(GenericViewSet):
 
         # No active user found, raise a validation error
         if not active_user_found:
-            logger.info("User is not active")
             raise exceptions.ValidationError({
                 'email': [_(
                     "There is no active user associated with this e-mail address or the password can not be changed")],
@@ -241,9 +281,9 @@ class ResetPasswordViewSets(GenericViewSet):
                 }
                 res, error = user.send_mail(mail_data)
                 if error == 'error':
-                    logger.error(res)
-                    return Response({'error': str(res)}, status=status.HTTP_200_OK)
-        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
+                    write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                    return Response({'message': str(res)}, status=200)
+        return Response({'message': 'OK'}, status=200)
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
@@ -257,13 +297,13 @@ class ResetPasswordViewSets(GenericViewSet):
         reset_password_token = ResetPasswordToken.objects.filter(key=token).first()
 
         if reset_password_token is None:
-            return Response({'status': 'not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'message': 'not found'}, status=404)
 
         expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
 
         if timezone.now() > expiry_date:
             reset_password_token.delete()
-            return Response({'status': 'expired'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'message': 'expired'}, status=404)
 
         reset_password_token.user.set_password(password)
         reset_password_token.user.save()
@@ -271,9 +311,10 @@ class ResetPasswordViewSets(GenericViewSet):
         # Delete all password reset tokens for this user
         ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
 
-        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
+        return Response({'message': 'OK'}, status=200)
 
 
+# Route - /assets/
 class AssetsViewSets(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
@@ -282,15 +323,19 @@ class AssetsViewSets(viewsets.ModelViewSet):
     field_list = ['id', 'email', 'number', 'username', 'password', 'provider', 'modified', 'tech',
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def retrieve(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
         try:
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             serializer = self.serializer_class(asset)
-            return Response({"result": serializer.data}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -311,10 +356,10 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 "number_asset": number_asset.values(*self.field_list),
                 "job_board_asset": job_board_asset.values(*self.field_list),
             }
-            return Response({"results": data}, status=status.HTTP_200_OK)
+            return Response({"data": data}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -329,11 +374,11 @@ class AssetsViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(asset, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-            return Response({"error": str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"data": serializer.data, "message": "Asset added"}, status=201)
+            return Response({"message": str(serializer.errors)}, status=400)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
@@ -358,12 +403,13 @@ class AssetsViewSets(viewsets.ModelViewSet):
                         final_string = num_string
                     else:
                         final_string = "Nothing"
-                desc = f"{request.user.employee_name.title()} updated {final_string} of {serializer.data['asset_type']} asset"
+                desc = f"{request.user.employee_name.title()} updated {final_string} of " \
+                       f"{serializer.data['asset_type']} asset"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"data": serializer.data, "message": "Asset updated"}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
@@ -371,12 +417,12 @@ class AssetsViewSets(viewsets.ModelViewSet):
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             asset.is_deleted = True
             asset.save()
-            desc = "{} deleted {} asset".format(request.user.employee_name.title(), asset.asset_type)
+            desc = f"{request.user.employee_name.title()} deleted {asset.asset_type} asset"
             create_activity(asset.id, 'asset', request.user, desc, 'deleted')
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(status=204)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
@@ -396,10 +442,10 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     names)
                 desc = f"{request.user.employee_name.title()} shared {asset.asset_type} asset to {user_list}"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
-            return Response({"result": "ok"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": "Asset shared"}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='un_share')
     def un_share(self, request, *args, **kwargs):
@@ -412,10 +458,10 @@ class AssetsViewSets(viewsets.ModelViewSet):
             desc = f"{request.user.employee_name} Unshared {user.employee_name} from {asset.asset_type} asset"
             create_activity(asset.id, 'asset', request.user, desc, 'updated')
             serializer = self.serializer_class(asset)
-            return Response({"result": serializer.data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"data": serializer.data}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='bulk_upload')
     def bulk_upload(self, request):
@@ -428,13 +474,13 @@ class AssetsViewSets(viewsets.ModelViewSet):
             elif file_extension == 'xlsx':
                 df = pd.read_excel(file)
             else:
-                return Response({"error": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "File format not supported"}, status=400)
             if not df.empty:
                 created, updated, failed = 0, 0, 0
                 if not {'Username', 'Provider', 'Password', 'Asset Type', 'Email', 'Technology',
                         'Remarks', 'Phone Number', 'Alternate Email', 'Alternate Number'
                         }.issubset(set(df.columns)):
-                    return Response({"result": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
+                    return Response({"message": "Invalid Data Format"}, status=404)
 
                 for index, row in df.iterrows():
                     if pd.isnull(row["Username"]):
@@ -449,7 +495,9 @@ class AssetsViewSets(viewsets.ModelViewSet):
                                 asset_type=row['Asset Type'].lower()
                             )
                         else:
-                            logger.error(row["Username"], request.user.employee_name, "Asset Type not found")
+                            write_exception(message=f"{row['Username']} {request.user.employee_name} "
+                                                    f"Asset Type not found", class_name=self.get_classname(),
+                                            function_name=inspect.stack()[0][3])
                             failed += 1
                             continue
                         asset.email = row['Email'] if not pd.isnull(row['Email']) else ""
@@ -468,7 +516,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
                             updated += 1
 
                     except Exception as e:
-                        logger.error(row["Username"], request.user.employee_name, e)
+                        write_exception(message=f"{row['Username']} {request.user.employee_name} {e}",
+                                        class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                         failed += 1
                         continue
                 mail_data = {
@@ -485,22 +534,27 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     },
                 }
                 send_email(mail_data, "Log1")
-                return Response({"result": "Upload Complete", "count": mail_data['context']},
-                                status=status.HTTP_201_CREATED)
-            return Response({"result": "Empty File"}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"message": "Upload Complete", "count": mail_data['context']},
+                                status=201)
+            return Response({"message": "Empty File"}, status=404)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+# Route - /users/
 class AllUsersViewSet(GenericViewSet, ListModelMixin):
     queryset = User.objects.all()
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
+
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '').strip()
+            query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
             users = self.queryset.filter(employee_name__istartswith=query, is_active=True).annotate(
                 name=F('employee_name'),
                 type=Value('user', CharField())
@@ -511,6 +565,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'name', 'type')
 
             result_list = list(chain(consultants[:5], users[:5]))
-            return Response({"results": result_list}, status=status.HTTP_200_OK)
+            return Response({"data": result_list}, status=200)
         except Exception as error:
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

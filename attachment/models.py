@@ -1,5 +1,4 @@
 import os
-import logging
 from django.db import models
 from django.utils import timezone
 from django.dispatch import receiver
@@ -8,9 +7,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 from employee.models import User
+from log1.utils import write_exception
 from utils_app.models import TimeStampedModel
-
-logger = logging.getLogger(__name__)
 
 ATTACHMENT_TYPE = (
     ('ssn', 'SSN'),
@@ -60,7 +58,7 @@ def create_attachment(data):
         )
         return True
     except Exception as error:
-        logger.error(error)
+        write_exception(message=error, class_name='None', function_name='create_attachment')
         return False
 
 

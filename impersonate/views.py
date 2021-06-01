@@ -1,4 +1,4 @@
-from rest_framework import status
+import inspect
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -6,15 +6,21 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, ListModelMixin
 
 from employee.models import User
+from log1.utils import write_exception
 from employee.serializers import UserSerializerLogin
 
 
+# Route - /impersonate/
 class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     # check if user is a superuser and has rights to impersonate
     queryset = User.objects.all()
     serializer_class = UserSerializerLogin
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @classmethod
+    def get_classname(cls):
+        return cls.__name__
 
     def create(self, request, *args, **kwargs):
         try:
@@ -25,10 +31,11 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
                 if user_exists:
                     user = user_exists.first()
                     serializer = self.serializer_class(user)
-                    return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
+                    return Response({"data": serializer.data, "message": "User is impersonated"}, status=201)
                 else:
-                    return Response({"error": {'message': 'User not Exist'}}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"message": 'User not Exist'}, status=400)
             else:
-                return Response({"error": {'message': 'Unauthorised Access'}}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"message": 'Unauthorised Access'}, status=401)
         except Exception as error:
-            return Response({"error": {'success': False, 'message': str(error)}}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": {'success': False, 'message': str(error)}}, status=400)
