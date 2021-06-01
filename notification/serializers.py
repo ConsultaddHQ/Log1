@@ -64,21 +64,20 @@ class NotificationListSerializer(serializers.ModelSerializer):
             }
         else:
             model_class = apps.get_model(obj.target_content_type.app_label, model_name)
-            parent_obj = model_class.objects.filter(id=obj.target_object_id)
-
-            if parent_obj:
+            target_obj = model_class.objects.filter(id=obj.target_object_id)
+            if target_obj:
                 if parent_model == 'consultant':
                     payload = {
                         "name": 'consultant',
                         "sub_id": obj.target_object_id,
-                        "id": parent_obj.first().consultant.id,
+                        "id": target_obj.first().consultant.id,
                         "sub_name": obj.target_content_type.model
                     }
                 elif parent_model == 'submission':
                     payload = {
                         "name": 'submission',
                         "sub_id": obj.target_object_id,
-                        "id": parent_obj.first().submission.id,
+                        "id": target_obj.first().submission.id,
                         "sub_name": obj.target_content_type.model
                     }
 
