@@ -32,15 +32,21 @@ def create_notification(user_list, data):
                 parent_content_type = None
         else:
             parent_content_type = None
+
+        if "parent_id" in data:
+            parent_object_id = data["parent_id"]
+        else:
+            parent_object_id = None
+
         for user in user_list:
             Notification.objects.create(
                 title=data["title"],
                 recipient_object_id=user.id,
                 description=data["description"],
                 category=data["category"].lower(),
+                parent_object_id=parent_object_id,
                 sender_object_id=data["sender_id"],
                 target_object_id=data["target_id"],
-                parent_object_id=data["parent_id"],
                 sender_content_type=sender_content_type,
                 parent_content_type=parent_content_type,
                 target_content_type=target_content_type,
