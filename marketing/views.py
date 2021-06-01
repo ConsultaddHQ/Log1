@@ -2621,8 +2621,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'target_id': test.id,
                 'target_type': 'test',
                 'sender_user_type': 'user',
+                'parent_type': 'submission',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
+                'parent_id': test.submission.id,
             }
             create_notification(user_list, notification_data)
 
@@ -2730,8 +2732,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'description': title,
                 'target_type': 'user',
                 'sender_user_type': 'user',
+                'parent_type': 'submission',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
+                'parent_id': test.submission.id,
                 'target_id': test.submitted_by.id,
             }
             create_notification(user_list, notification_data)

@@ -1710,9 +1710,11 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 'description': title,
                 'target_id': feedback.id,
                 'sender_user_type': 'user',
-                'target_type': 'consultant',
+                'target_type': 'feedback',
+                'parent_type': 'consultant',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
+                'parent_id': request.data.get('consultant'),
             }
             create_notification(user_list, notification_data)
 
@@ -1778,10 +1780,12 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 'category': 'info',
                 'description': title,
                 'target_id': feedback.id,
+                'target_type': 'feedback',
                 'sender_user_type': 'user',
-                'target_type': 'consultant',
+                'parent_type': 'consultant',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
+                'parent_id': feedback.consultant.id,
             }
             create_notification(user_list, notification_data)
 
