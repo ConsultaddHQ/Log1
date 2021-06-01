@@ -105,6 +105,15 @@ class Notification(models.Model):
     )
     target_content_object = GenericForeignKey('target_content_type', 'target_object_id')
 
+    parent_object_id = models.PositiveIntegerField(null=True, blank=True)
+    parent_content_type = models.ForeignKey(
+        ContentType,
+        blank=True, null=True,
+        on_delete=models.SET_NULL,
+        related_name='parent_notification'
+    )
+    parent_content_object = GenericForeignKey('parent_content_type', 'parent_object_id')
+
     objects = NotificationQuerySet.as_manager()
 
     class Meta:

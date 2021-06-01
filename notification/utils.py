@@ -25,6 +25,13 @@ def create_notification(user_list, data):
         recipient_content_type = ContentType.objects.get(model=data['recipient_user_type'])
         sender_content_type = ContentType.objects.get(model=data['sender_user_type'])
         target_content_type = ContentType.objects.get(model=data['target_type'])
+        if "parent_type" in data:
+            try:
+                parent_content_type = ContentType.objects.get(model=data['parent_type'])
+            except ContentType.DoesNotExist:
+                parent_content_type = None
+        else:
+            parent_content_type = None
         for user in user_list:
             Notification.objects.create(
                 title=data["title"],
@@ -33,7 +40,9 @@ def create_notification(user_list, data):
                 category=data["category"].lower(),
                 sender_object_id=data["sender_id"],
                 target_object_id=data["target_id"],
+                parent_object_id=data["parent_id"],
                 sender_content_type=sender_content_type,
+                parent_content_type=parent_content_type,
                 target_content_type=target_content_type,
                 recipient_content_type=recipient_content_type,
             )
