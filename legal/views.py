@@ -542,13 +542,13 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 title = f"{request.user.name} posted a new comment"
 
                 notification_data = {
-                    'category': 'alert',
-                    'sender_user_type': 'consultant',
-                    'target_type': 'user',
-                    'recipient_user_type': 'user',
-                    'description': title,
                     'title': title,
+                    'category': 'alert',
+                    'description': title,
+                    'target_type': 'user',
                     'sender_id': request.user.id,
+                    'recipient_user_type': 'user',
+                    'sender_user_type': 'consultant',
                     'target_id': petition.assigned_to.id,
                 }
                 create_notification(user_list, notification_data)

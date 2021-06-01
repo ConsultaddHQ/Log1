@@ -1003,22 +1003,28 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 )
             # notification
             user_list = []
+            aux_verb = "is"
+            if len(support_names) > 1:
+                aux_verb = "are"
             consultant = project.submission.consultant
             names = ", ".join(name for name in support_names)
             pocs = consultant.pocs.all()
             for data in pocs:
                 user_list.append(data.poc)
             user_list.append(project.submission.created_by)
-            title = f"""{names} is assigned as support to {consultant.name}'s project of {project.submission.client}"""
+            title = f"""{names} {aux_verb} assigned as support to {consultant.name}'s project of 
+                {project.submission.client}"""
             notification_data = {
                 'title': title,
+                'target_id': None,
                 'category': 'info',
                 'description': title,
-                'sender_id': request.user.id,
-                'target_id': project.id,
+                'parent_id': project.id,
+                'parent_type': 'project',
                 'sender_user_type': 'user',
-                'target_type': 'project',
+                'sender_id': request.user.id,
                 'recipient_user_type': 'user',
+                'target_type': 'projectsupport',
             }
             create_notification(user_list, notification_data)
             # Push Notification

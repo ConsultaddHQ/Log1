@@ -135,11 +135,13 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                     'title': title,
                     'category': 'info',
                     'description': title,
-                    'target_type': model,
+                    'target_id': comment.id,
+                    'target_type': 'feedback',
+                    'parent_user_type': model,
                     'sender_user_type': 'user',
                     'sender_id': request.user.id,
                     'recipient_user_type': 'user',
-                    'target_id': request.data['id'],
+                    'parent_id': request.data['id'],
                 }
                 create_notification(user_list, notification_data)
 
@@ -169,7 +171,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 if consultant:
                     consultant = consultant.first()
                     title = f"Comment added on {consultant.name}'s profile by {request.user.employee_name}"
-                    send_notification_for_user(consultant, request.user, title, 'comment')
+                    send_notification_for_user(consultant, request.user, title, 'comment', comment.id)
 
             serializer = CommentGetSerializer(comment)
             return Response({"message": ERROR_MSG, "data": serializer.data}, status=201)

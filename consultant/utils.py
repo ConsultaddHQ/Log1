@@ -132,9 +132,11 @@ def send_exit_interview_detail(terminate, request):
             'description': title,
             'target_id': terminate.id,
             'sender_user_type': 'user',
-            'target_type': 'consultant',
+            'parent_type': 'consultant',
             'sender_id': request.user.id,
             'recipient_user_type': 'user',
+            'target_type': 'consultantexit',
+            'parent_id': terminate.consultant.id,
         }
         create_notification(user_list, notification_data)
 
@@ -197,12 +199,14 @@ def terminate_consultant(terminate):
         notification_data = {
             'title': title,
             'category': 'info',
+            'target_id': terminate.id,
             'sender_user_type': 'user',
-            'target_type': 'consultant',
+            'parent_type': 'consultant',
             'recipient_user_type': 'user',
             'description': terminate.type,
+            'target_type': 'consultantexit',
             'sender_id': terminate.created_by.id,
-            'target_id': terminate.consultant.id,
+            'parent_id': terminate.consultant.id,
         }
         create_notification(user_list, notification_data)
 
@@ -331,6 +335,8 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
             'sender_id': sender.id,
             'target_type': sub_target,
             'sender_user_type': 'user',
+            'parent_id': consultant.id,
+            'parent_type': 'consultant',
             'recipient_user_type': 'user',
             'target_id': target_id if target_id else consultant.id,
         }

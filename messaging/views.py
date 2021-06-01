@@ -121,14 +121,14 @@ class ReceiveSMSViewSet(GenericViewSet):
                 title = f"New message received from {from_}"
 
                 notification_data = {
-                    'category': 'alert',
-                    'sender_user_type': 'conversation',
-                    'target_type': 'user',
-                    'recipient_user_type': 'user',
-                    'description': title,
                     'title': title,
-                    'sender_id': conversation.id,
+                    'category': 'alert',
+                    'description': title,
+                    'target_type': 'user',
                     'target_id': user1.owner.id,
+                    'sender_id': conversation.id,
+                    'recipient_user_type': 'user',
+                    'sender_user_type': 'conversation',
                 }
                 create_notification(user_list, notification_data)
 
