@@ -1,6 +1,7 @@
 import inspect
 from datetime import datetime
 
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.contrib.contenttypes.models import ContentType
@@ -60,7 +61,13 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
+            model = request.query_params.get('model', None)
             queryset = Notification.objects.active(request.user, 'user')
+            if model:
+                queryset = queryset.filter(
+                    Q(parent_content_type__model=model) |
+                    Q(target_content_type__model=model)
+                )
             serializer = NotificationListSerializer(queryset[first:last], many=True)
             unread = Notification.objects.unread(request.user, 'user').count()
             return Response({"data": serializer.data, "total": queryset.count(), "unread": unread}, status=200)
