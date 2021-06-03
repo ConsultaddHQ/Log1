@@ -426,9 +426,12 @@ class AssetsViewSets(viewsets.ModelViewSet):
 
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
-        users = request.data.get('users')
-        assets = request.data.get('assets')
+        users = request.data.get('users', [])
+        assets = request.data.get('assets', [])
         try:
+            if len(assets) < 1:
+                return Response({"message": "Please select Asset"}, status=404)
+
             for asset_id in assets:
                 asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
                 names = []

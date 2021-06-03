@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from consultant.models import Consultant
+from utils_app.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
@@ -87,52 +88,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_check_list(obj):
-        msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0
-
-        start_date = 1 if obj.start_date else 0
-
-        if obj.attachments.filter(attachment_type='msa'):
-            msa = 1
-
-        if obj.attachments.filter(attachment_type='work_order'):
-            work_order = 1
-
-        if obj.attachments.filter(attachment_type='work_order_msa'):
-            msa, work_order = 1, 1
-
-        if obj.attachments.filter(attachment_type='msa_signed'):
-            s_msa = 1
-
-        if obj.attachments.filter(attachment_type='work_order_signed'):
-            s_work_order = 1
-
-        if obj.attachments.filter(attachment_type='work_order_msa_signed'):
-            s_msa, s_work_order = 1, 1
-
-        if obj.client_address and len(obj.client_address.strip()) > 0:
-            client_address = 1
-
-        if obj.vendor_address and len(obj.vendor_address.strip()) > 0:
-            vendor_address = 1
-
-        if obj.reporting_details and len(obj.reporting_details.strip()) > 0:
-            reporting_details = 1
-
-        list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
-                               + reporting_details) / 6 >= 1 else False
-
-        return {
-            "total": 6,
-            "msa": msa,
-            "msa_signed": s_msa,
-            "status": list_status,
-            "work_order": work_order,
-            "start_date": start_date,
-            "client_address": client_address,
-            "vendor_address": vendor_address,
-            "work_order_signed": s_work_order,
-            "reporting_details": reporting_details,
-        }
+        return get_project_check_list(obj)
 
 
 class SubmissionDetailSerializer(serializers.ModelSerializer):
@@ -405,18 +361,14 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
 
 class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     vendor_layer = VendorLayerSerializer(read_only=True)
-    vendor_contact = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
+    vendor_contact = VendorContactSerializer()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
                   'marketer_name', 'is_complete', 'vendor_layer')
-
-    @staticmethod
-    def get_vendor_contact(obj):
-        return None
 
     @staticmethod
     def get_marketer_name(obj):
@@ -565,49 +517,4 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_check_list(obj):
-        msa, client_address, vendor_address, work_order, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0, 0, 0
-
-        start_date = 1 if obj.start_date else 0
-
-        if obj.attachments.filter(attachment_type='msa'):
-            msa = 1
-
-        if obj.attachments.filter(attachment_type='work_order'):
-            work_order = 1
-
-        if obj.attachments.filter(attachment_type='work_order_msa'):
-            msa, work_order = 1, 1
-
-        if obj.attachments.filter(attachment_type='msa_signed'):
-            s_msa = 1
-
-        if obj.attachments.filter(attachment_type='work_order_signed'):
-            s_work_order = 1
-
-        if obj.attachments.filter(attachment_type='work_order_msa_signed'):
-            s_msa, s_work_order = 1, 1
-
-        if obj.client_address and len(obj.client_address.strip()) > 0:
-            client_address = 1
-
-        if obj.vendor_address and len(obj.vendor_address.strip()) > 0:
-            vendor_address = 1
-
-        if obj.reporting_details and len(obj.reporting_details.strip()) > 0:
-            reporting_details = 1
-
-        status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
-                          + reporting_details) / 6 >= 1 else False
-
-        return {
-            "total": 6,
-            "msa": msa,
-            "status": status,
-            "msa_signed": s_msa,
-            "work_order": work_order,
-            "start_date": start_date,
-            "client_address": client_address,
-            "vendor_address": vendor_address,
-            "work_order_signed": s_work_order,
-            "reporting_details": reporting_details,
-        }
+        return get_project_check_list(obj)

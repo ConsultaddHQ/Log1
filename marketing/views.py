@@ -59,8 +59,8 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        query = request.query_params.get("query", "").lstrip().replace(':amp:', '&')
         try:
+            query = request.query_params.get("query", "").lstrip().replace(':amp:', '&')
             queryset = VendorCompany.objects.filter(name__icontains=query).order_by(Lower('name'))
             total = queryset.count()
             data = queryset[first:last].values('id', 'name', 'created_by')
@@ -149,18 +149,21 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
                 "company__name": vendor_contact.company.name,
                 "created_by": vendor_contact.created_by.employee_name,
             }
-            return Response({"data": data, "message": "Contact created"}, status=201)
+            return Response({"data": data, "message": "Vendor Contact created"}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
-        vendor = get_object_or_404(VendorContact, id=kwargs.get('pk'), created_by=request.user)
+        qs = VendorContact.objects.filter(id=kwargs.get('pk'), created_by=request.user)
+        if qs:
+            return Response({"message": "Vendor contact not found"}, status=404)
         try:
+            vendor = qs.first()
             serializer = self.serializer_class(vendor, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response({"data": serializer.data, "message": "Contact updated"}, status=202)
+                return Response({"data": serializer.data, "message": "Vendor Contact updated"}, status=202)
             return Response({"message": serializer.errors}, status=400)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -426,7 +429,10 @@ class LeadViewSets(viewsets.ModelViewSet):
     def archived(self, request):
         try:
             if request.method == 'PUT':
-                lead_ids = request.data["lead_ids"]
+                lead_ids = request.data.get("lead_ids", [])
+                if len(lead_ids) <= 0:
+                    return Response({"message": "Select data to archive"}, status=400)
+
                 leads = Lead.objects.filter(owner=request.user, id__in=lead_ids, status="new")
                 if leads:
                     leads.update(status='archived')
@@ -806,10 +812,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if 'admin' in roles or 'proxy' in roles:
                 sub = sub.filter(
                     Q(created_by__team=request.user.team) |
-                    Q(consultant_marketing__in_pool=True) |
                     Q(consultant_marketing__teams=request.user.team) |
                     Q(consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter')
+                      consultant_marketing__consultant__pocs__poc_type='recruiter') |
+                    Q(consultant_marketing__in_pool=True, consultant_marketing__status='open')
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
@@ -823,11 +829,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                         Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
                     )
                 else:
-                    consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
+                    consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
                     sub = sub.filter(
                         Q(created_by=request.user) |
-                        Q(consultant_marketing__in_pool=True) |
-                        Q(consultant_marketing__consultant__in=consultant_ids)
+                        Q(consultant_marketing__consultant__in=consultant_ids) |
+                        Q(consultant_marketing__in_pool=True, consultant_marketing__status='open')
                     )
 
             if filter_for == 'my':
@@ -1509,13 +1515,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'category': 'info',
                     'description': title,
                     'target_id': interview.id,
+                    'parent_id': submission.id,
                     'target_type': 'interview',
+                    'parent_type': 'submission',
                     'sender_user_type': 'user',
                     'sender_id': request.user.id,
                     'recipient_user_type': 'user',
                     'title': 'New Interview Created',
                 }
-                # create_notification(user_list, notification_data)
+                create_notification(user_list, notification_data)
                 return Response({
                     "data": data[0], 'booking_response': booking_res, "message": "Interview created"
                 }, status=201)
@@ -1541,17 +1549,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 serializer.save()
 
                 # Setting Submission is_active value
-                if interview.status == 'cancelled' and not interview.submission.screening.exclude(status='cancelled'):
-                    interview.submission.status = 'sub'
+                submission = interview.submission
+                if interview.status == 'cancelled' and not submission.screening.exclude(status='cancelled'):
+                    submission.status = 'sub'
                     # clear rank for cancelled interview
                     if interview.round == 1:
                         interview = self.rank_interviews(interview, 'cancel')
                 if interview.status in ['cancelled', 'next_round']:
-                    interview.submission.is_active = True
+                    submission.is_active = True
                 if interview.status in ['offer']:
-                    interview.submission.is_active = False
-                    interview.submission.status = 'in_offer'
-                interview.submission.save()
+                    submission.is_active = False
+                    submission.status = 'in_offer'
+                submission.save()
 
                 booking_res = 'error'
                 scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
@@ -1564,7 +1573,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         {interview.get_screening_type_display()} ::
                         {interview.get_interview_mode_display()} :: 
                         {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
-                        {interview.submission.client} :: {interview.consultant.name} :: 
+                        {submission.client} :: {interview.consultant.name} :: 
                         {interview.marketer.employee_name}"""
 
                 if status_change == "true" and interview.status not in ['cancelled']:
@@ -1591,7 +1600,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
                         interview.save()
-                        desc = f"Round {interview.round} is rescheduled for {interview.start_time} to {interview.end_time}"
+                        desc = f"Round {interview.round} is rescheduled for {interview.start_time} to" \
+                               f" {interview.end_time}"
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date():
                             text = "*CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {} :: {}*".format(
@@ -1599,15 +1609,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 interview.get_screening_type_display(),
                                 interview.get_interview_mode_display(),
                                 interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
-                                interview.submission.consultant.name,
-                                interview.submission.client, interview.marketer.employee_name)
+                                submission.consultant.name,
+                                submission.client, interview.marketer.employee_name)
                             data = {
                                 "title": "&#9201; Interview Rescheduled",
                                 "text": text
                             }
                             post_msg_using_webhook(config.announcement_url, data)
 
-                    create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+                    create_activity(submission.id, 'submission', request.user, desc, 'updated')
                     supervisor_email = interview.supervisor.email
                     attendees = [
                         {'email': supervisor_email},
@@ -1620,7 +1630,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     if len(guest) > 0:
                         attendees = attendees + guest
 
-                    sub = interview.submission
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         start = serializer.data["start_time"].replace("Z", "")
                         end = serializer.data["end_time"].replace("Z", "")
@@ -1628,11 +1637,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             "end": end,
                             "start": start,
                             "summary": title,
-                            "lead": sub.lead,
-                            "submission": sub,
                             "user": request.user,
                             "attendees": attendees,
-                            "consultant": sub.consultant,
+                            "lead": submission.lead,
+                            "submission": submission,
+                            "consultant": submission.consultant,
                             "description": request.data["description"],
                             "call_details": request.data["call_details"]
                         }
@@ -1673,13 +1682,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     'category': 'info',
                     'description': title,
                     'target_id': interview.id,
-                    'target_type': 'interview',
+                    'parent_id': submission.id,
                     'sender_user_type': 'user',
+                    'target_type': 'interview',
+                    'parent_type': 'submission',
                     'title': 'Interview Updated',
                     'sender_id': request.user.id,
                     'recipient_user_type': 'user',
                 }
-                # create_notification(user_list, notification_data)
+                create_notification(user_list, notification_data)
                 return Response(
                     {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
                 )
@@ -1711,15 +1722,16 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview.status = 'cancelled'
             interview.save()
 
+            submission = interview.submission
             desc = f"Round {interview.round} is cancelled"
-            create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+            create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
             if interview.round == 1:
-                interview.submission.status = 'sub'
+                submission.status = 'sub'
                 interview = self.rank_interviews(interview, 'cancel')
 
-            interview.submission.is_active = True
-            interview.submission.save()
+            submission.is_active = True
+            submission.save()
             scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
             user_list = [user for user in interview.guest.all()]
             user_list.append(interview.supervisor)
@@ -1729,20 +1741,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
                                     {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
-                                    {interview.submission.client} :: {interview.consultant.name} :: 
+                                    {submission.client} :: {interview.consultant.name} :: 
                                     {interview.marketer.employee_name}"""
 
             notification_data = {
                 'category': 'info',
                 'description': title,
                 'target_id': interview.id,
+                'parent_id': submission.id,
                 'target_type': 'interview',
+                'parent_type': 'submission',
                 'sender_user_type': 'user',
-                'title': 'Interview Cancelled',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
+                'title': 'Interview Cancelled',
             }
-            # create_notification(user_list, notification_data)
+            create_notification(user_list, notification_data)
             return Response(status=204)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -2605,6 +2619,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.status = 'assigned'
             test.save()
 
+            submission = test.submission
             # notification
             skills = ", ".join(skill.title() for skill in test.skills)
             test_type = 'Online'
@@ -2612,8 +2627,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_type = "Video"
             if test.is_offline:
                 test_type = 'Offline'
-            title = f"Test assigned :: {test.submission.consultant.name} :: {test.submission.client} ::" \
-                    f" {test_type} :: {skills}"
+            title = f"Test assigned :: {submission.consultant.name} :: {submission.client} :: {test_type} :: {skills}"
             notification_data = {
                 'title': title,
                 'category': 'info',
@@ -2624,7 +2638,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'parent_type': 'submission',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
-                'parent_id': test.submission.id,
+                'parent_id': submission.id,
             }
             create_notification(user_list, notification_data)
 
@@ -2652,7 +2666,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
                 text = f"Test Assigned to :- {assigned} <br>"
                 data = {
-                    "title": f"&#128203; Test Assigned :: {test.submission.consultant.name} :: {test.submission.client} :: {skills} <br>",
+                    "title": f"&#128203; Test Assigned :: {submission.consultant.name} :: {submission.client} :: {skills} <br>",
                     "text": text
                 }
                 post_msg_using_webhook(config.engineering_url, data)
