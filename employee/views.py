@@ -17,7 +17,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin
 
 from consultant.models import Consultant
 from utils_app.mailing import send_email
@@ -101,7 +101,7 @@ class EmployeeAuthViewSets(GenericViewSet):
 
 
 # Route - /employee/
-class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
@@ -150,6 +150,30 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def create(self, request, *args, **kwargs):
+        try:
+            role = request.data.get('role')
+            name = request.data.get('name')
+            email = request.data.get('email')
+            phone = request.data.get('phone')
+            gender = request.data.get('gender').lower()
+            password = request.data.get('password').strip()
+            employee_id = int(request.data.get('employee_id'))
+            team = Team.objects.get(name=request.data.get('team'))
+
+            user = User.objects.filter(employee_id__exact=employee_id)
+            if user:
+                return Response({"message": "User already exist",
+                                 "data": self.serializer_class(user, many=True).data[0]['email']}, status=406)
+            user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
+            for i in role:
+                r = Role.objects.get(id=i)
+                user.role.add(r)
+            return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:
@@ -169,7 +193,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
-            teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
+            query = request.query_params.get('query', None)
+            if query == 'all':
+                teams = Team.objects.exclude(dept='marketing').values('id', 'name', 'dept')
+            else:
+                teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
             return Response({"data": teams}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])

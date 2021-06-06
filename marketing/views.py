@@ -385,6 +385,8 @@ class LeadViewSets(viewsets.ModelViewSet):
                 if len(lead.job_desc) < 20:
                     submissions = lead.submission.all()
                     submissions.update(is_complete=False)
+                for submission in lead.submission.all():
+                    submission_is_complete(submission)
                 data = queryset.annotate(submission_count=Count('submission')).annotate(
                     company_id=F('vendor_company__id'),
                     company_name=F('vendor_company__name'),
@@ -821,7 +823,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
                 if 'recruiter' in roles or 'retention_manager' in roles:
-                    consultant_ids = list(request.user.marketed.all().values_list('consultant_id'))
+                    consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
                     sub = sub.filter(
                         Q(created_by=request.user) |
                         Q(consultant_marketing__in_pool=True) |
