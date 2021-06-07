@@ -97,7 +97,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             fcm_token.save()
 
             return Response({"data": self.login_serializer_class(user).data}, status=202)
-        return Response({"error": "Incorrect Password"}, status=400)
+        return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
 
 
 # Route - /employee/

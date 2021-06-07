@@ -6,7 +6,7 @@ from functools import reduce
 from django.db.models import F
 from django.utils import timezone
 from django.db import transaction
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, Count
 

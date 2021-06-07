@@ -671,7 +671,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             if hasattr(submission, 'project'):
-                serializer = ProjectV2Serializer(submission.project)
+                serializer = ProjectV2Serializer(submission.project, context={'user': request.user})
                 return Response({"data": serializer.data}, status=200)
             else:
                 return Response({"message": "Project not found"}, status=400)
