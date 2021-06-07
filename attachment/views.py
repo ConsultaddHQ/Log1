@@ -16,6 +16,7 @@ from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyM
 from project.models import Project
 from activity.views import create_activity
 from log1.utils import write_exception, ERROR_MSG
+from utils_app.utils import get_project_check_list
 from attachment.serializers import Attachment, AttachmentSerializer
 
 
@@ -126,55 +127,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 return Response({"data": serializer.data}, status=201)
             else:
                 project = get_object_or_404(Project, id=object_id)
-
-                msa, work_order, s_msa, s_work_order = 0, 0, 0, 0
-                client_address, vendor_address, reporting_details = 0, 0, 0
-
-                start_date = 1 if project.start_date else 0
-
-                if project.attachments.filter(attachment_type='msa'):
-                    msa = 1
-
-                if project.attachments.filter(attachment_type='work_order'):
-                    work_order = 1
-
-                if project.attachments.filter(attachment_type='work_order_msa'):
-                    msa, work_order = 1, 1
-
-                if project.attachments.filter(attachment_type='msa_signed'):
-                    s_msa = 1
-
-                if project.attachments.filter(attachment_type='work_order_signed'):
-                    s_work_order = 1
-
-                if project.attachments.filter(attachment_type='work_order_msa_signed'):
-                    s_msa, s_work_order = 1, 1
-
-                if project.client_address and len(project.client_address.strip()) > 0:
-                    client_address = 1
-
-                if project.vendor_address and len(project.vendor_address.strip()) > 0:
-                    vendor_address = 1
-
-                if project.reporting_details and len(project.reporting_details.strip()) > 0:
-                    reporting_details = 1
-
-                total = s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
-                list_status = True if (total / 6) >= 1 else False
-
-                check_list = {
-                    "total": 6,
-                    "msa": msa,
-                    "msa_signed": s_msa,
-                    "status": list_status,
-                    "work_order": work_order,
-                    "start_date": start_date,
-                    "client_address": client_address,
-                    "vendor_address": vendor_address,
-                    "work_order_signed": s_work_order,
-                    "reporting_details": reporting_details
-                }
-
+                check_list = get_project_check_list(project)
                 return Response(
                     {"data": serializer.data, "check_list": check_list, "message": "Attachment added"}, status=201
                 )
@@ -205,51 +158,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
 
-                client_address, vendor_address, reporting_details = 0, 0, 0
-                msa, work_order, s_msa, s_work_order = 0, 0, 0, 0
-
-                start_date = 1 if project.start_date else 0
-
-                if project.attachments.filter(attachment_type='msa'):
-                    msa = 1
-
-                if project.attachments.filter(attachment_type='work_order'):
-                    work_order = 1
-
-                if project.attachments.filter(attachment_type='work_order_msa'):
-                    msa, work_order = 1, 1
-
-                if project.attachments.filter(attachment_type='msa_signed'):
-                    s_msa = 1
-
-                if project.attachments.filter(attachment_type='work_order_signed'):
-                    s_work_order = 1
-
-                if project.attachments.filter(attachment_type='work_order_msa_signed'):
-                    s_msa, s_work_order = 1, 1
-
-                if project.client_address and len(project.client_address.strip()) > 0:
-                    client_address = 1
-
-                if project.vendor_address and len(project.vendor_address.strip()) > 0:
-                    vendor_address = 1
-
-                if project.reporting_details and len(project.reporting_details.strip()) > 0:
-                    reporting_details = 1
-
-                total = s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
-                list_status = True if (total / 6) >= 1 else False
-
-                check_list = {
-                    "total": 6,
-                    "msa": msa,
-                    "status": list_status,
-                    "start_date": start_date,
-                    "work_order": work_order,
-                    "client_address": client_address,
-                    "vendor_address": vendor_address,
-                    "reporting_details": reporting_details,
-                }
+                check_list = get_project_check_list(project)
                 return Response({"check_list": check_list, "message": "Attachment deleted"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])

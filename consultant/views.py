@@ -374,8 +374,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             query = request.query_params.get('query', None)
-            consultants = Consultant.objects.filter(marketing__status='open').exclude(
-                status__in=['archived', 'terminated'])
+            consultants = Consultant.objects.all()
             roles = request.user.roles
 
             if 'admin' in roles or 'proxy' in roles:
@@ -392,7 +391,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     recruits = consultants.filter(pocs__poc=request.user)
                 consultants = consultants.filter(
                     Q(marketing__in_pool=True, marketing__status='open') |
-                    Q(marketing__marketer=request.user, marketing__status='open')
+                    Q(marketing__marketer=request.user)
                 )
                 consultants = (consultants | recruits).distinct()
 
@@ -402,8 +401,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             if query:
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
+            else:
+                consultants = consultants.filter(marketing__status='open').exclude(status__in=['archived', 'terminated'])
 
-            consultants = consultants.order_by('id').distinct('id')[:50]
+            consultants = consultants.order_by('id').distinct('id')[:100]
             serializer = ConsultantListSerializer(consultants, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:

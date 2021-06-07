@@ -24,6 +24,7 @@ from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
 from attachment.models import create_attachment
+from utils_app.utils import get_attachment_status
 from consultant.utils import send_notification_for_user
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
@@ -321,126 +322,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                             class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, "error"
 
-    @action(methods=['get'], detail=False, url_path="mail_to_onboard")
-    def mail_to_onboard(self, request):
-        try:
-            project_id = request.query_params.get('project_id', None)
-            if project_id:
-
-                project = get_object_or_404(Project, id=project_id)
-
-                client_address, vendor_address, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0
-
-                start_date = 1 if project.start_date else 0
-
-                if project.attachments.filter(attachment_type='msa_signed'):
-                    s_msa = 1
-
-                if project.attachments.filter(attachment_type='work_order_signed'):
-                    s_work_order = 1
-
-                if project.attachments.filter(attachment_type='work_order_msa_signed'):
-                    s_msa, s_work_order = 1, 1
-
-                if project.client_address and len(project.client_address.strip()) > 0:
-                    client_address = 1
-
-                if project.vendor_address and len(project.vendor_address.strip()) > 0:
-                    vendor_address = 1
-
-                if project.reporting_details and len(project.reporting_details.strip()) > 0:
-                    reporting_details = 1
-
-                list_status = True if (s_msa + s_work_order + client_address + vendor_address + start_date
-                                       + reporting_details) / 6 >= 1 else False
-
-                if not list_status:
-                    return Response({"message": "Complete all details"}, status=400)
-
-                prev_status = project.statuses.filter(is_current=True).first()
-                po_type = 'created'
-                if prev_status.status == 'on_boarded':
-                    po_type = 'updated'
-
-                path = []
-                scrum_masters = list(User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy']
-                                                         ).values_list('email', flat=True))
-
-                for i in project.attachments.filter(
-                        attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']
-                ):
-                    try:
-                        path.append(download_s3_object(i.attachment_file.name))
-                    except Exception as error:
-                        write_exception(message=error, class_name=self.get_classname(),
-                                        function_name=inspect.stack()[0][3])
-
-                res, error = 'development server', 'development server'
-                if os.environ.get('ENV', 'local') == 'prod':
-                    res, error = self.po_mail(project, path, scrum_masters, po_type)
-                delete_temp_file(path)
-                if not error == 'error':
-                    project.submission.consultant_marketing.status = 'close'
-                    project.submission.consultant_marketing.end = project.start_date
-                    project.submission.consultant_marketing.save()
-                    if prev_status.status == 'received' or prev_status.status == 'new':
-                        new_status, created = ProjectStatus.objects.get_or_create(
-                            project=project,
-                            is_current=True,
-                            status='on_boarded',
-                        )
-                        if created:
-                            prev_status.is_current = False
-                            prev_status.save()
-                    return Response({"message": "On-boarding mail sent", "error": res}, status=200)
-                return Response({"data": str(res)}, status=400)
-            else:
-                return Response({"message": "Invalid Id"}, status=400)
-        except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['get'], detail=True, url_path="send_support_mail")
-    def send_support_mail(self, request, *args, **kwargs):
-        try:
-            project_id = kwargs.get('pk')
-            project = get_object_or_404(Project, id=project_id)
-
-            queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
-            scrum_masters = [user.email for user in queryset]
-
-            support_mail_res, support_mail_error = self.support_mail(project, project.submission, scrum_masters)
-            offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, project.submission, scrum_masters)
-
-            if support_mail_error == 'error' or offer_mail_error == "error":
-                return Response({
-                    "offer": str(offer_mail_res),
-                    "support": str(support_mail_res),
-                    "message": "Unable to send Support/Offer mail"
-                }, status=400)
-
-            return Response({"data": str(support_mail_res), "message": "Support/Offer mail sent"}, status=200)
-        except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['get'], detail=True, url_path='fields')
-    def fields(self, request, *args, **kwargs):
-        try:
-            project = get_object_or_404(Project, id=kwargs.get('pk'))
-            fields, group = [], None
-            status = project.statuses.filter(is_current=True).first().status
-            if project.submission.created_by.id == request.user.id:
-                group = ObjectGroup.objects.filter(name='owner', model='project', status=status)
-            if request.user.role.name == 'finance':
-                group = ObjectGroup.objects.filter(name='finance', model='project', status=status)
-            if group:
-                fields = group.first().fields.all().values_list('name', flat=True)
-            return Response({"data": fields}, status=200)
-        except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
     def retrieve(self, request, *args, **kwargs):
         try:
             permission = {"update": False}
@@ -527,8 +408,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 }
 
                 if 'status' in filters and len(filters["status"]) > 0:
+                    not_joined = Project.objects.none()
+                    if 'not_joined' in filters["status"]:
+                        not_joined = projects.filter(statuses__status='on_boarded', statuses__is_current=True,
+                                                     start_date__lt=date.today())
                     projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
-
+                    projects = (projects | not_joined).distinct('id')
             else:
                 if filter_by_lead == 'w2':
                     projects = projects.filter(submission__lead__is_w2=True)
@@ -954,6 +839,101 @@ class ProjectViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(project)
 
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path="mail_to_onboard")
+    def mail_to_onboard(self, request):
+        try:
+            project_id = request.query_params.get('project_id', None)
+            if project_id:
+
+                project = get_object_or_404(Project, id=project_id)
+                result = get_attachment_status(project)
+                if not result["status"]:
+                    return Response({"message": "Complete all details"}, status=400)
+
+                prev_status = project.statuses.filter(is_current=True).first()
+                po_type = 'created'
+                if prev_status.status == 'on_boarded':
+                    po_type = 'updated'
+
+                path = []
+                scrum_masters = list(User.objects.filter(
+                    team=request.user.team, role__name__in=['admin', 'proxy']
+                ).values_list('email', flat=True))
+
+                for i in project.attachments.filter(
+                        attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
+                    try:
+                        path.append(download_s3_object(i.attachment_file.name))
+                    except Exception as error:
+                        write_exception(message=error, class_name=self.get_classname(),
+                                        function_name=inspect.stack()[0][3])
+
+                res, error = 'development server', 'development server'
+                if os.environ.get('ENV', 'local') == 'prod':
+                    res, error = self.po_mail(project, path, scrum_masters, po_type)
+                delete_temp_file(path)
+                if not error == 'error':
+                    project.submission.consultant_marketing.status = 'close'
+                    project.submission.consultant_marketing.end = project.start_date
+                    project.submission.consultant_marketing.save()
+                    if prev_status.status == 'received' or prev_status.status == 'new':
+                        new_status, created = ProjectStatus.objects.get_or_create(
+                            project=project,
+                            is_current=True,
+                            status='on_boarded',
+                        )
+                        if created:
+                            prev_status.is_current = False
+                            prev_status.save()
+                    return Response({"message": "On-boarding mail sent", "error": res}, status=200)
+                return Response({"data": str(res)}, status=400)
+            else:
+                return Response({"message": "Invalid Id"}, status=400)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path="send_support_mail")
+    def send_support_mail(self, request, *args, **kwargs):
+        try:
+            project_id = kwargs.get('pk')
+            project = get_object_or_404(Project, id=project_id)
+
+            queryset = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
+            scrum_masters = [user.email for user in queryset]
+
+            support_mail_res, support_mail_error = self.support_mail(project, project.submission, scrum_masters)
+            offer_mail_res, offer_mail_error = self.send_offer_received_mail(project, project.submission, scrum_masters)
+
+            if support_mail_error == 'error' or offer_mail_error == "error":
+                return Response({
+                    "offer": str(offer_mail_res),
+                    "support": str(support_mail_res),
+                    "message": "Unable to send Support/Offer mail"
+                }, status=400)
+
+            return Response({"data": str(support_mail_res), "message": "Support/Offer mail sent"}, status=200)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='fields')
+    def fields(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            fields, group = [], None
+            status = project.statuses.filter(is_current=True).first().status
+            if project.submission.created_by.id == request.user.id:
+                group = ObjectGroup.objects.filter(name='owner', model='project', status=status)
+            if request.user.role.name == 'finance':
+                group = ObjectGroup.objects.filter(name='finance', model='project', status=status)
+            if group:
+                fields = group.first().fields.all().values_list('name', flat=True)
+            return Response({"data": fields}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
