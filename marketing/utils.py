@@ -23,6 +23,13 @@ def change_to_feedback_due():
         return None
 
 
+def submission_is_complete(obj):
+    if obj.rate and obj.vendor and obj.client and \
+            (obj.job_desc and len(obj.lead.job_desc) > 20):
+        obj.is_complete = False
+        obj.save()
+
+
 def create_submission(request, lead_id):
     try:
         profile = get_object_or_404(ConsultantProfile, id=request.data['profile_id'])
@@ -71,9 +78,7 @@ def create_submission(request, lead_id):
                 date_of_birth=profile.date_of_birth,
             )
 
-        if sub.rate and sub.vendor and sub.client and (sub.lead.job_desc and len(sub.lead.job_desc) > 20):
-            sub.is_complete = True
-            sub.save()
+        submission_is_complete(sub)
 
         resume = request.FILES.get('file_resume', None)
         resume_data = {
