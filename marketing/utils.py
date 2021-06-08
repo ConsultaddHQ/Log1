@@ -24,10 +24,15 @@ def change_to_feedback_due():
 
 
 def submission_is_complete(obj):
-    if obj.rate and obj.vendor and obj.client and \
-            (obj.job_desc and len(obj.lead.job_desc) > 20):
-        obj.is_complete = False
-        obj.save()
+    try:
+        if obj.rate and obj.vendor and obj.client and \
+                (obj.lead.job_desc and len(obj.lead.job_desc) > 20):
+            obj.is_complete = False
+            obj.save()
+        return None
+    except Exception as error:
+        write_exception(message=error, class_name=None, function_name="submission_is_complete")
+        return obj
 
 
 def create_submission(request, lead_id):

@@ -85,10 +85,10 @@ def get_project_check_list(project):
         "msa": msa,
         "work_order": work_order,
         "status": result["status"],
-        "msa_signed": result["s_msa"],
+        "msa_signed": result["msa_signed"],
         "start_date": result["start_date"],
         "client_address": result["client_address"],
         "vendor_address": result["vendor_address"],
-        "work_order_signed": result["s_work_order"],
+        "work_order_signed": result["work_order_signed"],
         "reporting_details": result["reporting_details"],
     }

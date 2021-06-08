@@ -79,7 +79,7 @@ class EmployeeAuthViewSets(GenericViewSet):
         if employee_id:
             queryset = User.objects.filter(employee_id=employee_id)
             if not queryset:
-                return Response({"error": "Employee Id not found"}, status=400)
+                return Response({"message": "This user not found"}, status=400)
         else:
             return Response({"message": "Employee Id is Empty"}, status=400)
         user = queryset.first()
@@ -97,7 +97,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             fcm_token.save()
 
             return Response({"data": self.login_serializer_class(user).data}, status=202)
-        return Response({"error": "Incorrect Password"}, status=400)
+        return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
 
 
 # Route - /employee/
@@ -280,7 +280,7 @@ class ResetPasswordViewSets(GenericViewSet):
         # No active user found, raise a validation error
         if not active_user_found:
             raise exceptions.ValidationError({
-                'email': [_(
+                'message': [_(
                     "There is no active user associated with this e-mail address or the password can not be changed")],
             })
         ip = request.META['REMOTE_ADDR']
@@ -308,10 +308,12 @@ class ResetPasswordViewSets(GenericViewSet):
                     },
                 }
                 res, error = user.send_mail(mail_data)
-                if error == 'error':
+                if error == "ok":
+                    return Response({"message": "Mail sent", "data": res}, status=200)
+                else:
                     write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
-                    return Response({'message': str(res)}, status=200)
-        return Response({'message': 'OK'}, status=200)
+                    return Response({"message": "Something went wrong", "error": str(res)}, status=400)
+        return Response({"message": "Something went wrong"}, status=400)
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
@@ -325,13 +327,13 @@ class ResetPasswordViewSets(GenericViewSet):
         reset_password_token = ResetPasswordToken.objects.filter(key=token).first()
 
         if reset_password_token is None:
-            return Response({'message': 'not found'}, status=404)
+            return Response({'message': 'Token not found'}, status=404)
 
         expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
 
         if timezone.now() > expiry_date:
             reset_password_token.delete()
-            return Response({'message': 'expired'}, status=404)
+            return Response({'message': 'Token Expired'}, status=404)
 
         reset_password_token.user.set_password(password)
         reset_password_token.user.save()
@@ -339,7 +341,7 @@ class ResetPasswordViewSets(GenericViewSet):
         # Delete all password reset tokens for this user
         ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
 
-        return Response({'message': 'OK'}, status=200)
+        return Response({'message': 'Password changed successfully'}, status=200)
 
 
 # Route - /assets/
