@@ -71,7 +71,7 @@ class ResetPasswordTokenAdmin(admin.ModelAdmin):
 
 @admin.register(Asset)
 class AssetAdmin(ExportActionModelAdmin):
-    list_filter = ('asset_type',)
+    list_filter = ('asset_type', 'provider')
     list_display = ('id', 'owner', 'email', 'asset_type')
     search_fields = ('id', 'owner__employee_name', 'email', 'asset_type', 'number')
 
