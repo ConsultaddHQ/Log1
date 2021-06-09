@@ -32,9 +32,9 @@ from attachment.serializers import AttachmentSerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
-from marketing.utils import change_to_feedback_due, create_submission
 from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
+from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
 from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
     write_exception, DONT_HAVE_ACCESS, ERROR_MSG
@@ -346,7 +346,8 @@ class LeadViewSets(viewsets.ModelViewSet):
         try:
             roles = request.user.roles
             if 'marketer' not in roles:
-                return Response({"data": DONT_HAVE_ACCESS}, status=403)
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
             serializer = LeadCreateSerializer(data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -360,7 +361,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     position_name=F('position__display_name')
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'created',
                          'is_w2', 'company_id', 'company_name', 'modified', 'submission_count')
-                return Response({"data": data[0], "message": "Requirement created"}, status=201)
+                return Response({"data": data[0], "message": "Requirement added"}, status=201)
             else:
                 write_exception(message=serializer.errors, class_name=self.get_classname(),
                                 function_name=inspect.stack()[0][3])
@@ -393,7 +394,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     position_name=F('position__display_name')
                 ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'status', 'is_w2',
                          'company_id', 'company_name', 'modified', 'submission_count')
-                return Response({"data": data[0], "message": "Requirement created"}, status=202)
+                return Response({"data": data[0], "message": "Requirement updated"}, status=202)
             write_exception(message=serializer.errors, class_name=self.get_classname(),
                             function_name=inspect.stack()[0][3])
             return Response({"message": "Data is invalid", "error": serializer.errors}, status=400)
@@ -438,7 +439,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 leads = Lead.objects.filter(owner=request.user, id__in=lead_ids, status="new")
                 if leads:
                     leads.update(status='archived')
-                    return Response({"message": "Leads Archived"}, status=202)
+                    return Response({"message": "Requirement Archived"}, status=202)
                 return Response({"message": "Data not found"}, status=404)
             else:
                 first, last = get_page_limits(request)
@@ -671,7 +672,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             if hasattr(submission, 'project'):
-                serializer = ProjectV2Serializer(submission.project)
+                serializer = ProjectV2Serializer(submission.project, context={'user': request.user})
                 return Response({"data": serializer.data}, status=200)
             else:
                 return Response({"message": "Project not found"}, status=400)
@@ -2229,12 +2230,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def get_classname(cls):
         return cls.__name__
 
-    def get_test_data(self, queryset, filter_by_status, first, last):
+    def get_test_data(self, queryset, filter_by_status):
         try:
             # Interview counts by status
-            sort_by = 'created'
+            sort_by = '-created'
             if filter_by_status == 'failed':
-                sort_by = 'modified'
+                sort_by = '-modified'
             queryset = queryset.order_by('-' + sort_by).distinct(sort_by)
             total = queryset.count()
             new = queryset.filter(status='new').count()
@@ -2255,8 +2256,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             if filter_by_status:
                 queryset = queryset.filter(status=filter_by_status)
-            data = TestListSerializer(queryset[first:last], many=True).data
-            return data, data_counts
+            return queryset, data_counts
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return error, 'error'
@@ -2275,18 +2275,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'feedback_due': queryset.filter(status='feedback_due').count(),
             }
 
-            order_by = 'created'
+            if filter_by_status:
+                queryset = queryset.filter(status__in=filter_by_status)
+
+            order_by = '-created'
             if filter_by_status == 'failed':
-                order_by = 'modified'
+                order_by = '-modified'
             if sort_by:
                 field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
                 if field_name == 'created':
                     order_by = "created" if order == "asc" else "-created"
                 elif field_name == 'deadline':
                     order_by = "deadline" if order == "asc" else "-deadline"
-
-            if filter_by_status:
-                queryset = queryset.filter(status__in=filter_by_status)
 
             queryset = Test.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             return queryset, data_counts
@@ -2438,7 +2438,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     queryset = queryset.filter(submission__created_by__team=request.user.team)
 
             # Test List according to role
-            if 'admin' in roles or 'proxy' in roles:
+            if 'admin' in roles and 'engineer' in roles:
+                pass
+            elif 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
                     Q(submission__consultant_marketing__teams=request.user.team,
                       submission__consultant_marketing__in_pool=False) |
@@ -2464,7 +2466,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                       submission__consultant_marketing__consultant__pocs__poc_type='relation')
                 )
 
-            queryset = get_time_filter(queryset, filter_by_time).order_by('-modified')
+            queryset = get_time_filter(queryset, filter_by_time)
 
             if version == 'v2' and filter_json:
                 filter_string, filter_by_status = dict(), list()
@@ -2510,7 +2512,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 queryset = queryset.filter(**filter_string)
                 queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
             else:
-                queryset, counts = self.get_test_data(queryset, filter_by_status, first, last)
+                queryset, counts = self.get_test_data(queryset, filter_by_status)
 
             if counts == 'error':
                 return Response({"error": str(queryset)}, status=400)

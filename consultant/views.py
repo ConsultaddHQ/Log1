@@ -1,12 +1,9 @@
-import os
 import json
 import inspect
 from operator import or_
 from functools import reduce
-from django.db.models import F
-from django.utils import timezone
 from django.db import transaction
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef, Q, Count
 
@@ -19,26 +16,15 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
 from api_key.models import APIKey
-from marketing.models import Interview
-from employee.serializers import TeamSerializer
-from employee.models import tag_users, User, Team
-from project.models import Project, ProjectStatus
+from consultant.serializers import *
+from employee.models import tag_users
+from project.models import ProjectStatus
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
 from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
     terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
-
-from consultant.models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, \
-    ConsultantRateRevision, ConsultantPOC, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ExitReason
-
-from consultant.serializers import ConsultantSerializer, ConsultantProfileSerializer, ConsultantMarketingSerializer, \
-    ConsultantMarketingCreateSerializer, ConsultantMarketingCycleSerializer, ConsultantRateRevisionSerializer, \
-    ConsultantPOCSerializer, ConsultantBenchSerializer, ConsultantListSerializer, ExitConsultantSerializer, \
-    ConsultantUpdateSerializer, EducationSerializer, ExperienceSerializer, ConsultantFeedbackSerializer, \
-    PayrollEmployerSerializer, POCSerializer, WorkAuthSerializer, ConsultantSubmissionSerializer, \
-    ExitDetailConsultantSerializer, ConsultantPetitionLoginSerializer
 
 
 # Route - v2/consultant/
@@ -59,9 +45,12 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             first, last = get_page_limits(request)
             query = request.query_params.get('query', None)
             sort_by = request.query_params.get('sort_by', None)
-            con_status = request.query_params.get('status', None)
+            con_status = request.query_params.get('status', 'on_bench')
             filter_json = request.query_params.get('filter_json', None)
             con_sub_status = request.query_params.get('sub_status', None)
+
+            if len(con_status) == 0 and len(query) > 0:
+                con_status = 'on_bench'
 
             consultants = Consultant.objects.all()
 
@@ -111,46 +100,51 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                     Q(email__iexact=query)
                 )
 
+            consultants = consultants.distinct('id')
             status_obj = {
                 "all": consultants,
-                "marketing_candidate": consultants.filter(marketing__status='close'),
                 "terminated": consultants.filter(status__in=['archived', 'terminated']),
-                "on_project": consultants.filter(projects__statuses__status='joined',
-                                                 projects__statuses__is_current=True),
-                "offer": consultants.filter(projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                                            projects__statuses__is_current=True),
+                "marketing_candidate": consultants.filter(status='on_bench', marketing__status='close'),
+                "on_project": consultants.filter(
+                    projects__statuses__status='joined', projects__statuses__is_current=True
+                ).exclude(status__in=['archived', 'terminated']),
+                "offer": consultants.filter(
+                    projects__statuses__is_current=True,
+                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                ).exclude(status__in=['archived', 'terminated']),
                 "on_bench": consultants.filter(marketing__status='open').exclude(
                     projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                    projects__statuses__is_current=True),
+                    projects__statuses__is_current=True, status__in=['archived', 'terminated']
+                ),
             }
 
             def queryset_filter_by_status(queryset, sub_status):
                 if sub_status == 'non_pool':
-                    return queryset.filter(marketing__in_pool=False, marketing__status='open')
+                    queryset = queryset.filter(marketing__in_pool=False, marketing__status='open')
 
                 elif sub_status == 'in_pool':
-                    return queryset.filter(marketing__in_pool=True, marketing__status='open')
+                    queryset = queryset.filter(marketing__in_pool=True, marketing__status='open')
 
                 elif sub_status == 'on_boarded':
-                    return queryset.filter(projects__statuses__status='on_boarded',
-                                           projects__statuses__is_current=True)
+                    queryset = queryset.filter(projects__statuses__status='on_boarded',
+                                               projects__statuses__is_current=True)
 
                 elif sub_status == 'in_offer':
-                    return queryset.filter(projects__statuses__status__in=['new', 'received'],
-                                           projects__statuses__is_current=True)
+                    queryset = queryset.filter(projects__statuses__status__in=['new', 'received'],
+                                               projects__statuses__is_current=True)
 
                 elif sub_status == 'fired':
-                    return queryset.filter(exit__type='fired')
+                    queryset = queryset.filter(exit__type='fired')
 
                 elif sub_status == 'resigned':
-                    return queryset.filter(exit__type='resigned')
+                    queryset = queryset.filter(exit__type='resigned')
 
                 elif sub_status == 'absconded':
-                    return queryset.filter(exit__type='absconded')
+                    queryset = queryset.filter(exit__type='absconded')
 
-                return queryset
+                return queryset.distinct('id')
 
-            if con_status:
+            if con_status and len(con_status) > 0:
                 consultants = status_obj[con_status]
 
             sub_status_obj = dict()
@@ -175,17 +169,18 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
             consultants = queryset_filter_by_status(consultants, con_sub_status)
 
+            consultants = Consultant.objects.filter(id__in=consultants.values('id'))
             if sort_by in ['name', 'created']:
                 consultants = consultants.order_by(sort_by)
 
             count = {
                 "total": consultants.count(),
+                "sub_status": sub_status_obj,
                 "offer": status_obj['offer'].count(),
                 "on_bench": status_obj['on_bench'].count(),
                 "on_project": status_obj['on_project'].count(),
                 "terminated": status_obj['terminated'].count(),
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
-                "sub_status": sub_status_obj
             }
 
             poc = ConsultantPOC.objects.filter(
@@ -402,7 +397,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             if query:
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
             else:
-                consultants = consultants.filter(marketing__status='open').exclude(status__in=['archived', 'terminated'])
+                consultants = consultants.filter(marketing__status='open').exclude(
+                    status__in=['archived', 'terminated'])
 
             consultants = consultants.order_by('id').distinct('id')[:100]
             serializer = ConsultantListSerializer(consultants, many=True)
