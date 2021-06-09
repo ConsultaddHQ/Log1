@@ -1,13 +1,10 @@
 from django.db.models import F
 from rest_framework import serializers
 
-from employee.models import User
+from consultant.models import *
 from project.models import Project
 from marketing.models import Interview
 from employee.serializers import TeamSerializer, UserSerializer, TaggedUserSerializer
-from consultant.models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, ConsultantPOC, \
-    ConsultantRateRevision, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ConsultantToken, \
-    ConsultantPetitionToken
 
 
 # Consultant Login
@@ -136,9 +133,10 @@ class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantMarketing
-        fields = ('id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
-                  'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count',
-                  'project_count', 'current_city')
+        fields = (
+            'id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location', 'project_count',
+            'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count', 'current_city'
+        )
 
 
 class ConsultantRateRevisionSerializer(serializers.ModelSerializer):

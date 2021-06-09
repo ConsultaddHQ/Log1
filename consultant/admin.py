@@ -1,13 +1,18 @@
+from consultant.models import *
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
-
-from .models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantRateRevision, ConsultantPOC, \
-    Education, Experience, WorkAuth, ConsultantToken, ConsultantPetitionToken, ConsultantExit, Feedback, ExitReason,\
-    PayrollEmployer, ConsultantResetPasswordToken
 
 
 @admin.register(Consultant)
 class ConsultantAdmin(ExportActionModelAdmin):
+    fieldsets = (
+        ('Personal info', {'fields': ('name', 'email', 'skills', 'links', 'domain', 'skype', 'ssn', 'current_city',
+                                      'phone_no', 'gender', 'date_of_birth')}),
+        ('Other details', {'fields': ('status', 'work_type')}),
+        ('Login details', {'fields': ('first_login', 'is_active', 'remote_only')}),
+        ('Petition', {'fields': ('p_is_active', 'visa_petition', 'pin')}),
+    )
+
     actions = ["export_as_csv"]
     list_filter = ('status', 'work_type', 'remote_only', 'first_login')
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')

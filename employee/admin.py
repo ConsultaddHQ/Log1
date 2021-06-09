@@ -13,11 +13,12 @@ admin.site.site_header = "Log1"
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin, ExportCsvMixin):
-    fieldsets = ((None, {'fields': ('team', 'employee_id', 'username', 'email', 'password')}),
-                 ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role')}),
-                 ('Permissions', {'fields': ('is_active', 'is_superuser', 'is_staff', 'user_permissions')}),
-                 ('Important dates', {'fields': ('last_login', 'date_joined')}),
-                 )
+    fieldsets = (
+        (None, {'fields': ('team', 'employee_id', 'username', 'email', 'password')}),
+        ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role')}),
+        ('Permissions', {'fields': ('is_active', 'is_superuser', 'is_staff', 'user_permissions', 'groups')}),
+        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+    )
 
     actions = ["export_as_csv"]
     date_hierarchy = 'last_login'
