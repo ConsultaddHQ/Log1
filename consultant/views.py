@@ -1,10 +1,7 @@
-import os
 import json
 import inspect
 from operator import or_
 from functools import reduce
-from django.db.models import F
-from django.utils import timezone
 from django.db import transaction
 from datetime import date, datetime
 from django.shortcuts import get_object_or_404
@@ -19,26 +16,15 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
 from api_key.models import APIKey
-from marketing.models import Interview
-from employee.serializers import TeamSerializer
-from employee.models import tag_users, User, Team
-from project.models import Project, ProjectStatus
+from consultant.serializers import *
+from employee.models import tag_users
+from project.models import ProjectStatus
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
 from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
     terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
-
-from consultant.models import Consultant, ConsultantProfile, ConsultantMarketing, ConsultantExit, \
-    ConsultantRateRevision, ConsultantPOC, WorkAuth, PayrollEmployer, Education, Experience, Feedback, ExitReason
-
-from consultant.serializers import ConsultantSerializer, ConsultantProfileSerializer, ConsultantMarketingSerializer, \
-    ConsultantMarketingCreateSerializer, ConsultantMarketingCycleSerializer, ConsultantRateRevisionSerializer, \
-    ConsultantPOCSerializer, ConsultantBenchSerializer, ConsultantListSerializer, ExitConsultantSerializer, \
-    ConsultantUpdateSerializer, EducationSerializer, ExperienceSerializer, ConsultantFeedbackSerializer, \
-    PayrollEmployerSerializer, POCSerializer, WorkAuthSerializer, ConsultantSubmissionSerializer, \
-    ExitDetailConsultantSerializer, ConsultantPetitionLoginSerializer
 
 
 # Route - v2/consultant/
@@ -63,7 +49,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             filter_json = request.query_params.get('filter_json', None)
             con_sub_status = request.query_params.get('sub_status', None)
 
-            if len(con_status) == 0:
+            if len(con_status) == 0 and len(query) > 0:
                 con_status = 'on_bench'
 
             consultants = Consultant.objects.all()
@@ -158,7 +144,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
                 return queryset.distinct('id')
 
-            if con_status:
+            if con_status and len(con_status) > 0:
                 consultants = status_obj[con_status]
 
             sub_status_obj = dict()

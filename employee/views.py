@@ -313,6 +313,8 @@ class ResetPasswordViewSets(GenericViewSet):
                 else:
                     write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
                     return Response({"message": "Something went wrong", "error": str(res)}, status=400)
+            else:
+                return Response({"message": "User is not active"}, status=400)
         return Response({"message": "Something went wrong"}, status=400)
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
