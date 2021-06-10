@@ -2,7 +2,6 @@ import inspect
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 
-
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from marketing.models import Submission, Interview
@@ -33,6 +32,13 @@ def submission_is_complete(obj):
     except Exception as error:
         write_exception(message=error, class_name=None, function_name="submission_is_complete")
         return obj
+
+
+def get_interview_title(interview):
+    return f"""CTB: {interview.supervisor.employee_name} :: {interview.round}R :: 
+        {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
+        {interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} :: 
+        {interview.consultant.name} :: {interview.marketer.employee_name}"""
 
 
 def create_submission(request, lead_id):

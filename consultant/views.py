@@ -49,7 +49,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             filter_json = request.query_params.get('filter_json', None)
             con_sub_status = request.query_params.get('sub_status', None)
 
-            if len(con_status) == 0 and len(query) > 0:
+            if len(con_status) == 0 and len(query) < 0:
                 con_status = 'on_bench'
 
             consultants = Consultant.objects.all()
@@ -64,8 +64,10 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 if 'gender' in filters:
                     consultants = consultants.filter(gender=filters['gender'])
 
-                if 'team' in filters:
-                    consultants = consultants.filter(marketing__teams__name=filters['team'])
+                if 'team' in filters and len(filters['team']) > 0:
+                    consultants = consultants.filter(
+                        marketing__teams__name__iexact=filters['team'], marketing__status='open'
+                    )
 
                 if 'visa' in filters:
                     consultants = consultants.filter(
@@ -101,21 +103,31 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 )
 
             consultants = consultants.distinct('id')
+
+            offer_candidates = consultants.filter(
+                projects__statuses__status__in=['new', 'received', 'on_boarded'],
+                projects__statuses__is_current=True
+            ).values('id')
+            open_candidates = consultants.filter(marketing__status='open').values('id')
+
             status_obj = {
                 "all": consultants,
                 "terminated": consultants.filter(status__in=['archived', 'terminated']),
-                "marketing_candidate": consultants.filter(status='on_bench', marketing__status='close'),
+
+                "marketing_candidate": consultants.filter(
+                    status='on_bench', marketing__status='close'
+                ).exclude(id__in=open_candidates),
+
                 "on_project": consultants.filter(
                     projects__statuses__status='joined', projects__statuses__is_current=True
                 ).exclude(status__in=['archived', 'terminated']),
+
                 "offer": consultants.filter(
                     projects__statuses__is_current=True,
                     projects__statuses__status__in=['new', 'received', 'on_boarded'],
                 ).exclude(status__in=['archived', 'terminated']),
-                "on_bench": consultants.filter(marketing__status='open').exclude(
-                    projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                    projects__statuses__is_current=True, status__in=['archived', 'terminated']
-                ),
+
+                "on_bench": consultants.filter(marketing__status='open').exclude(id__in=offer_candidates)
             }
 
             def queryset_filter_by_status(queryset, sub_status):
@@ -123,15 +135,21 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                     queryset = queryset.filter(marketing__in_pool=False, marketing__status='open')
 
                 elif sub_status == 'in_pool':
-                    queryset = queryset.filter(marketing__in_pool=True, marketing__status='open')
+                    queryset = queryset.filter(
+                        marketing__in_pool=True, marketing__status='open'
+                    ).exclude(id__in=offer_candidates)
 
                 elif sub_status == 'on_boarded':
-                    queryset = queryset.filter(projects__statuses__status='on_boarded',
-                                               projects__statuses__is_current=True)
+                    queryset = queryset.filter(
+                        projects__statuses__status='on_boarded',
+                        projects__statuses__is_current=True
+                    )
 
                 elif sub_status == 'in_offer':
-                    queryset = queryset.filter(projects__statuses__status__in=['new', 'received'],
-                                               projects__statuses__is_current=True)
+                    queryset = queryset.filter(
+                        projects__statuses__status__in=['new', 'received'],
+                        projects__statuses__is_current=True
+                    )
 
                 elif sub_status == 'fired':
                     queryset = queryset.filter(exit__type='fired')
@@ -236,7 +254,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='filters')
-    def filters(self, request, *args, **kwargs):
+    def filters(self, request):
         try:
             filters = {
                 "on_project": [],
@@ -1031,7 +1049,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             # Activity
             desc = f"{request.user.employee_name} started Marketing from {consultant_marketing.start}"
             create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"message": "Cycle Created"}, status=201)
+            return Response({"message": "Marketing started"}, status=201)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1086,11 +1104,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['get'], detail=False, url_path='previous_marketing')
     def previous_marketing(self, request, *args, **kwargs):
         try:
-            marketing = ConsultantMarketing.objects.filter(
-                consultant_id=request.query_params.get('consultant')
-            ).latest('end')
-            serializer = ConsultantMarketingCycleSerializer(marketing)
-            return Response({"data": serializer.data}, status=200)
+            qs = ConsultantMarketing.objects.filter(consultant_id=request.query_params.get('consultant'))
+            if qs:
+                data = ConsultantMarketingCycleSerializer(qs.latest('end')).data
+            else:
+                data = []
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

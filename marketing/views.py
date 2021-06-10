@@ -34,8 +34,8 @@ from utils_app.mailing import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
 from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
-from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionConProfile
+from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title
 from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
     write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.serializers import Lead, Submission, VendorCompany, VendorContact, VendorLayer, \
@@ -1295,7 +1295,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
             else:
-                queryset = Interview.objects.exclude(submission__consultant_marketing__status='close')
+                consultants = Consultant.objects.filter(marketing__status='open').values('id')
+                queryset = Interview.objects.filter(submission__consultant_marketing__consultant_id__in=consultants)
 
             if filter_for == 'my':
                 if 'interviewee' in roles:
@@ -1404,11 +1405,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 return Response({"message": 'This is not your submission'}, status=400)
 
             # calculating Interview round
-            prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(
-                status='cancelled')
+            prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(status='cancelled')
             round_count = 0
             if prev_interview and prev_interview.first().status not in ['cancelled', 'next_round']:
-                return Response({"message": "Change status of previous interview"}, status=400)
+                return Response({"message": "Change status of previous interview first"}, status=400)
 
             if prev_interview:
                 round_count = prev_interview.aggregate(Max('round'))['round__max']
@@ -1536,15 +1536,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
+        # Change status of past Screening to feedback due
+        change_to_feedback_due()
         try:
-            # Change status of past Screening to feedback due
-            change_to_feedback_due()
-            interview_id = kwargs.get('pk')
             status_change = request.query_params.get('status_change', 'true')
             reschedule = request.query_params.get('reschedule', None)
-            queryset = Interview.objects.filter(id=interview_id, submission__created_by=request.user)
+
+            interview_status = request.data.get('status', None)
+            if interview_status and len(interview_status) == 0:
+                return Response({"message": "Invalid value of status, Please select status"}, status=400)
+
+            if interview_status == 'cancelled':
+                return Response({"message": "Interview is not cancelled."}, status=400)
+
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
             if not queryset:
-                return Response({"error": "Interview not found"}, status=400)
+                return Response({"message": "Interview not found"}, status=400)
 
             interview = queryset.first()
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
@@ -1553,12 +1560,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Setting Submission is_active value
                 submission = interview.submission
-                if interview.status == 'cancelled' and not submission.screening.exclude(status='cancelled'):
-                    submission.status = 'sub'
-                    # clear rank for cancelled interview
-                    if interview.round == 1:
-                        interview = self.rank_interviews(interview, 'cancel')
-                if interview.status in ['cancelled', 'next_round']:
+                if interview.status in ['next_round']:
                     submission.is_active = True
                 if interview.status in ['offer']:
                     submission.is_active = False
@@ -1572,12 +1574,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 for user in scrum_masters:
                     user_list.append(user)
-                title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R :: 
-                        {interview.get_screening_type_display()} ::
-                        {interview.get_interview_mode_display()} :: 
-                        {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
-                        {submission.client} :: {interview.consultant.name} :: 
-                        {interview.marketer.employee_name}"""
+
+                title = get_interview_title(interview)
 
                 if status_change == "true" and interview.status not in ['cancelled']:
                     if interview.status == 'next_round':
@@ -1589,6 +1587,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         interview_status = "Failed"
                         interview_status_emoji = "&#128078;"
+
                     text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
                     text += interview.feedback
 
@@ -1607,16 +1606,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                f" {interview.end_time}"
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date():
-                            text = "*CTB: {} :: Round:{} :: {} :: {} :: {} :: {} :: {} :: {}*".format(
-                                interview.supervisor.employee_name, interview.round,
-                                interview.get_screening_type_display(),
-                                interview.get_interview_mode_display(),
-                                interview.start_time.strftime('%m/%d/%Y :: %I:%M EST'),
-                                submission.consultant.name,
-                                submission.client, interview.marketer.employee_name)
                             data = {
                                 "title": "&#9201; Interview Rescheduled",
-                                "text": text
+                                "text": title
                             }
                             post_msg_using_webhook(config.announcement_url, data)
 
@@ -1761,6 +1753,170 @@ class InterviewViewSets(viewsets.ModelViewSet):
             }
             create_notification(user_list, notification_data)
             return Response(status=204)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='reschedule')
+    def reschedule(self, request, *args, **kwargs):
+        # Change status of past Screening to feedback due
+        change_to_feedback_due()
+        try:
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
+            if not queryset:
+                return Response({"message": "Interview not found"}, status=400)
+
+            interview = queryset.first()
+            serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+
+            interview.status = 'rescheduled'
+            interview.save()
+
+            booking_res = 'error'
+            submission = interview.submission
+            guest = interview.guest.all()
+            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+            user_list = [user for user in guest] + [user for user in scrum_masters] + [interview.supervisor]
+
+            title = get_interview_title(interview)
+
+            desc = f"Round {interview.round} is rescheduled for {interview.start_time} to {interview.end_time}"
+            create_activity(submission.id, 'submission', request.user, desc, 'updated')
+            supervisor_email = interview.supervisor.email
+            guest = [{"email": user.email} for user in interview.guest.all()]
+            attendees = [{'email': supervisor_email}, {'email': request.user.email}]
+            attendees += [{'email': user.email} for user in scrum_masters] + guest
+
+            if interview.status not in ['offer', 'failed', 'next_round']:
+                start = serializer.data["start_time"].replace("Z", "")
+                end = serializer.data["end_time"].replace("Z", "")
+                event = {
+                    "end": end,
+                    "start": start,
+                    "summary": title,
+                    "user": request.user,
+                    "attendees": attendees,
+                    "lead": submission.lead,
+                    "submission": submission,
+                    "consultant": submission.consultant,
+                    "description": request.data["description"],
+                    "call_details": request.data["call_details"]
+                }
+
+                # Updating calendar Booking
+                if os.environ.get('ENV', 'local') == 'prod':
+                    event_id = interview.calendar_id
+                    if not event_id:
+                        try:
+                            cal_res = book_ms_calendar(event)
+                            interview.calendar_id = cal_res['id']
+                            booking_res = 'booked'
+                            interview.save()
+                        except Exception as error:
+                            return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
+                    else:
+                        try:
+                            update_ms_calendar(event_id, event)
+                            booking_res = 'updated'
+                        except Exception as error:
+                            return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
+
+                if date.today() == interview.start_time.date():
+                    data = {
+                        "title": "&#9201; Interview Rescheduled",
+                        "text": title
+                    }
+                    post_msg_using_webhook(config.announcement_url, data)
+
+                data = queryset.annotate(
+                    client=F('submission__client'),
+                    project=F('submission__project'),
+                    job_title=F('submission__lead__job_title'),
+                    supervisor_name=F('supervisor__employee_name'),
+                    company_name=F('submission__lead__vendor_company__name'),
+                    marketer_name=F('submission__created_by__employee_name'),
+                    consultant_name=F('submission__consultant_marketing__consultant__name'),
+                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'job_title',
+                         'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
+                         'company_name', 'screening_type', 'interview_mode')
+
+                notification_data = {
+                    'category': 'info',
+                    'description': title,
+                    'target_id': interview.id,
+                    'parent_id': submission.id,
+                    'sender_user_type': 'user',
+                    'target_type': 'interview',
+                    'parent_type': 'submission',
+                    'title': 'Interview Updated',
+                    'sender_id': request.user.id,
+                    'recipient_user_type': 'user',
+                }
+                create_notification(user_list, notification_data)
+                return Response({"data": data[0], "calendar": booking_res, "message": "Interview updated"}, status=202)
+        except Exception as error:
+            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='cancel_interview')
+    def cancel_interview(self, request, *args, **kwargs):
+        interview_id = kwargs.get('pk')
+        try:
+            interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
+            if os.environ.get('ENV', 'local') == 'prod':
+                try:
+                    if interview.calendar_id:
+                        delete_ms_calendar(interview.calendar_id)
+                    else:
+                        return Response({"message": "Booking not found"}, status=404)
+                except Exception as error:
+                    write_exception(message=f"Booking cancellation failed: {error}", class_name=self.get_classname(),
+                                    function_name=inspect.stack()[0][3])
+                    return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
+
+            interview.feedback = request.data.get('feedback', None)
+            interview.status = 'cancelled'
+            interview.save()
+
+            submission = interview.submission
+            desc = f"Round {interview.round} is cancelled"
+            create_activity(submission.id, 'submission', request.user, desc, 'updated')
+
+            if interview.round == 1:
+                submission.status = 'sub'
+                interview = self.rank_interviews(interview, 'cancel')
+
+            submission.is_active = True
+            submission.save()
+
+            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+            user_list = [user for user in interview.guest.all()]
+            user_list.append(interview.supervisor)
+
+            for user in scrum_masters:
+                user_list.append(user)
+            title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
+                                    {interview.get_screening_type_display()} :: 
+                                    {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
+                                    {submission.client} :: {interview.consultant.name} :: 
+                                    {interview.marketer.employee_name}"""
+
+            notification_data = {
+                'category': 'info',
+                'description': title,
+                'target_id': interview.id,
+                'parent_id': submission.id,
+                'target_type': 'interview',
+                'parent_type': 'submission',
+                'sender_user_type': 'user',
+                'sender_id': request.user.id,
+                'recipient_user_type': 'user',
+                'title': 'Interview Cancelled',
+            }
+            create_notification(user_list, notification_data)
+            return Response({"message": "Interview cancelled"}, status=202)
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
