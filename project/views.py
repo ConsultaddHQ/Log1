@@ -109,7 +109,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     'marketer_name': submission.created_by.employee_name,
                 },
             }
-            res = send_email(mail_data, submission.created_by.email)
+            res = None
+            if os.environ.get("ENV") == 'prod':
+                res = send_email(mail_data, submission.created_by.email)
             return res, "ok"
         except Exception as error:
             write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
@@ -169,7 +171,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 },
                 'attachments': path
             }
-            res = send_email_attachment_multiple(mail_data, submission.created_by.email)
+            res = None
+            if os.environ.get("ENV") == 'prod':
+                res = send_email_attachment_multiple.delay(mail_data, submission.created_by.email)
+
             delete_temp_file(path)
             return res, "ok"
         except Exception as error:
@@ -809,7 +814,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         send_notification_for_user(project.consultant, request.user, title, 'project')
 
                     elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancellation')
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Cancelled')
 
                         text = f"""{consultant_gender_emoji} Consultant :  **{project.consultant.name}** <br>
                         {marketer_gender_emoji} Marketer :  {project.marketer_name} <br>
@@ -830,7 +835,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         post_msg_using_webhook(config.offer_failure_url, data)
 
                     elif prev_status_obj.status != 'complete' and new_status == "complete":
-                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'PO Completion')
+                        resp, err = self.po_termination_or_cancellation_mail(project, scrum_masters, 'Project completed')
                         project.consultant.status = 'on_bench'
                         project.consultant.save()
                         title = f" Project Completed :: {project.consultant.name} :: {project.submission.client}"

@@ -1,7 +1,8 @@
 import os
+import time
 import boto3
 import inspect
-from datetime import datetime
+from django.conf import settings
 from botocore.exceptions import ClientError
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
@@ -38,7 +39,14 @@ def get_s3_object(key):
 
 
 def download_s3_object(key):
-    file_name = key.split('/')[1] + "_" + str(datetime.now()) + "_" + key.split('/')[3]
+    name = ".".join(key.split('/')[3].split(".")[:-1])
+    ext = key.split('/')[3].split(".")[-1]
+    folder = key.split('/')[1]
+    file_name = f"{folder}/{name}_{time.strftime('%Y%m%d-%H%M%S')}.{ext}"
+
+    if not os.path.exists(f"{settings.BASE_DIR}/media/{folder}"):
+        os.mkdir(f"{settings.BASE_DIR}/media/{folder}")
+
     s3 = boto3.client(
         's3', region_name=os.getenv('AWS_REGION_NAME'),
         aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
