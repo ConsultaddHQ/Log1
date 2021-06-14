@@ -2389,9 +2389,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def get_test_data(self, queryset, filter_by_status):
         try:
             # Interview counts by status
-            sort_by = '-created'
+            sort_by = 'created'
             if filter_by_status == 'failed':
-                sort_by = '-modified'
+                sort_by = 'modified'
             queryset = queryset.order_by('-' + sort_by).distinct(sort_by)
             total = queryset.count()
             new = queryset.filter(status='new').count()
@@ -2434,15 +2434,20 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
 
-            order_by = '-created'
-            if filter_by_status == 'failed':
-                order_by = '-modified'
             if sort_by:
                 field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
                 if field_name == 'created':
-                    order_by = "created" if order == "asc" else "-created"
+                    order_by = "-created"
+                    # order_by = "created" if order == "asc" else "-created"
                 elif field_name == 'deadline':
-                    order_by = "deadline" if order == "asc" else "-deadline"
+                    order_by = "-deadline"
+                    # order_by = "deadline" if order == "asc" else "-deadline"
+                else:
+                    order_by = '-modified'
+            else:
+                order_by = '-created'
+                if filter_by_status == 'failed':
+                    order_by = '-modified'
 
             queryset = Test.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             return queryset, data_counts
