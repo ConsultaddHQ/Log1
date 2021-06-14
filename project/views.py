@@ -173,7 +173,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res = None
             if os.environ.get("ENV") == 'prod':
-                res = send_email_attachment_multiple.delay(mail_data, submission.created_by.email)
+                res = send_email_attachment_multiple(mail_data, submission.created_by.email)
 
             delete_temp_file(path)
             return res, "ok"

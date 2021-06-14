@@ -49,7 +49,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             filter_json = request.query_params.get('filter_json', None)
             con_sub_status = request.query_params.get('sub_status', None)
 
-            if len(con_status) == 0 and len(query) < 0:
+            if len(con_status) == 0 and len(query) <= 0:
                 con_status = 'on_bench'
 
             consultants = Consultant.objects.all()
