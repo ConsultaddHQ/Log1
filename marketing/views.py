@@ -236,13 +236,10 @@ class LeadViewSets(viewsets.ModelViewSet):
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
 
-            order_by = '-created'
-            if sort_by:
-                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                if field_name == 'created':
-                    order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'modified':
-                    order_by = "modified" if order == "asc" else "-modified"
+            if sort_by in ['created', 'modified']:
+                order_by = f"-{sort_by}"
+            else:
+                order_by = "-modified"
 
             queryset = Lead.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             if 'archived' in filter_by_status:
@@ -738,13 +735,10 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             if sub_status:
                 queryset = queryset.filter(status__in=sub_status)
 
-            order_by = '-created'
-            if sort_by:
-                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                if field_name == 'created':
-                    order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'modified':
-                    order_by = "modified" if order == "asc" else "-modified"
+            if sort_by in ['created', 'modified']:
+                order_by = f"-{sort_by}"
+            else:
+                order_by = "-modified"
 
             queryset = Submission.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             data = queryset[first:last].annotate(
@@ -957,10 +951,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 else:
                     submission.is_active = False
 
-                if submission.rate and submission.vendor and submission.client and \
-                        (submission.lead.job_desc and len(submission.lead.job_desc) > 20):
-                    submission.is_complete = True
-                else:
+                if not submission_is_complete(submission):
                     submission.is_complete = False
 
                 submission.save()
@@ -1224,13 +1215,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
-            order_by = '-created'
-            if sort_by:
-                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                if field_name == 'created':
-                    order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'start_time':
-                    order_by = "start_time" if order == "asc" else "-start_time"
+
+            if sort_by in ['created', 'modified', 'start_time']:
+                order_by = f"-{sort_by}"
+            else:
+                order_by = "-modified"
 
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             data = queryset[first:last].annotate(
@@ -2434,16 +2423,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
 
-            if sort_by:
-                field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                if field_name == 'created':
-                    order_by = "-created"
-                    # order_by = "created" if order == "asc" else "-created"
-                elif field_name == 'deadline':
-                    order_by = "-deadline"
-                    # order_by = "deadline" if order == "asc" else "-deadline"
-                else:
-                    order_by = '-modified'
+            if sort_by in ['created', 'modified', 'deadline']:
+                order_by = f"-{sort_by}"
             else:
                 order_by = '-created'
                 if filter_by_status == 'failed':

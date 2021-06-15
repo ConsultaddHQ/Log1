@@ -24,14 +24,15 @@ def change_to_feedback_due():
 
 def submission_is_complete(obj):
     try:
-        if obj.rate and obj.vendor and obj.client and \
-                (obj.lead.job_desc and len(obj.lead.job_desc) > 20):
-            obj.is_complete = False
+        if obj.rate and obj.vendor and obj.client and (obj.lead.job_desc and len(obj.lead.job_desc) > 20):
+            obj.is_complete = True
             obj.save()
-        return None
+            return True
+        else:
+            return False
     except Exception as error:
         write_exception(message=error, class_name=None, function_name="submission_is_complete")
-        return obj
+        return False
 
 
 def get_interview_title(interview):
