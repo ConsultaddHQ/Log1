@@ -88,7 +88,10 @@ def close_marketing():
 
 def start_marketing():
     try:
-        queryset = ConsultantMarketing.objects.filter(start__lte=date.today(), status='close', end=None)
+        consultants = Consultant.objects.filter(status__in=['on_bench', 'on_project'], marketing__status='open')
+        queryset = ConsultantMarketing.objects.filter(
+            start__lte=date.today(), status='close', end=None
+        ).exclude(consultant_id__in=consultants.values('id'))
         queryset.update(status='open')
         admin = get_object_or_404(User, employee_id=1000)
 
@@ -457,7 +460,6 @@ def create_consultant(request, creator_id):
                 date_of_birth=request.data.get('dob'),
                 current_city=request.data.get('current_location')
             )
-            write_exception(message="Consultant Object Created", class_name='None', function_name='create_consultant')
 
             # Adding Recruiter of Consultant
             recruiter_employee_id = request.data.get('recruiter')
@@ -470,7 +472,6 @@ def create_consultant(request, creator_id):
                     poc_type='recruiter',
                     consultant=consultant,
                 )
-            write_exception(message="Recruiter added", class_name='None', function_name='create_consultant')
 
             # Adding rate
             rate = request.data.get('rate', None)
@@ -481,7 +482,6 @@ def create_consultant(request, creator_id):
                     start=date.today(),
                     consultant=consultant
                 )
-            write_exception(message="Rate added", class_name='None', function_name='create_consultant')
 
             # Creating Consultant Original Profile Consultant
             ConsultantProfile.objects.create(
@@ -495,7 +495,6 @@ def create_consultant(request, creator_id):
                 visa_start=request.data.get('visa_start'),
                 current_city=request.data.get('current_location'),
             )
-            write_exception(message="Profile added", class_name='None', function_name='create_consultant')
 
             add_other_details(request, consultant)
             return consultant, "ok"

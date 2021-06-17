@@ -22,7 +22,7 @@ class Command(BaseCommand):
             for job in jobs:
                 text += f"""
                             <tr>
-                                <td style="padding:5px 8px 5px 8px;">{job.name}</td>
+                                <td style="padding:5px 8px 5px 8px;">{" ".join(job.name.split("_")).title()}</td>
                                 <td style="padding:5px 8px 5px 8px; text-align: center;">
                                 {job.modified.astimezone(to_zone).strftime('%l:%M %p %Z on %b %d, %Y')}</td>
                             </tr>

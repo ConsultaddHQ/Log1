@@ -13,7 +13,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = create_cron_object(name='assign_test_update')
+        job = create_cron_object(name='visa_update_reminder')
         try:
             thirty_days = date.today() + timedelta(days=30)
             fifteen_days = date.today() + timedelta(days=15)

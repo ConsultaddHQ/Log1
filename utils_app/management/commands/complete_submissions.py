@@ -10,16 +10,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = create_cron_object(name='complete_submissions')
         try:
-            subs = Submission.objects.all()
+            subs = Submission.objects.filter(is_complete=False)
             for submission in subs:
-                if submission.rate and submission.vendor and submission.client and submission.lead.job_desc:
+                if submission.rate and submission.vendor and submission.client and \
+                        (submission.lead.job_desc and len(submission.lead.job_desc) > 20):
                     submission.is_complete = True
                     submission.save()
 
-            projects = Project.objects.all()
-            for project in projects:
-                project.rate = project.submission.rate
-                project.employer = project.submission.employer
-                project.save()
         except Exception as error:
             create_cron_error(job, error)
