@@ -28,8 +28,7 @@ def submission_is_complete(obj):
             obj.is_complete = True
             obj.save()
             return True
-        else:
-            return False
+        return False
     except Exception as error:
         write_exception(message=error, class_name=None, function_name="submission_is_complete")
         return False

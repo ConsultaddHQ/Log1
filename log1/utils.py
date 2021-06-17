@@ -1,8 +1,10 @@
+import sys
 import yaml
 import json
 import random
 import logging
 import requests
+import linecache
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 from logging.config import dictConfig
@@ -22,8 +24,13 @@ def load_config(file_path):
 
 
 def write_exception(message, class_name, function_name):
+    exc_type, exc_obj, tb = sys.exc_info()
+    f = tb.tb_frame
+    lineno = tb.tb_lineno
+    filename = f.f_code.co_filename
+    linecache.checkcache(filename)
     logger.error(f"Raise by Class: {class_name}, Function: {function_name}")
-    logger.error(f"Type {type(message)}, Error Message: {message}")
+    logger.error(f'EXCEPTION IN {filename}, LINE NO - {lineno} : {message}')
 
 
 def get_page_limits(request):

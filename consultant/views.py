@@ -995,7 +995,14 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     def create(self, request, *args, **kwargs):
         try:
-            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
+            qs = Consultant.objects.filter(id=request.data['consultant'])
+            if qs:
+                return Response({"message": "Consultant not found"}, status=404)
+            open_consultant = qs.filter(marketing__status='open')
+            if open_consultant:
+                return Response({"message": "Marketing is already started"}, status=400)
+
+            consultant = qs.first()
             queryset = consultant.marketing.filter(status='close')
             if queryset:
                 latest_marketing_cycle = queryset.latest('end')
