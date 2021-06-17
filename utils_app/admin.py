@@ -62,7 +62,7 @@ class ObjectGroupAdmin(admin.ModelAdmin):
 @admin.register(CronJob)
 class CronJobAdmin(admin.ModelAdmin):
     search_fields = ('name',)
-    list_display = ('id', 'name', 'enabled', 'schedule', 'description')
+    list_display = ('id', 'name', 'enabled', 'schedule', 'created', 'modified')
 
 
 @admin.register(CronError)

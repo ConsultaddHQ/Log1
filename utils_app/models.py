@@ -76,8 +76,8 @@ class ObjectGroup(models.Model):
 class CronJob(TimeStampedModel):
     name = models.CharField(_('Name'), max_length=100)
     enabled = models.BooleanField(_('Enabled'), default=True)
-    schedule = models.CharField(_('Schedule'), max_length=50)
     description = models.TextField(_('Description'), blank=True, null=True)
+    schedule = models.CharField(_('Schedule'), max_length=50, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if not self.id:

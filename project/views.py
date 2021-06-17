@@ -451,16 +451,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             if version == 'v2' and filter_json:
                 # count of project by status
-                order_by = '-created'
-                if sort_by:
-                    field_name, order = sort_by.split("_") if len(sort_by.split("_")) > 1 else (sort_by, "asc")
-                    if field_name == 'created':
-                        order_by = "created" if order == "asc" else "-created"
-                    elif field_name == 'modified':
-                        order_by = "modified" if order == "asc" else "-modified"
-                    elif field_name == 'consultant':
-                        order_by = "submission__consultant_marketing__consultant__name" if order == "asc" \
-                            else "-submission__consultant_marketing__consultant__name"
+                if sort_by in ['created', 'modified']:
+                    order_by = f"-{sort_by}"
+                elif sort_by == 'consultant':
+                    order_by = '-submission__consultant_marketing__consultant__name'
+                else:
+                    order_by = '-modified'
 
                 projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
             serializer = self.serializer_class(projects[first:last], many=True)
