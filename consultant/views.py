@@ -996,7 +996,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     def create(self, request, *args, **kwargs):
         try:
             qs = Consultant.objects.filter(id=request.data['consultant'])
-            if qs:
+            if not qs:
                 return Response({"message": "Consultant not found"}, status=404)
             open_consultant = qs.filter(marketing__status='open')
             if open_consultant:
@@ -1141,14 +1141,17 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     marketers_name.append(marketer.employee_name)
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
 
+                if len(marketers_name) > 1:
+                    marketer_str = "marketers"
+                else:
+                    marketer_str = "marketer"
+
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name}'s marketing details updated by " \
-                        f"{request.user.employee_name}"
+                title = f"{request.user.employee_name} assigned following {marketer_str} - {', '.join(marketers_name)}"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
-                desc = f"{request.user.employee_name} assigned following marketer - {', '.join(marketers_name)}"
-                create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
+                create_activity(consultant_marketing.consultant.id, 'consultant', request.user, title, 'updated')
                 return Response({"data": serializer.data, "message": "marketers assigned"}, status=202)
             else:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
@@ -1174,11 +1177,11 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 teams_string = ", ".join(team.name for team in consultant_marketing.teams.all())
 
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name} is assigned to {teams_string}"
+                title = f"{consultant_marketing.consultant.name} is assigned to team - {teams_string}"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
-                desc = f"{request.user.employee_name} is assigned to {teams_string}"
+                desc = f"{request.user.employee_name} is assigned to team - {teams_string}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Team added"}, status=202)
             else:
@@ -1208,7 +1211,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
 
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name}'s assigned marketer removed"
+                name = consultant_marketing.consultant.name
+                title = f"{', '.join(marketers_name)} is unassigned from {name}'s marketing"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
@@ -1240,7 +1244,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
 
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name}'s marketing team removed"
+                title = f"{consultant_marketing.consultant.name} is removed from {team_string}"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
