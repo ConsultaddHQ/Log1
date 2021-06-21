@@ -2624,9 +2624,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     filter_string["submission__created_by_id__in"] = filters["marketer"]
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    filter_string["submission__lead__vendor_company_id"] = filters["vendor"]
-
-                if 'vendor' in filters and len(filters["vendor"]) > 0:
                     filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
