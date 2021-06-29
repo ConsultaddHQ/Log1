@@ -43,6 +43,7 @@ def download_s3_object_beats(key, name):
         s3.download_file(os.getenv('AWS_BEATS_BUCKET'), key, local_path)
         return True, local_path
     except Exception as error:
+        write_exception(message=error)
         return False, error
 
 
@@ -68,6 +69,7 @@ def beats_to_log1(file_path, file_name, obj_id, model):
         os.remove(path)
         return True, path
     except Exception as error:
+        write_exception(message=error)
         return False, error
 
 
@@ -83,6 +85,7 @@ def close_marketing():
             send_notification_for_user(marketing.consultant, admin, title, 'marketing')
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -101,6 +104,7 @@ def start_marketing():
             send_notification_for_user(marketing.consultant, admin, title, 'marketing')
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -109,10 +113,11 @@ def send_exit_interview_detail(terminate, request):
         # Message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
         reason = ", ".join(reason.name for reason in terminate.reasons.all())
+        termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
         data = {
             "title": f"Exit interview for {terminate.consultant.name}",
             "text": f"**Reason for leaving** : {reason}<br>"
-                    f"**Termination Date** : {datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')}<br>"
+                    f"**Termination Date** : {termination_date}<br>"
                     f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
@@ -165,6 +170,7 @@ def send_exit_interview_detail(terminate, request):
 
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -174,8 +180,8 @@ def terminate_consultant(terminate):
         consultant.status = 'terminated'
         consultant.save()
 
-        marketings = consultant.marketing.filter(status='open')
-        for marketing in marketings:
+        queryset = consultant.marketing.filter(status='open')
+        for marketing in queryset:
             marketing.status = 'close'
             marketing.end = date.today()
             marketing.save()
@@ -187,7 +193,7 @@ def terminate_consultant(terminate):
         if os.environ.get('ENV', 'local') == 'prod':
             res, error = send_exit_process_mail(terminate, 'complete')
             if error == 'error':
-                write_exception(message=error, class_name='None', function_name='terminate_consultant')
+                write_exception(message=error)
 
         # App Notification
         recruiter = consultant.recruiter
@@ -237,6 +243,7 @@ def terminate_consultant(terminate):
         push_notification(object_ids, message_body)
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -256,8 +263,8 @@ def send_exit_process_mail(terminate, exit_status):
         for user in scrum_masters:
             cc.append(user.email)
 
-        marketings = consultant.marketing.filter(status='open')
-        for marketing in marketings:
+        queryset = consultant.marketing.filter(status='open')
+        for marketing in queryset:
             cc.append(marketing.primary_marketer.email)
 
         types = dict(EXIT_TYPE_CHOICE)
@@ -314,7 +321,7 @@ def send_exit_process_mail(terminate, exit_status):
         res = send_email(mail_data, terminate.created_by.email)
         return res, "ok"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_exit_process_mail')
+        write_exception(message=error)
         return error, "error"
 
 
@@ -365,7 +372,7 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
         push_notification(object_ids, message_body)
         return "Notification sent"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_notification_for_user')
+        write_exception(message=error)
         return error, "error"
 
 
@@ -380,7 +387,6 @@ def add_other_details(request, consultant):
                 is_current=visa['current'],
                 visa_type=visa['type']["name"],
             )
-        write_exception(message="Work Auth added", class_name='None', function_name='add_other_details')
 
         # Adding Education
         educations = json.loads(request.data.get('education', []))
@@ -394,7 +400,6 @@ def add_other_details(request, consultant):
                 end_date=education['end_date'],
                 consultant_id=consultant.id,
             )
-        write_exception(message="Education details added", class_name='None', function_name='add_other_details')
 
         experiences = json.loads(request.data.get('experience', []))
         for experience in experiences:
@@ -408,7 +413,6 @@ def add_other_details(request, consultant):
                 start_date=experience['start_date'],
                 consultant_id=consultant.id,
             )
-        write_exception(message="Experience details added", class_name='None', function_name='add_other_details')
 
         # Adding Documents
         documents = json.loads(request.data.get('documents', []))
@@ -421,10 +425,8 @@ def add_other_details(request, consultant):
             )
             if not res:
                 return res_data, "error"
-        write_exception(message="Documents added", class_name='None', function_name='add_other_details')
-
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='add_other_details')
+        write_exception(error, request)
         return error, "error"
 
 
@@ -444,7 +446,7 @@ def create_consultant(request, creator_id):
         qs = Consultant.objects.filter(email=request.data.get('email'))
         if qs:
             consultant = qs.first()
-            write_exception(message="Consultant already exist", class_name='None', function_name='create_consultant')
+            write_exception("Consultant already exist", request)
             return consultant, "exists"
         else:
             consultant = Consultant.objects.create(
@@ -499,7 +501,7 @@ def create_consultant(request, creator_id):
             add_other_details(request, consultant)
             return consultant, "ok"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='create_consultant')
+        write_exception(error, request)
         return error, "error"
 
 

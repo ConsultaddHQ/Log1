@@ -34,7 +34,6 @@ ATTACHMENT_TYPE = (
 
 
 def attachment_upload(instance, filename):
-    """Stores the attachment in a "per module/appname/primary key" folder"""
     if instance.content_object:
         return 'attachments/{app}_{model}/{pk}/{filename}'.format(
             app=instance.content_object._meta.app_label,
@@ -58,7 +57,7 @@ def create_attachment(data):
         )
         return True
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='create_attachment')
+        write_exception(message=error)
         return False
 
 
@@ -111,7 +110,7 @@ class Attachment(TimeStampedModel):
 
 
 @receiver(models.signals.post_delete, sender=Attachment)
-def auto_delete_file_on_delete(sender, instance, **kwargs):
+def auto_delete_file_on_delete(sender, instance):
     """
     Deletes file from filesystem
     when corresponding `MediaFile` object is deleted.

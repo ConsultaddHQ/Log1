@@ -1,4 +1,3 @@
-import inspect
 from datetime import datetime, date, timedelta
 
 from django.db.models import Q
@@ -389,7 +388,7 @@ command - {command} {query}\n
 
             return Response({"text": text}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
     @action(methods=['get'], detail=False, url_path='marketer')
@@ -437,7 +436,7 @@ command - {command} {query}\n
                 text += f"""| {user.employee_name} | {user.team.name} |  {submission_count} | {interview_count} | {offer_count} |  {consultant_assigned} |\n"""
             return Response({"text": text}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
     @action(methods=['get'], detail=False, url_path='team')
@@ -546,7 +545,7 @@ command - {slash_command}\n
 
             return Response({"text": text}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"text": "Bad request", "error": str(error)}, status=200)
 
 
@@ -663,7 +662,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                 supports.order_by('support__employee_name', '-start')[first:last], many=True)
             return Response({"data": serializer.data, "counts": data_count, "page_count": page_count}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
 
@@ -732,7 +731,7 @@ class MarketingReportViewSets(GenericViewSet):
                 })
             return Response({"data": data, "total": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='team')
@@ -805,7 +804,7 @@ class MarketingReportViewSets(GenericViewSet):
             })
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='consultant')
@@ -858,5 +857,5 @@ class MarketingReportViewSets(GenericViewSet):
                 })
             return Response({'data': data, "total": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

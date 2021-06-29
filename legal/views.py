@@ -1,5 +1,4 @@
 import os
-import inspect
 from datetime import datetime
 from django.db.models import Q
 from django.utils import timezone
@@ -62,7 +61,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             res = send_email(mail_data, petition.assigned_to.email)
             return res, "ok"
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(message=error)
             return error, 'error'
 
     @action(methods=['get'], detail=True, url_path='doc_types')
@@ -96,7 +95,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     })
             return Response({"results": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload_doc')
@@ -116,7 +115,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = DocumentSerializer(documents, many=True)
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=False, url_path='verify_doc')
@@ -144,7 +143,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = DocumentSerializer(documents, many=True)
             return Response({"result": serializer.data, "message": message}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='doc_request')
@@ -176,7 +175,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 "result": {"id": petition.id, "status": petition.status, "message": "mail sent"}
             }, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='doc_url')
@@ -187,7 +186,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             url = get_s3_object(document.file.name)
             return Response({"result": url}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
@@ -199,7 +198,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             response = presigned_post_url(object_name=object_name)
             return Response({"result": response}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
@@ -208,7 +207,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -232,7 +231,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(queryset[first:last], many=True)
             return Response({"results": serializer.data, "total": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -262,7 +261,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(petition)
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -274,7 +273,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(petition)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='lca')
@@ -302,7 +301,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='petition_file')
@@ -334,7 +333,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='petition_status')
@@ -422,7 +421,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             serializer = PetitionGetSerializer(petition)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=True, url_path='document')
@@ -438,7 +437,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 return Response({"result": serializer.data}, status=202)
             return Response({"error": "document id is missing"}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='comment')
@@ -469,7 +468,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 serializer = ConsultantCommentGetSerializer(comment)
                 return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
 
@@ -509,7 +508,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             send_email(mail_data, beneficiary.email)
             return Response({"result": {"message": "mail sent"}}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='comment')
@@ -575,7 +574,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 serializer = ConsultantCommentGetSerializer(comment)
                 return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='doc_types')
@@ -613,7 +612,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     })
             return Response({"results": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='doc_url')
@@ -624,7 +623,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             url = get_s3_object(document.file.name)
             return Response({"result": url}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
@@ -636,7 +635,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             response = presigned_post_url(object_name=object_name)
             return Response({"result": response}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -646,11 +645,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 petition = queryset.first()
                 serializer = self.serializer_class(petition.documents.all(), many=True)
                 return Response({"results": serializer.data}, status=200)
-            write_exception(message="Petition not available", class_name=self.get_classname(),
-                            function_name=inspect.stack()[0][3])
             return Response({"error": "Petition not available"}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -670,7 +667,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
 
             doc_type = Types.objects.filter(id=file_type).first()
             if doc_type:
-                title = f"{doc_type.display_name} uploaded by {petition.beneficiary.name} ({petition.beneficiary.email})"
+                title = f"{doc_type.display_name} uploaded by {petition.beneficiary.name}({petition.beneficiary.email})"
                 data = {
                     "title": title,
                     "category": "alert",
@@ -703,7 +700,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             serializer = self.serializer_class(documents, many=True)
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -713,5 +710,5 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             document.delete()
             return Response({"result": "File deleted"}, status=204)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)

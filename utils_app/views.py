@@ -25,7 +25,7 @@ class CityViewSets(ListModelMixin, GenericViewSet):
             data = city[:40].values('id', 'name', 'state')
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name='CityViewSets', function_name='list')
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -47,7 +47,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             data = queryset.values('id', 'name', 'display_name', 'field', 'content_type__model')
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name='ChoiceViewSet', function_name='list')
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -63,5 +63,5 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             )
             return Response({'message': 'Choice Created'}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name='ChoiceViewSet', function_name='create')
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)

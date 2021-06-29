@@ -133,6 +133,7 @@ class User(AbstractUser, PermissionsMixin):
             res = send_email(mail_data, "admin@log1.com")
             return res, "ok"
         except Exception as error:
+            write_exception(message=error)
             return error, "error"
 
     def save(self, *args, **kwargs):
@@ -242,5 +243,5 @@ def tag_users(data):
             tag.tagged_user.add(user)
         return True
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='tag_users')
+        write_exception(message=error)
         return False

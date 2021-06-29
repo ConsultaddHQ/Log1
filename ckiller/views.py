@@ -1,5 +1,4 @@
 import json
-import inspect
 import requests
 
 from django.db.models import Q
@@ -25,13 +24,16 @@ class CkillerSubmissionSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
 
-    def get_consultant(self, obj):
+    @staticmethod
+    def get_consultant(obj):
         return "{} {}".format(obj.consultant.name, obj.consultant.email)
 
-    def get_client(self, obj):
+    @staticmethod
+    def get_client(obj):
         return CkillerVendorClientSerializer(obj.vendors.filter(type='client'), many=True).data
 
-    def get_vendor(self, obj):
+    @staticmethod
+    def get_vendor(obj):
         return CkillerVendorClientSerializer(obj.vendors.filter(type='vendor'), many=True).data
 
     class Meta:
@@ -78,7 +80,7 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
             serializer = self.serializer_class(queryset[first:last], many=True)
             return Response({"data": serializer.data, "total": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -118,8 +120,7 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                         res = json.loads(res.text)
                         token = res["key"]
                     else:
-                        write_exception(message="Unable to Login", class_name=self.get_classname(),
-                                        function_name=inspect.stack()[0][3])
+                        write_exception("Unable to Login", request)
                         continue
                     header = {
                         'Content-Type': "application/json",
@@ -190,5 +191,5 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                 return Response({"data": result}, status=201)
             return Response({"message": "Please provide Email"}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

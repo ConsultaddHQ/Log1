@@ -22,7 +22,7 @@ def send_email(mail_data, from_email, reply_to=None):
         msg.send()
         return "mail sent"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_email')
+        write_exception(message=error)
         return error
 
 
@@ -40,7 +40,7 @@ def send_email_without_template(mail_data, from_email):
         msg.send()
         return "mail sent", True
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_email_without_template')
+        write_exception(message=error)
         return error, False
 
 
@@ -63,6 +63,6 @@ def send_email_attachment_multiple(mail_data, from_email, reply_to=None):
         msg.send()
         return "mail sent"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_email_attachment_multiple')
+        write_exception(message=error)
         return error
 

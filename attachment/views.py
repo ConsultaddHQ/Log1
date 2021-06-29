@@ -1,7 +1,6 @@
 import os
 import time
 import boto3
-import inspect
 from django.conf import settings
 from botocore.exceptions import ClientError
 from rest_framework.decorators import action
@@ -61,7 +60,7 @@ def delete_temp_file(paths):
         if os.path.exists(path):
             os.remove(path)
         else:
-            write_exception(message=path + " file does not exist", class_name='None', function_name='delete_temp_file')
+            write_exception(message=path + " file does not exist")
 
 
 def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
@@ -76,8 +75,8 @@ def presigned_post_url(object_name, fields=None, conditions=None, expiration=360
             bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
         )
         return response
-    except ClientError as e:
-        write_exception(message=e, class_name='None', function_name='presigned_post_url')
+    except ClientError as error:
+        write_exception(message=error)
         return None
 
 
@@ -109,7 +108,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             serializer = self.serializer_class(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -140,7 +139,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     {"data": serializer.data, "check_list": check_list, "message": "Attachment added"}, status=201
                 )
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -169,7 +168,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 check_list = get_project_check_list(project)
                 return Response({"check_list": check_list, "message": "Attachment deleted"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -191,7 +190,7 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             extension = attachment.attachment_file.name.split(".")[-1]
             return Response({"data": url, 'file_type': extension}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
@@ -210,5 +209,5 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             response = presigned_post_url(object_name=object_name)
             return Response({"data": response, "message": "Attachment uploaded"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

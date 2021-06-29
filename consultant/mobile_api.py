@@ -1,5 +1,4 @@
 import os
-import inspect
 from datetime import timedelta
 from django.db.models import F
 from django.utils import timezone
@@ -78,7 +77,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             send_email(mail_data, "log1@consultadd.com")
             return Response({"result": "mail sent"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='login')
@@ -123,10 +122,9 @@ class ConsultantAuthViewSet(GenericViewSet):
                 }
                 return Response({"result": data}, status=202)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"error": str(error)}, status=400)
-        write_exception(message="Incorrect Email Id OR Password", class_name=self.get_classname(),
-                        function_name=inspect.stack()[0][3])
+        write_exception("Incorrect Email Id OR Password", request)
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
@@ -148,7 +146,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='change_password')
@@ -176,7 +174,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             consultant.save()
             return Response({"result": "Password Updated"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=False, url_path='logout')
@@ -187,7 +185,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             token.delete()
             return Response(status=204)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
 
@@ -256,7 +254,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 }
                 res, error = consultant.send_mail(mail_data)
                 if error == 'error':
-                    write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                    write_exception(res, request)
                     return Response({'error': str(res)}, status=400)
         return Response({'status': 'OK'}, status=200)
 

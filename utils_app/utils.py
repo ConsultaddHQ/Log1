@@ -20,7 +20,7 @@ def create_cron_error(job, description):
         }
         send_email_without_template(mail_data, 'admin@log1.com')
     except Exception as error:
-        write_exception(message=error, class_name=None, function_name='create_cron_error')
+        write_exception(message=error)
 
 
 def create_cron_object(name):
@@ -30,7 +30,7 @@ def create_cron_object(name):
         job.save()
         return job
     except Exception as error:
-        write_exception(message=error, class_name=None, function_name='create_cron_object')
+        write_exception(message=error)
 
 
 def get_attachment_status(project):

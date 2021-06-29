@@ -1,4 +1,3 @@
-import inspect
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
@@ -26,7 +25,6 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
         try:
             if request.user.is_superuser:
                 employee_id = request.data['employee_id']
-                # check if requested impersonated user exists
                 user_exists = User.objects.filter(employee_id=employee_id)
                 if user_exists:
                     user = user_exists.first()
@@ -37,5 +35,5 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
             else:
                 return Response({"message": 'Unauthorised Access'}, status=401)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": {'success': False, 'message': str(error)}}, status=400)

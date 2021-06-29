@@ -1,4 +1,3 @@
-import inspect
 from datetime import datetime
 from django.shortcuts import get_object_or_404
 
@@ -53,7 +52,7 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
                 return Response({"data": serializer.data}, status=200)
             return Response({"message": "No activity found"}, status=404)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -63,7 +62,7 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
             serializer = self.serializer_class(activity, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -98,7 +97,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             serializer = self.serializer_class(comments.order_by('-created'), many=True)
             return Response({'data': serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -176,5 +175,5 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             serializer = CommentGetSerializer(comment)
             return Response({"message": ERROR_MSG, "data": serializer.data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

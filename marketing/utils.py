@@ -1,4 +1,3 @@
-import inspect
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 
@@ -18,7 +17,7 @@ def change_to_feedback_due():
             interview.status = 'feedback_due'
             interview.save()
     except Exception as error:
-        write_exception(message=error, class_name=None, function_name="change_to_feedback_due")
+        write_exception(message=error)
         return None
 
 
@@ -30,7 +29,7 @@ def submission_is_complete(obj):
             return True
         return False
     except Exception as error:
-        write_exception(message=error, class_name=None, function_name="submission_is_complete")
+        write_exception(message=error)
         return False
 
 
@@ -115,5 +114,5 @@ def create_submission(request, lead_id):
 
         return sub
     except Exception as error:
-        write_exception(message=error, class_name=None, function_name="create_submission")
+        write_exception(error, request)
         return False
