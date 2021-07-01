@@ -101,10 +101,6 @@ class SlashCommandViewSets(GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     months = ["Unknown", "January", "February", "March", "April", "May", "June", "July", "August", "September",
               "October", "November", "December"]
 
@@ -556,10 +552,6 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def get_support_counts(self, supports):
         counts = dict()
         supports = supports.order_by(
@@ -672,10 +664,6 @@ class MarketingReportViewSets(GenericViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):

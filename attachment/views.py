@@ -87,10 +87,6 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         obj_type = request.query_params.get("obj_type", None)
         object_id = request.query_params.get('object_id', None)
@@ -178,10 +174,6 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
     serializer_class = AttachmentSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         try:

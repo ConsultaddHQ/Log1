@@ -28,10 +28,6 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['get'], detail=False, url_path='number_list')
     def number_list(self, request):
         try:

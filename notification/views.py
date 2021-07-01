@@ -26,10 +26,6 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def create(self, request, *args, **kwargs):
         try:
             content_type = ContentType.objects.get(model='user')
@@ -51,10 +47,6 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
     queryset = Notification.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = NotificationSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @never_cache
     def list(self, request, *args, **kwargs):
@@ -136,10 +128,6 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
     serializer_class = NotificationSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @never_cache
     def list(self, request, *args, **kwargs):

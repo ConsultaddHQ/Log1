@@ -31,10 +31,6 @@ class ConsultantAuthViewSet(GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
@@ -136,10 +132,6 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             queryset = Consultant.objects.all()
@@ -196,10 +188,6 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
     authentication_classes = ()
     serializer_class = EmailSerializer
     queryset = Consultant.objects.all()
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):

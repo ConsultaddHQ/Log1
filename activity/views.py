@@ -39,10 +39,6 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
             activity_id = kwargs.get('pk')
@@ -72,10 +68,6 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     serializer_class = CommentGetSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')

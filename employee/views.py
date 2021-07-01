@@ -35,10 +35,6 @@ class EmployeeAuthViewSets(GenericViewSet):
     serializer_class = UserSerializer
     login_serializer_class = UserSerializerLogin
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
@@ -105,10 +101,6 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -253,10 +245,6 @@ class ResetPasswordViewSets(GenericViewSet):
     serializer_class = EmailSerializer
     pass_serializer_class = PasswordTokenSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -353,10 +341,6 @@ class AssetsViewSets(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
     field_list = ['id', 'email', 'number', 'username', 'password', 'provider', 'modified', 'tech',
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
@@ -577,10 +561,6 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
     queryset = User.objects.all()
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         try:

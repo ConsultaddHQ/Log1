@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from employee.models import User, Asset, Team, Tagging
+from employee.models import User, Asset, Team, Tagging, Handover
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -81,3 +81,30 @@ class TaggedUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tagging
         fields = '__all__'
+
+
+class HandoverSerializer(serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    employee_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Handover
+        fields = ('id', 'employee_id', 'name', 'email')
+
+    @staticmethod
+    def get_id(obj):
+        return obj.user.id
+
+    @staticmethod
+    def get_email(obj):
+        return obj.user.email
+
+    @staticmethod
+    def get_employee_id(obj):
+        return obj.user.employee_id
+
+    @staticmethod
+    def get_name(obj):
+        return obj.user.employee_name

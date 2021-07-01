@@ -32,10 +32,6 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['GET'], detail=False, url_path='history')
     def history(self, request):
         # page = int(request.query_params.get("page", 1))
@@ -195,10 +191,6 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
@@ -215,10 +207,6 @@ class Test(GenericViewSet, ListModelMixin):
     serializer_class = PayrollScheduleSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         timesheet = request.query_params.get('timesheet')
@@ -250,10 +238,6 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     serializer_class = TimeSheetSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['GET'], detail=True, url_path='history')
     def history(self, request, *args, **kwargs):

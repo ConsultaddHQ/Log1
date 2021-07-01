@@ -36,10 +36,6 @@ class PetitionViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def rejection_mail(self, beneficiary_name, petition, document):
         try:
             to = ['sarang.m@consultadd.com']
@@ -479,10 +475,6 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     serializer_class = DocumentSerializer
     permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='contact_us')
     def contact_us(self, request):

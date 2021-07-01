@@ -43,10 +43,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def fetch_scrum_masters(self, request):
         scrum_masters = list(User.objects.filter(
             team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True
@@ -749,10 +745,6 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=request.query_params.get('project_id'))
@@ -891,10 +883,6 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=request.query_params.get('project_id'))
@@ -991,10 +979,6 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             end = request.query_params.get("end", None)
@@ -1038,10 +1022,6 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     serializer_class = FinanceSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         first, last = get_page_limits(request)

@@ -33,10 +33,6 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -284,10 +280,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def get_submission_data(self, queryset, filter_by_status, first, last):
         try:
@@ -844,10 +836,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['get'], detail=False, url_path='map')
     def map(self, request):
         consultants = Consultant.objects.filter(
@@ -974,10 +962,6 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     queryset = ConsultantMarketing.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantMarketingSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         try:
@@ -1264,10 +1248,6 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
     serializer_class = ConsultantProfileSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     # Return Consultant Profile by ID
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -1354,10 +1334,6 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     serializer_class = ConsultantPOCSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
@@ -1419,10 +1395,6 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = WorkAuth.objects.all()
     serializer_class = WorkAuthSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
@@ -1501,10 +1473,6 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     queryset = ConsultantExit.objects.all()
     serializer_class = ExitDetailConsultantSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -1689,10 +1657,6 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantFeedbackSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
             feedback_type = request.query_params.get('type', None)
@@ -1856,10 +1820,6 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantPetitionLoginSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
         """
@@ -1890,10 +1850,6 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
 class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def create(self, request, *args, **kwargs):
         try:

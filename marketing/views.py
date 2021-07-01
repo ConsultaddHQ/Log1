@@ -52,10 +52,6 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     serializer_class = VendorCompanySerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
@@ -97,10 +93,6 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
     permission_classes = (IsAuthenticated,)
     serializer_class = VendorContactSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -174,10 +166,6 @@ class LeadViewSets(viewsets.ModelViewSet):
     serializer_class = LeadSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def get_lead_data(self, queryset, filter_by_status, first, last):
         try:
@@ -485,10 +473,6 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
             sub_id = kwargs.get('pk')
@@ -680,10 +664,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def get_submission_data(self, sub, filter_by_status, first, last):
         try:
@@ -1053,10 +1033,6 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
     serializer_class = VendorLayerSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
             submission_id = kwargs.get('pk', None)
@@ -1115,10 +1091,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
     serializer_class = InterviewSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def rank_interviews(self, interview, interview_status):
         try:
@@ -2060,10 +2032,6 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         team_name = request.query_params.get("team", None)
         filter_for = request.query_params.get("filter_for", None)
@@ -2359,10 +2327,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
     serializer_class = TestCreateSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def get_test_data(self, queryset, filter_by_status):
         try:

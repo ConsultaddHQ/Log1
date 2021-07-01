@@ -245,3 +245,20 @@ def tag_users(data):
     except Exception as error:
         write_exception(message=error)
         return False
+
+
+class Handover(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='handover_to')
+    handover_to = models.ForeignKey(User, on_delete=models.CASCADE, related_name='handovers', blank=True, null=True)
+
+    class Meta:
+        ordering = ('-user__employee_name',)
+
+    def __str__(self):
+        return f"{self.user.employee_name} --> {self.handover_to.employee_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Handover, self).save(*args, **kwargs)
