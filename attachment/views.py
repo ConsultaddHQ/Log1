@@ -15,8 +15,8 @@ from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyM
 
 from project.models import Project
 from activity.views import create_activity
-from log1.utils import write_exception, ERROR_MSG
 from utils_app.utils import get_project_check_list
+from log1.utils import write_exception, ERROR_MSG, write_info
 from attachment.serializers import Attachment, AttachmentSerializer
 
 
@@ -60,7 +60,7 @@ def delete_temp_file(paths):
         if os.path.exists(path):
             os.remove(path)
         else:
-            write_exception(message=path + " file does not exist")
+            write_info(message=path + " file does not exist", function='delete_temp_file')
 
 
 def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):

@@ -42,7 +42,7 @@ class ConsultantPetitionTokenAdmin(admin.ModelAdmin):
 @admin.register(ConsultantProfile)
 class ConsultantProfileAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'consultant__name', 'consultant__email', 'profile_owner__employee_name')
+    search_fields = ('id', 'title', 'consultant__name', 'consultant__email', 'profile_owner__employee_name')
     list_display = ('id', 'title', 'consultant', 'profile_owner', 'date_of_birth', 'linkedin', 'current_city',
                     'profile_owner', 'visa_type', 'visa_start', 'visa_end', 'links', 'education')
 

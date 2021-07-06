@@ -27,6 +27,12 @@ def load_config(file_path):
         logger.error(error)
 
 
+def write_info(message, function, request=None):
+    if request:
+        logger.error("Address: %s, User id : %s", request.META['REMOTE_ADDR'], request.user.id)
+    logger.error(f'Function - {function}, Info: {message}')
+
+
 def write_exception(message, request=None):
     if request:
         logger.error("Address: %s, User id : %s", request.META['REMOTE_ADDR'], request.user.id)

@@ -13,8 +13,8 @@ from rest_framework.viewsets import GenericViewSet
 
 from constance import config
 from project.models import Project
-from log1.utils import write_exception
 from utils_app.mailing import send_email
+from log1.utils import write_exception, write_info
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.serializers import ConsultantLoginSerializer
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
@@ -120,7 +120,6 @@ class ConsultantAuthViewSet(GenericViewSet):
             except Exception as error:
                 write_exception(error, request)
                 return Response({"error": str(error)}, status=400)
-        write_exception("Incorrect Email Id OR Password", request)
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
@@ -242,7 +241,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 }
                 res, error = consultant.send_mail(mail_data)
                 if error == 'error':
-                    write_exception(res, request)
+                    write_info(message=res, function='token_request', request=request)
                     return Response({'error': str(res)}, status=400)
         return Response({'status': 'OK'}, status=200)
 

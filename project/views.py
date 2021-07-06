@@ -186,6 +186,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             delete_temp_file(path)
             return res, "ok"
         except Exception as error:
+            write_exception(message=error)
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters):
@@ -197,15 +198,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
         if support_msg == 'error' and offer_msg == 'error':
             message = "Project created, but unable to send Support and Offer mail"
             exception_msg = f"Support: {support_res}, Offer: {offer_res}"
-            write_exception(message=exception_msg)
+
         elif support_msg == 'error':
             message = "Project created, but unable to send Support mail"
             exception_msg = f"Support: {support_res}"
-            write_exception(message=exception_msg)
+
         elif offer_msg == 'error':
             message = "Project created, but unable to send Offer mail"
             exception_msg = f"Offer: {offer_res}"
-            write_exception(message=exception_msg)
 
         return message, exception_msg
 
@@ -539,7 +539,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     "data": serializer.data,
                     "exception": exception_msg,
                 }, status=201)
-            write_exception(serializer.errors, request)
             return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
             write_exception(error, request)

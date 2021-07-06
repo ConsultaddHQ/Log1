@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from consultant.models import Consultant
-from log1.utils import write_exception, ERROR_MSG
+from log1.utils import write_exception, ERROR_MSG, write_info
 from ckiller.models import CkillerSubmission, CkillerVendorClient
 
 
@@ -116,7 +116,7 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
                         res = json.loads(res.text)
                         token = res["key"]
                     else:
-                        write_exception("Unable to Login", request)
+                        write_info("Unable to Login", 'CkillerSubmissionViewSet_create', request)
                         continue
                     header = {
                         'Content-Type': "application/json",

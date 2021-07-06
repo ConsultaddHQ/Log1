@@ -460,7 +460,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             # Creating Consultant Original Profile Consultant
             ConsultantProfile.objects.create(
                 title="Original",
-                links=data['links'],
                 consultant=consultant,
                 visa_end=data['visa_end'],
                 profile_owner=request.user,
@@ -468,6 +467,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 visa_start=data['visa_start'],
                 current_city=data['current_city'],
                 date_of_birth=data['date_of_birth'],
+                links=request.data.get('links', None),
             )
 
             # Creating Recruiter of Consultant
