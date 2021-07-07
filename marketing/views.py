@@ -159,6 +159,9 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
 
 # Route - /lead/
 class LeadViewSets(viewsets.ModelViewSet):
@@ -167,7 +170,8 @@ class LeadViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    def get_lead_data(self, queryset, filter_by_status, first, last):
+    @staticmethod
+    def get_lead_data(queryset, filter_by_status, first, last):
         try:
             total = queryset.count()
             new = queryset.filter(status='new').count()
@@ -186,29 +190,24 @@ class LeadViewSets(viewsets.ModelViewSet):
                 "archive": archive,
             }
 
-            if filter_by_status == 'archived':
-                data = queryset[first:last].annotate(
-                    company_id=F('vendor_company__id'),
-                    submission_count=Count('submission'),
-                    company_name=F('vendor_company__name'),
-                    position_name=F('position__display_name')
-                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
-                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
-            else:
-                data = queryset.exclude(status='archived')[first:last].annotate(
-                    company_id=F('vendor_company__id'),
-                    submission_count=Count('submission'),
-                    company_name=F('vendor_company__name'),
-                    position_name=F('position__display_name')
-                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
-                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
+            if filter_by_status != 'archived':
+                queryset = queryset.exclude(status='archived')
+
+            data = queryset[first:last].annotate(
+                company_id=F('vendor_company__id'),
+                submission_count=Count('submission'),
+                company_name=F('vendor_company__name'),
+                position_name=F('position__display_name')
+            ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
+                     'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
         except Exception as error:
             write_exception(message=error)
             return error, 'error'
 
-    def get_count_and_queryset(self, queryset, filter_by_status, sort_by, first, last):
+    @staticmethod
+    def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last):
         try:
             queryset = queryset.order_by('id').distinct('id')
             data_counts = {
@@ -228,22 +227,17 @@ class LeadViewSets(viewsets.ModelViewSet):
                 order_by = "-modified"
 
             queryset = Lead.objects.filter(id__in=queryset.values('id')).order_by(order_by)
-            if 'archived' in filter_by_status:
-                data = queryset[first:last].annotate(
-                    company_id=F('vendor_company__id'),
-                    submission_count=Count('submission'),
-                    company_name=F('vendor_company__name'),
-                    position_name=F('position__display_name')
-                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
-                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
-            else:
-                data = queryset.exclude(status='archived')[first:last].annotate(
-                    company_id=F('vendor_company__id'),
-                    submission_count=Count('submission'),
-                    company_name=F('vendor_company__name'),
-                    position_name=F('position__display_name')
-                ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
-                         'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
+
+            if 'archived' not in filter_by_status:
+                queryset = queryset.exclude(status='archived')
+
+            data = queryset[first:last].annotate(
+                company_id=F('vendor_company__id'),
+                submission_count=Count('submission'),
+                company_name=F('vendor_company__name'),
+                position_name=F('position__display_name')
+            ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
+                     'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count')
 
             return data, data_counts
         except Exception as error:
@@ -392,6 +386,9 @@ class LeadViewSets(viewsets.ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, *args, **kwargs):
@@ -665,7 +662,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
 
-    def get_submission_data(self, sub, filter_by_status, first, last):
+    @staticmethod
+    def get_submission_data(sub, filter_by_status, first, last):
         try:
             data = {
                 "total": sub,
@@ -698,7 +696,8 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, "error"
 
-    def get_count_and_queryset(self, queryset, sub_status, sort_by, first, last):
+    @staticmethod
+    def get_count_and_queryset(queryset, sub_status, sort_by, first, last):
         try:
             queryset = queryset.order_by('id').distinct('id')
             data_counts = {
@@ -939,6 +938,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
     @action(methods=['put'], detail=True, url_path='resume')
     def resume(self, request, *args, **kwargs):
         try:
@@ -1084,6 +1086,9 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
 
 # Route - /interview/
 class InterviewViewSets(viewsets.ModelViewSet):
@@ -1092,7 +1097,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    def rank_interviews(self, interview, interview_status):
+    @staticmethod
+    def rank_interviews(interview, interview_status):
         try:
             submission = interview.submission
             similar_interviews = Interview.objects.filter(
@@ -1124,7 +1130,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error
 
-    def get_interview_data(self, queryset, filter_by_status, first, last):
+    @staticmethod
+    def get_interview_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
             queryset = queryset.order_by('-modified').distinct('modified')
@@ -1166,7 +1173,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, 'error'
 
-    def get_count_and_queryset(self, queryset, filter_by_status, sort_by, first, last):
+    @staticmethod
+    def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last):
         try:
             # Interview counts by status
             queryset = queryset.order_by('id').distinct('id')
@@ -1707,6 +1715,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='reschedule')
     def reschedule(self, request, *args, **kwargs):
@@ -2328,7 +2339,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     authentication_classes = (TokenAuthentication,)
     serializer_class = TestCreateSerializer
 
-    def get_test_data(self, queryset, filter_by_status):
+    @staticmethod
+    def get_test_data(queryset, filter_by_status):
         try:
             # Interview counts by status
             sort_by = 'created'
@@ -2359,7 +2371,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(message=error)
             return error, 'error'
 
-    def get_count_and_queryset(self, queryset, filter_by_status, sort_by):
+    @staticmethod
+    def get_count_and_queryset(queryset, filter_by_status, sort_by):
         try:
             # Interview counts by status
             queryset = queryset.order_by('id').distinct('id')
@@ -2389,7 +2402,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(message=error)
             return error, 'error'
 
-    def send_test_mail(self, test, data, test_status):
+    @staticmethod
+    def send_test_mail(test, data, test_status):
         try:
             consultant = test.submission.consultant
             queryset = User.objects.filter(
@@ -2681,6 +2695,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, *args, **kwargs):

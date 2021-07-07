@@ -439,6 +439,9 @@ class AssetsViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
         users = request.data.get('users', [])

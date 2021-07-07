@@ -85,10 +85,7 @@ class ProjectUtil:
 
     def fetch_project_count(self, project_status, emoji):
         day_one = datetime.today().replace(day=1, hour=0, minute=0)
-        total_count = Project.objects.filter(
-            statuses__status=project_status,
-            statuses__created__gte=day_one,
-        ).count()
+        total_count = Project.objects.filter(statuses__status=project_status, statuses__created__gte=day_one).count()
 
         team_count = Project.objects.filter(
             statuses__status=project_status,
@@ -225,11 +222,8 @@ class ProjectUtil:
 
         for i in range(2):
             TimeSheet.objects.get_or_create(
-                hours=0,
-                end=end_date,
-                status='draft',
-                project=self.project,
-                start=start_date,
+                start=start_date, end=end_date,
+                hours=0, status='draft', project=self.project,
             )
             start_date = end_date + timedelta(days=1)
             end_date = end_date + timedelta(days=7)

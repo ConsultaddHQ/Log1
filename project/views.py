@@ -43,28 +43,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    def fetch_scrum_masters(self, request):
+    @staticmethod
+    def fetch_scrum_masters(request):
         scrum_masters = list(User.objects.filter(
             team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True
         ).values_list('email', flat=True))
         return scrum_masters
 
-    def consultant_mail_on_joining(self, project, password, new_user):
+    @staticmethod
+    def consultant_mail_on_joining(project, password, new_user):
         try:
             mail_data = {
-                'to': [project.consultant.email],
-                'cc': [config.FINANCE],
-                'bcc': [],
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
+                'to': [project.consultant.email], 'cc': [config.FINANCE], 'bcc': [],
                 'context': {
-                    'password': password,
-                    'new_user': new_user,
-                    'iphone_link': config.IPHONE_APP_LINK,
-                    'android_link': config.ANDROID_APP_LINK,
-                    'consultant_name': project.consultant.name,
-                    'client': project.submission.client.title(),
-                    'consultant_email': project.consultant.email,
+                    'iphone_link': config.IPHONE_APP_LINK, 'android_link': config.ANDROID_APP_LINK,
+                    'password': password, 'new_user': new_user, 'consultant_name': project.consultant.name,
+                    'client': project.submission.client.title(), 'consultant_email': project.consultant.email,
                 },
             }
             res = "Development Server"
@@ -75,7 +71,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, "error"
 
-    def send_offer_received_mail(self, project, scrum_masters):
+    @staticmethod
+    def send_offer_received_mail(project, scrum_masters):
         try:
             submission = project.submission
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.team.email]
@@ -94,23 +91,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
-                'to': to,
-                'cc': cc,
-                'bcc': [],
+                'to': to, 'cc': cc, 'bcc': [],
                 'template': '../templates/offer.html',
-                'subject': f'Offer Received of {consultant.name} :: {submission.client} :: '
-                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
+                'subject': f'Offer Received for {consultant.name} :: {submission.client} :: {project_start_date} :: '
+                           f'{submission.client} :: {submission.vendor.name}',
                 'context': {
-                    'rate': project.rate,
-                    'start': project_start_date,
-                    'con_rate': consultant.rate,
-                    'employer': project.employer,
-                    'client_name': submission.client,
-                    'consultant_name': consultant.name,
-                    'consultant_email': consultant.email,
-                    'job_title': submission.lead.job_title,
-                    'vendor_company': submission.vendor.name,
-                    'marketer_name': submission.created_by.employee_name,
+                    'consultant_email': consultant.email, 'job_title': submission.lead.job_title,
+                    'rate': project.rate, 'con_rate': consultant.rate, 'start': project_start_date,
+                    'vendor_company': submission.vendor.name, 'marketer_name': submission.created_by.employee_name,
+                    'employer': project.employer, 'client_name': submission.client, 'consultant_name': consultant.name,
                 },
             }
 
@@ -123,7 +112,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, "error"
 
-    def send_support_mail(self, project, scrum_masters):
+    @staticmethod
+    def send_support_mail(project, scrum_masters):
         try:
             submission = project.submission
             path, recordings = [], []
@@ -155,27 +145,16 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
-                'cc': cc,
-                'bcc': [],
-                'attachments': path,
-                'to': [config.ENGINEERING],
                 'template': '../templates/support.html',
+                'to': [config.ENGINEERING], 'cc': cc, 'bcc': [], 'attachments': path,
                 'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'context': {
-                    'notes': notes,
-                    'recordings': recordings,
-                    'start': project_start_date,
-                    'employer': project.employer,
-                    'client_name': submission.client,
-                    'location': submission.lead.city,
-                    'recruiter_name': recruiter_name,
-                    'consultant_name': consultant.name,
-                    'consultant_email': consultant.email,
-                    'job_title': submission.lead.job_title,
-                    'consultant_phone_no': consultant.phone_no,
-                    'consultant_location': consultant.current_city,
-                    'marketer_name': submission.created_by.employee_name,
-                    'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
+                    'location': submission.lead.city, 'consultant_location': consultant.current_city,
+                    'job_title': submission.lead.job_title, 'consultant_phone_no': consultant.phone_no,
+                    'employer': project.employer, 'marketer_name': submission.created_by.employee_name,
+                    'recruiter_name': recruiter_name, 'start': project_start_date, 'recordings': recordings,
+                    'consultant_name': consultant.name, 'consultant_email': consultant.email, 'notes': notes,
+                    'client_name': submission.client, 'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
                 },
             }
 
@@ -209,7 +188,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
         return message, exception_msg
 
-    def po_mail(self, project, path, scrum_master_email, po_type):
+    @staticmethod
+    def po_mail(project, path, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -232,33 +212,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
-                'to': to,
-                'cc': cc,
-                'bcc': [],
-                'attachments': path,
                 'template': '../templates/po.html',
-                'subject': f'On Boarding of {consultant.name} :: {project.employer} :: '
-                           f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
+                'to': to, 'cc': cc, 'bcc': [], 'attachments': path,
+                'subject': f'On Boarding of {consultant.name} :: {project.employer} :: {project_start_date} :: '
+                           f'{submission.client} :: {submission.vendor.name}',
                 'context': {
-                    'type': po_type,
-                    'rate': project.rate,
-                    'start': project_start_date,
-                    'employer': project.employer,
-                    'client_name': submission.client,
-                    'con_rate': int(consultant.rate),
-                    'vendor_name': vendor_contact.name,
-                    'consultant_name': consultant.name,
-                    'vendor_email': vendor_contact.email,
-                    'payment_term': project.payment_term,
-                    'consultant_email': consultant.email,
-                    'job_title': submission.lead.job_title,
-                    'vendor_number': vendor_contact.number,
-                    'client_address': project.client_address,
-                    'vendor_address': project.vendor_address,
-                    'invoicing_period': project.invoicing_period,
-                    'reporting_details': project.reporting_details,
-                    'marketer_name': submission.created_by.employee_name,
-                    'vendor_company': submission.lead.vendor_company.name,
+                    'job_title': submission.lead.job_title, 'vendor_number': vendor_contact.number,
+                    'client_address': project.client_address, 'vendor_address': project.vendor_address,
+                    'marketer_name': submission.created_by.employee_name, 'employer': project.employer,
+                    'vendor_company': submission.lead.vendor_company.name, 'client_name': submission.client,
+                    'type': po_type, 'consultant_name': consultant.name, 'vendor_email': vendor_contact.email,
+                    'invoicing_period': project.invoicing_period, 'reporting_details': project.reporting_details,
+                    'payment_term': project.payment_term, 'consultant_email': consultant.email, 'rate': project.rate,
+                    'con_rate': int(consultant.rate), 'vendor_name': vendor_contact.name, 'start': project_start_date,
                 },
             }
 
@@ -271,7 +237,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(message=f"Offer mail error for {marketer.email}: {error}")
             return error, "error"
 
-    def po_end_mail(self, project, scrum_master_email, po_type):
+    @staticmethod
+    def po_end_mail(project, scrum_master_email, po_type):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -305,32 +272,20 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
             mail_data = {
-                'to': to,
-                'cc': cc,
-                'bcc': [],
+                'to': to, 'cc': cc, 'bcc': [],
                 'template': '../templates/po_termination.html',
                 'subject': f"{consultant.name}'s {po_type} :: {project.employer} :: "
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'context': {
-                    'po_type': po_type,
-                    'rate': project.rate,
-                    'end': project_end_date,
-                    'remark': project.feedback,
-                    'vendor_name': vendor_name,
-                    'start': project_start_date,
-                    'vendor_email': vendor_email,
-                    'employer': project.employer,
-                    'vendor_number': vendor_number,
-                    'client_name': submission.client,
-                    'consultant_name': consultant.name,
-                    'consultant_email': consultant.email,
-                    'job_title': submission.lead.job_title,
-                    'marketer_name': marketer.employee_name,
-                    'vendor_address': project.vendor_address,
-                    'client_address': project.client_address,
-                    'reporting_details': project.reporting_details,
-                    'vendor_company': submission.lead.vendor_company.name,
+                    'vendor_number': vendor_number, 'client_name': submission.client,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
+                    'reporting_details': project.reporting_details, 'end': project_end_date,
+                    'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                    'vendor_company': submission.lead.vendor_company.name, 'po_type': po_type,
+                    'job_title': submission.lead.job_title, 'marketer_name': marketer.employee_name,
+                    'vendor_email': vendor_email, 'employer': project.employer, 'rate': project.rate,
+                    'vendor_address': project.vendor_address, 'client_address': project.client_address,
+                    'vendor_name': vendor_name, 'start': project_start_date, 'remark': project.feedback,
                 }
             }
             res1 = "Development Server"
@@ -338,20 +293,15 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 res1 = send_email(mail_data, marketer.email)
 
             mail_data_eng = {
-                'cc': [],
-                'bcc': [],
-                'to': [config.ENGINEERING],
+                'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
                 'template': '../templates/po_termination_engineering.html',
                 'subject': f"{consultant.name}'s {po_type} :: {project_start_date} :: {submission.client} ::"
                            f" {submission.vendor.name}",
                 'context': {
-                    'po_type': po_type,
-                    'end': project_end_date,
-                    'client_name': submission.client,
-                    'consultant_name': consultant.name,
-                    'consultant_email': consultant.email,
-                    'vendor_company': submission.lead.vendor_company.name,
+                    'consultant_name': consultant.name, 'end': project_end_date,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
+                    'consultant_email': consultant.email, 'client_name': submission.client,
+                    'vendor_company': submission.lead.vendor_company.name, 'po_type': po_type,
                 }
             }
             res2 = "Development Server"
@@ -650,6 +600,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
     @action(methods=['get'], detail=False, url_path="mail_to_onboard")
     def mail_to_onboard(self, request):
         try:
@@ -789,32 +742,18 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             title = f"""{names} {aux_verb} assigned as support to {consultant.name}'s project of 
                 {project.submission.client}"""
             notification_data = {
-                'title': title,
-                'target_id': None,
-                'category': 'info',
-                'description': title,
-                'parent_id': project.id,
-                'parent_type': 'project',
-                'sender_user_type': 'user',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'target_type': 'projectsupport',
+                'category': 'info', 'target_type': 'projectsupport', 'parent_type': 'project',
+                'title': title, 'target_id': None, 'description': title, 'parent_id': project.id,
+                'sender_id': request.user.id, 'recipient_user_type': 'user', 'sender_user_type': 'user',
             }
             create_notification(user_list, notification_data)
             # Push Notification
             message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
+                "click_action": "https://app.log1.com", "show_in_foreground": True,
+                "body": title, "title": title, "category": "alert",
                 "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'submission',
-                    'sub_target': 'support',
-                    'timestamp': str(datetime.now()),
-                    'target_id': project.submission.id,
+                    'is_read': False, 'sub_target': 'support', 'timestamp': str(datetime.now()),
+                    'is_deleted': False, 'target': 'submission', 'target_id': project.submission.id,
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -842,24 +781,17 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             prev = support.statuses.filter(is_current=True)
             if prev.first() and prev.first().frequency != new_freq:
                 prev.update(is_current=False)
-                SupportStatus.objects.create(
-                    is_current=True,
-                    support=support,
-                    change_date=start,
-                    frequency=new_freq,
-                )
+                SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
             elif not prev.first():
-                SupportStatus.objects.create(
-                    is_current=True,
-                    support=support,
-                    change_date=start,
-                    frequency=new_freq,
-                )
+                SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
             serializer = ProjectSupportSerializer(support)
             return Response({"data": serializer.data, "message": "Support is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path="remove")
     def remove_support(self, request, *args, **kwargs):
@@ -913,11 +845,8 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
                        f"{request.data.get('value')} by {request.user.employee_name}"
 
             order = ProjectOrder.objects.create(
-                project=project,
-                created_by=request.user,
-                effective_date=effective_date,
-                value=request.data.get('value'),
-                field=request.data.get('field'),
+                field=request.data.get('field'), value=request.data.get('value'),
+                project=project, created_by=request.user, effective_date=effective_date,
             )
             project.save()
 
@@ -929,11 +858,8 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
 
                 for file in request.FILES.getlist('file'):
                     file_data = {
-                        "file": file,
-                        "model": "project",
-                        "object_id": project.id,
-                        "creator": request.user,
-                        "type": request.data.get('file_type'),
+                        "file": file, "model": "project", "object_id": project.id,
+                        "creator": request.user, "type": request.data.get('file_type'),
                     }
                     create_attachment(file_data)
             create_activity(order.id, 'projectorder', request.user, desc, 'created')
@@ -969,6 +895,9 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # Route - /eng_project/
@@ -1032,8 +961,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             projects = Project.objects.filter(
                 Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
                         Q(statuses__status__istartswith='terminated') |
-                        Q(statuses__status='complete') |
-                        Q(statuses__status='joined')
+                        Q(statuses__status='complete') | Q(statuses__status='joined')
                 )
             )
             if query:
@@ -1067,10 +995,12 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
         try:
 
-            project_status = ['joined', 'terminated-resigned', 'terminated', 'terminated-resigned_location_issue',
-                              'terminated-resigned_location_issue', 'terminated-resigned_full_time_offer',
-                              'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
-                              'terminated-fired_performance_issue', 'terminated-fired_security_issue', 'complete']
+            project_status = [
+                'terminated-fired_performance_issue', 'terminated-fired_security_issue',
+                'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
+                'terminated-fired_budget_issue', 'terminated-resigned_location_issue', 'complete',
+                'joined', 'terminated', 'terminated-resigned', 'terminated-resigned_location_issue',
+            ]
 
             if consultant_id:
                 consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
@@ -1080,6 +1010,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultant_ids = Project.objects.filter(
                     statuses__status__in=project_status, statuses__is_current=True
                 ).values_list('consultant', flat=True)
+
                 consultants = Consultant.objects.filter(
                     id__in=list(consultant_ids),
                     projects__timesheets__is_active=True,
@@ -1118,12 +1049,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     timesheet.save()
 
                     timesheet = TimeSheet.objects.create(
-                        hours=0,
-                        status='rejected',
-                        end=timesheet.end,
-                        start=timesheet.start,
-                        remark=timesheet.remark,
-                        project=timesheet.project,
+                        hours=0, remark=timesheet.remark, project=timesheet.project,
+                        status='rejected', start=timesheet.start, end=timesheet.end,
                     )
                     recipient_content_type = ContentType.objects.get(model='consultant')
                     sender_content_type = ContentType.objects.get(model='user')
@@ -1137,30 +1064,19 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                                 f"{timesheet.project.submission.client}"
 
                     Notification.objects.create(
-                        title=title,
-                        description=title,
-                        category="rejected",
-                        target_object_id=timesheet.id,
-                        sender_object_id=request.user.id,
-                        sender_content_type=sender_content_type,
-                        target_content_type=target_content_type,
-                        recipient_content_type=recipient_content_type,
-                        recipient_object_id=timesheet.project.consultant.id,
+                        title=title, recipient_object_id=timesheet.project.consultant.id,
+                        category="rejected", recipient_content_type=recipient_content_type,
+                        sender_content_type=sender_content_type, target_content_type=target_content_type,
+                        description=title, target_object_id=timesheet.id, sender_object_id=request.user.id,
                     )
 
                     # Push Notification
                     message_body = {
-                        "body": title,
-                        "title": title,
-                        "category": "rejected",
-                        "show_in_foreground": True,
-                        "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                        "body": title, "title": title, "category": "rejected",
+                        "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
                         "data": {
-                            'is_read': False,
-                            'is_deleted': False,
-                            'target': 'timesheet',
-                            'target_id': timesheet.id,
-                            'timestamp': str(timezone.now()),
+                            'target': 'timesheet', 'target_id': timesheet.id,
+                            'is_read': False, 'is_deleted': False, 'timestamp': str(timezone.now()),
                         },
                     }
                     object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
@@ -1175,6 +1091,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=["get"], detail=True, url_name="from_notification")
     def from_notification(self, request, *args, **kwargs):

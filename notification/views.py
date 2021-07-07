@@ -10,7 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, UpdateModelMixin, CreateModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from notification.utils import push_notification
 from notification.models import FCMDevice, Notification
@@ -42,7 +42,7 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
 
 
 # Route - /emp_notify/
-class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
+class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = Notification.objects.all()
     authentication_classes = (TokenAuthentication,)
@@ -123,7 +123,7 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
 
 
 # Mobile App Route - /con_notify/
-class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
+class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = (ConsultantIsAuthenticated,)

@@ -281,7 +281,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    def get_submission_data(self, queryset, filter_by_status, first, last):
+    @staticmethod
+    def get_submission_data(queryset, filter_by_status, first, last):
         try:
             data_counts = {
                 'total': queryset.count(),
@@ -305,7 +306,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, "error"
 
-    def get_interview_data(self, queryset, filter_by_status, first, last):
+    @staticmethod
+    def get_interview_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
             queryset = queryset.order_by('-modified').distinct('modified')
@@ -340,7 +342,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, 'error'
 
-    def get_project_data(self, queryset, filter_by_status):
+    @staticmethod
+    def get_project_data(queryset, filter_by_status):
         try:
             # count of project by status
             data_counts = {
@@ -555,6 +558,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": error}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['get'], detail=True, url_path='activities')
     def activities(self, request, *args, **kwargs):
@@ -1063,6 +1069,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
     @action(methods=['put'], detail=True, url_path='stop_marketing')
     def stop_marketing(self, request, *args, **kwargs):
         try:
@@ -1326,6 +1335,9 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
 
 # Route - /consultant_poc/
 class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1387,6 +1399,9 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # Route - /consultant_work_auth/
@@ -1465,6 +1480,9 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # Route - /consultant_exit/
@@ -1604,6 +1622,9 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='cancel')
     def cancel_termination(self, request, *args, **kwargs):
@@ -1810,6 +1831,9 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # API for Petition Web App

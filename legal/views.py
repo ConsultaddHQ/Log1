@@ -272,6 +272,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
     @action(methods=['put'], detail=True, url_path='lca')
     def lca(self, request, *args, **kwargs):
         try:

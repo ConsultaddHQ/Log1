@@ -182,6 +182,9 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
 
 # API for Mobile App (For Consultants)
 # Route - /payroll/
@@ -504,3 +507,6 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
