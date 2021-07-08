@@ -269,29 +269,27 @@ class LeadViewSets(viewsets.ModelViewSet):
                 )
 
             if version == 'v2' and filter_json:
-                filter_by_status = []
-                filter_string = dict()
+                filter_by_status = list()
                 filters = json.loads(filter_json)
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
                 if 'position' in filters and len(filters["position"]) > 0:
-                    filter_string["position_id__in"] = filters["position"]
+                    leads = leads.filter(position_id__in=filters["position"])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    filter_string["vendor_company_id__in"] = filters["vendor"]
+                    leads = leads.filter(vendor_company_id__in=filters["vendor"])
 
                 created = filters.get('created', None)
                 if created:
                     lte = created.get('lte', None)
                     gte = created.get('gte', None)
                     if lte:
-                        filter_string["created__lte"] = lte
+                        leads = leads.filter(created__lte=lte)
                     if gte:
-                        filter_string["created__gte"] = gte
+                        leads = leads.filter(created__gte=gte)
 
-                leads = leads.filter(**filter_string)
                 data, data_counts = self.get_count_and_queryset(leads, filter_by_status, sort_by, first, last)
             else:
                 leads = get_time_filter(leads, filter_by=filter_by_time)
@@ -814,38 +812,36 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                 sub = sub.filter(created_by__team=request.user.team)
 
             if version == 'v2' and filter_json:
-                filter_by_status = []
-                filter_string = dict()
+                filter_by_status = list()
                 filters = json.loads(filter_json)
-
-                if 'client' in filters and len(filters["client"]) > 0:
-                    filter_string["client__in"] = filters["client"]
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
+                if 'client' in filters and len(filters["client"]) > 0:
+                    sub = sub.filter(client__in=filters['client'])
+
                 if 'incomplete' in filters:
-                    filter_string["is_complete"] = not filters["incomplete"]
-
-                if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    filter_string["lead__vendor_company_id__in"] = filters["vendor"]
-
-                if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    filter_string["consultant_marketing__consultant_id__in"] = filters["consultant"]
+                    sub = sub.filter(is_complete=filters['incomplete'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
-                    filter_string["created_by_id__in"] = filters["marketer"]
+                    sub = sub.filter(created_by_id__in=filters['marketer'])
+
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    sub = sub.filter(lead__vendor_company_id__in=filters['vendor'])
+
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    sub = sub.filter(consultant_marketing__consultant_id__in=filters['consultant'])
 
                 created = filters.get('created', None)
                 if created:
                     lte = created.get('lte', None)
                     gte = created.get('gte', None)
                     if lte:
-                        filter_string["created__lte"] = lte
+                        sub = sub.filter(created__lte=lte)
                     if gte:
-                        filter_string["created__gte"] = gte
+                        sub = sub.filter(created__gte=gte)
 
-                sub = sub.filter(**filter_string)
                 data, sub_data = self.get_count_and_queryset(sub, filter_by_status, sort_by, first, last)
             else:
                 if incomplete == 'true':
@@ -1305,46 +1301,45 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 queryset = queryset
 
             if version == 'v2' and filter_json:
-                filter_string = dict()
                 filters = json.loads(filter_json)
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
                 if 'ctb' in filters and len(filters["ctb"]) > 0:
-                    filter_string["supervisor_id__in"] = filters["ctb"]
+                    queryset = queryset.filter(supervisor_id__in=filters["ctb"])
 
                 if 'client' in filters and len(filters["client"]) > 0:
-                    filter_string["submission__client__in"] = filters["client"]
+                    queryset = queryset.filter(submission__client__in=filters["client"])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
-                    filter_string["submission__created_by_id__in"] = filters["marketer"]
+                    queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
+                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters["vendor"])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant"]
+                    queryset = queryset.filter(
+                        submission__consultant_marketing__consultant_id__in=filters["consultant"])
 
                 start_time = filters.get('start_time', None)
                 if start_time:
                     lte = start_time.get('lte', None)
                     gte = start_time.get('gte', None)
                     if lte:
-                        filter_string["start_time__lte"] = lte
+                        queryset = queryset.filter(start_time__lte=lte)
                     if gte:
-                        filter_string["start_time__gte"] = gte
+                        queryset = queryset.filter(start_time__gte=gte)
 
                 created = filters.get('created', None)
                 if created:
                     lte = created.get('lte', None)
                     gte = created.get('gte', None)
                     if lte:
-                        filter_string["created__lte"] = lte
+                        queryset = queryset.filter(created__lte=lte)
                     if gte:
-                        filter_string["created__gte"] = gte
+                        queryset = queryset.filter(created__gte=gte)
 
-                queryset = queryset.filter(**filter_string)
                 data, screen_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
             else:
                 queryset = get_time_filter_by_start(queryset, filter_by_time)
@@ -2578,23 +2573,24 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             queryset = get_time_filter(queryset, filter_by_time)
 
             if version == 'v2' and filter_json:
-                filter_string, filter_by_status = dict(), list()
+                filter_by_status = list()
                 filters = json.loads(filter_json)
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
                 if 'client' in filters and len(filters["client"]) > 0:
-                    filter_string["submission__client__in"] = filters["client"]
+                    queryset = queryset.filter(submission__client__in=filters['client'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
-                    filter_string["submission__created_by_id__in"] = filters["marketer"]
+                    queryset = queryset.filter(submission__created_by_id__in=filters['marketer'])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
+                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters['vendor'])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant"]
+                    queryset = queryset.filter(
+                        submission__consultant_marketing__consultant_id__in=filters['consultant'])
 
                 created = filters.get('created', None)
                 deadline = filters.get('created', None)
@@ -2603,19 +2599,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     lte = created.get('lte', None)
                     gte = created.get('gte', None)
                     if lte:
-                        filter_string["created__lte"] = lte
+                        queryset = queryset.filter(created__lte=lte)
                     if gte:
-                        filter_string["created__gte"] = gte
+                        queryset = queryset.filter(created__gte=gte)
 
                 if deadline:
                     lte = deadline.get('lte', None)
                     gte = deadline.get('gte', None)
                     if lte:
-                        filter_string["deadline__lte"] = lte
+                        queryset = queryset.filter(deadline__gte=lte)
                     if gte:
-                        filter_string["deadline__gte"] = gte
+                        queryset = queryset.filter(deadline__gte=gte)
 
-                queryset = queryset.filter(**filter_string)
                 queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
             else:
                 queryset, counts = self.get_test_data(queryset, filter_by_status)

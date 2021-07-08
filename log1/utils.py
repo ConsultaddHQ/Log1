@@ -15,10 +15,6 @@ DONT_HAVE_ACCESS = "You don't have access"
 ERROR_MSG = "Something went wrong. Please contact support"
 
 
-class Http400(Exception):
-    pass
-
-
 def load_config(file_path):
     try:
         with open(file_path, 'r') as f:
@@ -53,7 +49,8 @@ def get_page_limits(request):
         page_size = int(request.query_params.get("page_size", 10))
         return page * page_size - page_size, page * page_size
     except Exception as error:
-        raise Http400(str(error))
+        write_exception(message=error)
+        return 1, 10
 
 
 def get_time_filter(queryset, filter_by):

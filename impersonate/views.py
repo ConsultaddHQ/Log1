@@ -11,7 +11,7 @@ from rest_framework.mixins import CreateModelMixin, ListModelMixin
 
 from log1.utils import write_exception
 from employee.models import User, Handover
-from employee.serializers import Token, UserSerializerLogin, HandoverSerializer
+from employee.serializers import Token, UserSerializerLogin, HandoverSerializer, HandoverUserSerializer
 
 
 # Route - /impersonate/
@@ -57,8 +57,12 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     @action(methods=['get'], detail=False, url_path='users')
     def users(self, request, *args, **kwargs):
         try:
-            handovers = Handover.objects.filter(handover_to=request.user)
-            serializer = HandoverSerializer(handovers, many=True)
+            if request.user.is_superuser:
+                users = User.objects.exclude(role__name='consultant')
+                serializer = HandoverUserSerializer(users, many=True)
+            else:
+                handovers = Handover.objects.filter(handover_to=request.user)
+                serializer = HandoverSerializer(handovers, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)

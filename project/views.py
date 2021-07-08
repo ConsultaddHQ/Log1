@@ -17,7 +17,6 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
 
 from constance import config
-from log1.utils import ERROR_MSG
 from utils_app.models import ObjectGroup
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -28,7 +27,7 @@ from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from attachment.views import download_s3_object, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from log1.utils import get_time_filter, get_page_limits, write_exception
+from log1.utils import ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password
 from notification.utils import create_notification, push_notification, push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
@@ -356,38 +355,36 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 )
 
             if version == 'v2' and filter_json:
-                filter_string = dict()
                 filters = json.loads(filter_json)
 
                 if 'remote' in filters:
-                    filter_string["is_remote"] = filters['remote']
+                    projects = projects.filter(is_remote=filters['remote'])
 
                 if 'w2' in filters:
-                    filter_string["submission__lead__is_w2"] = filters['w2']
+                    projects = projects.filter(submission__lead__is_w2=filters['w2'])
 
                 if 'client' in filters and len(filters["client"]) > 0:
-                    filter_string["submission__client"] = filters["client"]
+                    projects = projects.filter(submission__client=filters['client'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
-                    filter_string["submission__created_by_id__in"] = filters["marketer"]
+                    projects = projects.filter(submission__created_by_id__in=filters['marketer'])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    filter_string["submission__lead__vendor_company_id__in"] = filters["vendor"]
+                    projects = projects.filter(submission__lead__vendor_company_id__in=filters['vendor'])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    filter_string["submission__consultant_marketing__consultant_id__in"] = filters["consultant"]
+                    projects = projects.filter(submission__consultant_marketing__consultant_id__in=filters['consultant'])
 
                 created = filters.get('created', None)
                 if created:
                     lte = created.get('lte', None)
                     gte = created.get('gte', None)
                     if lte:
-                        filter_string["created__lte"] = lte
+                        projects = projects.filter(created__lte=lte)
                     if gte:
-                        filter_string["created__gte"] = gte
+                        projects = projects.filter(created__gte=gte)
 
                 projects = projects.order_by('id').distinct('id')
-                projects = projects.filter(**filter_string)
                 data = {
                     "total": projects,
                     "new": projects.filter(statuses__status='new', statuses__is_current=True),

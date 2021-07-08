@@ -83,6 +83,18 @@ class TaggedUserSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class HandoverUserSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_id', 'name', 'email')
+
+    @staticmethod
+    def get_name(obj):
+        return obj.employee_name
+
+
 class HandoverSerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()

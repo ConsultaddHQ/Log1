@@ -100,8 +100,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             consultants = consultants.distinct('id')
 
             offer_candidates = consultants.filter(
-                projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                projects__statuses__is_current=True
+                projects__statuses__status__in=['new', 'received', 'on_boarded'], projects__statuses__is_current=True
             ).values('id')
             open_candidates = consultants.filter(marketing__status='open').values('id')
 
@@ -196,22 +195,11 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
 
-            poc = ConsultantPOC.objects.filter(
-                consultant=OuterRef("pk"), end=None, poc_type='recruiter')
-
-            rate = ConsultantRateRevision.objects.filter(
-                consultant=OuterRef("pk"), end=None)
-
-            marketing = ConsultantMarketing.objects.filter(
-                consultant=OuterRef("pk"), status='open')
-
-            work_auth = WorkAuth.objects.filter(
-                consultant=OuterRef("pk"), is_current=True
-            )
-
-            termination = ConsultantExit.objects.filter(
-                consultant=OuterRef("pk")
-            )
+            termination = ConsultantExit.objects.filter(consultant=OuterRef("pk"))
+            work_auth = WorkAuth.objects.filter(consultant=OuterRef("pk"), is_current=True)
+            rate = ConsultantRateRevision.objects.filter(consultant=OuterRef("pk"), end=None)
+            marketing = ConsultantMarketing.objects.filter(consultant=OuterRef("pk"), status='open')
+            poc = ConsultantPOC.objects.filter(consultant=OuterRef("pk"), end=None, poc_type='recruiter')
 
             if con_status == 'terminated':
                 data = consultants[first:last].annotate(

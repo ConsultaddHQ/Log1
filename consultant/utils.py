@@ -20,16 +20,17 @@ from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, Cons
 
 
 def create_activity(object_id, model, user, desc, activity_type):
-    content_type = ContentType.objects.get(model=model)
-    activity = Activity.objects.create(
-        user=user,
-        desc=desc,
-        object_id=object_id,
-        content_type=content_type,
-        activity_type=activity_type,
-    )
-    serializer = ActivitySerializer(activity)
-    return serializer.data
+    try:
+        content_type = ContentType.objects.get(model=model)
+        activity = Activity.objects.create(
+            user=user, desc=desc, object_id=object_id,
+            content_type=content_type, activity_type=activity_type,
+        )
+        serializer = ActivitySerializer(activity)
+        return serializer.data
+    except Exception as error:
+        write_exception(message=error)
+        return None
 
 
 def download_s3_object_beats(key, name):
@@ -59,10 +60,8 @@ def beats_to_log1(file_path, file_name, obj_id, model):
         local_file = open(path, 'rb')
         file = ContentFile(local_file.read())
         attachment = Attachment.objects.create(
-            creator=creator,
-            object_id=obj_id,
-            attachment_type='other',
-            content_type_id=content_type.id,
+            creator=creator, attachment_type='other',
+            object_id=obj_id, content_type_id=content_type.id,
         )
         attachment.attachment_file.save(path, file, save=True)
         attachment.save()
@@ -152,9 +151,8 @@ def send_exit_interview_detail(terminate, request):
         message_body = {
             "category": "alert",
             "show_in_foreground": True,
+            "title": title, "body": title,
             "click_action": "https://app.log1.com",
-            "body": title,
-            "title": title,
             "data": {
                 'is_read': False,
                 'is_deleted': False,
@@ -221,10 +219,9 @@ def terminate_consultant(terminate):
 
         # Push Notification
         message_body = {
-            "body": title,
-            "title": title,
             "category": "alert",
             "show_in_foreground": True,
+            "title": title, "body": title,
             "click_action": "https://app.log1.com",
             "data": {
                 'is_read': False,
@@ -296,26 +293,18 @@ def send_exit_process_mail(terminate, exit_status):
             resign_date = datetime.strptime(terminate.resign_date, "%Y-%m-%d").strftime("%b. %d, %Y")
 
         mail_data = {
-            'to': to,
-            'cc': cc,
-            'bcc': [],
-            'subject': subject,
+            'to': to, 'cc': cc, 'bcc': [], 'subject': subject,
             'template': '../templates/exit_process.html',
             'context': {
-                'title': title,
-                'reason': reason,
-                'last_date': last_date,
-                'resign_date': resign_date,
-                'exit_status': exit_status,
-                'type': types[terminate.type],
-                'consultant': consultant.name,
-                'consultant_email': consultant.email,
-                'recruiter': recruiter.employee_name,
                 'rehire': 'Yes' if terminate.rehire else 'No',
                 'legal': 'Yes' if terminate.legal_action else 'No',
+                'resign_date': resign_date, 'exit_status': exit_status,
+                'title': title, 'reason': reason, 'last_date': last_date,
+                'type': types[terminate.type], 'consultant': consultant.name,
                 'exit_details': exit_details if terminate.exit_details else 'NA',
-                'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
+                'consultant_email': consultant.email, 'recruiter': recruiter.employee_name,
                 'notice_period': terminate.notice_period if terminate.legal_action else 'NA',
+                'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
             },
         }
         res = send_email(mail_data, terminate.created_by.email)
@@ -339,26 +328,19 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
                 user_list.append(marketer)
             user_list.append(marketing.primary_marketer)
         notification_data = {
-            'title': title,
-            'category': 'info',
-            'description': title,
-            'sender_id': sender.id,
-            'target_type': sub_target,
-            'sender_user_type': 'user',
-            'parent_id': consultant.id,
-            'parent_type': 'consultant',
-            'recipient_user_type': 'user',
-            'target_id': target_id if target_id else consultant.id,
+            'category': 'info', 'sender_id': sender.id,
+            'description': title, 'recipient_user_type': 'user',
+            'target_type': sub_target, 'sender_user_type': 'user',
+            'parent_id': consultant.id, 'parent_type': 'consultant',
+            'title': title, 'target_id': target_id if target_id else consultant.id,
         }
         create_notification(user_list, notification_data)
 
         # Push Notification
         message_body = {
-            "body": title,
-            "title": title,
-            "category": "info",
-            "show_in_foreground": True,
+            "title": title, "body": title,
             "click_action": "https://app.log1.com",
+            "category": "info", "show_in_foreground": True,
             "data": {
                 'is_read': False,
                 'is_deleted': False,
@@ -429,10 +411,10 @@ def add_other_details(request, consultant_id):
 
         for document in documents:
             res, res_data = beats_to_log1(
-                document['file_path'],
-                document['file_name'],
-                consultant_id,
-                'consultant'
+                model='consultant',
+                obj_id=consultant_id,
+                file_path=document['file_path'],
+                file_name=document['file_name'],
             )
             if not res:
                 write_info(res_data, 'add_other_details', request)
@@ -466,10 +448,9 @@ def create_consultant(request, creator_id):
             return consultant, "exists"
         else:
             consultant = Consultant.objects.create(
-                links=links,
-                skills=skills,
                 work_type='full_time',
                 phone_no=phone_numbers,
+                links=links, skills=skills,
                 ssn=request.data.get('ssn'),
                 name=request.data.get('name'),
                 email=request.data.get('email'),
