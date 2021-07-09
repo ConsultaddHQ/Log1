@@ -113,9 +113,9 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '')
-            teams = request.query_params.get('teams', None)
-            user_type = request.query_params.get('type', None)
+            query = request.GET.get('query', '')
+            teams = request.GET.get('teams', None)
+            user_type = request.GET.get('type', None)
             users = User.objects.exclude(role__name='consultant').exclude(is_active=False)
             if user_type == 'relation':
                 users = users.filter(team__name='Retention')
@@ -184,7 +184,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
-            query = request.query_params.get('query', None)
+            query = request.GET.get('query', None)
             if query == 'all':
                 teams = Team.objects.exclude(dept='marketing').values('id', 'name', 'dept')
             else:
@@ -354,7 +354,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            assets_of = request.query_params.get('asset')
+            assets_of = request.GET.get('asset')
             if assets_of == 'shared':
                 asset = Asset.objects.filter(shared_to=request.user, is_deleted=False)
             else:
@@ -567,7 +567,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
+            query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
             users = self.queryset.filter(employee_name__istartswith=query, is_active=True).annotate(
                 name=F('employee_name'),
                 type=Value('user', CharField())

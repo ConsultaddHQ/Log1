@@ -51,10 +51,10 @@ class CkillerSubmissionViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', None)
-            consultant = request.query_params.get('consultant', None)
-            page = int(request.query_params.get("page", 1))
-            page_size = int(request.query_params.get("page_size", 10))
+            query = request.GET.get('query', None)
+            consultant = request.GET.get('consultant', None)
+            page = int(request.GET.get("page", 1))
+            page_size = int(request.GET.get("page_size", 10))
             last, first = page * page_size, page * page_size - page_size
             if 'superadmin' in request.user.roles:
                 consultants = Consultant.objects.filter(marketing__status='open').values_list('id', flat=True)

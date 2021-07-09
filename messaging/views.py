@@ -54,7 +54,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            asset_id = request.query_params.get('user1', None)
+            asset_id = request.GET.get('user1', None)
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             messages = Message.objects.filter(conversation=OuterRef('pk'))
             conversations = Conversation.objects.filter(user1=asset).annotate(
@@ -100,7 +100,7 @@ class ReceiveSMSViewSet(GenericViewSet):
     @action(methods=['get', 'post'], detail=False, url_path='sms')
     def receive_sms(self, request):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if APIKey.objects.is_valid(api_key):
                 to = request.data.get('To')
                 body = request.data.get('Body')

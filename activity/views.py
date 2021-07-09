@@ -52,7 +52,7 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
-        object_id = request.query_params.get('object_id')
+        object_id = request.GET.get('object_id')
         try:
             activity = Activity.objects.filter(object_id=object_id, user=request.user)
             serializer = self.serializer_class(activity, many=True)
@@ -71,7 +71,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
 
     def retrieve(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
-        model = request.query_params.get('model')
+        model = request.GET.get('model')
         try:
             models = {
                 "project": Project,

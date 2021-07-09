@@ -143,7 +143,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
         try:
-            first_login = request.query_params.get('first_login', None)
+            first_login = request.GET.get('first_login', None)
             new_password = request.data.get('new_password', None)
             consultant = request.user
             if first_login and new_password:

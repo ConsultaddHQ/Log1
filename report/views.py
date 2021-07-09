@@ -319,12 +319,12 @@ command - {command}\n\n
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request, *args, **kwargs):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"text": "Unauthorized"}, status=200)
 
-            query = request.query_params.get('text', None)
-            command = request.query_params.get('command', None)
+            query = request.GET.get('text', None)
+            command = request.GET.get('command', None)
 
             if not query and len(query) > 3:
                 return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
@@ -390,12 +390,12 @@ command - {command} {query}\n
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"text": "Unauthorized"}, status=200)
 
-            query = request.query_params.get('text', None)
-            command = request.query_params.get('command', None)
+            query = request.GET.get('text', None)
+            command = request.GET.get('command', None)
             if not query and len(query) < 3:
                 return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
 
@@ -438,12 +438,12 @@ command - {command} {query}\n
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"text": "Unauthorized"}, status=200)
 
-            query = request.query_params.get('text', None)
-            command = request.query_params.get('command', None)
+            query = request.GET.get('text', None)
+            command = request.GET.get('command', None)
             arguments = query.split()
             slash_command = f"{command} {query}"
             if not query and len(arguments) > 0:
@@ -586,10 +586,10 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     def list(self, request, *args, **kwargs):
         try:
             first, last = get_page_limits(request)
-            query = request.query_params.get('query', None)
-            filter_for = request.query_params.get('filter_for', None)
-            filter_by_status = request.query_params.get('status', None)
-            filter_by_tech = request.query_params.get('filter_by_tech', None)
+            query = request.GET.get('query', None)
+            filter_for = request.GET.get('filter_for', None)
+            filter_by_status = request.GET.get('status', None)
+            filter_by_tech = request.GET.get('filter_by_tech', None)
 
             supports = ProjectSupport.objects.all()
             if query:
@@ -669,10 +669,10 @@ class MarketingReportViewSets(GenericViewSet):
     def marketer(self, request):
         try:
             first, last = get_page_limits(request)
-            end = request.query_params.get('end', None)
-            start = request.query_params.get('start', None)
-            query = request.query_params.get('query', None)
-            filter_by_team = request.query_params.get('filter_by_team', None)
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
+            query = request.GET.get('query', None)
+            filter_by_team = request.GET.get('filter_by_team', None)
 
             if query:
                 employees = User.objects.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
@@ -725,8 +725,8 @@ class MarketingReportViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
-            end = request.query_params.get('end', None)
-            start = request.query_params.get('start', None)
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
                                                                                                  '%Y-%m-%d').date():
                 return Response({'message': 'Invalid date filter'}, status=400)
@@ -799,8 +799,8 @@ class MarketingReportViewSets(GenericViewSet):
     def consultant(self, request):
         try:
             first, last = get_page_limits(request)
-            query = request.query_params.get('query', None)
-            filter_by_team = request.query_params.get('filter_by_team', None)
+            query = request.GET.get('query', None)
+            filter_by_team = request.GET.get('filter_by_team', None)
 
             if query:
                 bench_consultant = Consultant.objects.filter(

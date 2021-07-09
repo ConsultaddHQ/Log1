@@ -38,11 +38,11 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             first, last = get_page_limits(request)
-            query = request.query_params.get('query', None)
-            sort_by = request.query_params.get('sort_by', None)
-            con_status = request.query_params.get('status', 'on_bench')
-            filter_json = request.query_params.get('filter_json', None)
-            con_sub_status = request.query_params.get('sub_status', None)
+            query = request.GET.get('query', None)
+            sort_by = request.GET.get('sort_by', None)
+            con_status = request.GET.get('status', 'on_bench')
+            filter_json = request.GET.get('filter_json', None)
+            con_sub_status = request.GET.get('sub_status', None)
 
             if len(con_status) == 0 and len(query) <= 0:
                 con_status = 'on_bench'
@@ -368,7 +368,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             close_marketing()
             start_marketing()
-            query = request.query_params.get('query', None)
+            query = request.GET.get('query', None)
             consultants = Consultant.objects.all()
             roles = request.user.roles
 
@@ -412,7 +412,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             consultant_id = kwargs.get('pk')
-            submission = request.query_params.get('submission', 'false')
+            submission = request.GET.get('submission', 'false')
             if submission.lower() == "true":
                 consultant = get_object_or_404(Consultant, id=consultant_id)
                 serializer = ConsultantSubmissionSerializer(consultant)
@@ -579,7 +579,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='search')
     def search(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', None)
+            query = request.GET.get('query', None)
             if query:
                 consultants = Consultant.objects.filter(
                     name__istartswith=query.lstrip().replace(':amp:', '&')
@@ -696,8 +696,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=True, url_path='marketing')
     def marketing(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        marketing_stage = request.query_params.get('stage')
-        filter_by_status = request.query_params.get("filter_by_status", None)
+        marketing_stage = request.GET.get('stage')
+        filter_by_status = request.GET.get("filter_by_status", None)
 
         try:
             consultant_id = kwargs.get('pk')
@@ -839,13 +839,13 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        visa = request.query_params.get('visa', [])
-        days = request.query_params.get('days', None)
-        query = request.query_params.get('query', None)
-        skills = request.query_params.get('skills', [])
-        gender = request.query_params.get('gender', None)
-        team_name = request.query_params.get('team', None)
-        con_status = request.query_params.get('status', 'all')
+        visa = request.GET.get('visa', [])
+        days = request.GET.get('days', None)
+        query = request.GET.get('query', None)
+        skills = request.GET.get('skills', [])
+        gender = request.GET.get('gender', None)
+        team_name = request.GET.get('team', None)
+        con_status = request.GET.get('status', 'all')
 
         try:
             # Consultants search based on name, email, recruiter and location
@@ -962,7 +962,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             close_marketing()
             start_marketing()
             marketing = ConsultantMarketing.objects.filter(
-                consultant_id=request.query_params.get('consultant')
+                consultant_id=request.GET.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
             return Response({"data": serializer.data}, status=200)
@@ -1080,7 +1080,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     def remarketing(self, request, *args, **kwargs):
         try:
             marketing = ConsultantMarketing.objects.filter(
-                consultant_id=request.query_params.get('consultant')
+                consultant_id=request.GET.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
             return Response({"data": serializer.data}, status=200)
@@ -1091,7 +1091,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     @action(methods=['get'], detail=False, url_path='previous_marketing')
     def previous_marketing(self, request, *args, **kwargs):
         try:
-            qs = ConsultantMarketing.objects.filter(consultant_id=request.query_params.get('consultant'))
+            qs = ConsultantMarketing.objects.filter(consultant_id=request.GET.get('consultant'))
             if qs:
                 data = ConsultantMarketingCycleSerializer(qs.latest('end')).data
             else:
@@ -1259,7 +1259,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
     # Return Consultant Profiles
     def list(self, request, *args, **kwargs):
         try:
-            consultant_id = request.query_params.get('con_id', None)
+            consultant_id = request.GET.get('con_id', None)
             consultant = get_object_or_404(Consultant, id=consultant_id)
             profiles = consultant.profiles.all()
             serializer = self.serializer_class(profiles, many=True)
@@ -1482,8 +1482,8 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        query = request.query_params.get('query', None)
-        con_status = request.query_params.get('status', 'all')
+        query = request.GET.get('query', None)
+        con_status = request.GET.get('status', 'all')
 
         try:
             consultants = Consultant.objects.filter(status__in=['terminated', 'archived'])
@@ -1668,7 +1668,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            feedback_type = request.query_params.get('type', None)
+            feedback_type = request.GET.get('type', None)
             feedback = Feedback.objects.filter(consultant_id=kwargs.get('pk')).order_by('-created')
             if feedback_type:
                 feedback = feedback.filter(feedback_type=feedback_type)
@@ -1865,7 +1865,7 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
 
     def create(self, request, *args, **kwargs):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not api_key:
                 return Response({"message": "Api Key not found"}, status=401)
             if not APIKey.objects.is_valid(api_key):

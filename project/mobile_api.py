@@ -34,8 +34,8 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
 
     @action(methods=['GET'], detail=False, url_path='history')
     def history(self, request):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
@@ -64,8 +64,8 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
@@ -94,7 +94,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
     def update(self, request, *args, **kwargs):
         try:
             screenshot = False
-            zero_hours = request.query_params.get('zero_hours', None)
+            zero_hours = request.GET.get('zero_hours', None)
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status__in=['draft', 'rejected'],
                                           is_active=True)
             timesheet_id = timesheet.id
@@ -212,8 +212,8 @@ class Test(GenericViewSet, ListModelMixin):
     authentication_classes = (ConsultantTokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
-        timesheet = request.query_params.get('timesheet')
-        device_id = request.query_params.get('fcm_token')
+        timesheet = request.GET.get('timesheet')
+        device_id = request.GET.get('fcm_token')
         message_body = {
             "category": "rejected",
             "show_in_foreground": True,
@@ -244,8 +244,8 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
     @action(methods=['GET'], detail=True, url_path='history')
     def history(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project_id = kwargs.get('pk')
@@ -391,8 +391,8 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
@@ -408,7 +408,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     def update(self, request, *args, **kwargs):
         try:
             screenshot = False
-            zero_hours = request.query_params.get('zero_hours', None)
+            zero_hours = request.GET.get('zero_hours', None)
             timesheet = get_object_or_404(
                 TimeSheet, id=kwargs.get('pk', None),
                 project__consultant=request.user,

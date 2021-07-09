@@ -23,7 +23,7 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', None)
+            query = request.GET.get('query', None)
             users = User.objects.exclude(role__name='consultant')
             if query:
                 query = query.lstrip().replace(':amp:', '&')

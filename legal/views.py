@@ -177,7 +177,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='doc_url')
     def doc_url(self, request, *args, **kwargs):
         try:
-            document_id = request.query_params.get('document_id')
+            document_id = request.GET.get('document_id')
             document = get_object_or_404(Document, id=document_id)
             url = get_s3_object(document.file.name)
             return Response({"result": url}, status=200)
@@ -210,8 +210,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
         first, last = get_page_limits(request)
 
         try:
-            filter_for = request.query_params.get('filter', 'all')
-            query = request.query_params.get('query', None)
+            filter_for = request.GET.get('filter', 'all')
+            query = request.GET.get('query', None)
             queryset = Petition.objects.filter(is_active=True)
             if filter_for == 'my':
                 queryset = queryset.filter(
@@ -427,7 +427,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def document(self, request, *args, **kwargs):
         try:
             petition_id = kwargs.get('pk')
-            doc_id = request.query_params.get('doc_id', None)
+            doc_id = request.GET.get('doc_id', None)
             if doc_id:
                 petition = get_object_or_404(Petition, id=petition_id)
                 doc = get_object_or_404(Document, id=doc_id)
@@ -613,7 +613,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     @action(methods=['get'], detail=False, url_path='doc_url')
     def doc_url(self, request, *args, **kwargs):
         try:
-            document_id = request.query_params.get('document_id')
+            document_id = request.GET.get('document_id')
             document = get_object_or_404(Document, id=document_id, petition__beneficiary=request.user)
             url = get_s3_object(document.file.name)
             return Response({"result": url}, status=200)

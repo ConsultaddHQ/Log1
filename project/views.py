@@ -326,14 +326,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        query = request.query_params.get('query', None)
-        version = request.query_params.get('version', 'v1')
-        sort_by = request.query_params.get('sort_by', None)
-        filter_for = request.query_params.get('filter_for', None)
-        filter_json = request.query_params.get('filter_json', None)
-        filter_by_time = request.query_params.get('filter_by_time', None)
-        filter_by_lead = request.query_params.get('filter_by_lead', None)
-        filter_by_status = request.query_params.get('filter_by_status', None)
+        query = request.GET.get('query', None)
+        version = request.GET.get('version', 'v1')
+        sort_by = request.GET.get('sort_by', None)
+        filter_for = request.GET.get('filter_for', None)
+        filter_json = request.GET.get('filter_json', None)
+        filter_by_time = request.GET.get('filter_by_time', None)
+        filter_by_lead = request.GET.get('filter_by_lead', None)
+        filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
             # search project by client and consultant
@@ -603,7 +603,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path="mail_to_onboard")
     def mail_to_onboard(self, request):
         try:
-            project_id = request.query_params.get('project_id', None)
+            project_id = request.GET.get('project_id', None)
             if project_id:
 
                 project = get_object_or_404(Project, id=project_id)
@@ -696,7 +696,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
 
     def list(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            project = get_object_or_404(Project, id=request.GET.get('project_id'))
             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -813,7 +813,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
 
     def list(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=request.query_params.get('project_id'))
+            project = get_object_or_404(Project, id=request.GET.get('project_id'))
             serializer = ProjectOrderSerializer(project.order.all().order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -906,8 +906,8 @@ class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            end = request.query_params.get("end", None)
-            start = request.query_params.get("start", None)
+            end = request.GET.get("end", None)
+            start = request.GET.get("start", None)
             if start and end:
                 projects = Project.objects.select_related('submission').filter(modified__range=[start, end])
             else:
@@ -950,9 +950,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
     def retrieve(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        query = request.query_params.get('query', None)
-        start = request.query_params.get('start', None)
-        end = request.query_params.get('end', date.today())
+        query = request.GET.get('query', None)
+        start = request.GET.get('start', None)
+        end = request.GET.get('end', date.today())
 
         try:
             projects = Project.objects.filter(
@@ -986,9 +986,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        query = request.query_params.get('query', None)
-        consultant_id = request.query_params.get('consultant', None)
-        consultant_name = request.query_params.get('consultant_name', None)
+        query = request.GET.get('query', None)
+        consultant_id = request.GET.get('consultant', None)
+        consultant_name = request.GET.get('consultant_name', None)
 
         try:
 

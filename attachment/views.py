@@ -88,9 +88,9 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
     authentication_classes = (TokenAuthentication,)
 
     def retrieve(self, request, *args, **kwargs):
-        obj_type = request.query_params.get("obj_type", None)
-        object_id = request.query_params.get('object_id', None)
-        attachment_type = request.query_params.get("type", None)
+        obj_type = request.GET.get("obj_type", None)
+        object_id = request.GET.get('object_id', None)
+        attachment_type = request.GET.get("type", None)
         try:
             obj_content_type = ContentType.objects.get(model=obj_type)
             if attachment_type:
@@ -140,8 +140,8 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
 
     def destroy(self, request, *args, **kwargs):
         try:
-            content_type = self.request.query_params.get('type', None)
-            attachment_id = self.request.query_params.get('attachment_id', None)
+            content_type = self.request.GET.get('type', None)
+            attachment_id = self.request.GET.get('attachment_id', None)
             roles = request.user.roles
             if content_type == 'consultant' and ('recruiter' in roles or 'admin' in roles or 'superadmin' in roles):
                 attachment = get_object_or_404(Attachment, id=attachment_id)

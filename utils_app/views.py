@@ -20,7 +20,7 @@ class CityViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
+            query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
             city = City.objects.filter(name__istartswith=query)
             data = city[:40].values('id', 'name', 'state')
             return Response({"data": data}, status=200)
@@ -38,8 +38,8 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            field = request.query_params.get('field')
-            model = request.query_params.get('model', None)
+            field = request.GET.get('field')
+            model = request.GET.get('model', None)
             queryset = self.queryset.filter(field=field)
             if model:
                 content_type = ContentType.objects.get(model=model)

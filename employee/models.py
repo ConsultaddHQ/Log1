@@ -255,7 +255,7 @@ class Handover(TimeStampedModel):
         ordering = ('-user__employee_name',)
 
     def __str__(self):
-        return f"{self.user.employee_name} --> {self.handover_to.employee_name}"
+        return f"{self.user} --> {self.handover_to}"
 
     def save(self, *args, **kwargs):
         if not self.id:

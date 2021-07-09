@@ -52,7 +52,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
-            model = request.query_params.get('model', None)
+            model = request.GET.get('model', None)
             queryset = Notification.objects.active(request.user, 'user')
             if model:
                 queryset = queryset.filter(
@@ -98,7 +98,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
 
     @action(methods=['get'], detail=False, url_name='push_notification')
     def push_notification(self, request):
-        consultant_id = request.query_params.get('consultant_id')
+        consultant_id = request.GET.get('consultant_id')
         try:
             message_body = {
                 "category": "alert",
