@@ -42,7 +42,7 @@ class ConsultantPetitionTokenAdmin(admin.ModelAdmin):
 @admin.register(ConsultantProfile)
 class ConsultantProfileAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'consultant__name', 'consultant__email', 'profile_owner__employee_name')
+    search_fields = ('id', 'title', 'consultant__name', 'consultant__email', 'profile_owner__employee_name')
     list_display = ('id', 'title', 'consultant', 'profile_owner', 'date_of_birth', 'linkedin', 'current_city',
                     'profile_owner', 'visa_type', 'visa_start', 'visa_end', 'links', 'education')
 
@@ -74,8 +74,7 @@ class ConsultantMarketingAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('status',)
     search_fields = ('id', 'consultant__name', 'consultant__email')
-    list_display = ('id', 'cycle', 'consultant', 'start', 'end', 'in_pool', 'preferred_location', 'team_display',
-                    'status', 'primary_marketer', 'previous_marketing_days', 'marketer_display')
+    list_display = ('id', 'consultant', 'start', 'end', 'in_pool', 'cycle', 'status', 'previous_marketing_days',)
 
     def team_display(self, obj):
         return ", ".join([
@@ -83,13 +82,6 @@ class ConsultantMarketingAdmin(ExportActionModelAdmin):
         ])
 
     team_display.short_description = "Teams"
-
-    def marketer_display(self, obj):
-        return ", ".join([
-            marketer.employee_name for marketer in obj.marketer.all()
-        ])
-
-    marketer_display.short_description = "Marketers"
 
 
 @admin.register(ConsultantRateRevision)

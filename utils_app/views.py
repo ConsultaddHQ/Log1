@@ -20,12 +20,12 @@ class CityViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
+            query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
             city = City.objects.filter(name__istartswith=query)
             data = city[:40].values('id', 'name', 'state')
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name='CityViewSets', function_name='list')
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -38,8 +38,8 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            field = request.query_params.get('field')
-            model = request.query_params.get('model', None)
+            field = request.GET.get('field')
+            model = request.GET.get('model', None)
             queryset = self.queryset.filter(field=field)
             if model:
                 content_type = ContentType.objects.get(model=model)
@@ -47,7 +47,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             data = queryset.values('id', 'name', 'display_name', 'field', 'content_type__model')
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name='ChoiceViewSet', function_name='list')
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -63,5 +63,5 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             )
             return Response({'message': 'Choice Created'}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name='ChoiceViewSet', function_name='create')
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)

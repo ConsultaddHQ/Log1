@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
-env_path = Path('.', '.env')
+env_path = Path(BASE_DIR, '.env')
 load_dotenv(dotenv_path=env_path)
 
 # SECURITY WARNING: don't run with debug turned on in production!

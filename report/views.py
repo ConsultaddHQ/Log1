@@ -1,4 +1,3 @@
-import inspect
 from datetime import datetime, date, timedelta
 
 from django.db.models import Q
@@ -102,10 +101,6 @@ class SlashCommandViewSets(GenericViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     months = ["Unknown", "January", "February", "March", "April", "May", "June", "July", "August", "September",
               "October", "November", "December"]
 
@@ -188,7 +183,8 @@ command - {command}\n
 
         return text
 
-    def team_data_by_start(self, start, command):
+    @staticmethod
+    def team_data_by_start(start, command):
         text = f"""#### Team Status :memo: \n
 From Date - {start} to {str(date.today())}
 command - {command}\n
@@ -324,12 +320,12 @@ command - {command}\n\n
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request, *args, **kwargs):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"text": "Unauthorized"}, status=200)
 
-            query = request.query_params.get('text', None)
-            command = request.query_params.get('command', None)
+            query = request.GET.get('text', None)
+            command = request.GET.get('command', None)
 
             if not query and len(query) > 3:
                 return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
@@ -337,7 +333,7 @@ command - {command}\n\n
             data_type = query.split(" ")[0]
             name = query.split(" ")[1]
 
-            consultants = Consultant.objects.filter(name__istartswith=name).exclude(status='archived')
+            consultants = Consultant.objects.filter(name__istartswith=name).exclude(status='terminated')
             text = "Bad Input"
 
             if data_type == 'poc':
@@ -389,18 +385,18 @@ command - {command} {query}\n
 
             return Response({"text": text}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"text": "Unauthorized"}, status=200)
 
-            query = request.query_params.get('text', None)
-            command = request.query_params.get('command', None)
+            query = request.GET.get('text', None)
+            command = request.GET.get('command', None)
             if not query and len(query) < 3:
                 return Response({"text": f"{command} {query} \n Bad Input"}, status=200)
 
@@ -437,18 +433,18 @@ command - {command} {query}\n
                 text += f"""| {user.employee_name} | {user.team.name} |  {submission_count} | {interview_count} | {offer_count} |  {consultant_assigned} |\n"""
             return Response({"text": text}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"text": "Unauthorized"}, status=200)
 
-            query = request.query_params.get('text', None)
-            command = request.query_params.get('command', None)
+            query = request.GET.get('text', None)
+            command = request.GET.get('command', None)
             arguments = query.split()
             slash_command = f"{command} {query}"
             if not query and len(arguments) > 0:
@@ -512,14 +508,16 @@ command - {slash_command}\n
 | Name | Email | Phone No | Teams | Status | In Pool | RTG | Marketing Start | Days | Recruiter | Preferred Location |
 |:-----|:------|:---------|:------|:-------|:--------|:----|:----------------|:-----|:----------|:-------------------|
 """
-                    bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='archived')
+                    bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='terminated')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (
-                                       date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        if marketing.start:
+                            days = (date.today() - marketing.start).days + marketing.previous_marketing_days
+                        else:
+                            days = None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
                 else:
@@ -532,7 +530,7 @@ command - {slash_command}\n
                     bench_consultant = Consultant.objects.filter(
                         marketing__status='open',
                         marketing__teams__name__iexact=arg2,
-                    ).exclude(status='archived')
+                    ).exclude(status='terminated')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
@@ -546,7 +544,7 @@ command - {slash_command}\n
 
             return Response({"text": text}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"text": "Bad request", "error": str(error)}, status=200)
 
 
@@ -557,11 +555,8 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
-    def get_support_counts(self, supports):
+    @staticmethod
+    def get_support_counts(supports):
         counts = dict()
         supports = supports.order_by(
             'project__id', 'project__consultant__id'
@@ -595,10 +590,10 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     def list(self, request, *args, **kwargs):
         try:
             first, last = get_page_limits(request)
-            query = request.query_params.get('query', None)
-            filter_for = request.query_params.get('filter_for', None)
-            filter_by_status = request.query_params.get('status', None)
-            filter_by_tech = request.query_params.get('filter_by_tech', None)
+            query = request.GET.get('query', None)
+            filter_for = request.GET.get('filter_for', None)
+            filter_by_status = request.GET.get('status', None)
+            filter_by_tech = request.GET.get('filter_by_tech', None)
 
             supports = ProjectSupport.objects.all()
             if query:
@@ -663,7 +658,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
                 supports.order_by('support__employee_name', '-start')[first:last], many=True)
             return Response({"data": serializer.data, "counts": data_count, "page_count": page_count}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
 
@@ -674,18 +669,14 @@ class MarketingReportViewSets(GenericViewSet):
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
             first, last = get_page_limits(request)
-            end = request.query_params.get('end', None)
-            start = request.query_params.get('start', None)
-            query = request.query_params.get('query', None)
-            filter_by_team = request.query_params.get('filter_by_team', None)
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
+            query = request.GET.get('query', None)
+            filter_by_team = request.GET.get('filter_by_team', None)
 
             if query:
                 employees = User.objects.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
@@ -732,14 +723,14 @@ class MarketingReportViewSets(GenericViewSet):
                 })
             return Response({"data": data, "total": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
-            end = request.query_params.get('end', None)
-            start = request.query_params.get('start', None)
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
                                                                                                  '%Y-%m-%d').date():
                 return Response({'message': 'Invalid date filter'}, status=400)
@@ -805,24 +796,24 @@ class MarketingReportViewSets(GenericViewSet):
             })
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
         try:
             first, last = get_page_limits(request)
-            query = request.query_params.get('query', None)
-            filter_by_team = request.query_params.get('filter_by_team', None)
+            query = request.GET.get('query', None)
+            filter_by_team = request.GET.get('filter_by_team', None)
 
             if query:
                 bench_consultant = Consultant.objects.filter(
                     marketing__status='open', name__istartswith=query.lstrip().replace(':amp:', '&')
-                ).exclude(status__in=['archived', 'terminated'])
+                ).exclude(status__in=['terminated'])
             else:
                 bench_consultant = Consultant.objects.filter(
                     marketing__status='open'
-                ).exclude(status__in=['archived', 'terminated'])
+                ).exclude(status__in=['terminated'])
             if filter_by_team:
                 bench_consultant = bench_consultant.filter(
                     marketing__teams__name__iexact=filter_by_team
@@ -858,5 +849,5 @@ class MarketingReportViewSets(GenericViewSet):
                 })
             return Response({'data': data, "total": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

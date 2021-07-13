@@ -1,5 +1,4 @@
 import os
-import inspect
 from datetime import datetime, timedelta
 
 from django.utils import timezone
@@ -33,14 +32,10 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['GET'], detail=False, url_path='history')
     def history(self, request):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
@@ -65,12 +60,12 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             serializer = self.serializer_class(data, many=True)
             return Response({"total": total, "result": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project_status = ['joined', 'terminated-resigned', 'completed', 'terminated', 'extended',
@@ -93,13 +88,13 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 return Response({"result": serializer.data}, status=200)
             return Response({"result": "No Weeks"}, status=404)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
             screenshot = False
-            zero_hours = request.query_params.get('zero_hours', None)
+            zero_hours = request.GET.get('zero_hours', None)
             timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status__in=['draft', 'rejected'],
                                           is_active=True)
             timesheet_id = timesheet.id
@@ -137,7 +132,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                 if not screenshot:
                     return Response({"error": "Attachment is required"}, status=400)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"error": str(error)}, status=400)
             timesheet.submitted_at = datetime.now()
             timesheet.save()
@@ -175,7 +170,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -184,8 +179,11 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
             timesheet.status = 'consultant_rejected'
             timesheet.save()
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # API for Mobile App (For Consultants)
@@ -196,17 +194,13 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
             serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
 
@@ -217,13 +211,9 @@ class Test(GenericViewSet, ListModelMixin):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
-        timesheet = request.query_params.get('timesheet')
-        device_id = request.query_params.get('fcm_token')
+        timesheet = request.GET.get('timesheet')
+        device_id = request.GET.get('fcm_token')
         message_body = {
             "category": "rejected",
             "show_in_foreground": True,
@@ -252,14 +242,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['GET'], detail=True, url_path='history')
     def history(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project_id = kwargs.get('pk')
@@ -273,7 +259,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(data, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['POST'], detail=False, url_path='contact_us')
@@ -345,7 +331,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
             return Response({"result": "mail sent"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['PUT'], detail=True, url_path='cancel')
@@ -361,7 +347,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['GET'], detail=True, url_path='attachments')
@@ -383,7 +369,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
             return Response({"result": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
@@ -401,12 +387,12 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             ).order_by('-start_date').values('id', 'start_date', 'client', 'employer', 'status')
             return Response({'result': result}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
+        # page = int(request.GET.get("page", 1))
+        # page_size = int(request.GET.get("page_size", 10))
         # last, first = page * page_size, page * page_size - page_size
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
@@ -416,13 +402,13 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(queryset, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
             screenshot = False
-            zero_hours = request.query_params.get('zero_hours', None)
+            zero_hours = request.GET.get('zero_hours', None)
             timesheet = get_object_or_404(
                 TimeSheet, id=kwargs.get('pk', None),
                 project__consultant=request.user,
@@ -466,7 +452,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 if not screenshot:
                     return Response({"error": "Attachment is required"}, status=400)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"error": str(error)}, status=400)
 
             timesheet.submitted_at = datetime.now()
@@ -519,5 +505,8 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)

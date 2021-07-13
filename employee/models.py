@@ -133,6 +133,7 @@ class User(AbstractUser, PermissionsMixin):
             res = send_email(mail_data, "admin@log1.com")
             return res, "ok"
         except Exception as error:
+            write_exception(message=error)
             return error, "error"
 
     def save(self, *args, **kwargs):
@@ -242,5 +243,22 @@ def tag_users(data):
             tag.tagged_user.add(user)
         return True
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='tag_users')
+        write_exception(message=error)
         return False
+
+
+class Handover(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='handover_to')
+    handover_to = models.ForeignKey(User, on_delete=models.CASCADE, related_name='handovers', blank=True, null=True)
+
+    class Meta:
+        ordering = ('-user__employee_name',)
+
+    def __str__(self):
+        return f"{self.user} --> {self.handover_to}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Handover, self).save(*args, **kwargs)

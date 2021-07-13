@@ -30,7 +30,7 @@ class Activity(models.Model):
     created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
 
     def __str__(self):
-        return f'{self.content_type.model.title()} {self.get_activity_type_display()} by {self.user.employee_name}'
+        return f'{str(self.content_type.model).title()} {self.get_activity_type_display()} by {self.user.employee_name}'
 
     def save(self, *args, **kwargs):
         """
