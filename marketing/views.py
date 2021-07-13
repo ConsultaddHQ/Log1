@@ -149,13 +149,14 @@ class LeadViewSets(viewsets.ModelViewSet):
     @staticmethod
     def get_queryset_and_count(queryset, filter_by_status, sort_by):
         try:
-            total, data_counts = 0, dict()
             queryset = queryset.order_by('id').distinct('id')
-            counts = queryset.values('status').annotate(total=Count('status')).order_by('status')
-            for count in counts:
-                data_counts[count['status']] = count['total']
-                total += count['total']
-            data_counts['total'] = total
+            data_counts = {
+                "total": queryset.count(),
+                "new": queryset.filter(status='new').count(),
+                "sub": queryset.filter(status='sub').count(),
+                "draft": queryset.filter(status='draft').count(),
+                "archive": queryset.filter(status='archived').count(),
+            }
 
             if 'archived' in filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
@@ -546,13 +547,13 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     @staticmethod
     def get_count_and_queryset(queryset, sub_status, sort_by, first, last):
         try:
-            total, data_counts = 0, dict()
             queryset = queryset.order_by('id').distinct('id')
-            counts = queryset.values('status').annotate(total=Count('status')).order_by('status')
-            for count in counts:
-                data_counts[count['status']] = count['total']
-                total += count['total']
-            data_counts['total'] = total
+            data_counts = {
+                'total': queryset.count(),
+                'sub': queryset.filter(status='sub').count(),
+                'project': queryset.filter(status='project').count(),
+                'interview': queryset.filter(status='interview').count(),
+            }
 
             if sub_status:
                 queryset = queryset.filter(status__in=sub_status)
@@ -929,14 +930,16 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last):
         try:
             # Interview counts by status
-            total: int = 0
-            data_counts: dict = {}
             queryset = queryset.order_by('id').distinct('id')
-            counts = queryset.values('status').annotate(total=Count('status')).order_by('status')
-            for count in counts:
-                data_counts[count['status']] = count['total']
-                total += count['total']
-            data_counts['total'] = total
+            data_counts = {
+                'total': queryset.count(),
+                'offer': queryset.filter(status='offer').count(),
+                'failed': queryset.filter(status='failed').count(),
+                'scheduled': queryset.filter(status='scheduled').count(),
+                'cancelled': queryset.filter(status='cancelled').count(),
+                'rescheduled': queryset.filter(status='rescheduled').count(),
+                'feedback_due': queryset.filter(status=' feedback_due').count(),
+            }
 
             if filter_by_status:
                 queryset = queryset.filter(status__in=filter_by_status)
@@ -1044,7 +1047,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         Q(supervisor_id=user_id) |
                         Q(submission__created_by_id=user_id) |
                         Q(submission__consultant_marketing__in_pool=True) |
-                        Q(submission__consultant_marketing__marketer_id=user_id)
+                        Q(submission__consultant_marketing__marketer__id=user_id)
                     )
 
             elif 'superadmin' in roles:

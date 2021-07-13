@@ -36,7 +36,7 @@ def date_filter(queryset, created, field_str):
             filters[f"{field_str}__lte"] = lte
         if gte:
             filters[f"{field_str}__gte"] = gte
-    return queryset(**filters)
+    return queryset.filter(**filters)
 
 
 # Change status of scheduled and rescheduled Interviews to feedback_due
