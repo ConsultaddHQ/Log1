@@ -1,5 +1,4 @@
 import json
-import inspect
 from operator import or_
 from functools import reduce
 from django.db import transaction
@@ -34,20 +33,16 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
             start_marketing()
             first, last = get_page_limits(request)
-            query = request.query_params.get('query', None)
-            sort_by = request.query_params.get('sort_by', None)
-            con_status = request.query_params.get('status', 'on_bench')
-            filter_json = request.query_params.get('filter_json', None)
-            con_sub_status = request.query_params.get('sub_status', None)
+            query = request.GET.get('query', None)
+            sort_by = request.GET.get('sort_by', None)
+            con_status = request.GET.get('status', 'on_bench')
+            filter_json = request.GET.get('filter_json', None)
+            con_sub_status = request.GET.get('sub_status', None)
 
             if len(con_status) == 0 and len(query) <= 0:
                 con_status = 'on_bench'
@@ -105,14 +100,13 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             consultants = consultants.distinct('id')
 
             offer_candidates = consultants.filter(
-                projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                projects__statuses__is_current=True
+                projects__statuses__status__in=['new', 'received', 'on_boarded'], projects__statuses__is_current=True
             ).values('id')
             open_candidates = consultants.filter(marketing__status='open').values('id')
 
             status_obj = {
                 "all": consultants,
-                "terminated": consultants.filter(status__in=['archived', 'terminated']),
+                "terminated": consultants.filter(status='terminated'),
 
                 "marketing_candidate": consultants.filter(
                     status='on_bench', marketing__status='close'
@@ -120,12 +114,12 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
                 "on_project": consultants.filter(
                     projects__statuses__status='joined', projects__statuses__is_current=True
-                ).exclude(status__in=['archived', 'terminated']),
+                ).exclude(status='terminated'),
 
                 "offer": consultants.filter(
                     projects__statuses__is_current=True,
                     projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                ).exclude(status__in=['archived', 'terminated']),
+                ).exclude(status='terminated'),
 
                 "on_bench": consultants.filter(marketing__status='open').exclude(id__in=offer_candidates)
             }
@@ -201,22 +195,11 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
 
-            poc = ConsultantPOC.objects.filter(
-                consultant=OuterRef("pk"), end=None, poc_type='recruiter')
-
-            rate = ConsultantRateRevision.objects.filter(
-                consultant=OuterRef("pk"), end=None)
-
-            marketing = ConsultantMarketing.objects.filter(
-                consultant=OuterRef("pk"), status='open')
-
-            work_auth = WorkAuth.objects.filter(
-                consultant=OuterRef("pk"), is_current=True
-            )
-
-            termination = ConsultantExit.objects.filter(
-                consultant=OuterRef("pk")
-            )
+            termination = ConsultantExit.objects.filter(consultant=OuterRef("pk"))
+            work_auth = WorkAuth.objects.filter(consultant=OuterRef("pk"), is_current=True)
+            rate = ConsultantRateRevision.objects.filter(consultant=OuterRef("pk"), end=None)
+            marketing = ConsultantMarketing.objects.filter(consultant=OuterRef("pk"), status='open')
+            poc = ConsultantPOC.objects.filter(consultant=OuterRef("pk"), end=None, poc_type='recruiter')
 
             if con_status == 'terminated':
                 data = consultants[first:last].annotate(
@@ -250,7 +233,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                          'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end')
             return Response({"count": count, "data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='filters')
@@ -275,7 +258,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             }
             return Response({"data": filters}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -286,11 +269,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
-    def get_submission_data(self, queryset, filter_by_status, first, last):
+    @staticmethod
+    def get_submission_data(queryset, filter_by_status, first, last):
         try:
             data_counts = {
                 'total': queryset.count(),
@@ -311,10 +291,11 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             return data, data_counts
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(message=error)
             return error, "error"
 
-    def get_interview_data(self, queryset, filter_by_status, first, last):
+    @staticmethod
+    def get_interview_data(queryset, filter_by_status, first, last):
         try:
             # Interview counts by status
             queryset = queryset.order_by('-modified').distinct('modified')
@@ -346,10 +327,11 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             return data, data_counts
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(message=error)
             return error, 'error'
 
-    def get_project_data(self, queryset, filter_by_status):
+    @staticmethod
+    def get_project_data(queryset, filter_by_status):
         try:
             # count of project by status
             data_counts = {
@@ -379,14 +361,14 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                      'status', 'employer', 'start_date', 'end_date', 'job_title')
             return data, data_counts
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(message=error)
             return error, 'error'
 
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
             start_marketing()
-            query = request.query_params.get('query', None)
+            query = request.GET.get('query', None)
             consultants = Consultant.objects.all()
             roles = request.user.roles
 
@@ -416,13 +398,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
             else:
                 consultants = consultants.filter(marketing__status='open').exclude(
-                    status__in=['archived', 'terminated'])
+                    status='terminated')
 
             consultants = consultants.order_by('id').distinct('id')[:100]
             serializer = ConsultantListSerializer(consultants, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
@@ -430,7 +412,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             consultant_id = kwargs.get('pk')
-            submission = request.query_params.get('submission', 'false')
+            submission = request.GET.get('submission', 'false')
             if submission.lower() == "true":
                 consultant = get_object_or_404(Consultant, id=consultant_id)
                 serializer = ConsultantSubmissionSerializer(consultant)
@@ -439,7 +421,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 serializer = self.serializer_class(consultant)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -469,7 +451,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             # Creating Consultant Original Profile Consultant
             ConsultantProfile.objects.create(
                 title="Original",
-                links=data['links'],
                 consultant=consultant,
                 visa_end=data['visa_end'],
                 profile_owner=request.user,
@@ -477,23 +458,24 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 visa_start=data['visa_start'],
                 current_city=data['current_city'],
                 date_of_birth=data['date_of_birth'],
+                links=request.data.get('links', None),
             )
 
             # Creating Recruiter of Consultant
             ConsultantPOC.objects.create(
-                start=timezone.now(),
-                poc_type='recruiter',
+                poc_id=data['recruiter'],
                 consultant=consultant,
-                poc_id=data['recruiter']
+                poc_type='recruiter',
+                start=timezone.now(),
             )
 
             # Creating Retention of Consultant
             if request.data.get('retention', None):
                 ConsultantPOC.objects.create(
+                    poc_id=data['retention'],
+                    consultant=consultant,
                     poc_type='retention',
                     start=timezone.now(),
-                    consultant=consultant,
-                    poc_id=data['retention']
                 )
 
             # Creating Work-Auth
@@ -513,7 +495,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             return Response({"data": ConsultantSerializer(consultant).data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -562,8 +544,11 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Consultant Updated"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": error}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['get'], detail=True, url_path='activities')
     def activities(self, request, *args, **kwargs):
@@ -575,7 +560,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             serializer = ActivitySerializer(activities, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='set_password')
@@ -594,7 +579,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='search')
     def search(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', None)
+            query = request.GET.get('query', None)
             if query:
                 consultants = Consultant.objects.filter(
                     name__istartswith=query.lstrip().replace(':amp:', '&')
@@ -604,7 +589,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             data = consultants[:10].values('id', 'name', 'email')
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='education')
@@ -636,7 +621,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(education.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Education details added"}, status=201)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
@@ -654,7 +639,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(education.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Education details updated"}, status=202)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='experience')
@@ -687,7 +672,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(experience.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Experience details added"}, status=201)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
@@ -705,14 +690,14 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(experience.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Experience details updated"}, status=202)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='marketing')
     def marketing(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        marketing_stage = request.query_params.get('stage')
-        filter_by_status = request.query_params.get("filter_by_status", None)
+        marketing_stage = request.GET.get('stage')
+        filter_by_status = request.GET.get("filter_by_status", None)
 
         try:
             consultant_id = kwargs.get('pk')
@@ -735,7 +720,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     return Response({"error": str(data)}, status=400)
             return Response({"data": data, "total": counts}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='documents')
@@ -746,7 +731,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             serializer = AttachmentSerializer(queryset, many=True)
             return Response({'data': serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get', 'post', 'put'], detail=True, url_path='payroll_employer')
@@ -774,7 +759,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(employer.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Employer updated"}, status=202)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
@@ -792,7 +777,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Employer added"}, status=201)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
@@ -803,7 +788,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback', 'consultant')
                 return Response({"data": data}, status=200)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
@@ -834,7 +819,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 create_activity(rate_obj.id, 'consultantraterevision', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Rate revised"}, status=201)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -845,10 +830,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['get'], detail=False, url_path='map')
     def map(self, request):
         consultants = Consultant.objects.filter(
@@ -858,13 +839,13 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        visa = request.query_params.get('visa', [])
-        days = request.query_params.get('days', None)
-        query = request.query_params.get('query', None)
-        skills = request.query_params.get('skills', [])
-        gender = request.query_params.get('gender', None)
-        team_name = request.query_params.get('team', None)
-        con_status = request.query_params.get('status', 'all')
+        visa = request.GET.get('visa', [])
+        days = request.GET.get('days', None)
+        query = request.GET.get('query', None)
+        skills = request.GET.get('skills', [])
+        gender = request.GET.get('gender', None)
+        team_name = request.GET.get('team', None)
+        con_status = request.GET.get('status', 'all')
 
         try:
             # Consultants search based on name, email, recruiter and location
@@ -878,7 +859,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                     Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
             else:
-                consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
+                consultants = Consultant.objects.exclude(status='terminated')
 
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
@@ -912,17 +893,18 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             obj = {
                 "all": consultants.all(),
-                "on_project": consultants.filter(projects__statuses__status='joined',
-                                                 projects__statuses__is_current=True),
-                "in_offer": consultants.filter(projects__statuses__status__in=['new', 'received'],
-                                               projects__statuses__is_current=True),
-                "on_boarded": consultants.filter(projects__statuses__status='on_boarded',
-                                                 projects__statuses__is_current=True),
-                "candidate": consultants.filter(status='on_bench').exclude(id__in=open_candidates),
-                "in_pool": consultants.filter(marketing__status='open', marketing__in_pool=True).exclude(
-                    id__in=offer_candidates),
-                "in_marketing": consultants.filter(marketing__status='open', marketing__in_pool=False).exclude(
-                    id__in=offer_candidates)
+                "on_project": consultants.filter(
+                    projects__statuses__status='joined', projects__statuses__is_current=True),
+                "in_offer": consultants.filter(
+                    projects__statuses__status__in=['new', 'received'], projects__statuses__is_current=True),
+                "on_boarded": consultants.filter(
+                    projects__statuses__status='on_boarded', projects__statuses__is_current=True),
+                "candidate": consultants.filter(
+                    status='on_bench').exclude(id__in=open_candidates),
+                "in_pool": consultants.filter(
+                    marketing__status='open', marketing__in_pool=True).exclude(id__in=offer_candidates),
+                "in_marketing": consultants.filter(
+                    marketing__status='open', marketing__in_pool=False).exclude(id__in=offer_candidates)
             }
 
             count = {
@@ -965,7 +947,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                      'marketing_start', 'previous_marketing_days', 'visa')
             return Response({"data": data, "count": count}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -976,27 +958,23 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantMarketingSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
             start_marketing()
             marketing = ConsultantMarketing.objects.filter(
-                consultant_id=request.query_params.get('consultant')
+                consultant_id=request.GET.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
             qs = Consultant.objects.filter(id=request.data['consultant'])
-            if qs:
+            if not qs:
                 return Response({"message": "Consultant not found"}, status=404)
             open_consultant = qs.filter(marketing__status='open')
             if open_consultant:
@@ -1058,7 +1036,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"message": "Marketing started"}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -1077,8 +1055,11 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Marketing cycle updated"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='stop_marketing')
     def stop_marketing(self, request, *args, **kwargs):
@@ -1093,32 +1074,32 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             create_activity(marketing.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"message": "Marketing cycle stopped"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='remarketing')
     def remarketing(self, request, *args, **kwargs):
         try:
             marketing = ConsultantMarketing.objects.filter(
-                consultant_id=request.query_params.get('consultant')
+                consultant_id=request.GET.get('consultant')
             )
             serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='previous_marketing')
     def previous_marketing(self, request, *args, **kwargs):
         try:
-            qs = ConsultantMarketing.objects.filter(consultant_id=request.query_params.get('consultant'))
+            qs = ConsultantMarketing.objects.filter(consultant_id=request.GET.get('consultant'))
             if qs:
                 data = ConsultantMarketingCycleSerializer(qs.latest('end')).data
             else:
                 data = []
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Marketer assignment
@@ -1141,19 +1122,22 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     marketers_name.append(marketer.employee_name)
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
 
+                if len(marketers_name) > 1:
+                    marketer_str = "marketers"
+                else:
+                    marketer_str = "marketer"
+
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name}'s marketing details updated by " \
-                        f"{request.user.employee_name}"
+                title = f"{request.user.employee_name} assigned following {marketer_str} - {', '.join(marketers_name)}"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
-                desc = f"{request.user.employee_name} assigned following marketer - {', '.join(marketers_name)}"
-                create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
+                create_activity(consultant_marketing.consultant.id, 'consultant', request.user, title, 'updated')
                 return Response({"data": serializer.data, "message": "marketers assigned"}, status=202)
             else:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Team Assignment
@@ -1174,17 +1158,17 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 teams_string = ", ".join(team.name for team in consultant_marketing.teams.all())
 
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name} is assigned to {teams_string}"
+                title = f"{consultant_marketing.consultant.name} is assigned to team - {teams_string}"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
-                desc = f"{request.user.employee_name} is assigned to {teams_string}"
+                desc = f"{request.user.employee_name} is assigned to team - {teams_string}"
                 create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Team added"}, status=202)
             else:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Remove assigned Marketer from Consultant
@@ -1208,7 +1192,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 serializer = POCSerializer(consultant_marketing.marketer.all(), many=True)
 
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name}'s assigned marketer removed"
+                name = consultant_marketing.consultant.name
+                title = f"{', '.join(marketers_name)} is unassigned from {name}'s marketing"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
@@ -1218,7 +1203,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Remove team from Consultant
@@ -1240,7 +1225,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
 
                 # Push Notification
-                title = f"{consultant_marketing.consultant.name}'s marketing team removed"
+                title = f"{consultant_marketing.consultant.name} is removed from {team_string}"
                 send_notification_for_user(consultant_marketing.consultant, request.user, title, 'consultantmarketing')
 
                 # Activity
@@ -1250,7 +1235,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -1261,10 +1246,6 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
     serializer_class = ConsultantProfileSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     # Return Consultant Profile by ID
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -1273,19 +1254,18 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(profile)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # Return Consultant Profiles
     def list(self, request, *args, **kwargs):
         try:
-            consultant_id = request.query_params.get('con_id', None)
+            consultant_id = request.GET.get('con_id', None)
             consultant = get_object_or_404(Consultant, id=consultant_id)
             profiles = consultant.profiles.all()
             serializer = self.serializer_class(profiles, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -1320,7 +1300,7 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             create_activity(profile.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Profile created"}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -1340,8 +1320,11 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
                 return Response({"data": serializer.data, "message": "Profile updated"}, status=202)
             return Response({"message": ERROR_MSG, "error": str(serializer.errors)}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # Route - /consultant_poc/
@@ -1350,10 +1333,6 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = ConsultantPOC.objects.all()
     serializer_class = ConsultantPOCSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
@@ -1383,7 +1362,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             create_activity(poc.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"message": "POC added"}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -1406,8 +1385,11 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             create_activity(instance.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "POC updated"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # Route - /consultant_work_auth/
@@ -1416,10 +1398,6 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = WorkAuth.objects.all()
     serializer_class = WorkAuthSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
@@ -1457,7 +1435,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             create_activity(work_auth.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Work Auth added"}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -1488,8 +1466,11 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             create_activity(work_auth.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Work Auth added"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # Route - /consultant_exit/
@@ -1499,19 +1480,14 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     serializer_class = ExitDetailConsultantSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        query = request.query_params.get('query', None)
-        con_status = request.query_params.get('status', 'all')
+        query = request.GET.get('query', None)
+        con_status = request.GET.get('status', 'all')
 
         try:
-            consultants = Consultant.objects.filter(status__in=['terminated', 'archived'])
+            consultants = Consultant.objects.filter(status='terminated')
 
-            # Consultants search based on name, email, recruiter and location
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 consultants = consultants.filter(
@@ -1532,16 +1508,13 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 "absconded": absconded.count(),
             }
 
-            # Filter Consultant by status
             if con_status == 'all':
                 consultants = consultants.all()
             else:
                 consultants = consultants.filter(exit__type=con_status)
 
             consultants = consultants.order_by('id', '-exit__modified').distinct('id')
-
             exit_obj = ConsultantExit.objects.filter(consultant=OuterRef("pk"))
-
             data = consultants[first:last].annotate(
                 type=Subquery(exit_obj.values('type')[:1]),
                 rehire=Subquery(exit_obj.values('rehire')[:1]),
@@ -1550,7 +1523,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             ).values('id', 'name', 'skills', 'type', 'last_date', 'rehire')
             return Response({"data": data, "count": count}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @transaction.atomic
@@ -1592,8 +1565,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 if os.environ.get('ENV', 'local') == 'prod':
                     res, error = send_exit_process_mail(con_exit, 'start')
                     if error == 'error':
-                        write_exception(message=res, class_name=self.get_classname(),
-                                        function_name=inspect.stack()[0][3])
+                        write_exception(res, request)
                         return Response({"message": "Exit process mail not sent", "error": str(res)}, status=400)
             serializer = self.serializer_class(consultant.exit.all().order_by('-created'), many=True)
 
@@ -1604,7 +1576,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 {"data": serializer.data, "exit_mail": str(res), "message": "Exit process created"}, status=201
             )
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -1625,15 +1597,19 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit)
-            serializer = self.serializer_class(con_exit)
 
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
             create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
+
+            serializer = self.serializer_class(con_exit)
             return Response({"data": serializer.data, "message": "Exit process updated"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='cancel')
     def cancel_termination(self, request, *args, **kwargs):
@@ -1655,20 +1631,20 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 if os.environ.get('ENV', 'local') == 'prod':
                     res, error = send_exit_process_mail(con_exit, 'cancel')
                     if error == 'error':
-                        write_exception(message=res, class_name=self.get_classname(),
-                                        function_name=inspect.stack()[0][3])
+                        write_exception(res, request)
                         return Response({"message": "Cancel Termination main not sent", "error": str(res)}, status=400)
-                serializer = self.serializer_class(con_exit)
 
                 # Activity
                 desc = f"{request.user.employee_name} cancelled exit process"
                 create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
+
+                serializer = self.serializer_class(con_exit)
                 return Response(
                     {"data": serializer.data, "exit_mail": str(res), "message": "Exit process cancelled"}, status=202
                 )
             return Response({"message": "Exit process can not be cancelled "}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='reason')
@@ -1677,7 +1653,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             reasons = ExitReason.objects.all().values('id', 'name')
             return Response({'data': reasons}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -1688,20 +1664,16 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantFeedbackSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
-            feedback_type = request.query_params.get('type', None)
+            feedback_type = request.GET.get('type', None)
             feedback = Feedback.objects.filter(consultant_id=kwargs.get('pk')).order_by('-created')
             if feedback_type:
                 feedback = feedback.filter(feedback_type=feedback_type)
             serializer = self.serializer_class(feedback, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -1761,8 +1733,6 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
 
-            serializer = self.serializer_class(feedback)
-
             # Push Notification
             poc_title = f"{feedback.get_feedback_type_display()} feedback added for {feedback.consultant.name} " \
                         f"by {request.user.employee_name}"
@@ -1771,9 +1741,10 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Activity
             desc = f"{request.user.employee_name} added {feedback.get_feedback_type_display()} feedback"
             create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
+            serializer = self.serializer_class(feedback)
             return Response({"data": serializer.data, "message": "Feedback added"}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -1787,11 +1758,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             if len(tags) > 0:
                 user_tag = feedback.tagged_user.all().first()
                 if not user_tag:
-                    tag_data = {
-                        "model": "feedback",
-                        "object_id": feedback.id,
-                        "tags": tags
-                    }
+                    tag_data = {"tags": tags, "model": "feedback", "object_id": feedback.id}
                     tag_users(tag_data)
                 for tag in tags:
                     user = get_object_or_404(User, id=tag)
@@ -1843,8 +1810,11 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Feedback updated"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # API for Petition Web App
@@ -1854,10 +1824,6 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
     authentication_classes = ()
     queryset = Consultant.objects.all()
     serializer_class = ConsultantPetitionLoginSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
@@ -1879,10 +1845,9 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
                 serializer = self.serializer_class(consultant)
                 return Response({"result": serializer.data}, status=202)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"error": str(error)}, status=400)
-        write_exception(message="Incorrect Email Id OR Password", class_name=self.get_classname(),
-                        function_name=inspect.stack()[0][3])
+        write_exception("Incorrect Email Id OR Password", request)
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
@@ -1891,13 +1856,9 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def create(self, request, *args, **kwargs):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if not api_key:
                 return Response({"message": "Api Key not found"}, status=401)
             if not APIKey.objects.is_valid(api_key):
@@ -1911,5 +1872,5 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
             else:
                 return Response({"message": str(data)}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": str(error)}, status=400)

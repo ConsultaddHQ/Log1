@@ -1,10 +1,10 @@
+import os
 import sys
 import yaml
 import json
 import random
 import logging
 import requests
-import linecache
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 from logging.config import dictConfig
@@ -23,20 +23,45 @@ def load_config(file_path):
         logger.error(error)
 
 
-def write_exception(message, class_name, function_name):
-    exc_type, exc_obj, tb = sys.exc_info()
+def log_request(request):
+    """Log the request"""
+    address = request.META['REMOTE_ADDR']
+    method = str(getattr(request, 'method', '')).upper()
+    request_path = str(getattr(request, 'path', ''))
+    query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
+    query_params = query_params if query_params else ''
+    logger.error(f"[{method}] User: ({request.user.id}), Path: {address}{request_path}, Params: {query_params}")
+
+
+def write_info(message, function, request=None):
+    if request:
+        log_request(request)
+    logger.error(f'Function - {function}, Info: {message}')
+
+
+def write_exception(message, request=None):
+    if request:
+        logger.error(f"User id : {request.user.id}")
+        log_request(request)
+    _, _, tb = sys.exc_info()
     f = tb.tb_frame
     lineno = tb.tb_lineno
+    function = f.f_code.co_name
     filename = f.f_code.co_filename
-    linecache.checkcache(filename)
-    logger.error(f"Raise by Class: {class_name}, Function: {function_name}")
-    logger.error(f'EXCEPTION IN {filename}, LINE NO - {lineno} : {message}')
+    classname = None
+    if 'self' in f.f_locals:
+        classname = f.f_locals["self"].__class__.__name__
+    logger.error(f'Error in {filename}, Class - {classname}, Function - {function}, Line no - {lineno}, {message}')
 
 
 def get_page_limits(request):
-    page = int(request.query_params.get("page", 1))
-    page_size = int(request.query_params.get("page_size", 10))
-    return page * page_size - page_size, page * page_size
+    try:
+        page = int(request.GET.get("page", 1))
+        page_size = int(request.GET.get("page_size", 10))
+        return page * page_size - page_size, page * page_size
+    except Exception as error:
+        write_exception(message=error)
+        return 1, 10
 
 
 def get_time_filter(queryset, filter_by):
@@ -106,10 +131,12 @@ def get_time_filter_by_start(queryset, filter_by):
 def post_msg_using_webhook(url, data):
     try:
         headers = {'Content-Type': 'application/json'}
-        resp = requests.post(url, headers=headers, data=json.dumps(data))
-        return resp, "ok"
+        if os.environ.get("ENV", "local") == 'prod':
+            resp = requests.post(url, headers=headers, data=json.dumps(data))
+            return resp, "ok"
+        return "Message sent", "ok"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='post_msg_using_webhook')
+        write_exception(error)
         return error, "error"
 
 

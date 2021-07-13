@@ -6,7 +6,7 @@ from django.utils.translation import ugettext_lazy as _
 from import_export.admin import ExportActionModelAdmin
 
 from utils_app.admin import ExportCsvMixin
-from .models import User, Role, Team, ResetPasswordToken, Asset, Tagging
+from .models import User, Role, Team, ResetPasswordToken, Asset, Tagging, Handover
 
 admin.site.site_header = "Log1"
 
@@ -80,3 +80,9 @@ class AssetAdmin(ExportActionModelAdmin):
 @admin.register(Tagging)
 class AssetAdmin(ExportActionModelAdmin):
     list_display = ('id', 'content_type', 'object_id')
+
+
+@admin.register(Handover)
+class HandoverAdmin(admin.ModelAdmin):
+    search_fields = ('user__employee_name', 'user__employee_id', 'user__email', 'handover_to__employee_name')
+    list_display = ('id', 'user', 'handover_to', 'created', 'modified')

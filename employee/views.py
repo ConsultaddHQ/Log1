@@ -1,4 +1,3 @@
-import inspect
 from itertools import chain
 from datetime import timedelta, datetime
 
@@ -36,10 +35,6 @@ class EmployeeAuthViewSets(GenericViewSet):
     serializer_class = UserSerializer
     login_serializer_class = UserSerializerLogin
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
@@ -66,7 +61,7 @@ class EmployeeAuthViewSets(GenericViewSet):
                 user.role.add(r)
             return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='login')
@@ -75,29 +70,33 @@ class EmployeeAuthViewSets(GenericViewSet):
             Normal Login
             :param request, email, password
         """
-        employee_id = request.data.get('employee_id')
-        if employee_id:
-            queryset = User.objects.filter(employee_id=employee_id)
-            if not queryset:
-                return Response({"message": "This user not found"}, status=400)
-        else:
-            return Response({"message": "Employee Id is Empty"}, status=400)
-        user = queryset.first()
-        user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
-        if user:
-            user.last_login = datetime.now()
-            user.save()
-            fcm_token, created = FCMDevice.objects.get_or_create(
-                device_id=request.data.get("fcm_token"),
-                content_type=ContentType.objects.get(model='user')
-            )
-            fcm_token.type = 'web'
-            fcm_token.name = 'windows'
-            fcm_token.object_id = user.id
-            fcm_token.save()
+        try:
+            employee_id = request.data.get('employee_id')
+            if employee_id:
+                queryset = User.objects.filter(employee_id=employee_id)
+                if not queryset:
+                    return Response({"message": "This user not found"}, status=400)
+            else:
+                return Response({"message": "Employee Id is Empty"}, status=400)
+            user = queryset.first()
+            user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
+            if user:
+                user.last_login = datetime.now()
+                user.save()
+                fcm_token, created = FCMDevice.objects.get_or_create(
+                    device_id=request.data.get("fcm_token"),
+                    content_type=ContentType.objects.get(model='user')
+                )
+                fcm_token.type = 'web'
+                fcm_token.name = 'windows'
+                fcm_token.object_id = user.id
+                fcm_token.save()
 
-            return Response({"data": self.login_serializer_class(user).data}, status=202)
-        return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
+                return Response({"data": self.login_serializer_class(user).data}, status=202)
+            return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": "Unable to Login", "error": str(error)}, status=400)
 
 
 # Route - /employee/
@@ -107,24 +106,20 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
             user = get_object_or_404(User, id=kwargs.get('pk'))
             serializer = self.serializer_class(user)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '')
-            teams = request.query_params.get('teams', None)
-            user_type = request.query_params.get('type', None)
+            query = request.GET.get('query', '')
+            teams = request.GET.get('teams', None)
+            user_type = request.GET.get('type', None)
             users = User.objects.exclude(role__name='consultant').exclude(is_active=False)
             if user_type == 'relation':
                 users = users.filter(team__name='Retention')
@@ -147,7 +142,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             data = users.values('id', 'employee_id', 'email', 'name')
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -171,7 +166,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 user.role.add(r)
             return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='me')
@@ -187,20 +182,20 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             roles = Role.objects.all().values('id', 'name')
             return Response({"data": roles}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
-            query = request.query_params.get('query', None)
+            query = request.GET.get('query', None)
             if query == 'all':
                 teams = Team.objects.exclude(dept='marketing').values('id', 'name', 'dept')
             else:
                 teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
             return Response({"data": teams}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='logout')
@@ -228,7 +223,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 return Response({"message": f"{user.employee_name}'s team update to {team.name}"}, status=202)
             return Response({"message": DONT_HAVE_ACCESS}, status=401)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='change_password')
@@ -242,7 +237,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 return Response({"message": "password updated"}, status=200)
             return Response({"message": "Wrong Password"}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -253,10 +248,6 @@ class ResetPasswordViewSets(GenericViewSet):
     authentication_classes = ()
     serializer_class = EmailSerializer
     pass_serializer_class = PasswordTokenSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
@@ -311,7 +302,7 @@ class ResetPasswordViewSets(GenericViewSet):
                 if error == "ok":
                     return Response({"message": "Mail sent", "data": res}, status=200)
                 else:
-                    write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                    write_exception(res, request)
                     return Response({"message": "Something went wrong", "error": str(res)}, status=400)
             else:
                 return Response({"message": "User is not active"}, status=400)
@@ -355,10 +346,6 @@ class AssetsViewSets(viewsets.ModelViewSet):
     field_list = ['id', 'email', 'number', 'username', 'password', 'provider', 'modified', 'tech',
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         asset_id = kwargs.get('pk')
         try:
@@ -366,12 +353,12 @@ class AssetsViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(asset)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
-            assets_of = request.query_params.get('asset')
+            assets_of = request.GET.get('asset')
             if assets_of == 'shared':
                 asset = Asset.objects.filter(shared_to=request.user, is_deleted=False)
             else:
@@ -390,7 +377,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             }
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -409,7 +396,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 return Response({"data": serializer.data, "message": "Asset added"}, status=201)
             return Response({"message": str(serializer.errors)}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
@@ -440,7 +427,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Asset updated"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
@@ -453,8 +440,11 @@ class AssetsViewSets(viewsets.ModelViewSet):
             create_activity(asset.id, 'asset', request.user, desc, 'deleted')
             return Response(status=204)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
@@ -479,7 +469,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
             return Response({"message": "Asset shared"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='un_share')
@@ -495,7 +485,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
             serializer = self.serializer_class(asset)
             return Response({"data": serializer.data}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='bulk_upload')
@@ -530,9 +520,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                                 asset_type=row['Asset Type'].lower()
                             )
                         else:
-                            write_exception(message=f"{row['Username']} {request.user.employee_name} "
-                                                    f"Asset Type not found", class_name=self.get_classname(),
-                                            function_name=inspect.stack()[0][3])
+                            write_exception(f"{row['Username']} {request.user.employee_name} Asset Type not found")
                             failed += 1
                             continue
                         asset.email = row['Email'] if not pd.isnull(row['Email']) else ""
@@ -551,8 +539,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                             updated += 1
 
                     except Exception as e:
-                        write_exception(message=f"{row['Username']} {request.user.employee_name} {e}",
-                                        class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                        write_exception(f"{row['Username']} {request.user.employee_name} {e}", request)
                         failed += 1
                         continue
                 mail_data = {
@@ -569,11 +556,10 @@ class AssetsViewSets(viewsets.ModelViewSet):
                     },
                 }
                 send_email(mail_data, "Log1")
-                return Response({"message": "Upload Complete", "count": mail_data['context']},
-                                status=201)
+                return Response({"message": "Upload Complete", "count": mail_data['context']}, status=201)
             return Response({"message": "Empty File"}, status=404)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -583,24 +569,20 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
-            query = request.query_params.get('query', '').lstrip().replace(':amp:', '&')
+            query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
             users = self.queryset.filter(employee_name__istartswith=query, is_active=True).annotate(
                 name=F('employee_name'),
                 type=Value('user', CharField())
             ).values('id', 'name', 'type')
 
-            consultants = Consultant.objects.filter(name__istartswith=query).exclude(status='archived').annotate(
+            consultants = Consultant.objects.filter(name__istartswith=query).exclude(status='terminated').annotate(
                 type=Value('consultant', CharField())
             ).values('id', 'name', 'type')
 
             result_list = list(chain(consultants[:5], users[:5]))
             return Response({"data": result_list}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

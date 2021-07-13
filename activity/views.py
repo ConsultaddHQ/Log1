@@ -1,4 +1,3 @@
-import inspect
 from datetime import datetime
 from django.shortcuts import get_object_or_404
 
@@ -40,10 +39,6 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
             activity_id = kwargs.get('pk')
@@ -53,17 +48,17 @@ class ActivityViewSets(RetrieveModelMixin, ListModelMixin):
                 return Response({"data": serializer.data}, status=200)
             return Response({"message": "No activity found"}, status=404)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
-        object_id = request.query_params.get('object_id')
+        object_id = request.GET.get('object_id')
         try:
             activity = Activity.objects.filter(object_id=object_id, user=request.user)
             serializer = self.serializer_class(activity, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -74,13 +69,9 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
-        model = request.query_params.get('model')
+        model = request.GET.get('model')
         try:
             models = {
                 "project": Project,
@@ -98,7 +89,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             serializer = self.serializer_class(comments.order_by('-created'), many=True)
             return Response({'data': serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -176,5 +167,5 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             serializer = CommentGetSerializer(comment)
             return Response({"message": ERROR_MSG, "data": serializer.data}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

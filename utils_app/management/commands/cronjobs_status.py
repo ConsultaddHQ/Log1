@@ -1,4 +1,5 @@
 from dateutil import tz
+from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
@@ -18,13 +19,16 @@ class Command(BaseCommand):
             text = """<tr>
                         <th style="padding:5px 8px 5px 8px;">Name</th>
                         <th style="padding:5px 8px 5px 8px;">Triggered At</th>
+                        <th style="padding:5px 8px 5px 8px;">Error</th>
                     </tr>"""
             for job in jobs:
+                errors = " :: ".join(job.errors.filter(created__date=date.today()).values('description'))
                 text += f"""
                             <tr>
                                 <td style="padding:5px 8px 5px 8px;">{" ".join(job.name.split("_")).title()}</td>
                                 <td style="padding:5px 8px 5px 8px; text-align: center;">
                                 {job.modified.astimezone(to_zone).strftime('%l:%M %p %Z on %b %d, %Y')}</td>
+                                <td style="padding:5px 8px 5px 8px;">{errors}</td>
                             </tr>
                         """
             data = {

@@ -23,7 +23,7 @@ class Command(BaseCommand):
                 Q(status='open') &
                 Q(start__lte=upper_limit) &
                 Q(start__gte=lower_limit)
-            ).exclude(status='archived')
+            ).exclude(status='terminated')
 
             for consultant_marketing in queryset:
                 consultant_marketing.in_pool = True

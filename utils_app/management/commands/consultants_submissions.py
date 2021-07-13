@@ -18,7 +18,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = create_cron_object(name='consultants_submissions')
         try:
-            consultants = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
+            consultants = Consultant.objects.filter(marketing__status='open').exclude(status='terminated').distinct()
             submission_data = []
             today = datetime.today()
             if today.weekday() == 0:

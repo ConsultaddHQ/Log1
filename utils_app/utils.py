@@ -14,20 +14,23 @@ def create_cron_error(job, description):
         mail_data = {
             'cc': [],
             'bcc': [],
-            'to': ['sarang.m@consultadd.com', 'devesh.n@consultadd.com'],
             'body': f'Error :: {description}',
+            'to': ['sarang.m@consultadd.com'],
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
         send_email_without_template(mail_data, 'admin@log1.com')
     except Exception as error:
-        write_exception(message=error, class_name=None, function_name='create_cron_error')
+        write_exception(message=error)
 
 
 def create_cron_object(name):
-    job, created = CronJob.objects.get_or_create(name=name)
-    job.modified = datetime.now()
-    job.save()
-    return job
+    try:
+        job, created = CronJob.objects.get_or_create(name=name)
+        job.modified = datetime.now()
+        job.save()
+        return job
+    except Exception as error:
+        write_exception(message=error)
 
 
 def get_attachment_status(project):

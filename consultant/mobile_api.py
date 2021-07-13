@@ -1,5 +1,4 @@
 import os
-import inspect
 from datetime import timedelta
 from django.db.models import F
 from django.utils import timezone
@@ -14,8 +13,8 @@ from rest_framework.viewsets import GenericViewSet
 
 from constance import config
 from project.models import Project
-from log1.utils import write_exception
 from utils_app.mailing import send_email
+from log1.utils import write_exception, write_info
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.serializers import ConsultantLoginSerializer
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
@@ -31,10 +30,6 @@ class ConsultantAuthViewSet(GenericViewSet):
     authentication_classes = ()
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
@@ -78,7 +73,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             send_email(mail_data, "log1@consultadd.com")
             return Response({"result": "mail sent"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='login')
@@ -123,10 +118,8 @@ class ConsultantAuthViewSet(GenericViewSet):
                 }
                 return Response({"result": data}, status=202)
             except Exception as error:
-                write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                write_exception(error, request)
                 return Response({"error": str(error)}, status=400)
-        write_exception(message="Incorrect Email Id OR Password", class_name=self.get_classname(),
-                        function_name=inspect.stack()[0][3])
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
@@ -138,23 +131,19 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def list(self, request, *args, **kwargs):
         try:
             queryset = Consultant.objects.all()
             serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
         try:
-            first_login = request.query_params.get('first_login', None)
+            first_login = request.GET.get('first_login', None)
             new_password = request.data.get('new_password', None)
             consultant = request.user
             if first_login and new_password:
@@ -176,7 +165,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             consultant.save()
             return Response({"result": "Password Updated"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=False, url_path='logout')
@@ -187,7 +176,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             token.delete()
             return Response(status=204)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
 
@@ -198,10 +187,6 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
     authentication_classes = ()
     serializer_class = EmailSerializer
     queryset = Consultant.objects.all()
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
@@ -256,7 +241,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 }
                 res, error = consultant.send_mail(mail_data)
                 if error == 'error':
-                    write_exception(message=res, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+                    write_info(message=res, function='token_request', request=request)
                     return Response({'error': str(res)}, status=400)
         return Response({'status': 'OK'}, status=200)
 

@@ -1,4 +1,3 @@
-import inspect
 from datetime import datetime
 
 from django.db.models import Q
@@ -11,7 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, UpdateModelMixin, CreateModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from notification.utils import push_notification
 from notification.models import FCMDevice, Notification
@@ -27,10 +26,6 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def create(self, request, *args, **kwargs):
         try:
             content_type = ContentType.objects.get(model='user')
@@ -42,26 +37,22 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
             )
             return Response({"message": "Token Created"}, status=201)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /emp_notify/
-class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
+class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = Notification.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = NotificationSerializer
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @never_cache
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
-            model = request.query_params.get('model', None)
+            model = request.GET.get('model', None)
             queryset = Notification.objects.active(request.user, 'user')
             if model:
                 queryset = queryset.filter(
@@ -72,7 +63,7 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             unread = Notification.objects.unread(request.user, 'user').count()
             return Response({"data": serializer.data, "total": queryset.count(), "unread": unread}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='mark_as_read')
@@ -83,7 +74,7 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             notification.save()
             return Response({"message": 'read'}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='mark_all_read')
@@ -92,7 +83,7 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             Notification.objects.mark_all_as_read(request.user, 'user')
             return Response({"message": "read"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='count')
@@ -102,12 +93,12 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             total = queryset.count()
             return Response({"count": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='push_notification')
     def push_notification(self, request):
-        consultant_id = request.query_params.get('consultant_id')
+        consultant_id = request.GET.get('consultant_id')
         try:
             message_body = {
                 "category": "alert",
@@ -127,20 +118,16 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
             push_notification([request.user.id], message_body)
             return Response({"message": "done"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Mobile App Route - /con_notify/
-class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
+class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
-
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
 
     @never_cache
     def list(self, request, *args, **kwargs):
@@ -153,7 +140,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
                 'id', 'description', 'title', 'deleted', 'unread', 'timestamp', 'category', 'target_object_id')
             return Response({"results": data, "total": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='count')
@@ -163,7 +150,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
             total = queryset.count()
             return Response({"count": total}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_delete')
@@ -181,7 +168,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
             )
             return Response({"result": data, "total": total}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_not_delete')
@@ -199,7 +186,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
             )
             return Response({"result": data, "total": total}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='mark_all_delete')
@@ -208,7 +195,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
             Notification.objects.mark_all_as_deleted(request.user, 'consultant')
             return Response({"result": "deleted"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_read')
@@ -226,7 +213,7 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
             )
             return Response({"result": data, "total": total}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='mark_all_read')
@@ -235,5 +222,5 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
             Notification.objects.mark_all_as_read(request.user, 'consultant')
             return Response({"result": "read"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"error": str(error)}, status=400)

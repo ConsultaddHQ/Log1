@@ -14,22 +14,23 @@ from employee.models import tag_users, User
 from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
 from notification.utils import create_notification, push_notification
-from log1.utils import post_msg_using_webhook, html_to_text, write_exception
+from log1.utils import post_msg_using_webhook, html_to_text, write_exception, write_info
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth
 
 
 def create_activity(object_id, model, user, desc, activity_type):
-    content_type = ContentType.objects.get(model=model)
-    activity = Activity.objects.create(
-        user=user,
-        desc=desc,
-        object_id=object_id,
-        content_type=content_type,
-        activity_type=activity_type,
-    )
-    serializer = ActivitySerializer(activity)
-    return serializer.data
+    try:
+        content_type = ContentType.objects.get(model=model)
+        activity = Activity.objects.create(
+            user=user, desc=desc, object_id=object_id,
+            content_type=content_type, activity_type=activity_type,
+        )
+        serializer = ActivitySerializer(activity)
+        return serializer.data
+    except Exception as error:
+        write_exception(message=error)
+        return None
 
 
 def download_s3_object_beats(key, name):
@@ -43,6 +44,7 @@ def download_s3_object_beats(key, name):
         s3.download_file(os.getenv('AWS_BEATS_BUCKET'), key, local_path)
         return True, local_path
     except Exception as error:
+        write_exception(message=error)
         return False, error
 
 
@@ -58,16 +60,15 @@ def beats_to_log1(file_path, file_name, obj_id, model):
         local_file = open(path, 'rb')
         file = ContentFile(local_file.read())
         attachment = Attachment.objects.create(
-            creator=creator,
-            object_id=obj_id,
-            attachment_type='other',
-            content_type_id=content_type.id,
+            creator=creator, attachment_type='other',
+            object_id=obj_id, content_type_id=content_type.id,
         )
         attachment.attachment_file.save(path, file, save=True)
         attachment.save()
         os.remove(path)
         return True, path
     except Exception as error:
+        write_exception(message=error)
         return False, error
 
 
@@ -83,6 +84,7 @@ def close_marketing():
             send_notification_for_user(marketing.consultant, admin, title, 'marketing')
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -101,6 +103,7 @@ def start_marketing():
             send_notification_for_user(marketing.consultant, admin, title, 'marketing')
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -109,10 +112,11 @@ def send_exit_interview_detail(terminate, request):
         # Message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
         reason = ", ".join(reason.name for reason in terminate.reasons.all())
+        termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
         data = {
             "title": f"Exit interview for {terminate.consultant.name}",
             "text": f"**Reason for leaving** : {reason}<br>"
-                    f"**Termination Date** : {datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')}<br>"
+                    f"**Termination Date** : {termination_date}<br>"
                     f"**Exit Interview Details** : {exit_details} <br>"
         }
         post_msg_using_webhook(config.exit_interview_url, data)
@@ -147,9 +151,8 @@ def send_exit_interview_detail(terminate, request):
         message_body = {
             "category": "alert",
             "show_in_foreground": True,
+            "title": title, "body": title,
             "click_action": "https://app.log1.com",
-            "body": title,
-            "title": title,
             "data": {
                 'is_read': False,
                 'is_deleted': False,
@@ -165,6 +168,7 @@ def send_exit_interview_detail(terminate, request):
 
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -174,8 +178,8 @@ def terminate_consultant(terminate):
         consultant.status = 'terminated'
         consultant.save()
 
-        marketings = consultant.marketing.filter(status='open')
-        for marketing in marketings:
+        queryset = consultant.marketing.filter(status='open')
+        for marketing in queryset:
             marketing.status = 'close'
             marketing.end = date.today()
             marketing.save()
@@ -187,7 +191,7 @@ def terminate_consultant(terminate):
         if os.environ.get('ENV', 'local') == 'prod':
             res, error = send_exit_process_mail(terminate, 'complete')
             if error == 'error':
-                write_exception(message=error, class_name='None', function_name='terminate_consultant')
+                write_info(message=error, function='terminate_consultant')
 
         # App Notification
         recruiter = consultant.recruiter
@@ -215,10 +219,9 @@ def terminate_consultant(terminate):
 
         # Push Notification
         message_body = {
-            "body": title,
-            "title": title,
             "category": "alert",
             "show_in_foreground": True,
+            "title": title, "body": title,
             "click_action": "https://app.log1.com",
             "data": {
                 'is_read': False,
@@ -237,6 +240,7 @@ def terminate_consultant(terminate):
         push_notification(object_ids, message_body)
         return None
     except Exception as error:
+        write_exception(message=error)
         return error
 
 
@@ -256,8 +260,8 @@ def send_exit_process_mail(terminate, exit_status):
         for user in scrum_masters:
             cc.append(user.email)
 
-        marketings = consultant.marketing.filter(status='open')
-        for marketing in marketings:
+        queryset = consultant.marketing.filter(status='open')
+        for marketing in queryset:
             cc.append(marketing.primary_marketer.email)
 
         types = dict(EXIT_TYPE_CHOICE)
@@ -289,32 +293,24 @@ def send_exit_process_mail(terminate, exit_status):
             resign_date = datetime.strptime(terminate.resign_date, "%Y-%m-%d").strftime("%b. %d, %Y")
 
         mail_data = {
-            'to': to,
-            'cc': cc,
-            'bcc': [],
-            'subject': subject,
+            'to': to, 'cc': cc, 'bcc': [], 'subject': subject,
             'template': '../templates/exit_process.html',
             'context': {
-                'title': title,
-                'reason': reason,
-                'last_date': last_date,
-                'resign_date': resign_date,
-                'exit_status': exit_status,
-                'type': types[terminate.type],
-                'consultant': consultant.name,
-                'consultant_email': consultant.email,
-                'recruiter': recruiter.employee_name,
                 'rehire': 'Yes' if terminate.rehire else 'No',
                 'legal': 'Yes' if terminate.legal_action else 'No',
+                'resign_date': resign_date, 'exit_status': exit_status,
+                'title': title, 'reason': reason, 'last_date': last_date,
+                'type': types[terminate.type], 'consultant': consultant.name,
                 'exit_details': exit_details if terminate.exit_details else 'NA',
-                'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
+                'consultant_email': consultant.email, 'recruiter': recruiter.employee_name,
                 'notice_period': terminate.notice_period if terminate.legal_action else 'NA',
+                'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
             },
         }
         res = send_email(mail_data, terminate.created_by.email)
         return res, "ok"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_exit_process_mail')
+        write_exception(message=error)
         return error, "error"
 
 
@@ -332,26 +328,19 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
                 user_list.append(marketer)
             user_list.append(marketing.primary_marketer)
         notification_data = {
-            'title': title,
-            'category': 'info',
-            'description': title,
-            'sender_id': sender.id,
-            'target_type': sub_target,
-            'sender_user_type': 'user',
-            'parent_id': consultant.id,
-            'parent_type': 'consultant',
-            'recipient_user_type': 'user',
-            'target_id': target_id if target_id else consultant.id,
+            'category': 'info', 'sender_id': sender.id,
+            'description': title, 'recipient_user_type': 'user',
+            'target_type': sub_target, 'sender_user_type': 'user',
+            'parent_id': consultant.id, 'parent_type': 'consultant',
+            'title': title, 'target_id': target_id if target_id else consultant.id,
         }
         create_notification(user_list, notification_data)
 
         # Push Notification
         message_body = {
-            "body": title,
-            "title": title,
-            "category": "info",
-            "show_in_foreground": True,
+            "title": title, "body": title,
             "click_action": "https://app.log1.com",
+            "category": "info", "show_in_foreground": True,
             "data": {
                 'is_read': False,
                 'is_deleted': False,
@@ -365,66 +354,74 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
         push_notification(object_ids, message_body)
         return "Notification sent"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='send_notification_for_user')
+        write_exception(message=error)
         return error, "error"
 
 
-def add_other_details(request, consultant):
+def add_other_details(request, consultant_id):
     try:
-        work_auths = json.loads(request.data.get('work_auth', []))
-        for visa in work_auths:
-            WorkAuth.objects.create(
-                consultant=consultant,
-                visa_end=visa['end'],
-                visa_start=visa['start'],
-                is_current=visa['current'],
-                visa_type=visa['type']["name"],
-            )
-        write_exception(message="Work Auth added", class_name='None', function_name='add_other_details')
+        work_auths, experiences, educations, documents = [], [], [], []
+        if 'work_auth' in request.data:
+            work_auths = json.loads(request.data.get('work_auth'))
 
-        # Adding Education
-        educations = json.loads(request.data.get('education', []))
-        for education in educations:
-            Education.objects.create(
-                city=education['city'],
-                major=education['major'],
-                remark=education['remark'],
-                org_name=education['org_name'],
-                edu_type=education['edu_type']['name'],
-                end_date=education['end_date'],
-                consultant_id=consultant.id,
-            )
-        write_exception(message="Education details added", class_name='None', function_name='add_other_details')
+        if not WorkAuth.objects.filter(consultant_id=consultant_id).exists():
+            for visa in work_auths:
+                WorkAuth.objects.create(
+                    visa_end=visa['end'],
+                    visa_start=visa['start'],
+                    is_current=visa['current'],
+                    consultant_id=consultant_id,
+                    visa_type=visa['type']["name"],
+                )
 
-        experiences = json.loads(request.data.get('experience', []))
-        for experience in experiences:
-            Experience.objects.create(
-                city=experience['city'],
-                title=experience['title'],
-                remark=experience['remark'],
-                company=experience['company'],
-                exp_type=experience['exp_type']['name'],
-                end_date=experience['end_date'],
-                start_date=experience['start_date'],
-                consultant_id=consultant.id,
-            )
-        write_exception(message="Experience details added", class_name='None', function_name='add_other_details')
+        if 'education' in request.data:
+            educations = json.loads(request.data.get('education'))
+
+        if not Education.objects.filter(consultant_id=consultant_id).exists():
+            for education in educations:
+                Education.objects.create(
+                    city=education['city'],
+                    major=education['major'],
+                    remark=education['remark'],
+                    consultant_id=consultant_id,
+                    org_name=education['org_name'],
+                    end_date=education['end_date'],
+                    edu_type=education['edu_type']['name'],
+                )
+
+        if 'experience' in request.data:
+            experiences = json.loads(request.data.get('experience'))
+
+        if not Experience.objects.filter(consultant_id=consultant_id).exists():
+            for experience in experiences:
+                Experience.objects.create(
+                    city=experience['city'],
+                    title=experience['title'],
+                    remark=experience['remark'],
+                    consultant_id=consultant_id,
+                    company=experience['company'],
+                    end_date=experience['end_date'],
+                    start_date=experience['start_date'],
+                    exp_type=experience['exp_type']['name'],
+                )
 
         # Adding Documents
-        documents = json.loads(request.data.get('documents', []))
+        if 'documents' in request.data:
+            documents = json.loads(request.data.get('documents'))
+
         for document in documents:
             res, res_data = beats_to_log1(
-                document['file_path'],
-                document['file_name'],
-                consultant.id,
-                'consultant'
+                model='consultant',
+                obj_id=consultant_id,
+                file_path=document['file_path'],
+                file_name=document['file_name'],
             )
             if not res:
+                write_info(res_data, 'add_other_details', request)
                 return res_data, "error"
-        write_exception(message="Documents added", class_name='None', function_name='add_other_details')
-
+        return "Details added", "ok"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='add_other_details')
+        write_exception(error, request)
         return error, "error"
 
 
@@ -444,14 +441,16 @@ def create_consultant(request, creator_id):
         qs = Consultant.objects.filter(email=request.data.get('email'))
         if qs:
             consultant = qs.first()
-            write_exception(message="Consultant already exist", class_name='None', function_name='create_consultant')
+            consultant_id = consultant.id
+            result, msg = add_other_details(request, consultant_id)
+            if msg == 'error':
+                write_info(result, 'create_consultant', request)
             return consultant, "exists"
         else:
             consultant = Consultant.objects.create(
-                links=links,
-                skills=skills,
                 work_type='full_time',
                 phone_no=phone_numbers,
+                links=links, skills=skills,
                 ssn=request.data.get('ssn'),
                 name=request.data.get('name'),
                 email=request.data.get('email'),
@@ -460,6 +459,7 @@ def create_consultant(request, creator_id):
                 date_of_birth=request.data.get('dob'),
                 current_city=request.data.get('current_location')
             )
+            consultant_id = consultant.id
 
             # Adding Recruiter of Consultant
             recruiter_employee_id = request.data.get('recruiter')
@@ -470,23 +470,23 @@ def create_consultant(request, creator_id):
                     poc=recruiter,
                     start=timezone.now(),
                     poc_type='recruiter',
-                    consultant=consultant,
+                    consultant_id=consultant_id,
                 )
 
             # Adding rate
             rate = request.data.get('rate', None)
             if rate:
                 ConsultantRateRevision.objects.create(
-                    previous_rate=0,
                     rate=rate,
+                    previous_rate=0,
                     start=date.today(),
-                    consultant=consultant
+                    consultant_id=consultant_id
                 )
 
             # Creating Consultant Original Profile Consultant
             ConsultantProfile.objects.create(
                 title="Original",
-                consultant=consultant,
+                consultant_id=consultant_id,
                 profile_owner_id=creator_id,
                 links=request.data.get('links'),
                 date_of_birth=request.data.get('dob'),
@@ -496,10 +496,10 @@ def create_consultant(request, creator_id):
                 current_city=request.data.get('current_location'),
             )
 
-            add_other_details(request, consultant)
+            add_other_details(request, consultant_id)
             return consultant, "ok"
     except Exception as error:
-        write_exception(message=error, class_name='None', function_name='create_consultant')
+        write_exception(error, request)
         return error, "error"
 
 

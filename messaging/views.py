@@ -1,5 +1,4 @@
 import os
-import inspect
 from datetime import datetime
 
 from django.http import HttpResponse
@@ -29,10 +28,6 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     @action(methods=['get'], detail=False, url_path='number_list')
     def number_list(self, request):
         try:
@@ -41,7 +36,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             ).values('id', 'number')
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
@@ -54,12 +49,12 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             messages.update(read=True)
             return Response({"data": data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
-            asset_id = request.query_params.get('user1', None)
+            asset_id = request.GET.get('user1', None)
             asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
             messages = Message.objects.filter(conversation=OuterRef('pk'))
             conversations = Conversation.objects.filter(user1=asset).annotate(
@@ -70,7 +65,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             ).order_by('-id', '-messages__created').distinct('id')
             return Response({"data": conversations}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='send')
@@ -93,7 +88,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             else:
                 return Response({"message": "Message not sent, please try again."}, status=400)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -105,7 +100,7 @@ class ReceiveSMSViewSet(GenericViewSet):
     @action(methods=['get', 'post'], detail=False, url_path='sms')
     def receive_sms(self, request):
         try:
-            api_key = request.query_params.get('api_key', None)
+            api_key = request.GET.get('api_key', None)
             if APIKey.objects.is_valid(api_key):
                 to = request.data.get('To')
                 body = request.data.get('Body')
@@ -155,5 +150,5 @@ class ReceiveSMSViewSet(GenericViewSet):
             else:
                 return HttpResponse(status=401)
         except Exception as error:
-            write_exception(message=error, class_name='ReceiveSMSViewSet', function_name='receive_sms')
+            write_exception(error, request)
             return HttpResponse(status=400)

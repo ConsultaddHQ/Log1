@@ -18,7 +18,7 @@ class Command(BaseCommand):
             end = date.today() - timedelta(days=1)
             start = date.today() - timedelta(days=7)
 
-            queryset = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
+            queryset = Consultant.objects.filter(marketing__status='open').exclude(status='terminated').distinct()
             total = queryset.count()
             dev = queryset.filter(marketing__status='open', marketing__start__range=[start, end], domain='dev').count()
             ba = queryset.filter(marketing__status='open', marketing__start__range=[start, end],

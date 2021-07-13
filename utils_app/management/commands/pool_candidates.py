@@ -33,7 +33,7 @@ class Command(BaseCommand):
                         </tr>"""
 
             for con in in_pool_con:
-                if con.consultant.status != 'archived':
+                if con.consultant.status != 'terminated':
                     days, marketer, recruiter, open_offer = None, None, None, "NO"
                     team = ", ".join(con.teams.all().values_list('name', flat=True))
                     if con.start:

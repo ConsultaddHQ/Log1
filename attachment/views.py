@@ -1,7 +1,6 @@
 import os
 import time
 import boto3
-import inspect
 from django.conf import settings
 from botocore.exceptions import ClientError
 from rest_framework.decorators import action
@@ -16,8 +15,8 @@ from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyM
 
 from project.models import Project
 from activity.views import create_activity
-from log1.utils import write_exception, ERROR_MSG
 from utils_app.utils import get_project_check_list
+from log1.utils import write_exception, ERROR_MSG, write_info
 from attachment.serializers import Attachment, AttachmentSerializer
 
 
@@ -61,7 +60,7 @@ def delete_temp_file(paths):
         if os.path.exists(path):
             os.remove(path)
         else:
-            write_exception(message=path + " file does not exist", class_name='None', function_name='delete_temp_file')
+            write_info(message=path + " file does not exist", function='delete_temp_file')
 
 
 def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
@@ -76,8 +75,8 @@ def presigned_post_url(object_name, fields=None, conditions=None, expiration=360
             bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
         )
         return response
-    except ClientError as e:
-        write_exception(message=e, class_name='None', function_name='presigned_post_url')
+    except ClientError as error:
+        write_exception(message=error)
         return None
 
 
@@ -88,14 +87,10 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
-        obj_type = request.query_params.get("obj_type", None)
-        object_id = request.query_params.get('object_id', None)
-        attachment_type = request.query_params.get("type", None)
+        obj_type = request.GET.get("obj_type", None)
+        object_id = request.GET.get('object_id', None)
+        attachment_type = request.GET.get("type", None)
         try:
             obj_content_type = ContentType.objects.get(model=obj_type)
             if attachment_type:
@@ -109,7 +104,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             serializer = self.serializer_class(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -140,13 +135,13 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                     {"data": serializer.data, "check_list": check_list, "message": "Attachment added"}, status=201
                 )
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
         try:
-            content_type = self.request.query_params.get('type', None)
-            attachment_id = self.request.query_params.get('attachment_id', None)
+            content_type = self.request.GET.get('type', None)
+            attachment_id = self.request.GET.get('attachment_id', None)
             roles = request.user.roles
             if content_type == 'consultant' and ('recruiter' in roles or 'admin' in roles or 'superadmin' in roles):
                 attachment = get_object_or_404(Attachment, id=attachment_id)
@@ -169,7 +164,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 check_list = get_project_check_list(project)
                 return Response({"check_list": check_list, "message": "Attachment deleted"}, status=202)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -180,10 +175,6 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @classmethod
-    def get_classname(cls):
-        return cls.__name__
-
     def retrieve(self, request, *args, **kwargs):
         try:
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
@@ -191,7 +182,7 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             extension = attachment.attachment_file.name.split(".")[-1]
             return Response({"data": url, 'file_type': extension}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='upload')
@@ -210,5 +201,5 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             response = presigned_post_url(object_name=object_name)
             return Response({"data": response, "message": "Attachment uploaded"}, status=200)
         except Exception as error:
-            write_exception(message=error, class_name=self.get_classname(), function_name=inspect.stack()[0][3])
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
