@@ -678,13 +678,9 @@ class SubmissionViewSets(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
-        version = request.GET.get('version', 'v1')
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', 'all')
-        incomplete = request.GET.get('incomplete', False)
         filter_json = request.GET.get('filter_json', None)
-        consultant_id = request.GET.get('consultant_id', None)
-        filter_by_time = request.GET.get('filter_by_time', 'all')
         filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
@@ -702,7 +698,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     Q(consultant_marketing__consultant__name__istartswith=query)
                 )
             else:
-                queryset = queryset.exclude(consultant_marketing__consultant__status='archived')
+                queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
 
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:

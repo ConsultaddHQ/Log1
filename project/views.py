@@ -1000,9 +1000,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             ]
 
             if consultant_id:
-                consultants = Consultant.objects.filter(id=consultant_id).exclude(status='archived')
+                consultants = Consultant.objects.filter(id=consultant_id)
             elif consultant_name:
-                consultants = Consultant.objects.filter(name__istartswith=consultant_name).exclude(status='archived')
+                consultants = Consultant.objects.filter(name__istartswith=consultant_name)
             else:
                 consultant_ids = Project.objects.filter(
                     statuses__status__in=project_status, statuses__is_current=True
@@ -1012,7 +1012,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     id__in=list(consultant_ids),
                     projects__timesheets__is_active=True,
                     projects__timesheets__status='submitted',
-                ).exclude(status='archived').order_by('id').distinct('id')
+                ).order_by('id').distinct('id')
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')

@@ -573,7 +573,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
                 type=Value('user', CharField())
             ).values('id', 'name', 'type')
 
-            consultants = Consultant.objects.filter(name__istartswith=query).exclude(status='archived').annotate(
+            consultants = Consultant.objects.filter(name__istartswith=query).exclude(status='terminated').annotate(
                 type=Value('consultant', CharField())
             ).values('id', 'name', 'type')
 

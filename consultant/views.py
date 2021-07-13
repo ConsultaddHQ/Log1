@@ -106,7 +106,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
             status_obj = {
                 "all": consultants,
-                "terminated": consultants.filter(status__in=['archived', 'terminated']),
+                "terminated": consultants.filter(status='terminated'),
 
                 "marketing_candidate": consultants.filter(
                     status='on_bench', marketing__status='close'
@@ -114,12 +114,12 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
                 "on_project": consultants.filter(
                     projects__statuses__status='joined', projects__statuses__is_current=True
-                ).exclude(status__in=['archived', 'terminated']),
+                ).exclude(status='terminated'),
 
                 "offer": consultants.filter(
                     projects__statuses__is_current=True,
                     projects__statuses__status__in=['new', 'received', 'on_boarded'],
-                ).exclude(status__in=['archived', 'terminated']),
+                ).exclude(status='terminated'),
 
                 "on_bench": consultants.filter(marketing__status='open').exclude(id__in=offer_candidates)
             }
@@ -398,7 +398,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
             else:
                 consultants = consultants.filter(marketing__status='open').exclude(
-                    status__in=['archived', 'terminated'])
+                    status='terminated')
 
             consultants = consultants.order_by('id').distinct('id')[:100]
             serializer = ConsultantListSerializer(consultants, many=True)
@@ -463,19 +463,19 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
             # Creating Recruiter of Consultant
             ConsultantPOC.objects.create(
-                start=timezone.now(),
-                poc_type='recruiter',
+                poc_id=data['recruiter'],
                 consultant=consultant,
-                poc_id=data['recruiter']
+                poc_type='recruiter',
+                start=timezone.now(),
             )
 
             # Creating Retention of Consultant
             if request.data.get('retention', None):
                 ConsultantPOC.objects.create(
+                    poc_id=data['retention'],
+                    consultant=consultant,
                     poc_type='retention',
                     start=timezone.now(),
-                    consultant=consultant,
-                    poc_id=data['retention']
                 )
 
             # Creating Work-Auth
@@ -859,7 +859,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
                     Q(pocs__poc__employee_name__istartswith=query, pocs__end=None)
                 )
             else:
-                consultants = Consultant.objects.exclude(status__in=['archived', 'terminated'])
+                consultants = Consultant.objects.exclude(status='terminated')
 
             # Team wise Filter
             if team_name and team_name != 'all' and team_name.lower() != 'consultadd':
@@ -893,17 +893,18 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             obj = {
                 "all": consultants.all(),
-                "on_project": consultants.filter(projects__statuses__status='joined',
-                                                 projects__statuses__is_current=True),
-                "in_offer": consultants.filter(projects__statuses__status__in=['new', 'received'],
-                                               projects__statuses__is_current=True),
-                "on_boarded": consultants.filter(projects__statuses__status='on_boarded',
-                                                 projects__statuses__is_current=True),
-                "candidate": consultants.filter(status='on_bench').exclude(id__in=open_candidates),
-                "in_pool": consultants.filter(marketing__status='open', marketing__in_pool=True).exclude(
-                    id__in=offer_candidates),
-                "in_marketing": consultants.filter(marketing__status='open', marketing__in_pool=False).exclude(
-                    id__in=offer_candidates)
+                "on_project": consultants.filter(
+                    projects__statuses__status='joined', projects__statuses__is_current=True),
+                "in_offer": consultants.filter(
+                    projects__statuses__status__in=['new', 'received'], projects__statuses__is_current=True),
+                "on_boarded": consultants.filter(
+                    projects__statuses__status='on_boarded', projects__statuses__is_current=True),
+                "candidate": consultants.filter(
+                    status='on_bench').exclude(id__in=open_candidates),
+                "in_pool": consultants.filter(
+                    marketing__status='open', marketing__in_pool=True).exclude(id__in=offer_candidates),
+                "in_marketing": consultants.filter(
+                    marketing__status='open', marketing__in_pool=False).exclude(id__in=offer_candidates)
             }
 
             count = {
@@ -1256,7 +1257,6 @@ class ConsultantProfileViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # Return Consultant Profiles
     def list(self, request, *args, **kwargs):
         try:
             consultant_id = request.GET.get('con_id', None)
@@ -1486,9 +1486,8 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         con_status = request.GET.get('status', 'all')
 
         try:
-            consultants = Consultant.objects.filter(status__in=['terminated', 'archived'])
+            consultants = Consultant.objects.filter(status='terminated')
 
-            # Consultants search based on name, email, recruiter and location
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 consultants = consultants.filter(
@@ -1509,16 +1508,13 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 "absconded": absconded.count(),
             }
 
-            # Filter Consultant by status
             if con_status == 'all':
                 consultants = consultants.all()
             else:
                 consultants = consultants.filter(exit__type=con_status)
 
             consultants = consultants.order_by('id', '-exit__modified').distinct('id')
-
             exit_obj = ConsultantExit.objects.filter(consultant=OuterRef("pk"))
-
             data = consultants[first:last].annotate(
                 type=Subquery(exit_obj.values('type')[:1]),
                 rehire=Subquery(exit_obj.values('rehire')[:1]),
@@ -1601,11 +1597,12 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit)
-            serializer = self.serializer_class(con_exit)
 
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
             create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
+
+            serializer = self.serializer_class(con_exit)
             return Response({"data": serializer.data, "message": "Exit process updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -1636,11 +1633,12 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                     if error == 'error':
                         write_exception(res, request)
                         return Response({"message": "Cancel Termination main not sent", "error": str(res)}, status=400)
-                serializer = self.serializer_class(con_exit)
 
                 # Activity
                 desc = f"{request.user.employee_name} cancelled exit process"
                 create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
+
+                serializer = self.serializer_class(con_exit)
                 return Response(
                     {"data": serializer.data, "exit_mail": str(res), "message": "Exit process cancelled"}, status=202
                 )
@@ -1735,8 +1733,6 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
 
-            serializer = self.serializer_class(feedback)
-
             # Push Notification
             poc_title = f"{feedback.get_feedback_type_display()} feedback added for {feedback.consultant.name} " \
                         f"by {request.user.employee_name}"
@@ -1745,6 +1741,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             # Activity
             desc = f"{request.user.employee_name} added {feedback.get_feedback_type_display()} feedback"
             create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
+            serializer = self.serializer_class(feedback)
             return Response({"data": serializer.data, "message": "Feedback added"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -1761,11 +1758,7 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
             if len(tags) > 0:
                 user_tag = feedback.tagged_user.all().first()
                 if not user_tag:
-                    tag_data = {
-                        "model": "feedback",
-                        "object_id": feedback.id,
-                        "tags": tags
-                    }
+                    tag_data = {"tags": tags, "model": "feedback", "object_id": feedback.id}
                     tag_users(tag_data)
                 for tag in tags:
                     user = get_object_or_404(User, id=tag)

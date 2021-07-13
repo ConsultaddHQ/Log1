@@ -47,6 +47,7 @@ class ProjectUtil:
         self.project = project
         self.project_end = None
         self.statuses = self.fetch_project_status()
+        self.consultant = project.submission.consultant_marketing.consultant
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
         if project.end_date:
             self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
@@ -70,7 +71,7 @@ class ProjectUtil:
         emoji = dict()
         try:
             # Emojis of messaging app
-            recruiter = self.project.consultant.recruiter
+            recruiter = self.consultant.recruiter
             if recruiter:
                 emoji['recruiter_gender'] = '&#128103;' if recruiter.gender == 'female' else '&#129490;'
                 emoji['recruiter_name'] = recruiter.employee_name
@@ -81,7 +82,7 @@ class ProjectUtil:
             emoji['role'] = '&#128074;'
             emoji['client'] = '&#127913;'
             emoji['employer'] = '&#x1F4BC;'
-            emoji['consultant_gender'] = '&#128105;' if self.project.consultant.gender == 'female' else '&#128104;'
+            emoji['consultant_gender'] = '&#128105;' if self.consultant.gender == 'female' else '&#128104;'
             emoji['marketer_gender'] = '&#128105;' if self.project.submission.created_by.gender == 'female' else '&#128104;'
 
             return emoji
@@ -102,10 +103,10 @@ class ProjectUtil:
 
             if self.project.is_remote or self.project.submission.lead.is_w2:
                 con_str = f"**Remote Project** <br>"
-                con_str += f"{emoji} Consultant Joined: **{self.project.consultant.name.strip()}** <br>"
-                con_str += f"{emoji} Submitted On: **{self.project.consultant.name.strip()}** "
+                con_str += f"{emoji} Consultant Joined: **{self.consultant.name.strip()}** <br>"
+                con_str += f"{emoji} Submitted On: **{self.consultant.name.strip()}** "
             else:
-                con_str = f"{emoji} Consultant :  **{self.project.consultant.name.strip()}** "
+                con_str = f"{emoji} Consultant :  **{self.consultant.name.strip()}** "
 
             return total_count, team_count, con_str
         except Exception as error:
@@ -134,8 +135,8 @@ class ProjectUtil:
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.joined_url, data)
 
-            title = f" Project Joined :: {self.project.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.project.consultant, user, title, 'project')
+            title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
+            send_notification_for_user(self.consultant, user, title, 'project')
         except Exception as error:
             write_exception(message=error)
 
@@ -169,8 +170,8 @@ class ProjectUtil:
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.offer_url, data)
 
-            title = f" Project Received :: {self.project.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.project.consultant, user, title, 'self.project')
+            title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
+            send_notification_for_user(self.consultant, user, title, 'self.project')
         except Exception as error:
             write_exception(message=error)
 
@@ -178,7 +179,7 @@ class ProjectUtil:
         # Emoji for Message
         try:
             emojis = self.fetch_emojis()
-            text = f"""{emojis['consultant_gender']} Consultant :  **{self.project.consultant.name}** <br>
+            text = f"""{emojis['consultant_gender']} Consultant :  **{self.consultant}** <br>
                 {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
                 {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
                 {emojis['employer']} Employer :  {self.project.employer} <br>
@@ -196,8 +197,8 @@ class ProjectUtil:
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.project_termination_url, data)
 
-            title = f"Project Terminated :: {self.project.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.project.consultant, user, title, 'project')
+            title = f"Project Terminated :: {self.consultant.name} :: {self.project.submission.client}"
+            send_notification_for_user(self.consultant, user, title, 'project')
         except Exception as error:
             write_exception(message=error)
 
@@ -205,7 +206,7 @@ class ProjectUtil:
         # Emoji for Message
         try:
             emojis = self.fetch_emojis()
-            text = f"""{emojis['consultant_gender']} Consultant :  **{self.project.consultant.name}** <br>
+            text = f"""{emojis['consultant_gender']} Consultant :  **{self.consultant}** <br>
                 {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
                 {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter']} <br>
                 {emojis['employer']} Employer :  {self.project.employer}<br>
@@ -222,15 +223,15 @@ class ProjectUtil:
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.offer_failure_url, data)
 
-            title = f"Project Cancelled :: {self.project.consultant.name} :: {self.project.submission.client}"
+            title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
             send_notification_for_user(self.project.consultant, user, title, 'self.project')
         except Exception as error:
             write_exception(message=error)
 
     def send_completion_notification(self, user):
         try:
-            title = f" Project Completed :: {self.project.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.project.consultant, user, title, 'project')
+            title = f" Project Completed :: {self.consultant} :: {self.project.submission.client}"
+            send_notification_for_user(self.consultant, user, title, 'project')
         except Exception as error:
             write_exception(message=error)
 

@@ -14,17 +14,17 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = create_cron_object(name='bench_count')
         try:
-            queryset = Consultant.objects.filter(marketing__status='open').exclude(status='archived').distinct()
+            queryset = Consultant.objects.filter(marketing__status='open').exclude(status='terminated').distinct()
             on_bench_con = queryset.count()
             in_pool_con = queryset.filter(marketing__in_pool=True).count()
             on_boarded = Consultant.objects.filter(
                 projects__statuses__status='on_boarded',
                 projects__statuses__is_current=True
-            ).exclude(status='archived').distinct().count()
+            ).exclude(status='terminated').distinct().count()
             joined = Consultant.objects.filter(
                 projects__statuses__status='on_boarded',
                 projects__statuses__is_current=True
-            ).exclude(status='archived').distinct().count()
+            ).exclude(status='terminated').distinct().count()
 
             data = {
                 "title": "Consultant Bench Status &#128221;",

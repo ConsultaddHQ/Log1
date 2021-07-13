@@ -183,7 +183,8 @@ command - {command}\n
 
         return text
 
-    def team_data_by_start(self, start, command):
+    @staticmethod
+    def team_data_by_start(start, command):
         text = f"""#### Team Status :memo: \n
 From Date - {start} to {str(date.today())}
 command - {command}\n
@@ -332,7 +333,7 @@ command - {command}\n\n
             data_type = query.split(" ")[0]
             name = query.split(" ")[1]
 
-            consultants = Consultant.objects.filter(name__istartswith=name).exclude(status='archived')
+            consultants = Consultant.objects.filter(name__istartswith=name).exclude(status='terminated')
             text = "Bad Input"
 
             if data_type == 'poc':
@@ -507,14 +508,16 @@ command - {slash_command}\n
 | Name | Email | Phone No | Teams | Status | In Pool | RTG | Marketing Start | Days | Recruiter | Preferred Location |
 |:-----|:------|:---------|:------|:-------|:--------|:----|:----------------|:-----|:----------|:-------------------|
 """
-                    bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='archived')
+                    bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='terminated')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                         teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                         recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
-                        days = (
-                                       date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                        if marketing.start:
+                            days = (date.today() - marketing.start).days + marketing.previous_marketing_days
+                        else:
+                            days = None
                         text += f"| {consultant.name} | {consultant.email} | {consultant.phone_no} | {teams} | {consultant.status} | {marketing.in_pool} | {marketing.rtg} | {str(marketing.start)} | {days} | {recruiter} | {preferred_location} |\n"
 
                 else:
@@ -527,7 +530,7 @@ command - {slash_command}\n
                     bench_consultant = Consultant.objects.filter(
                         marketing__status='open',
                         marketing__teams__name__iexact=arg2,
-                    ).exclude(status='archived')
+                    ).exclude(status='terminated')
                     for consultant in bench_consultant:
                         marketing = consultant.marketing.filter(status='open').first()
                         preferred_location = marketing.preferred_location.replace('\r\n', ', ')
@@ -552,7 +555,8 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
-    def get_support_counts(self, supports):
+    @staticmethod
+    def get_support_counts(supports):
         counts = dict()
         supports = supports.order_by(
             'project__id', 'project__consultant__id'
@@ -805,11 +809,11 @@ class MarketingReportViewSets(GenericViewSet):
             if query:
                 bench_consultant = Consultant.objects.filter(
                     marketing__status='open', name__istartswith=query.lstrip().replace(':amp:', '&')
-                ).exclude(status__in=['archived', 'terminated'])
+                ).exclude(status__in=['terminated'])
             else:
                 bench_consultant = Consultant.objects.filter(
                     marketing__status='open'
-                ).exclude(status__in=['archived', 'terminated'])
+                ).exclude(status__in=['terminated'])
             if filter_by_team:
                 bench_consultant = bench_consultant.filter(
                     marketing__teams__name__iexact=filter_by_team
