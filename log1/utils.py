@@ -23,15 +23,26 @@ def load_config(file_path):
         logger.error(error)
 
 
+def log_request(request):
+    """Log the request"""
+    address = request.META['REMOTE_ADDR']
+    method = str(getattr(request, 'method', '')).upper()
+    request_path = str(getattr(request, 'path', ''))
+    query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
+    query_params = query_params if query_params else ''
+    logger.error(f"[{method}] User: ({request.user.id}), Path: {address}{request_path}, Params: {query_params}")
+
+
 def write_info(message, function, request=None):
     if request:
-        logger.error("Address: %s, User id : %s", request.META['REMOTE_ADDR'], request.user.id)
+        log_request(request)
     logger.error(f'Function - {function}, Info: {message}')
 
 
 def write_exception(message, request=None):
     if request:
-        logger.error("Address: %s, User id : %s", request.META['REMOTE_ADDR'], request.user.id)
+        logger.error(f"User id : {request.user.id}")
+        log_request(request)
     _, _, tb = sys.exc_info()
     f = tb.tb_frame
     lineno = tb.tb_lineno

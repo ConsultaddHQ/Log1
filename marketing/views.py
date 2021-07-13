@@ -1,9 +1,14 @@
 import os
 import json
 import difflib
-from django.conf import settings
 from datetime import date, datetime, timedelta
 from dateutil.relativedelta import relativedelta
+
+from django.conf import settings
+from django.db import transaction
+from django.db.models.functions import Lower
+from django.db.models import F, Q, Max, Count
+from django.shortcuts import get_object_or_404
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -15,11 +20,6 @@ from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateMode
     DestroyModelMixin
 
 from constance import config
-from django.db import transaction
-from django.db.models.functions import Lower
-from django.db.models import F, Q, Max, Count
-from django.shortcuts import get_object_or_404
-
 from project.models import Project
 from activity.models import Activity
 from employee.models import User, Team
@@ -34,14 +34,14 @@ from notification.utils import create_notification, push_notification
 from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
 from marketing.models import Lead, Submission, VendorCompany, VendorContact, VendorLayer, Interview, Test
-from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title
-from log1.utils import get_time_filter, get_time_filter_by_start, get_page_limits, post_msg_using_webhook, \
-    write_exception, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
+from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
+    date_filter, get_attendees_and_users
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionSupportSerializer, \
     VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, TestUpdateSerializer, \
     TestListSerializer, InterviewV2Serializer, TestGetSerializer, SubmissionConProfile, ProjectV2Serializer, \
-    InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, SubmissionDetailSerializer, \
-    SubmissionCreateSerializer, VendorLayerSerializer, InterviewSerializer, VendorCompanySerializer
+    InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, SubmissionCreateSerializer, \
+    VendorLayerSerializer, InterviewSerializer, VendorCompanySerializer
 
 
 # Route - /vendor_company/
@@ -147,34 +147,6 @@ class LeadViewSets(viewsets.ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
-    def get_lead_data(queryset, filter_by_status, first, last):
-        try:
-            total, data_counts = 0, dict()
-            counts = queryset.values('status').annotate(total=Count('status')).order_by('status')
-            for count in counts:
-                data_counts[count['status']] = count['total']
-                total += count['total']
-            data_counts['total'] = total
-
-            if filter_by_status == 'archived':
-                queryset = queryset.filter(status=filter_by_status)
-            elif filter_by_status:
-                queryset = queryset.filter(status=filter_by_status).exclude(status='archived')
-
-            data = queryset[first:last].annotate(
-                company_id=F('vendor_company__id'),
-                submission_count=Count('submission'),
-                company_name=F('vendor_company__name'),
-                position_name=F('position__display_name')
-            ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id', 'is_w2',
-                     'company_name', 'status', 'created', 'modified', 'submission_count')
-
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
-
-    @staticmethod
     def get_queryset_and_count(queryset, filter_by_status, sort_by):
         try:
             total, data_counts = 0, dict()
@@ -244,13 +216,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     queryset = queryset.filter(vendor_company_id__in=filters["vendor"])
 
                 created = filters.get('created', None)
-                if created:
-                    lte = created.get('lte', None)
-                    gte = created.get('gte', None)
-                    if lte:
-                        queryset = queryset.filter(created__lte=lte)
-                    if gte:
-                        queryset = queryset.filter(created__gte=gte)
+                queryset = date_filter(queryset, created, 'created')
 
             queryset, counts = self.get_queryset_and_count(queryset, filter_by_status, sort_by)
 
@@ -316,6 +282,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                     submissions.update(is_complete=False)
                 for submission in lead.submission.all():
                     submission_is_complete(submission)
+
                 data = self.get_data(lead)
                 return Response({"data": data[0], "message": "Requirement updated"}, status=202)
             write_exception(serializer.errors, request)
@@ -358,11 +325,13 @@ class LeadViewSets(viewsets.ModelViewSet):
         try:
             if request.method == 'GET':
                 first, last = get_page_limits(request)
+                sort_by = request.GET.get('sort_by', None)
                 leads = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
-                data, data_counts = self.get_lead_data(leads, 'archived', first, last)
-                if data_counts == 'error':
-                    return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
-                return Response({"data": data, "counts": data_counts}, status=200)
+                queryset, counts = self.get_queryset_and_count(leads, ['archived'], sort_by)
+                if counts == 'error':
+                    return Response({"message": ERROR_MSG, "error": str(queryset)}, status=400)
+                data = self.get_data(queryset, first, last)
+                return Response({"data": data, "counts": counts}, status=200)
             else:
                 lead_ids = request.data.get("lead_ids", [])
                 if len(lead_ids) <= 0:
@@ -384,27 +353,6 @@ class LeadViewSets(viewsets.ModelViewSet):
                 Q(owner=request.user) | Q(shared_to=request.user)
             ).values('city').annotate(total=Count('city')).order_by('city')
             return Response({"data": leads}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['get'], detail=False, url_path='leads_by_city')
-    def leads_by_city(self, request):
-        try:
-            first, last = get_page_limits(request)
-            city = request.GET.get('query', None)
-
-            leads = Lead.objects.annotate(submission_count=Count('submission')).filter(
-                Q(shared_to=request.user, city__iexact=city) |
-                Q(owner=request.user, city__iexact=city)
-            ).order_by('-modified')
-
-            data, data_counts = self.get_lead_data(leads, '', first, last)
-
-            if data_counts == 'error':
-                return Response({"message": ERROR_MSG, "error": data}, status=400)
-
-            return Response({"data": data, "counts": data_counts}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -589,39 +537,11 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
 
 
 # Route - /submission/
-class SubmissionViewSets(viewsets.ModelViewSet):
+class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = Submission.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @staticmethod
-    def get_submission_data(queryset, filter_by_status, first, last):
-        try:
-            total, data_counts = 0, dict()
-            counts = queryset.values('status').annotate(total=Count('status')).order_by('status')
-            for count in counts:
-                data_counts[count['status']] = count['total']
-                total += count['total']
-            data_counts['total'] = total
-
-            if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
-
-            data = queryset.order_by('-modified')[first:last].annotate(
-                city=F('lead__city'),
-                marketer_id=F('created_by'),
-                company_name=F('lead__vendor_company__name'),
-                marketer_name=F('created_by__employee_name'),
-                consultant_name=F('consultant_marketing__consultant__name'),
-            ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
-                     'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact',
-                     'is_complete')
-
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, "error"
 
     @staticmethod
     def get_count_and_queryset(queryset, sub_status, sort_by, first, last):
@@ -657,23 +577,6 @@ class SubmissionViewSets(viewsets.ModelViewSet):
         except Exception as error:
             write_exception(message=error)
             return error, "error"
-
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            sub_id = kwargs.get('pk')
-            permission = {"update": False}
-            sub = get_object_or_404(Submission, id=sub_id)
-
-            if sub.created_by == request.user:
-                permission['update'] = True
-                serializer = SubmissionDetailSerializer(sub)
-                return Response({"data": serializer.data, "permission": permission}, status=200)
-            else:
-                serializer = self.serializer_class(sub)
-                return Response({"data": serializer.data, "permission": permission}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -756,13 +659,7 @@ class SubmissionViewSets(viewsets.ModelViewSet):
                     queryset = queryset.filter(consultant_marketing__consultant_id__in=filters['consultant'])
 
                 created = filters.get('created', None)
-                if created:
-                    lte = created.get('lte', None)
-                    gte = created.get('gte', None)
-                    if lte:
-                        queryset = queryset.filter(created__lte=lte)
-                    if gte:
-                        queryset = queryset.filter(created__gte=gte)
+                queryset = date_filter(queryset, created, 'created')
 
             data, sub_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
 
@@ -868,7 +765,11 @@ class SubmissionViewSets(viewsets.ModelViewSet):
         try:
             queryset = Submission.objects.filter(consultant_marketing__consultant_id=consultant_id)
             if request.GET.get('lead_id') == "0":
-                vendor_company = get_object_or_404(VendorCompany, id=request.GET.get('company_id'))
+                qs = VendorCompany.objects.filter(id=request.GET.get('company_id'))
+                if qs:
+                    vendor_company = qs.first()
+                else:
+                    return Response({"message": "Issue in fetching Suggestions"}, status=400)
                 if client_name:
                     queryset = queryset.filter(
                         Q(client__istartswith=client_name) | Q(lead__vendor_company=vendor_company)
@@ -1025,38 +926,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return error
 
     @staticmethod
-    def get_interview_data(queryset, filter_by_status, first, last):
-        try:
-            # Interview counts by status
-            total, data_counts = 0, dict()
-            queryset = queryset.order_by('modified').distinct('modified')
-            counts = queryset.values('status').annotate(total=Count('status')).order_by('status')
-            for count in counts:
-                data_counts[count['status']] = count['total']
-                total += count['total']
-            data_counts['total'] = total
-
-            if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
-
-            data = queryset[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                marketer_id=F('submission__created_by'),
-                job_title=F('submission__lead__job_title'),
-                supervisor_name=F('supervisor__employee_name'),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
-                     'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'screening_type', 'project', 'job_title', 'modified', 'feedback')
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
-
-    @staticmethod
     def get_count_and_queryset(queryset, filter_by_status, sort_by, first, last):
         try:
             # Interview counts by status
@@ -1087,7 +956,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
+            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
                      'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
                      'screening_type', 'project', 'job_title', 'modified', 'feedback')
             return data, data_counts
@@ -1117,11 +986,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
-        version = request.GET.get('version', 'v1')
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
-        filter_by_time = request.GET.get('filter_by_time', None)
         filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
@@ -1152,7 +1019,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 queryset = queryset.filter(submission__created_by__team=request.user.team)
 
             # Interview List for Scrum Master and Proxy Scrum Master (team interviews) and marketer
-
             if 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
                     Q(supervisor_id=user_id) |
@@ -1169,8 +1035,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         Q(submission__created_by_id=user_id) |
                         Q(submission__consultant_marketing__in_pool=True) |
                         Q(submission__consultant_marketing__marketer_id=user_id) |
-                        Q(submission__consultant_marketing__status='open',
-                          submission__consultant_marketing__consultant__pocs__poc_id=user_id)
+                        Q(submission__consultant_marketing__consultant__pocs__poc_id=user_id,
+                          submission__consultant_marketing__status='open')
                     )
 
                 else:
@@ -1207,23 +1073,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         submission__consultant_marketing__consultant_id__in=filters["consultant"]
                     )
 
-                start_time = filters.get('start_time', None)
-                if start_time:
-                    lte = start_time.get('lte', None)
-                    gte = start_time.get('gte', None)
-                    if lte:
-                        queryset = queryset.filter(start_time__lte=lte)
-                    if gte:
-                        queryset = queryset.filter(start_time__gte=gte)
-
                 created = filters.get('created', None)
-                if created:
-                    lte = created.get('lte', None)
-                    gte = created.get('gte', None)
-                    if lte:
-                        queryset = queryset.filter(created__lte=lte)
-                    if gte:
-                        queryset = queryset.filter(created__gte=gte)
+                queryset = date_filter(queryset, created, 'created')
+
+                start_time = filters.get('start_time', None)
+                queryset = date_filter(queryset, start_time, "start_time")
 
             data, screen_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
 
@@ -1287,15 +1141,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         f":: {interview.marketer.employee_name} " \
                         f":: {interview.submission.employer}"
 
-                # Calendar attendees
-                supervisor = interview.supervisor
-                guest = [{"email": user.email} for user in interview.guest.all()]
-                user_list = [user for user in interview.guest.all()] + [supervisor]
-                attendees = [{'email': supervisor.email}, {'email': request.user.email}] + guest
-                scrum_master = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
-                for user in scrum_master:
-                    user_list.append(user)
-                    attendees.append({"email": user.email})
+                # Calendar attendees and User for sending notification
+                attendees, user_list = get_attendees_and_users(request, interview)
 
                 # Calendar booking start and end time
                 event = {
@@ -1350,16 +1197,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Creating Notification
                 notification_data = {
-                    'category': 'info',
-                    'description': title,
-                    'target_id': interview.id,
-                    'parent_id': submission.id,
-                    'target_type': 'interview',
-                    'parent_type': 'submission',
-                    'sender_user_type': 'user',
-                    'sender_id': request.user.id,
-                    'recipient_user_type': 'user',
-                    'title': 'New Interview Created',
+                    'recipient_user_type': 'user', 'description': title,
+                    'category': 'info', 'title': 'New Interview Created',
+                    'target_id': interview.id, 'parent_id': submission.id,
+                    'target_type': 'interview', 'parent_type': 'submission',
+                    'sender_id': request.user.id, 'sender_user_type': 'user',
                 }
                 create_notification(user_list, notification_data)
                 return Response({
@@ -1403,13 +1245,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 submission.save()
 
                 booking_res = 'Development Server'
-                scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
-                user_list = [user for user in interview.guest.all()]
-                user_list.append(interview.supervisor)
-
-                for user in scrum_masters:
-                    user_list.append(user)
-
+                user_list, _ = get_attendees_and_users(request, interview)
                 title = get_interview_title(interview)
 
                 if status_change == "true" and interview.status not in ['cancelled']:
@@ -1449,14 +1285,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                     create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
-                    supervisor_email = interview.supervisor.email
-                    attendees = [{'email': supervisor_email}, {'email': request.user.email}]
-
-                    for user in scrum_masters:
-                        attendees.append({'email': user.email})
-                    guest = [{"email": user.email} for user in interview.guest.all()]
-                    if len(guest) > 0:
-                        attendees = attendees + guest
+                    _, attendees = get_attendees_and_users(request, interview)
 
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         start = serializer.data["start_time"].replace("Z", "")
@@ -1504,16 +1333,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                          'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
                 notification_data = {
-                    'category': 'info',
-                    'description': title,
-                    'target_id': interview.id,
-                    'parent_id': submission.id,
-                    'sender_user_type': 'user',
-                    'target_type': 'interview',
-                    'parent_type': 'submission',
-                    'title': 'Interview Updated',
-                    'sender_id': request.user.id,
-                    'recipient_user_type': 'user',
+                    'category': 'info', 'description': title,
+                    'target_id': interview.id, 'parent_id': submission.id,
+                    'target_type': 'interview', 'parent_type': 'submission',
+                    'sender_user_type': 'user', 'title': 'Interview Updated',
+                    'sender_id': request.user.id, 'recipient_user_type': 'user',
                 }
                 create_notification(user_list, notification_data)
                 return Response(
@@ -1555,12 +1379,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             submission.is_active = True
             submission.save()
-            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
-            user_list = [user for user in interview.guest.all()]
-            user_list.append(interview.supervisor)
 
-            for user in scrum_masters:
-                user_list.append(user)
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
                                     {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
@@ -1579,6 +1398,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 'recipient_user_type': 'user',
                 'title': 'Interview Cancelled',
             }
+            user_list, _ = get_attendees_and_users(request, interview)
             create_notification(user_list, notification_data)
             return Response(status=204)
         except Exception as error:
@@ -1607,18 +1427,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             booking_res = 'error'
             submission = interview.submission
-            guest = interview.guest.all()
-            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
-            user_list = [user for user in guest] + [user for user in scrum_masters] + [interview.supervisor]
-
+            user_list, attendees = get_attendees_and_users(request, interview)
             title = get_interview_title(interview)
 
             desc = f"Round {interview.round} is rescheduled for {interview.start_time} to {interview.end_time}"
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
-            supervisor_email = interview.supervisor.email
-            guest = [{"email": user.email} for user in interview.guest.all()]
-            attendees = [{'email': supervisor_email}, {'email': request.user.email}]
-            attendees += [{'email': user.email} for user in scrum_masters] + guest
 
             if interview.status not in ['offer', 'failed', 'next_round']:
                 start = serializer.data["start_time"].replace("Z", "")
@@ -1721,12 +1534,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             submission.is_active = True
             submission.save()
 
-            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
-            user_list = [user for user in interview.guest.all()]
-            user_list.append(interview.supervisor)
-
-            for user in scrum_masters:
-                user_list.append(user)
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
                                     {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
@@ -1745,6 +1552,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 'recipient_user_type': 'user',
                 'title': 'Interview Cancelled',
             }
+            user_list, _ = get_attendees_and_users(request, interview)
             create_notification(user_list, notification_data)
             return Response({"message": "Interview cancelled"}, status=202)
         except Exception as error:
@@ -2205,40 +2013,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
     queryset = Test.objects.all()
     permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
     serializer_class = TestCreateSerializer
-
-    @staticmethod
-    def get_test_data(queryset, filter_by_status):
-        try:
-            # Interview counts by status
-            sort_by = 'created'
-            if filter_by_status == 'failed':
-                sort_by = 'modified'
-            queryset = queryset.order_by('-' + sort_by).distinct(sort_by)
-            total = queryset.count()
-            new = queryset.filter(status='new').count()
-            failed = queryset.filter(status='failed').count()
-            passed = queryset.filter(status='passed').count()
-            assigned = queryset.filter(status='assigned').count()
-            cancelled = queryset.filter(status='cancelled').count()
-            feedback_due = queryset.filter(status='feedback_due').count()
-
-            data_counts = {
-                'new': new,
-                'total': total,
-                'failed': failed,
-                'passed': passed,
-                'assigned': assigned,
-                'cancelled': cancelled,
-                'feedback_due': feedback_due,
-            }
-            if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
-            return queryset, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
+    authentication_classes = (TokenAuthentication,)
 
     @staticmethod
     def get_count_and_queryset(queryset, filter_by_status, sort_by):
@@ -2380,11 +2156,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
-        version = request.GET.get('version', 'v1')
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
-        filter_by_time = request.GET.get('filter_by_time', None)
         filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
@@ -2444,9 +2218,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                       submission__consultant_marketing__consultant__pocs__poc_type='relation')
                 )
 
-            queryset = get_time_filter(queryset, filter_by_time)
-
-            if version == 'v2' and filter_json:
+            if filter_json:
                 filter_by_status = list()
                 filters = json.loads(filter_json)
 
@@ -2467,27 +2239,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         submission__consultant_marketing__consultant_id__in=filters['consultant'])
 
                 created = filters.get('created', None)
-                deadline = filters.get('created', None)
+                queryset = date_filter(queryset, created, 'created')
 
-                if created:
-                    lte = created.get('lte', None)
-                    gte = created.get('gte', None)
-                    if lte:
-                        queryset = queryset.filter(created__lte=lte)
-                    if gte:
-                        queryset = queryset.filter(created__gte=gte)
+                deadline = filters.get('deadline', None)
+                queryset = date_filter(queryset, deadline, 'deadline')
 
-                if deadline:
-                    lte = deadline.get('lte', None)
-                    gte = deadline.get('gte', None)
-                    if lte:
-                        queryset = queryset.filter(deadline__gte=lte)
-                    if gte:
-                        queryset = queryset.filter(deadline__gte=gte)
-
-                queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
-            else:
-                queryset, counts = self.get_test_data(queryset, filter_by_status)
+            queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
 
             if counts == 'error':
                 return Response({"error": str(queryset)}, status=400)

@@ -91,60 +91,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         return get_project_check_list(obj)
 
 
-class SubmissionDetailSerializer(serializers.ModelSerializer):
-    attachments = serializers.SerializerMethodField()
-    interviews = serializers.SerializerMethodField()
-    marketer_name = serializers.SerializerMethodField()
-    marketer_id = serializers.SerializerMethodField()
-    consultant = serializers.SerializerMethodField()
-    comments = serializers.SerializerMethodField()
-    project = serializers.SerializerMethodField()
-    test = serializers.SerializerMethodField()
-    vendor_contact = VendorContactSerializer()
-    lead = LeadSerializer(read_only=True)
-
-    class Meta:
-        model = Submission
-        fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
-                  'current_city', 'attachments', 'test', 'interviews', 'project', 'comments', 'marketer_name',
-                  'marketer_id', 'consultant', 'is_complete')
-
-    @staticmethod
-    def get_marketer_name(obj):
-        return obj.created_by.employee_name
-
-    @staticmethod
-    def get_marketer_id(obj):
-        return obj.created_by.id
-
-    @staticmethod
-    def get_attachments(obj):
-        return AttachmentSerializer(obj.attachments.all(), many=True).data
-
-    @staticmethod
-    def get_consultant(obj):
-        return ConsultantSerializer(obj.consultant).data
-
-    @staticmethod
-    def get_comments(obj):
-        return CommentGetSerializer(obj.comments.filter(parent_comment=None), many=True).data
-
-    @staticmethod
-    def get_interviews(obj):
-        return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
-
-    @staticmethod
-    def get_test(obj):
-        return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
-
-    @staticmethod
-    def get_project(obj):
-        if hasattr(obj, 'project'):
-            return ProjectSerializer(obj.project).data
-        return None
-
-
 class SubmissionSerializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
@@ -218,7 +164,7 @@ class InterviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        fields = '__all__'
+        exclude = ('calendar_id',)
 
 
 class InterviewDetailSerializer(serializers.ModelSerializer):
@@ -228,13 +174,13 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        fields = '__all__'
+        exclude = ('calendar_id',)
 
 
 class InterviewCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
-        fields = '__all__'
+        exclude = ('calendar_id',)
 
 
 class InterviewGetSerializer(serializers.ModelSerializer):
@@ -244,7 +190,7 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        fields = '__all__'
+        exclude = ('calendar_id',)
 
     @staticmethod
     def get_attachment_link(obj):
@@ -404,7 +350,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        fields = '__all__'
+        exclude = ('calendar_id',)
 
     def get_permission(self, obj):
         user = self.context.get('user')

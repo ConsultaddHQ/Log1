@@ -1,11 +1,42 @@
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 
+from employee.models import User
+from log1.utils import write_exception
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from marketing.models import Submission, Interview
 
-from log1.utils import write_exception
+
+def get_scrum_masters(request):
+    return User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+
+
+def get_attendees_and_users(request, interview):
+    user_list = [interview.supervisor]
+
+    scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+    for user in scrum_masters:
+        user_list.append(user)
+
+    attendees = [{'email': interview.supervisor.email}, {'email': request.user.email}]
+    for user in interview.guest.all():
+        user_list.append(user)
+        attendees.append({"email": user.email})
+
+    return user_list, attendees
+
+
+def date_filter(queryset, created, field_str):
+    filters = dict()
+    if created:
+        lte = created.get('lte', None)
+        gte = created.get('gte', None)
+        if lte:
+            filters[f"{field_str}__lte"] = lte
+        if gte:
+            filters[f"{field_str}__gte"] = gte
+    return queryset(**filters)
 
 
 # Change status of scheduled and rescheduled Interviews to feedback_due
