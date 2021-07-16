@@ -19,7 +19,7 @@ class VendorCompanySerializer(serializers.ModelSerializer):
 class VendorContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = VendorContact
-        fields = '__all__'
+        fields = ('id', 'name', 'email', 'number')
 
 
 class LeadCreateSerializer(serializers.ModelSerializer):

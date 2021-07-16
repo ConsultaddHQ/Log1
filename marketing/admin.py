@@ -22,7 +22,6 @@ class VendorCompanyAdmin(ExportActionModelAdmin):
 @admin.register(VendorContact)
 class VendorContactAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_filter = ('created_by',)
     list_display = ('id', 'name', 'email', 'number', 'company', 'created_by')
     search_fields = ('id', 'name', 'email', 'company__name', 'created_by__email', 'created_by__employee_name')
 

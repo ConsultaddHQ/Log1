@@ -34,7 +34,7 @@ from notification.utils import create_notification, push_notification
 from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
 from marketing.models import Lead, Submission, VendorCompany, VendorContact, VendorLayer, Interview, Test
-from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
     date_filter, get_attendees_and_users
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionSupportSerializer, \
@@ -92,8 +92,8 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            data = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
-            data = data.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
+            contact = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
+            data = contact.values('id', 'name', 'email', 'number', 'company__name')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -101,8 +101,8 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
     def list(self, request, *args, **kwargs):
         try:
-            data = VendorContact.objects.filter(company_id=request.GET.get('company'), created_by=request.user)
-            data = data.values('id', 'name', 'email', 'number', 'company__name', 'created_by')
+            contact = VendorContact.objects.filter(company_id=request.GET.get('company'), created_by=request.user)
+            data = contact.values('id', 'name', 'email', 'number', 'company__name')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -118,21 +118,14 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
         if vendor:
             return Response({"message": "Already exists"}, status=400)
         try:
-            contact = VendorContact.objects.filter(
+            contact = VendorContact.objects.create(
                 email=email,
                 company_id=company,
                 created_by=request.user,
                 name=request.data['name'],
                 number=request.data['number'],
             )
-            data = {
-                "id": contact.id,
-                "name": contact.name,
-                "email": contact.email,
-                "number": contact.number,
-                "company__name": contact.company.name,
-                "created_by": contact.created_by.employee_name,
-            }
+            data = contact.values('id', 'name', 'email', 'number')
             return Response({"data": data, "message": "Vendor Contact created"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -256,7 +249,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 lead = queryset.first()
                 lead.owner = request.user
                 lead.save()
-                data = self.get_data(lead)
+                data = self.get_data(queryset)
                 return Response({"data": data[0], "message": "Requirement added"}, status=201)
             else:
                 return Response({"message": "Data is invalid", "error": serializer.errors}, status=400)
@@ -457,7 +450,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='resume')
     def resume(self, request, *args, **kwargs):
         try:
-            user_id = request.user
+            user_id = request.user.id
             data, visibility = list(), False
             submission = get_object_or_404(Submission, id=kwargs.get('pk'))
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
@@ -465,7 +458,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 visibility = True
                 queryset = submission.attachments.all()
                 data = AttachmentSerializer(queryset, many=True).data
-            return Response({"data": data, "visibility": visibility}, status=200)
+            return Response({"data": data, "visibility": visibility, 'status': submission.status}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1037,7 +1030,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         Q(supervisor_id=user_id) |
                         Q(submission__created_by_id=user_id) |
                         Q(submission__consultant_marketing__in_pool=True) |
-                        Q(submission__consultant_marketing__marketer_id=user_id) |
+                        Q(submission__consultant_marketing__marketer__id=user_id) |
                         Q(submission__consultant_marketing__consultant__pocs__poc_id=user_id,
                           submission__consultant_marketing__status='open')
                     )
@@ -1145,7 +1138,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         f":: {interview.submission.employer}"
 
                 # Calendar attendees and User for sending notification
-                attendees, user_list = get_attendees_and_users(request, interview)
+                user_list, attendees = get_attendees_and_users(request, interview)
 
                 # Calendar booking start and end time
                 event = {
@@ -1165,7 +1158,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 booking_res = 'Development Server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     try:
-                        cal_res = book_ms_calendar(event)
+                        cal_res, msg = book_ms_calendar(event)
+                        if msg == 'error':
+                            return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
+
                         interview.calendar_id = cal_res['id']
                         booking_res = 'booked'
                         interview.save()
@@ -1310,13 +1306,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         if os.environ.get('ENV', 'local') == 'prod':
                             event_id = interview.calendar_id
                             if not event_id:
-                                cal_res = book_ms_calendar(event)
-                                interview.calendar_id = cal_res['id']
+                                res, msg = book_ms_calendar(event)
+                                if msg == 'error':
+                                    return Response({"message": "Calendar booking failed", "error": res}, status=400)
+                                interview.calendar_id = res['id']
                                 booking_res = 'booked'
                                 interview.save()
                             else:
                                 try:
-                                    update_ms_calendar(event_id, event)
+                                    res, msg = update_ms_calendar(event_id, event)
+                                    if msg == "error":
+                                        return Response({"message": "Calendar update failed", "error": res}, status=400)
                                     booking_res = 'updated'
                                 except Exception as error:
                                     write_exception(f"Booking update failed: {error}", request)
@@ -1457,7 +1457,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     event_id = interview.calendar_id
                     if not event_id:
                         try:
-                            cal_res = book_ms_calendar(event)
+                            cal_res, msg = book_ms_calendar(event)
+                            if msg == "error":
+                                return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
+
                             interview.calendar_id = cal_res['id']
                             booking_res = 'booked'
                             interview.save()
@@ -1465,7 +1468,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                     else:
                         try:
-                            update_ms_calendar(event_id, event)
+                            res, msg = update_ms_calendar(event_id, event)
+                            if msg == 'error':
+                                return Response({"message": "Calendar reschedule failed", "error": res}, status=400)
                             booking_res = 'updated'
                         except Exception as error:
                             return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
@@ -1659,16 +1664,16 @@ class InterviewViewSets(viewsets.ModelViewSet):
         try:
             if ctb:
                 queryset = Interview.objects.filter(
-                    Q(submission__client__contains=sub.client) |
-                    Q(submission__client__contains=sub.client, supervisor=ctb) |
-                    Q(submission__client__contains=sub.client,
+                    Q(submission__client__icontains=sub.client) |
+                    Q(submission__client__icontains=sub.client, supervisor=ctb) |
+                    Q(submission__client__icontains=sub.client,
                       submission__consultant_marketing__consultant=sub.consultant_marketing.consultant) |
                     Q(submission__lead__vendor_company=sub.vendor,
                       submission__consultant_marketing__consultant=sub.consultant_marketing.consultant)
                 )
             else:
                 queryset = Interview.objects.filter(
-                    Q(submission__client__contains=sub.client) |
+                    Q(submission__client__icontains=sub.client) |
                     Q(submission__consultant_marketing__consultant=sub.consultant_marketing.consultant,
                       submission__client__contains=sub.client) |
                     Q(submission__consultant_marketing__consultant=sub.consultant_marketing.consultant,
