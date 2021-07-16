@@ -127,7 +127,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             serializer = self.serializer_class(attachment)
 
             if content_type.model != 'project':
-                return Response({"data": serializer.data}, status=201)
+                return Response({"data": serializer.data, "message": "Attachment uploaded"}, status=201)
             else:
                 project = get_object_or_404(Project, id=object_id)
                 check_list = get_project_check_list(project)
@@ -153,7 +153,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 create_activity(attachment_id, 'attachment', request.user, desc, 'deleted')
                 attachment.attachment_file.delete(save=False)
                 attachment.delete()
-                return Response({"data": "deleted"}, status=202)
+                return Response({"message": "Attachment deleted"}, status=202)
             else:
                 project = get_object_or_404(Project, id=attachment.object_id)
                 desc = f"{attachment.filename} deleted by {request.user.employee_name}"

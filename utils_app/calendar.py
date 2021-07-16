@@ -5,6 +5,8 @@ import httplib2
 from googleapiclient.discovery import build
 from oauth2client.client import OAuth2Credentials
 
+from log1.utils import write_exception
+
 
 def create_ms_token():
     tenant_id = os.environ.get('tenant_id')
@@ -117,6 +119,9 @@ def calendar_ms_description(data):
 def book_ms_calendar(data):
     try:
         token = create_ms_token()
+        if not token:
+            return False, "error"
+
         description = calendar_ms_description(data)
         attendees = []
         for i in data['attendees']:
@@ -148,17 +153,21 @@ def book_ms_calendar(data):
         }
         url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/"
         response = requests.post(url, headers=headers, data=event)
+        data = json.loads(response.text.encode('utf-8'))
         if response.status_code == 201:
-            return json.loads(response.text.encode('utf-8'))
-        return False
+            return data, "ok"
+        return data, "error"
     except Exception as error:
-        print(error)
-        return False
+        write_exception(message=error)
+        return str(error), "error"
 
 
 def update_ms_calendar(event_id, data):
     try:
         token = create_ms_token()
+        if not token:
+            return False, "error"
+
         description = calendar_ms_description(data)
         attendees = []
         for i in data['attendees']:
@@ -190,17 +199,21 @@ def update_ms_calendar(event_id, data):
         }
         url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
         response = requests.patch(url, headers=headers, data=event)
+        data = json.loads(response.text.encode('utf-8'))
         if response.status_code == 200:
-            return json.loads(response.text.encode('utf-8'))
-        return False
+            return data, "ok"
+        return data, "error"
     except Exception as error:
-        print(error)
-        return False
+        write_exception(message=error)
+        return str(error), "error"
 
 
 def delete_ms_calendar(event_id):
     try:
         token = create_ms_token()
+        if not token:
+            return False, "error"
+
         headers = {
             "Authorization": "bearer " + token,
             "Content-Type": "application/json"
@@ -208,11 +221,11 @@ def delete_ms_calendar(event_id):
         url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
         response = requests.delete(url, headers=headers)
         if response.status_code == 204:
-            return True
-        return False
+            return True, "ok"
+        return False, "error"
     except Exception as error:
-        print(error)
-        return False
+        write_exception(message=error)
+        return str(error), "error"
 
 
 def get_user_id(email):

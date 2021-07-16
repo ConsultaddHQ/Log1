@@ -93,8 +93,9 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 consultants = consultants.filter(
-                    Q(name__istartswith=query) |
-                    Q(email__iexact=query)
+                    Q(name__icontains=query) |
+                    Q(email__iexact=query) |
+                    Q(pocs__poc__employee_name__icontains=query, pocs__end=None)
                 )
 
             consultants = consultants.distinct('id')
@@ -1009,12 +1010,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             consultant_marketing = ConsultantMarketing.objects.create(
                 cycle=cycle,
                 status='close',
-                rtg=request.data['rtg'],
-                in_pool=request.data['in_pool'],
-                start=request.data['marketing_start'],
-                consultant_id=request.data['consultant'],
+                rtg=request.data.get('rtg'),
+                in_pool=request.data.get('in_pool'),
+                start=request.data.get('marketing_start'),
+                consultant_id=request.data.get('consultant'),
                 previous_marketing_days=previous_marketing_days,
-                preferred_location=request.data['preferred_location'],
+                preferred_location=request.data.get('preferred_location'),
             )
             primary_marketer = request.data.get('primary_marketer', None)
             if primary_marketer:
