@@ -83,14 +83,16 @@ class EmployeeAuthViewSets(GenericViewSet):
             if user:
                 user.last_login = datetime.now()
                 user.save()
-                fcm_token, created = FCMDevice.objects.get_or_create(
-                    device_id=request.data.get("fcm_token"),
-                    content_type=ContentType.objects.get(model='user')
-                )
-                fcm_token.type = 'web'
-                fcm_token.name = 'windows'
-                fcm_token.object_id = user.id
-                fcm_token.save()
+                fcm_token = request.data.get("fcm_token", None)
+                if fcm_token:
+                    fcm_token, created = FCMDevice.objects.get_or_create(
+                        device_id=request.data.get("fcm_token"),
+                        content_type=ContentType.objects.get(model='user')
+                    )
+                    fcm_token.type = 'web'
+                    fcm_token.name = 'windows'
+                    fcm_token.object_id = user.id
+                    fcm_token.save()
 
                 return Response({"data": self.login_serializer_class(user).data}, status=202)
             return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)

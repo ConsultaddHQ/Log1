@@ -9,10 +9,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from api_key.models import APIKey
-from log1.utils import write_exception
 from utils_app.mailing import send_email
-from employee.token import get_token_generator
 from utils_app.models import TimeStampedModel
+from employee.token import get_token_generator
+from log1.utils import write_exception, write_info
 
 GENDER_CHOICE = (
     ('male', 'Male'),
@@ -131,6 +131,7 @@ class User(AbstractUser, PermissionsMixin):
     def send_mail(self, mail_data):
         try:
             res = send_email(mail_data, "admin@log1.com")
+            write_info(res, "send_mail")
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
