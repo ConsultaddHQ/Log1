@@ -97,6 +97,10 @@ class Project(TimeStampedModel):
     def marketer_name(self):
         return self.submission.created_by.employee_name
 
+    @property
+    def created_by(self):
+        return self.submission.created_by
+
 
 class ProjectStatus(models.Model):
     is_current = models.BooleanField(_('Is Current'), default=True)

@@ -307,7 +307,9 @@ def send_exit_process_mail(terminate, exit_status):
                 'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
             },
         }
-        res = send_email(mail_data, terminate.created_by.email)
+        res, msg = send_email(mail_data, terminate.created_by.email)
+        if not msg:
+            return res, "error"
         return res, "ok"
     except Exception as error:
         write_exception(message=error)

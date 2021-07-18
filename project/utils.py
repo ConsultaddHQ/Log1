@@ -190,9 +190,10 @@ class ProjectUtil:
                 &#128221; End Date :  {self.project_end} <br>
                 &#10060; Status :  {po_status} <br>"""
 
+            reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
             data = {
                 "title": "Offer Termination Feedback",
-                "text": text + " **Reason:** " + " " + self.project.feedback if self.project.feedback else "None"
+                "text": text + f" **Reason:** {reason}"
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.project_termination_url, data)
@@ -208,7 +209,7 @@ class ProjectUtil:
             emojis = self.fetch_emojis()
             text = f"""{emojis['consultant_gender']} Consultant :  **{self.consultant}** <br>
                 {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
-                {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter']} <br>
+                {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
                 {emojis['employer']} Employer :  {self.project.employer}<br>
                 {emojis['employer']} Team :  {self.project.submission.created_by.team.name}<br>
                  🇺🇸 Location :  {self.project.city}<br>
@@ -216,9 +217,10 @@ class ProjectUtil:
                 {emojis['role']} Role :  {self.project.submission.lead.job_title}<br>
                 &#128221; Joining Date :  {self.project_start}<br>"""
 
+            reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
             data = {
                 "title": "Offer Cancellation Feedback ",
-                "text": text + " **Reason:** " + self.project.feedback if self.project.feedback else "None"
+                "text": text + f" **Reason:** {reason}"
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.offer_failure_url, data)
