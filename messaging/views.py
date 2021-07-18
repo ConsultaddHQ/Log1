@@ -105,7 +105,12 @@ class ReceiveSMSViewSet(GenericViewSet):
                 to = request.data.get('To')
                 body = request.data.get('Body')
                 from_ = request.data.get('From')
-                user1 = Asset.objects.filter(number=to).first()
+                user1 = Asset.objects.filter(number=to)
+                if user1:
+                    user1 = user1.first()
+                else:
+                    write_exception(message=f"Asset not found to: {to}")
+                    return HttpResponse(status=400)
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
                 Message.objects.create(text=body, read=False, is_sent=False, conversation_id=conversation.id)
                 conversation.modified = datetime.now()
@@ -148,7 +153,8 @@ class ReceiveSMSViewSet(GenericViewSet):
 
                 return HttpResponse(status=201)
             else:
+                write_exception(message="Invalid User")
                 return HttpResponse(status=401)
         except Exception as error:
-            write_exception(error, request)
+            write_exception(message=error)
             return HttpResponse(status=400)

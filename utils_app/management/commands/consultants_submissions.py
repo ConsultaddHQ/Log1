@@ -67,9 +67,8 @@ class Command(BaseCommand):
                 }
 
                 reply_to = [config.RELATIONS]
-                mail_res = send_email(mail_data, "marketing@consultadd.com", reply_to)
-                if mail_res != "mail sent":
-                    raise Exception(mail_res)
+                mail_res, msg = send_email(mail_data, "marketing@consultadd.com", reply_to)
+
                 submission_data.append({
                     "scrum_masters": cc,
                     "mail_res": mail_res,
@@ -91,8 +90,6 @@ class Command(BaseCommand):
                     'days': days,
                 },
             }
-            mail_res = send_email(mail_data, "marketing@consultadd.com")
-            if mail_res != "mail sent":
-                raise Exception(mail_res)
+            send_email(mail_data, "marketing@consultadd.com")
         except Exception as error:
             create_cron_error(job, error)

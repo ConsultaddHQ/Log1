@@ -28,9 +28,14 @@ def log_request(request):
     address = request.META['REMOTE_ADDR']
     method = str(getattr(request, 'method', '')).upper()
     request_path = str(getattr(request, 'path', ''))
+    data = ''
+    if method in ['POST', 'PUT']:
+        data = str(["%s: %s" % (k, v) for k, v in request.data.items()])
+
     query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
     query_params = query_params if query_params else ''
-    logger.error(f"[{method}] User: ({request.user.id}), Path: {address}{request_path}, Params: {query_params}")
+    logger.error(f"User : {request.user.id} :: {request.user.name}")
+    logger.error(f"[{method}] : {address}{request_path}, Params: {query_params}, Data: {data}")
 
 
 def write_info(message, function, request=None):
@@ -41,7 +46,6 @@ def write_info(message, function, request=None):
 
 def write_exception(message, request=None):
     if request:
-        logger.error(f"User id : {request.user.id}")
         log_request(request)
     _, _, tb = sys.exc_info()
     f = tb.tb_frame

@@ -25,10 +25,10 @@ def send_email(mail_data, from_email, reply_to=None):
             "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
         msg.attach_alternative(body, 'text/html')
         msg.send()
-        return "mail sent"
+        return "mail sent", True
     except Exception as error:
         write_exception(message=error)
-        return error
+        return str(error), False
 
 
 @shared_task
@@ -46,7 +46,7 @@ def send_email_without_template(mail_data, from_email):
         return "mail sent", True
     except Exception as error:
         write_exception(message=error)
-        return error, False
+        return str(error), False
 
 
 @shared_task
@@ -71,7 +71,7 @@ def send_email_attachment_multiple(mail_data, from_email, reply_to=None):
         for i in mail_data["attachments"]:
             msg.attach_file(i)
         msg.send()
-        return "mail sent"
+        return "mail sent", True
     except Exception as error:
         write_exception(message=error)
-        return error
+        return str(error), False

@@ -30,7 +30,9 @@ def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
             },
             'attachments': path
         }
-        res = send_email_attachment_multiple(mail_data, 'Log1')
+        res, msg = send_email_attachment_multiple(mail_data, 'Log1')
+        if not msg:
+            return res, "error"
         return res, "ok"
     except Exception as error:
         return error, "error"

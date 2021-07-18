@@ -130,8 +130,9 @@ class User(AbstractUser, PermissionsMixin):
 
     def send_mail(self, mail_data):
         try:
-            res = send_email(mail_data, "admin@log1.com")
-            write_info(res, "send_mail")
+            res, msg = send_email(mail_data, "admin@log1.com")
+            if not msg:
+                return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
