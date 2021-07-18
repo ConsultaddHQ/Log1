@@ -12,7 +12,7 @@ def get_scrum_masters(request):
     return User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
 
 
-def get_attendees_and_users(request, interview):
+def get_users_and_attendees(request, interview):
     user_list = [interview.supervisor]
 
     scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
@@ -127,7 +127,7 @@ def create_submission(request, lead_id):
             }
             create_attachment(other_file_data)
 
-        return sub
+        return sub, "ok"
     except Exception as error:
         write_exception(error, request)
-        return False
+        return error, "error"

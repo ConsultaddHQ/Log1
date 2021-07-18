@@ -64,7 +64,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res = send_email(mail_data, config.RELATIONS)
+                res, msg = send_email(mail_data, config.RELATIONS)
+                if not msg:
+                    return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -104,8 +106,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res = send_email(mail_data, submission.created_by.email)
-
+                res, msg = send_email(mail_data, submission.created_by.email)
+                if not msg:
+                    return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -159,9 +162,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res = send_email_attachment_multiple(mail_data, submission.created_by.email)
-
-            delete_temp_file(path)
+                res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email)
+                delete_temp_file(path)
+                if not msg:
+                    return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -229,8 +233,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res = send_email_attachment_multiple(mail_data, marketer.email)
-
+                res, msg = send_email_attachment_multiple(mail_data, marketer.email)
+                if not msg:
+                    return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=f"Offer mail error for {marketer.email}: {error}")
@@ -289,7 +294,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res1 = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res1 = send_email(mail_data, marketer.email)
+                res1, msg1 = send_email(mail_data, marketer.email)
 
             mail_data_eng = {
                 'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
@@ -305,7 +310,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res2 = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res2 = send_email(mail_data_eng, marketer.email)
+                res2, msg2 = send_email(mail_data_eng, marketer.email)
 
             return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:

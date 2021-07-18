@@ -54,7 +54,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     'petitioner_name': petition.assigned_to.employee_name,
                 },
             }
-            res = send_email(mail_data, petition.assigned_to.email)
+            res, msg = send_email(mail_data, petition.assigned_to.email)
+            if not msg:
+                return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)

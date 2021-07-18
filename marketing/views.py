@@ -36,7 +36,7 @@ from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_c
 from marketing.models import Lead, Submission, VendorCompany, VendorContact, VendorLayer, Interview, Test
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
-    date_filter, get_attendees_and_users
+    date_filter, get_users_and_attendees
 from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionSupportSerializer, \
     VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, TestUpdateSerializer, \
     TestListSerializer, InterviewV2Serializer, TestGetSerializer, SubmissionConProfile, ProjectV2Serializer, \
@@ -125,7 +125,12 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
                 name=request.data['name'],
                 number=request.data['number'],
             )
-            data = contact.values('id', 'name', 'email', 'number')
+            data = {
+                "id": contact.id,
+                "name": contact.name,
+                "email": contact.email,
+                "number": contact.number,
+            }
             return Response({"data": data, "message": "Vendor Contact created"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -277,7 +282,7 @@ class LeadViewSets(viewsets.ModelViewSet):
                 for submission in lead.submission.all():
                     submission_is_complete(submission)
 
-                data = self.get_data(lead)
+                data = self.get_data(queryset)
                 return Response({"data": data[0], "message": "Requirement updated"}, status=202)
             write_exception(serializer.errors, request)
             return Response({"message": "Data is invalid", "error": serializer.errors}, status=400)
@@ -320,8 +325,8 @@ class LeadViewSets(viewsets.ModelViewSet):
             if request.method == 'GET':
                 first, last = get_page_limits(request)
                 sort_by = request.GET.get('sort_by', None)
-                leads = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
-                queryset, counts = self.get_queryset_and_count(leads, ['archived'], sort_by)
+                queryset = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
+                queryset, counts = self.get_queryset_and_count(queryset, ['archived'], sort_by)
                 if counts == 'error':
                     return Response({"message": ERROR_MSG, "error": str(queryset)}, status=400)
                 data = self.get_data(queryset, first, last)
@@ -687,8 +692,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 lead = get_object_or_404(Lead, id=lead_id)
 
-            sub = create_submission(request, lead_id)
-            if sub.vendor_contact and sub.client:
+            sub, msg = create_submission(request, lead_id)
+            if msg == "error":
+                return Response({"message": "Submission not created", "error": str(sub)}, status=400)
+            if sub and sub.vendor_contact and sub.client:
                 sub.is_active = True
             else:
                 sub.is_active = False
@@ -1138,7 +1145,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         f":: {interview.submission.employer}"
 
                 # Calendar attendees and User for sending notification
-                user_list, attendees = get_attendees_and_users(request, interview)
+                user_list, attendees = get_users_and_attendees(request, interview)
 
                 # Calendar booking start and end time
                 event = {
@@ -1190,9 +1197,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'screening_type', 'rank',
+                ).values('id', 'round', 'status', 'start_time', 'end_time', 'screening_type', 'rank', 'submission_id',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name', 'job_title',
-                         'submission_id', 'interview_mode')
+                         'interview_mode')
 
                 # Creating Notification
                 notification_data = {
@@ -1244,7 +1251,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 submission.save()
 
                 booking_res = 'Development Server'
-                user_list, _ = get_attendees_and_users(request, interview)
+                user_list, _ = get_users_and_attendees(request, interview)
                 title = get_interview_title(interview)
 
                 if status_change == "true" and interview.status not in ['cancelled']:
@@ -1284,7 +1291,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                     create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
-                    _, attendees = get_attendees_and_users(request, interview)
+                    _, attendees = get_users_and_attendees(request, interview)
 
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         start = serializer.data["start_time"].replace("Z", "")
@@ -1332,8 +1339,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'job_title', 'submission_id',
-                         'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
+                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project', 
+                         'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
                 notification_data = {
                     'category': 'info', 'description': title,
@@ -1401,7 +1408,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 'recipient_user_type': 'user',
                 'title': 'Interview Cancelled',
             }
-            user_list, _ = get_attendees_and_users(request, interview)
+            user_list, _ = get_users_and_attendees(request, interview)
             create_notification(user_list, notification_data)
             return Response(status=204)
         except Exception as error:
@@ -1430,7 +1437,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             booking_res = 'error'
             submission = interview.submission
-            user_list, attendees = get_attendees_and_users(request, interview)
+            user_list, attendees = get_users_and_attendees(request, interview)
             title = get_interview_title(interview)
 
             desc = f"Round {interview.round} is rescheduled for {interview.start_time} to {interview.end_time}"
@@ -1560,7 +1567,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 'recipient_user_type': 'user',
                 'title': 'Interview Cancelled',
             }
-            user_list, _ = get_attendees_and_users(request, interview)
+            user_list, _ = get_users_and_attendees(request, interview)
             create_notification(user_list, notification_data)
             return Response({"message": "Interview cancelled"}, status=202)
         except Exception as error:
@@ -2118,8 +2125,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, created_by.email)
+                res, msg = send_email_attachment_multiple(mail_data, created_by.email)
                 delete_temp_file(path)
+                if not msg:
+                    return res, "error"
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -2154,8 +2163,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res = send_email_attachment_multiple(mail_data, test.submitted_by.email)
+                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email)
                 delete_temp_file(path)
+                if not msg:
+                    return res, "error"
                 return res, "ok"
         except Exception as error:
             write_exception(message=error)
