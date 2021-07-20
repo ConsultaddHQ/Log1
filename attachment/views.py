@@ -1,8 +1,3 @@
-import os
-import time
-import boto3
-from django.conf import settings
-from botocore.exceptions import ClientError
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
@@ -15,69 +10,10 @@ from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyM
 
 from project.models import Project
 from activity.views import create_activity
+from log1.utils import write_exception, ERROR_MSG
 from utils_app.utils import get_project_check_list
-from log1.utils import write_exception, ERROR_MSG, write_info
+from utils_app.aws_utils import get_s3_object, presigned_post_url
 from attachment.serializers import Attachment, AttachmentSerializer
-
-
-def get_s3_object(key):
-    s3 = boto3.client(
-        's3', region_name=os.getenv('AWS_REGION_NAME'),
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-    )
-    url = s3.generate_presigned_url(
-        ClientMethod='get_object',
-        Params={
-            'Bucket': os.getenv('AWS_STORAGE_BUCKET_NAME'),
-            'Key': f'media/{key}'
-        },
-        ExpiresIn=3600
-    )
-    return url
-
-
-def download_s3_object(key):
-    name = ".".join(key.split('/')[3].split(".")[:-1])
-    ext = key.split('/')[3].split(".")[-1]
-    folder = key.split('/')[1]
-    file_name = f"{folder}/{name}_{time.strftime('%Y%m%d-%H%M%S')}.{ext}"
-
-    if not os.path.exists(f"{settings.BASE_DIR}/media/{folder}"):
-        os.mkdir(f"{settings.BASE_DIR}/media/{folder}")
-
-    s3 = boto3.client(
-        's3', region_name=os.getenv('AWS_REGION_NAME'),
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-    )
-    s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME'), f'media/{key}', f'media/{file_name}')
-    return f'media/{file_name}'
-
-
-def delete_temp_file(paths):
-    for path in paths:
-        if os.path.exists(path):
-            os.remove(path)
-        else:
-            write_info(message=path + " file does not exist", function='delete_temp_file')
-
-
-def presigned_post_url(object_name, fields=None, conditions=None, expiration=3600):
-    bucket_name = os.getenv('AWS_STORAGE_BUCKET_NAME')
-    s3 = boto3.client(
-        's3', region_name=os.getenv('AWS_REGION_NAME'),
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-    )
-    try:
-        response = s3.generate_presigned_post(
-            bucket_name, object_name, Fields=fields, Conditions=conditions, ExpiresIn=expiration
-        )
-        return response
-    except ClientError as error:
-        write_exception(message=error)
-        return None
 
 
 # Route - /attachment/
@@ -112,8 +48,9 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             content_type = ContentType.objects.get(model=request.data['obj_type'])
             object_id = request.data['object_id']
             if content_type.model == 'submission' and request.data['obj_type'] == 'resume':
-                resume = Attachment.objects.filter(object_id=object_id, content_type=content_type,
-                                                   attachment_type='resume')
+                resume = Attachment.objects.filter(
+                    object_id=object_id, content_type=content_type, attachment_type='resume'
+                )
                 if resume:
                     return Response({"message": "You can't attach multiple resumes"}, status=400)
 
@@ -178,9 +115,11 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
     def retrieve(self, request, *args, **kwargs):
         try:
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
-            url = get_s3_object(attachment.attachment_file.name)
+            response, error = get_s3_object(attachment.attachment_file.name)
+            if error:
+                return Response({"message": "Unable to fetch document", "error": response}, status=400)
             extension = attachment.attachment_file.name.split(".")[-1]
-            return Response({"data": url, 'file_type': extension}, status=200)
+            return Response({"data": response, "file_type": extension}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -198,7 +137,9 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
                 pk=object_id,
                 filename=file_name,
             )
-            response = presigned_post_url(object_name=object_name)
+            response, error = presigned_post_url(object_name=object_name)
+            if error:
+                return Response({"message": "Unable to upload document", "error": response}, status=400)
             return Response({"data": response, "message": "Attachment uploaded"}, status=200)
         except Exception as error:
             write_exception(error, request)

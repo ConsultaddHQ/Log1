@@ -28,17 +28,6 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @action(methods=['get'], detail=False, url_path='number_list')
-    def number_list(self, request):
-        try:
-            data = Asset.objects.filter(
-                asset_type='number', provider='twilio', owner=request.user, is_deleted=False
-            ).values('id', 'number')
-            return Response({"data": data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
-
     def retrieve(self, request, *args, **kwargs):
         try:
             conversation_id = kwargs.get('pk', None)
@@ -64,6 +53,17 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 'id', 'user2', 'created', 'modified', 'text', 'read'
             ).order_by('-id', '-messages__created').distinct('id')
             return Response({"data": conversations}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='number_list')
+    def number_list(self, request):
+        try:
+            data = Asset.objects.filter(
+                asset_type='number', provider='twilio', owner=request.user, is_deleted=False
+            ).values('id', 'number')
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)

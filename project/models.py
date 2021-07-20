@@ -235,4 +235,3 @@ class PayrollSchedule(models.Model):
 
     def __str__(self):
         return f'{self.processing_date} :: {self.pay_period_start} - {self.pay_period_end} :: {self.pay_date}'
-

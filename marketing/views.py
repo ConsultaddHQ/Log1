@@ -11,37 +11,29 @@ from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
 
 from rest_framework import viewsets
+from rest_framework.mixins import *
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin, \
-    DestroyModelMixin
 
 from constance import config
-from project.models import Project
+from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
-from consultant.models import Consultant
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
+from utils_app.utils import delete_temp_file
 from activity.serializers import ActivitySerializer
-from attachment.serializers import AttachmentSerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
-from attachment.views import presigned_post_url, download_s3_object, delete_temp_file
+from utils_app.aws_utils import presigned_post_url, download_s3_object
 from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
-from marketing.models import Lead, Submission, VendorCompany, VendorContact, VendorLayer, Interview, Test
-from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
     date_filter, get_users_and_attendees
-from marketing.serializers import SubmissionV2Serializer, SubmissionV2DetailSerializer, SubmissionSupportSerializer, \
-    VendorContactSerializer, LeadSerializer, LeadCreateSerializer, SubmissionSerializer, TestUpdateSerializer, \
-    TestListSerializer, InterviewV2Serializer, TestGetSerializer, SubmissionConProfile, ProjectV2Serializer, \
-    InterviewDetailSerializer, InterviewCreateSerializer, TestCreateSerializer, SubmissionCreateSerializer, \
-    VendorLayerSerializer, InterviewSerializer, VendorCompanySerializer
 
 
 # Route - /vendor_company/
@@ -1339,7 +1331,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project', 
+                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
                 notification_data = {
@@ -1370,8 +1362,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 try:
                     if interview.calendar_id:
                         delete_ms_calendar(interview.calendar_id)
-                    else:
-                        return Response({"message": "Calendar id not found"}, status=404)
                 except Exception as error:
                     write_exception(f"Booking deletion failed: {error}", request)
                     return Response({"data": "Calendar booking deletion failed", "error": str(error)}, status=400)
@@ -1461,8 +1451,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Updating calendar Booking
                 if os.environ.get('ENV', 'local') == 'prod':
-                    event_id = interview.calendar_id
-                    if not event_id:
+                    calendar_id = interview.calendar_id
+                    if not calendar_id:
                         try:
                             cal_res, msg = book_ms_calendar(event)
                             if msg == "error":
@@ -1475,7 +1465,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                     else:
                         try:
-                            res, msg = update_ms_calendar(event_id, event)
+                            res, msg = update_ms_calendar(calendar_id, event)
                             if msg == 'error':
                                 return Response({"message": "Calendar reschedule failed", "error": res}, status=400)
                             booking_res = 'updated'
@@ -1497,9 +1487,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'calendar_id', 'status', 'start_time', 'end_time', 'job_title',
-                         'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
-                         'company_name', 'screening_type', 'interview_mode')
+                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
+                         'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
+                         'screening_type', 'interview_mode')
 
                 notification_data = {
                     'category': 'info',
@@ -1528,8 +1518,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 try:
                     if interview.calendar_id:
                         delete_ms_calendar(interview.calendar_id)
-                    else:
-                        return Response({"message": "Booking not found"}, status=404)
                 except Exception as error:
                     write_exception(f"Booking cancellation failed: {error}", request)
                     return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
@@ -1623,7 +1611,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 file_name = request.data['file_name']
                 object_name = f'media/attachments/recordings/{object_id}/{file_name}'
                 interview = get_object_or_404(Interview, id=object_id)
-                response = presigned_post_url(object_name=object_name)
+                response, error = presigned_post_url(object_name=object_name)
+                if error:
+                    return Response({"message": "Unable to upload recording", "error": response}, status=400)
                 interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
                 interview.save()
 
@@ -1651,11 +1641,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=True, url_path='recording')
     def recording(self, request, *args, **kwargs):
         try:
-            from attachment.views import get_s3_object
+            from utils_app.aws_utils import get_s3_object
             interview = get_object_or_404(Interview, id=kwargs.get('pk'))
             if interview.attachment_link:
-                url = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
-                return Response({"data": url}, status=200)
+                response, error = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
+                if error:
+                    return Response({"message": "Unable to fetch recording", "error": response}, status=400)
+                return Response({"data": response}, status=200)
             return Response({"message": "Recording not available"}, status=400)
         except Exception as error:
             write_exception(error, request)
@@ -2084,10 +2076,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 subject = f'Test Received :: {test_type} :: {consultant.name} :: {skills} '
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
-                    path.append(download_s3_object(resume.first().attachment_file.name))
+                    response, error = download_s3_object(resume.first().attachment_file.name)
+                    path.append(response)
                 test_docs = test.attachments.all()
                 for doc in test_docs:
-                    path.append(download_s3_object(doc.attachment_file.name))
+                    response, error = download_s3_object(doc.attachment_file.name)
+                    path.append(response)
                 deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
                     "%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
@@ -2145,7 +2139,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     engineer = 'NA'
                 test_docs = test.attachments.filter(attachment_type='test_submit')
                 for doc in test_docs:
-                    path.append(download_s3_object(doc.attachment_file.name))
+                    response, error = download_s3_object(doc.attachment_file.name)
+                    path.append(response)
                 to = [created_by.email]
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
                 subject = f'Test Completed  :: {test_type} :: {consultant.name} :: {skills}'
