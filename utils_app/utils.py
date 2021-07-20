@@ -1,8 +1,18 @@
+import os
 from datetime import datetime
 
-from log1.utils import write_exception
+from project.models import Project
 from utils_app.models import CronJob, CronError
+from log1.utils import write_exception, write_info
 from utils_app.mailing import send_email_without_template
+
+
+def delete_temp_file(paths):
+    for path in paths:
+        if os.path.exists(path):
+            os.remove(path)
+        else:
+            write_info(message=f"{path} file does not exist", function='delete_temp_file')
 
 
 def create_cron_error(job, description):
@@ -12,10 +22,9 @@ def create_cron_error(job, description):
             job=job
         )
         mail_data = {
-            'cc': [],
-            'bcc': [],
-            'body': f'Error :: {description}',
+            'cc': [], 'bcc': [],
             'to': ['sarang.m@consultadd.com'],
+            'body': f'Error :: {description}',
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
         send_email_without_template(mail_data, 'admin@log1.com')
@@ -34,9 +43,7 @@ def create_cron_object(name):
 
 
 def get_attachment_status(project):
-    start_date = 1 if project.start_date else 0
-    client_address, vendor_address, s_msa, s_work_order, reporting_details = 0, 0, 0, 0, 0
-
+    s_msa, s_work_order = 0, 0
     if project.attachments.filter(attachment_type='msa_signed'):
         s_msa = 1
 
@@ -46,14 +53,14 @@ def get_attachment_status(project):
     if project.attachments.filter(attachment_type='work_order_msa_signed'):
         s_msa, s_work_order = 1, 1
 
-    if project.client_address and len(project.client_address.strip()) > 0:
-        client_address = 1
-
-    if project.vendor_address and len(project.vendor_address.strip()) > 0:
-        vendor_address = 1
-
-    if project.reporting_details and len(project.reporting_details.strip()) > 0:
-        reporting_details = 1
+    queryset = Project.objects.filter(id=project.id)
+    start_date, client_address, vendor_address, reporting_details = queryset.values_list(
+        'start_date', 'client_address', 'vendor_address', 'reporting_details'
+    )
+    start_date = 1 if start_date else 0
+    client_address = 1 if (project.client_address and len(project.client_address.strip()) > 0) else 0
+    vendor_address = 1 if (project.vendor_address and len(project.vendor_address.strip()) > 0) else 0
+    reporting_details = 1 if (project.reporting_details and len(project.reporting_details.strip()) > 0) else 0
 
     total = s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
     list_status = True if (total / 6) >= 1 else False

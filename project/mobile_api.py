@@ -15,7 +15,7 @@ from constance import config
 from employee.models import User
 from log1.utils import write_exception
 from utils_app.mailing import send_email
-from attachment.views import get_s3_object
+from utils_app.aws_utils import get_s3_object
 from attachment.serializers import Attachment
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
@@ -357,11 +357,13 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             attachments = timesheet.attachments.all()
             data = []
             for attachment in attachments:
-                url = get_s3_object(attachment.attachment_file.name)
+                response, error = get_s3_object(attachment.attachment_file.name)
+                if error:
+                    return Response({"message": "Unable to fetch attachments", "error": response}, status=400)
                 extension = attachment.attachment_file.name.split(".")[-1]
                 data.append({
                     "id": attachment.id,
-                    "file_path": url,
+                    "file_path": response,
                     "extension": extension,
                     "created": attachment.created,
                     "file_name": attachment.filename,

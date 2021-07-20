@@ -17,15 +17,16 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
 
 from constance import config
+from marketing.utils import date_filter
 from utils_app.models import ObjectGroup
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
 from attachment.models import create_attachment
-from utils_app.utils import get_attachment_status
+from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
-from attachment.views import download_s3_object, delete_temp_file
+from utils_app.utils import get_attachment_status, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
 from log1.utils import ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password
@@ -90,7 +91,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 cc.append(retention.email)
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-
+            if project.employer:
+                employer = project.employer
+            else:
+                employer = project.submission.employer
             mail_data = {
                 'to': to, 'cc': cc, 'bcc': [],
                 'template': '../templates/offer.html',
@@ -99,8 +103,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'context': {
                     'consultant_email': consultant.email, 'job_title': submission.lead.job_title,
                     'rate': project.rate, 'con_rate': consultant.rate, 'start': project_start_date,
+                    'employer': employer, 'client_name': submission.client, 'consultant_name': consultant.name,
                     'vendor_company': submission.vendor.name, 'marketer_name': submission.created_by.employee_name,
-                    'employer': project.employer, 'client_name': submission.client, 'consultant_name': consultant.name,
                 },
             }
 
@@ -129,7 +133,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             notes = "\n".join(notes) if len(notes) != 0 else "NA"
 
             if resume:
-                path.append(download_s3_object(resume.first().attachment_file.name))
+                response, error = download_s3_object(resume.first().attachment_file.name)
+                path.append(response)
 
             consultant = project.submission.consultant
             recruiter = consultant.recruiter
@@ -145,15 +150,18 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 cc.append(retention.email)
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-
+            if project.employer:
+                employer = project.employer
+            else:
+                employer = project.submission.employer
             mail_data = {
                 'template': '../templates/support.html',
                 'to': [config.ENGINEERING], 'cc': cc, 'bcc': [], 'attachments': path,
                 'subject': f'Support Initiation for {consultant.name} {submission.client} {submission.lead.city}',
                 'context': {
+                    'employer': employer, 'marketer_name': submission.created_by.employee_name,
                     'location': submission.lead.city, 'consultant_location': consultant.current_city,
                     'job_title': submission.lead.job_title, 'consultant_phone_no': consultant.phone_no,
-                    'employer': project.employer, 'marketer_name': submission.created_by.employee_name,
                     'recruiter_name': recruiter_name, 'start': project_start_date, 'recordings': recordings,
                     'consultant_name': consultant.name, 'consultant_email': consultant.email, 'notes': notes,
                     'client_name': submission.client, 'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
@@ -214,15 +222,19 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
+            if project.employer:
+                employer = project.employer
+            else:
+                employer = project.submission.employer
             mail_data = {
                 'template': '../templates/po.html',
                 'to': to, 'cc': cc, 'bcc': [], 'attachments': path,
                 'subject': f'On Boarding of {consultant.name} :: {project.employer} :: {project_start_date} :: '
                            f'{submission.client} :: {submission.vendor.name}',
                 'context': {
+                    'marketer_name': submission.created_by.employee_name, 'employer': employer,
                     'job_title': submission.lead.job_title, 'vendor_number': vendor_contact.number,
                     'client_address': project.client_address, 'vendor_address': project.vendor_address,
-                    'marketer_name': submission.created_by.employee_name, 'employer': project.employer,
                     'vendor_company': submission.lead.vendor_company.name, 'client_name': submission.client,
                     'type': po_type, 'consultant_name': consultant.name, 'vendor_email': vendor_contact.email,
                     'invoicing_period': project.invoicing_period, 'reporting_details': project.reporting_details,
@@ -274,20 +286,23 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project_end_date = None
             if project.end_date:
                 project_end_date = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-
+            if project.employer:
+                employer = project.employer
+            else:
+                employer = project.submission.employer
             mail_data = {
                 'to': to, 'cc': cc, 'bcc': [],
                 'template': '../templates/po_termination.html',
-                'subject': f"{consultant.name}'s {po_type} :: {project.employer} :: "
+                'subject': f"{consultant.name}'s {po_type} :: {employer} :: "
                            f'{project_start_date} :: {submission.client} :: {submission.vendor.name}',
                 'context': {
                     'vendor_number': vendor_number, 'client_name': submission.client,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                     'reporting_details': project.reporting_details, 'end': project_end_date,
                     'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                    'vendor_email': vendor_email, 'employer': employer, 'rate': project.rate,
                     'vendor_company': submission.lead.vendor_company.name, 'po_type': po_type,
                     'job_title': submission.lead.job_title, 'marketer_name': marketer.employee_name,
-                    'vendor_email': vendor_email, 'employer': project.employer, 'rate': project.rate,
                     'vendor_address': project.vendor_address, 'client_address': project.client_address,
                     'vendor_name': vendor_name, 'start': project_start_date, 'remark': project.feedback,
                 }
@@ -359,17 +374,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
-            if version == 'v2' and filter_json:
+            if filter_json:
                 filters = json.loads(filter_json)
 
                 if 'remote' in filters:
                     projects = projects.filter(is_remote=filters['remote'])
 
-                if 'w2' in filters:
-                    projects = projects.filter(submission__lead__is_w2=filters['w2'])
-
                 if 'client' in filters and len(filters["client"]) > 0:
                     projects = projects.filter(submission__client=filters['client'])
+
+                if 'w2' in filters:
+                    projects = projects.filter(submission__lead__is_w2=filters['w2'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     projects = projects.filter(submission__created_by_id__in=filters['marketer'])
@@ -378,16 +393,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     projects = projects.filter(submission__lead__vendor_company_id__in=filters['vendor'])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    projects = projects.filter(submission__consultant_marketing__consultant_id__in=filters['consultant'])
+                    projects = projects.filter(
+                        Q(submission__consultant_marketing__consultant_id__in=filters['consultant']) |
+                        Q(submission__consultant_id__in=filters['consultant'])
+                    )
 
                 created = filters.get('created', None)
-                if created:
-                    lte = created.get('lte', None)
-                    gte = created.get('gte', None)
-                    if lte:
-                        projects = projects.filter(created__lte=lte)
-                    if gte:
-                        projects = projects.filter(created__gte=gte)
+                projects = date_filter(projects, created, 'created')
 
                 projects = projects.order_by('id').distinct('id')
                 data = {
@@ -626,7 +638,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 for i in project.attachments.filter(
                         attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
                     try:
-                        path.append(download_s3_object(i.attachment_file.name))
+                        response, error = download_s3_object(i.attachment_file.name)
+                        path.append(response)
                     except Exception as error:
                         write_exception(error, request)
 
