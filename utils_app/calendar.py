@@ -5,7 +5,7 @@ import httplib2
 from googleapiclient.discovery import build
 from oauth2client.client import OAuth2Credentials
 
-from log1.utils import write_exception
+from log1.utils import write_exception, write_info
 
 
 def create_ms_token():
@@ -199,9 +199,14 @@ def update_ms_calendar(event_id, data):
         }
         url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
         response = requests.patch(url, headers=headers, data=event)
-        data = json.loads(response.text.encode('utf-8'))
+        response_data = json.loads(response.text.encode('utf-8'))
         if response.status_code == 200:
-            return data, "ok"
+            return response_data, "updated"
+        if response.status_code == 404:
+            response_data, msg = book_ms_calendar(data)
+            if msg == 'ok':
+                return response_data, "booked"
+            return response_data, "error"
         return data, "error"
     except Exception as error:
         write_exception(message=error)

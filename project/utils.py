@@ -42,6 +42,64 @@ def create_remote_consultant(request):
         write_exception(message=error)
 
 
+def get_attachment_status(project):
+    s_msa, s_work_order = 0, 0
+    if project.attachments.filter(attachment_type='msa_signed'):
+        s_msa = 1
+
+    if project.attachments.filter(attachment_type='work_order_signed'):
+        s_work_order = 1
+
+    if project.attachments.filter(attachment_type='work_order_msa_signed'):
+        s_msa, s_work_order = 1, 1
+
+    start_date = 1 if project.start_date else 0
+    client_address = 1 if (project.client_address and len(project.client_address.strip()) > 0) else 0
+    vendor_address = 1 if (project.vendor_address and len(project.vendor_address.strip()) > 0) else 0
+    reporting_details = 1 if (project.reporting_details and len(project.reporting_details.strip()) > 0) else 0
+
+    total = s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
+    list_status = True if (total / 6) >= 1 else False
+    return {
+        "total": 6,
+        "msa_signed": s_msa,
+        "status": list_status,
+        "start_date": start_date,
+        "client_address": client_address,
+        "vendor_address": vendor_address,
+        "work_order_signed": s_work_order,
+        "reporting_details": reporting_details,
+    }
+
+
+def get_project_check_list(project):
+    msa, work_order = 0, 0
+
+    if project.attachments.filter(attachment_type='msa'):
+        msa = 1
+
+    if project.attachments.filter(attachment_type='work_order'):
+        work_order = 1
+
+    if project.attachments.filter(attachment_type='work_order_msa'):
+        msa, work_order = 1, 1
+
+    result = get_attachment_status(project)
+
+    return {
+        "total": 6,
+        "msa": msa,
+        "work_order": work_order,
+        "status": result["status"],
+        "msa_signed": result["msa_signed"],
+        "start_date": result["start_date"],
+        "client_address": result["client_address"],
+        "vendor_address": result["vendor_address"],
+        "work_order_signed": result["work_order_signed"],
+        "reporting_details": result["reporting_details"],
+    }
+
+
 class ProjectUtil:
     def __init__(self, project):
         self.project = project
