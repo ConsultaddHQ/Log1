@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from consultant.models import Consultant
-from utils_app.utils import get_project_check_list
+from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
