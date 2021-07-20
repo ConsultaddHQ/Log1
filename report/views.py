@@ -822,7 +822,9 @@ class MarketingReportViewSets(GenericViewSet):
             total = bench_consultant.count()
             for consultant in bench_consultant[first:last]:
                 marketing = consultant.marketing.filter(status='open').first()
-                preferred_location = marketing.preferred_location.replace('\r\n', ', ')
+                preferred_location = ''
+                if marketing.preferred_location:
+                    preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                 teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
                 recruiter = consultant.recruiter.employee_name if consultant.recruiter else None
                 submission_count = Submission.objects.filter(

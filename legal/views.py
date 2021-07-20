@@ -13,10 +13,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 
-
 from utils_app.mailing import send_email
 from employee.token import get_token_generator
-from attachment.views import presigned_post_url, get_s3_object
+from utils_app.aws_utils import presigned_post_url, get_s3_object
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from notification.utils import create_notification, push_notification
 from legal.models import Types, Petition, Reason, Document, DocumentList
@@ -36,7 +35,86 @@ class PetitionViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    def rejection_mail(self, beneficiary_name, petition, document):
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            petition = get_object_or_404(Petition, id=kwargs.get('pk'))
+            serializer = PetitionGetSerializer(petition)
+            return Response({"result": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+
+        try:
+            filter_for = request.GET.get('filter', 'all')
+            query = request.GET.get('query', None)
+            queryset = Petition.objects.filter(is_active=True)
+            if filter_for == 'my':
+                queryset = queryset.filter(
+                    Q(assigned_to=request.user)
+                )
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                queryset = queryset.filter(
+                    Q(assigned_to__employee_name=query) |
+                    Q(beneficiary__name__istartswith=query)
+                )
+            total = queryset.count()
+            serializer = self.serializer_class(queryset[first:last], many=True)
+            return Response({"results": serializer.data, "total": total}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            petition = Petition.objects.filter(beneficiary_id=request.data['consultant'])
+            if petition:
+                return Response({"error": "already exist"}, status=400)
+            petition = Petition.objects.create(
+                status='assigned',
+                created_by=request.user,
+                employer=request.data['employer'],
+                beneficiary_id=request.data['consultant'],
+                assigned_to_id=request.data['assigned_to'],
+                petition_type=request.data['petition_type'],
+                beneficiary_type=request.data['beneficiary_type'],
+            )
+            for i in Types.objects.exclude(category="Beneficiary Documents from the petitioner"):
+                DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=True)
+            for i in Types.objects.filter(category="Beneficiary Documents from the petitioner"):
+                DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
+
+            consultant = petition.beneficiary
+            consultant.pin = TOKEN_GENERATOR_CLASS.generate_token()
+            consultant.visa_petition = True
+            consultant.p_is_active = True
+            consultant.save()
+            serializer = self.serializer_class(petition)
+            return Response({"result": serializer.data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            petition = get_object_or_404(Petition, id=kwargs.get('pk'))
+            serializer = PetitionUpdateSerializer(petition, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            serializer = self.serializer_class(petition)
+            return Response({"result": serializer.data}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
+    @staticmethod
+    def rejection_mail(beneficiary_name, petition, document):
         try:
             to = ['sarang.m@consultadd.com']
             if os.environ.get('ENV') == 'prod':
@@ -181,8 +259,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
         try:
             document_id = request.GET.get('document_id')
             document = get_object_or_404(Document, id=document_id)
-            url = get_s3_object(document.file.name)
-            return Response({"result": url}, status=200)
+            response, error = get_s3_object(document.file.name)
+            if error:
+                return Response({"message": "Unable to fetch document", "error": response}, status=400)
+            return Response({"result": response}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -193,89 +273,13 @@ class PetitionViewSets(viewsets.ModelViewSet):
             file_name = request.data['file_name']
             object_id = request.data['object_id']
             object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
-            response = presigned_post_url(object_name=object_name)
+            response, error = presigned_post_url(object_name=object_name)
+            if error:
+                return Response({"message": "Unable to upload recording", "error": response}, status=400)
             return Response({"result": response}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
-
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            petition = get_object_or_404(Petition, id=kwargs.get('pk'))
-            serializer = PetitionGetSerializer(petition)
-            return Response({"result": serializer.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    def list(self, request, *args, **kwargs):
-        first, last = get_page_limits(request)
-
-        try:
-            filter_for = request.GET.get('filter', 'all')
-            query = request.GET.get('query', None)
-            queryset = Petition.objects.filter(is_active=True)
-            if filter_for == 'my':
-                queryset = queryset.filter(
-                    Q(assigned_to=request.user)
-                )
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                queryset = queryset.filter(
-                    Q(assigned_to__employee_name=query) |
-                    Q(beneficiary__name__istartswith=query)
-                )
-            total = queryset.count()
-            serializer = self.serializer_class(queryset[first:last], many=True)
-            return Response({"results": serializer.data, "total": total}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    def create(self, request, *args, **kwargs):
-        try:
-            petition = Petition.objects.filter(beneficiary_id=request.data['consultant'])
-            if petition:
-                return Response({"error": "already exist"}, status=400)
-            petition = Petition.objects.create(
-                status='assigned',
-                created_by=request.user,
-                employer=request.data['employer'],
-                beneficiary_id=request.data['consultant'],
-                assigned_to_id=request.data['assigned_to'],
-                petition_type=request.data['petition_type'],
-                beneficiary_type=request.data['beneficiary_type'],
-            )
-            for i in Types.objects.exclude(category="Beneficiary Documents from the petitioner"):
-                DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=True)
-            for i in Types.objects.filter(category="Beneficiary Documents from the petitioner"):
-                DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
-
-            consultant = petition.beneficiary
-            consultant.pin = TOKEN_GENERATOR_CLASS.generate_token()
-            consultant.visa_petition = True
-            consultant.p_is_active = True
-            consultant.save()
-            serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=201)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    def update(self, request, *args, **kwargs):
-        try:
-            petition = get_object_or_404(Petition, id=kwargs.get('pk'))
-            serializer = PetitionUpdateSerializer(petition, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=202)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    def partial_update(self, request, *args, **kwargs):
-        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='lca')
     def lca(self, request, *args, **kwargs):
@@ -481,6 +485,81 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
 
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = Petition.objects.filter(beneficiary=request.user, is_active=True)
+            if queryset:
+                petition = queryset.first()
+                serializer = self.serializer_class(petition.documents.all(), many=True)
+                return Response({"results": serializer.data}, status=200)
+            return Response({"error": "Petition not available"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            petition_id = request.data.get('petition')
+            file_type = request.data.get('file_type')
+            for file in request.FILES.getlist('file'):
+                Document.objects.create(
+                    file=file,
+                    creator=None,
+                    verified=None,
+                    doc_type_id=file_type,
+                    petition_id=petition_id,
+                )
+            documents = Document.objects.filter(petition=petition_id)
+            petition = get_object_or_404(Petition, id=petition_id)
+
+            doc_type = Types.objects.filter(id=file_type).first()
+            if doc_type:
+                title = f"{doc_type.display_name} uploaded by {petition.beneficiary.name}({petition.beneficiary.email})"
+                data = {
+                    "title": title,
+                    "category": "alert",
+                    "description": title,
+                    "target_type": "petition",
+                    "target_id": request.user.id,
+                    "sender_id": request.user.id,
+                    "recipient_user_type": "user",
+                    "sender_user_type": "consultant",
+                }
+                create_notification([petition.assigned_to], data)
+
+                # Push Notification
+                message_body = {
+                    "body": title,
+                    "title": title,
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "https://log1.app",
+                    "data": {
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target': 'petition',
+                        'target_id': petition_id,
+                        'timestamp': str(timezone.now()),
+                    },
+                }
+                push_notification([petition.assigned_to.id], message_body)
+
+            serializer = self.serializer_class(documents, many=True)
+            return Response({"result": serializer.data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            document_id = kwargs.get('pk')
+            document = get_object_or_404(Document, id=document_id, verified=False)
+            document.delete()
+            return Response({"result": "File deleted"}, status=204)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
     @action(methods=['post'], detail=False, url_path='contact_us')
     def contact_us(self, request):
         try:
@@ -617,8 +696,10 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         try:
             document_id = request.GET.get('document_id')
             document = get_object_or_404(Document, id=document_id, petition__beneficiary=request.user)
-            url = get_s3_object(document.file.name)
-            return Response({"result": url}, status=200)
+            response, error = get_s3_object(document.file.name)
+            if error:
+                return Response({"message": "Unable to fetch document", "error": response}, status=400)
+            return Response({"result": response}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -629,83 +710,10 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             file_name = request.data['file_name']
             object_id = request.data['object_id']
             object_name = f'media/attachments/visa_petition/{object_id}/{file_name}'
-            response = presigned_post_url(object_name=object_name)
+            response, error = presigned_post_url(object_name=object_name)
+            if error:
+                return Response({"message": "Unable to upload recording", "error": response}, status=400)
             return Response({"result": response}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    def list(self, request, *args, **kwargs):
-        try:
-            queryset = Petition.objects.filter(beneficiary=request.user, is_active=True)
-            if queryset:
-                petition = queryset.first()
-                serializer = self.serializer_class(petition.documents.all(), many=True)
-                return Response({"results": serializer.data}, status=200)
-            return Response({"error": "Petition not available"}, status=400)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    def create(self, request, *args, **kwargs):
-        try:
-            petition_id = request.data.get('petition')
-            file_type = request.data.get('file_type')
-            for file in request.FILES.getlist('file'):
-                Document.objects.create(
-                    file=file,
-                    creator=None,
-                    verified=None,
-                    doc_type_id=file_type,
-                    petition_id=petition_id,
-                )
-            documents = Document.objects.filter(petition=petition_id)
-            petition = get_object_or_404(Petition, id=petition_id)
-
-            doc_type = Types.objects.filter(id=file_type).first()
-            if doc_type:
-                title = f"{doc_type.display_name} uploaded by {petition.beneficiary.name}({petition.beneficiary.email})"
-                data = {
-                    "title": title,
-                    "category": "alert",
-                    "description": title,
-                    "target_type": "petition",
-                    "target_id": request.user.id,
-                    "sender_id": request.user.id,
-                    "recipient_user_type": "user",
-                    "sender_user_type": "consultant",
-                }
-                create_notification([petition.assigned_to], data)
-
-                # Push Notification
-                message_body = {
-                    "body": title,
-                    "title": title,
-                    "category": "alert",
-                    "show_in_foreground": True,
-                    "click_action": "https://log1.app",
-                    "data": {
-                        'is_read': False,
-                        'is_deleted': False,
-                        'target': 'petition',
-                        'target_id': petition_id,
-                        'timestamp': str(timezone.now()),
-                    },
-                }
-                push_notification([petition.assigned_to.id], message_body)
-
-            serializer = self.serializer_class(documents, many=True)
-            return Response({"result": serializer.data}, status=201)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    def destroy(self, request, *args, **kwargs):
-        try:
-            document_id = kwargs.get('pk')
-            document = get_object_or_404(Document, id=document_id, verified=False)
-            document.delete()
-            return Response({"result": "File deleted"}, status=204)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)

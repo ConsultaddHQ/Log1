@@ -1010,7 +1010,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             consultant_marketing = ConsultantMarketing.objects.create(
                 cycle=cycle,
                 status='close',
-                rtg=request.data.get('rtg'),
+                rtg=request.data.get('rtg', False),
                 in_pool=request.data.get('in_pool'),
                 start=request.data.get('marketing_start'),
                 consultant_id=request.data.get('consultant'),

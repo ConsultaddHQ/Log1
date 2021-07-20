@@ -1,6 +1,5 @@
 import os
 import json
-import boto3
 from django.utils import timezone
 from datetime import date, datetime, timedelta
 from django.core.files.base import ContentFile
@@ -13,6 +12,7 @@ from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
+from utils_app.aws_utils import download_s3_object_beats
 from notification.utils import create_notification, push_notification
 from log1.utils import post_msg_using_webhook, html_to_text, write_exception, write_info
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
@@ -33,40 +33,25 @@ def create_activity(object_id, model, user, desc, activity_type):
         return None
 
 
-def download_s3_object_beats(key, name):
-    try:
-        local_path = f'media/beats/{name}'
-        s3 = boto3.client(
-            's3', region_name=os.getenv('AWS_REGION_NAME'),
-            aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-        )
-        s3.download_file(os.getenv('AWS_BEATS_BUCKET'), key, local_path)
-        return True, local_path
-    except Exception as error:
-        write_exception(message=error)
-        return False, error
-
-
 def beats_to_log1(file_path, file_name, obj_id, model):
     try:
         content_type = ContentType.objects.get(model=model)
         creator = User.objects.get(employee_id=1000)
-        msg, path = download_s3_object_beats(file_path, file_name)
-        if not msg:
-            return False, path
-        if not os.path.exists(path):
+        response, error = download_s3_object_beats(file_path, file_name)
+        if error:
+            return False, response
+        if not os.path.exists(response):
             return False, "File not found"
-        local_file = open(path, 'rb')
+        local_file = open(response, 'rb')
         file = ContentFile(local_file.read())
         attachment = Attachment.objects.create(
             creator=creator, attachment_type='other',
             object_id=obj_id, content_type_id=content_type.id,
         )
-        attachment.attachment_file.save(path, file, save=True)
+        attachment.attachment_file.save(response, file, save=True)
         attachment.save()
-        os.remove(path)
-        return True, path
+        os.remove(response)
+        return True, response
     except Exception as error:
         write_exception(message=error)
         return False, error
@@ -328,7 +313,8 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
             marketers = marketing.marketer.all()
             for marketer in marketers:
                 user_list.append(marketer)
-            user_list.append(marketing.primary_marketer)
+            if marketing.primary_marketer:
+                user_list.append(marketing.primary_marketer)
         notification_data = {
             'category': 'info', 'sender_id': sender.id,
             'description': title, 'recipient_user_type': 'user',
