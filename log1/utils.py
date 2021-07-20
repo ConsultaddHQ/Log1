@@ -34,7 +34,7 @@ def log_request(request):
 
     query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
     query_params = query_params if query_params else ''
-    if 'name' in request.user:
+    if hasattr(request.user, "name"):
         logger.error(f"User : {request.user.id} :: {request.user.name}")
     else:
         logger.error(f"User : {request.user.id} :: {request.user.employee_name}")

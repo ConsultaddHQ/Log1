@@ -21,17 +21,17 @@ from marketing.utils import date_filter
 from utils_app.models import ObjectGroup
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
+from utils_app.utils import delete_temp_file
 from marketing.models import Submission, User
 from attachment.models import create_attachment
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
-from utils_app.utils import get_attachment_status, delete_temp_file
 from utils_app.mailing import send_email_attachment_multiple, send_email
 from log1.utils import ERROR_MSG, get_time_filter, get_page_limits, write_exception
-from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password
 from notification.utils import create_notification, push_notification, push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
+from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
@@ -347,7 +347,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
-        version = request.GET.get('version', 'v1')
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', None)
         filter_json = request.GET.get('filter_json', None)
@@ -449,7 +448,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 'not_joined': data["not_joined"].count(),
             }
 
-            if version == 'v2' and filter_json:
+            if filter_json:
                 # count of project by status
                 if sort_by in ['created', 'modified']:
                     order_by = f"-{sort_by}"

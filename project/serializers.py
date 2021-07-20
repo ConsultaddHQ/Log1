@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from consultant.models import Consultant
 from employee.serializers import UserSerializer
-from utils_app.utils import get_project_check_list
+from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule

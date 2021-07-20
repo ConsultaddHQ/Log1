@@ -276,7 +276,6 @@ class LeadViewSets(viewsets.ModelViewSet):
 
                 data = self.get_data(queryset)
                 return Response({"data": data[0], "message": "Requirement updated"}, status=202)
-            write_exception(serializer.errors, request)
             return Response({"message": "Data is invalid", "error": serializer.errors}, status=400)
         except Exception as error:
             write_exception(error, request)
@@ -1214,10 +1213,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
         # Change status of past Screening to feedback due
         change_to_feedback_due()
         try:
-            status_change = request.GET.get('status_change', 'true')
             reschedule = request.GET.get('reschedule', None)
-
             interview_status = request.data.get('status', None)
+            status_change = request.GET.get('status_change', 'true')
+
             if interview_status and len(interview_status) == 0:
                 return Response({"message": "Invalid value of status, Please select status"}, status=400)
 
@@ -1242,7 +1241,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     submission.status = 'in_offer'
                 submission.save()
 
-                booking_res = 'Development Server'
+                booking_res = 'Interview or Status Updated'
                 user_list, _ = get_users_and_attendees(request, interview)
                 title = get_interview_title(interview)
 
@@ -1266,8 +1265,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.interview_feedback_url, data)
 
+                desc = f"Round {interview.round} is updated"
                 if status_change == 'false':
-                    desc = f"Round {interview.round} is updated"
+                    desc = f"Round {interview.round} status is updated"
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
                         interview.save()
@@ -1281,48 +1281,55 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             }
                             post_msg_using_webhook(config.announcement_url, data)
 
-                    create_activity(submission.id, 'submission', request.user, desc, 'updated')
+                        _, attendees = get_users_and_attendees(request, interview)
 
-                    _, attendees = get_users_and_attendees(request, interview)
+                        if interview.status not in ['offer', 'failed', 'next_round']:
+                            start = serializer.data["start_time"].replace("Z", "")
+                            end = serializer.data["end_time"].replace("Z", "")
+                            event = {
+                                "end": end,
+                                "start": start,
+                                "summary": title,
+                                "user": request.user,
+                                "attendees": attendees,
+                                "lead": submission.lead,
+                                "submission": submission,
+                                "consultant": submission.consultant,
+                                "description": request.data["description"],
+                                "call_details": request.data["call_details"]
+                            }
 
-                    if interview.status not in ['offer', 'failed', 'next_round']:
-                        start = serializer.data["start_time"].replace("Z", "")
-                        end = serializer.data["end_time"].replace("Z", "")
-                        event = {
-                            "end": end,
-                            "start": start,
-                            "summary": title,
-                            "user": request.user,
-                            "attendees": attendees,
-                            "lead": submission.lead,
-                            "submission": submission,
-                            "consultant": submission.consultant,
-                            "description": request.data["description"],
-                            "call_details": request.data["call_details"]
-                        }
+                            # Updating calendar Booking
+                            booking_res = 'Development Server'
+                            if os.environ.get('ENV', 'local') == 'prod':
+                                calendar_id = interview.calendar_id
+                                if not calendar_id:
+                                    res, msg = book_ms_calendar(event)
+                                    if msg == 'error':
+                                        return Response({"message": "Calendar booking failed", "error": res},
+                                                        status=400)
+                                    interview.calendar_id = res['id']
+                                    booking_res = 'booked'
+                                    interview.save()
+                                else:
+                                    try:
+                                        res, msg = update_ms_calendar(calendar_id, event)
+                                        booking_res = 'updated'
+                                        if msg == 'booked':
+                                            interview.calendar_id = res['id']
+                                            booking_res = 'booked'
+                                            interview.save()
+                                        if msg == "error":
+                                            return Response({"message": "Calendar update failed", "error": res},
+                                                            status=400)
+                                    except Exception as error:
+                                        write_exception(f"Booking update failed: {error}", request)
+                                        return Response(
+                                            {"message": "Calendar booking update failed", "error": str(error)},
+                                            status=400
+                                        )
 
-                        # Updating calendar Booking
-                        if os.environ.get('ENV', 'local') == 'prod':
-                            event_id = interview.calendar_id
-                            if not event_id:
-                                res, msg = book_ms_calendar(event)
-                                if msg == 'error':
-                                    return Response({"message": "Calendar booking failed", "error": res}, status=400)
-                                interview.calendar_id = res['id']
-                                booking_res = 'booked'
-                                interview.save()
-                            else:
-                                try:
-                                    res, msg = update_ms_calendar(event_id, event)
-                                    if msg == "error":
-                                        return Response({"message": "Calendar update failed", "error": res}, status=400)
-                                    booking_res = 'updated'
-                                except Exception as error:
-                                    write_exception(f"Booking update failed: {error}", request)
-                                    return Response(
-                                        {"message": "Calendar booking update failed", "error": str(error)}, status=400
-                                    )
-
+                create_activity(submission.id, 'submission', request.user, desc, 'updated')
                 data = queryset.annotate(
                     client=F('submission__client'),
                     project=F('submission__project'),
@@ -1345,7 +1352,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 return Response(
                     {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
                 )
-            write_exception(serializer.errors, request)
             return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
             write_exception(error, request)
@@ -1466,9 +1472,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     else:
                         try:
                             res, msg = update_ms_calendar(calendar_id, event)
+                            booking_res = 'updated'
+                            if msg == 'booked':
+                                interview.calendar_id = res['id']
+                                booking_res = 'booked'
+                                interview.save()
                             if msg == 'error':
                                 return Response({"message": "Calendar reschedule failed", "error": res}, status=400)
-                            booking_res = 'updated'
                         except Exception as error:
                             return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
 

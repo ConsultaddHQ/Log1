@@ -10,8 +10,8 @@ from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyM
 
 from project.models import Project
 from activity.views import create_activity
+from project.utils import get_project_check_list
 from log1.utils import write_exception, ERROR_MSG
-from utils_app.utils import get_project_check_list
 from utils_app.aws_utils import get_s3_object, presigned_post_url
 from attachment.serializers import Attachment, AttachmentSerializer
 
