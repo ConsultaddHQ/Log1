@@ -63,9 +63,16 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             name = request.data.get('name', None)
             if name:
                 name = name.strip().replace(':amp:', '&')
-                queryset = VendorCompany.objects.filter(name__iexact=name)
-                if queryset:
-                    return Response({"data": "Company already exist"}, status=400)
+                queryset = VendorCompany.objects.filter(name__icontains=name)
+                name = name.strip().replace(':amp:', '&').replace(' ', '').lower()
+                for v in queryset:
+                    vendor = v.name.strip().replace(' ', '').lower()
+                    if name == vendor:
+                        return Response({"data": "Company already exist"}, status=400)
+                    if name + 's' == vendor:
+                        return Response({"data": "Company name already exist with s at the end"}, status=400)
+                    if name == vendor + 's':
+                        return Response({"data": "Company name already exist without s at the end"}, status=400)
                 created_by = str(request.user.employee_id) + " - " + request.user.employee_name
                 company = VendorCompany.objects.create(name=request.data.get('name', None), created_by=created_by)
                 return Response({"data": VendorCompanySerializer(company).data}, status=201)
@@ -929,7 +936,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 'scheduled': queryset.filter(status='scheduled').count(),
                 'cancelled': queryset.filter(status='cancelled').count(),
                 'rescheduled': queryset.filter(status='rescheduled').count(),
-                'feedback_due': queryset.filter(status=' feedback_due').count(),
+                'feedback_due': queryset.filter(status='feedback_due').count(),
             }
 
             if filter_by_status:
