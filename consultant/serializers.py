@@ -105,6 +105,12 @@ class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
     current_city = serializers.SerializerMethodField()
     teams = TeamSerializer(many=True)
 
+    class Meta:
+        model = ConsultantMarketing
+        fields = ('id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
+                  'project_count', 'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count',
+                  'current_city')
+
     @staticmethod
     def get_primary_marketer(obj):
         return obj.primary_marketer.employee_name if obj.primary_marketer else None
@@ -130,13 +136,6 @@ class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):
         return Interview.objects.filter(
             submission__consultant_marketing=obj
         ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
-
-    class Meta:
-        model = ConsultantMarketing
-        fields = (
-            'id', 'cycle', 'teams', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location', 'project_count',
-            'primary_marketer', 'primary_marketer_team', 'submission_count', 'interview_count', 'current_city'
-        )
 
 
 class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
