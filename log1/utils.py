@@ -67,7 +67,7 @@ def get_page_limits(request):
         page_size = int(request.GET.get("page_size", 10))
         return page * page_size - page_size, page * page_size
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
         return 1, 10
 
 

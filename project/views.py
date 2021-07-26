@@ -394,7 +394,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     projects = projects.filter(
                         Q(submission__consultant_marketing__consultant_id__in=filters['consultant']) |
-                        Q(submission__consultant_id__in=filters['consultant'])
+                        Q(consultant_id__in=filters['consultant'])
                     )
 
                 created = filters.get('created', None)
