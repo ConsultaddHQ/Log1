@@ -120,9 +120,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV') == 'prod':
                 to = [petition.beneficiary.email]
             mail_data = {
-                'to': to,
-                'cc': [],
-                'bcc': [],
+                'to': to, 'cc': [], 'bcc': [],
                 'template': '../templates/rejection_email.html',
                 'subject': f'Your H1B process - Need correction in documents',
                 'context': {
@@ -231,9 +229,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV') == 'prod':
                 to = [beneficiary.email]
                 mail_data = {
-                    'to': to,
-                    'cc': [],
-                    'bcc': [],
+                    'to': to, 'cc': [], 'bcc': [],
                     'template': '../templates/doc_upload_request.html',
                     'subject': f'Your H1B process - Request for documents',
                     'context': {
@@ -569,9 +565,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             if os.environ.get('ENV') == 'prod':
                 to = [petition.assigned_to.email]
             mail_data = {
-                'to': to,
-                'cc': [],
-                'bcc': [],
+                'to': to, 'cc': [], 'bcc': [],
                 'template': '../templates/petition_contact_us.html',
                 'subject': f'Petition app issue from {request.user.name} :: {str(datetime.now())}',
                 'context': {

@@ -15,8 +15,8 @@ from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 from twilio.rest import Client
 from employee.models import Asset
 from api_key.permissions import APIKey
-from log1.utils import write_exception, ERROR_MSG
 from messaging.models import Message, Conversation
+from log1.utils import write_exception, ERROR_MSG, write_info
 from notification.utils import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
 
@@ -109,7 +109,7 @@ class ReceiveSMSViewSet(GenericViewSet):
                 if user1:
                     user1 = user1.first()
                 else:
-                    write_exception(message=f"Asset not found to: {to}")
+                    write_info(message=f"Asset not found to: {to}", function='receive_sms')
                     return HttpResponse(status=400)
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
                 Message.objects.create(text=body, read=False, is_sent=False, conversation_id=conversation.id)
@@ -153,8 +153,8 @@ class ReceiveSMSViewSet(GenericViewSet):
 
                 return HttpResponse(status=201)
             else:
-                write_exception(message="Invalid User")
+                write_info(message="Invalid User", function='receive_sms')
                 return HttpResponse(status=401)
         except Exception as error:
-            write_exception(message=error)
+            write_info(message=error, function='receive_sms')
             return HttpResponse(status=400)
