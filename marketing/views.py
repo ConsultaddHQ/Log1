@@ -557,7 +557,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if sort_by in ['created', 'modified']:
                 order_by = f"-{sort_by}"
             else:
-                order_by = "-modified"
+                order_by = "-created"
 
             queryset = Submission.objects.filter(id__in=queryset.values('id')).order_by(order_by)
             data = queryset[first:last].annotate(
@@ -584,6 +584,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
         filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
+            team = request.user.team
             roles = request.user.roles
             queryset = Submission.objects.exclude(status='draft')
             if query:
@@ -602,9 +603,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:
+                consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
                 queryset = queryset.filter(
-                    Q(created_by__team=request.user.team) |
-                    Q(consultant_marketing__teams=request.user.team) |
+                    Q(created_by__team=team) |
+                    Q(consultant_marketing__teams=team) |
+                    Q(consultant_marketing__consultant__in=consultant_ids) |
                     Q(consultant_marketing__consultant__pocs__poc=request.user,
                       consultant_marketing__consultant__pocs__poc_type='recruiter') |
                     Q(consultant_marketing__in_pool=True, consultant_marketing__status='open')
@@ -612,8 +615,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
+                consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
                 if 'recruiter' in roles or 'retention_manager' in roles:
-                    consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
                     queryset = queryset.filter(
                         Q(created_by=request.user) |
                         Q(consultant_marketing__in_pool=True) |
@@ -621,7 +624,6 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                         Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
                     )
                 else:
-                    consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
                     queryset = queryset.filter(
                         Q(created_by=request.user) |
                         Q(consultant_marketing__consultant__in=consultant_ids) |
@@ -631,7 +633,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
             elif filter_for == 'team':
-                queryset = queryset.filter(created_by__team=request.user.team)
+                queryset = queryset.filter(created_by__team=team)
 
             if filter_json:
                 filter_by_status = list()
@@ -997,12 +999,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
             change_to_feedback_due()
             user_id = request.user.id
             roles = request.user.roles
+            team = request.user.team
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 queryset = Interview.objects.filter(
                     Q(submission__client__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__email__iexact=query) |
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
@@ -1017,25 +1020,28 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     queryset = queryset.filter(submission__created_by_id=user_id)
 
             elif filter_for == 'team':
-                queryset = queryset.filter(submission__created_by__team=request.user.team)
+                queryset = queryset.filter(submission__created_by__team=team)
 
             # Interview List for Scrum Master and Proxy Scrum Master (team interviews) and marketer
             if 'admin' in roles or 'proxy' in roles:
+                consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
                 queryset = queryset.filter(
                     Q(supervisor_id=user_id) |
                     Q(submission__created_by_id=user_id) |
                     Q(submission__consultant_marketing__in_pool=True) |
-                    Q(submission__consultant_marketing__teams=request.user.team,
-                      submission__consultant_marketing__in_pool=False)
+                    Q(submission__consultant_marketing__consultant__in=consultant_ids) |
+                    Q(submission__consultant_marketing__teams=team, submission__consultant_marketing__in_pool=False)
                 )
 
             elif 'marketer' in roles:
+                consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
                 if 'recruiter' in roles or 'retention_manager' in roles:
                     queryset = queryset.filter(
                         Q(supervisor_id=user_id) |
                         Q(submission__created_by_id=user_id) |
                         Q(submission__consultant_marketing__in_pool=True) |
                         Q(submission__consultant_marketing__marketer__id=user_id) |
+                        Q(submission__consultant_marketing__consultant__in=consultant_ids) |
                         Q(submission__consultant_marketing__consultant__pocs__poc_id=user_id,
                           submission__consultant_marketing__status='open')
                     )
@@ -1045,7 +1051,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         Q(supervisor_id=user_id) |
                         Q(submission__created_by_id=user_id) |
                         Q(submission__consultant_marketing__in_pool=True) |
-                        Q(submission__consultant_marketing__marketer__id=user_id)
+                        Q(submission__consultant_marketing__marketer__id=user_id) |
+                        Q(submission__consultant_marketing__consultant__in=consultant_ids)
                     )
 
             elif 'superadmin' in roles:

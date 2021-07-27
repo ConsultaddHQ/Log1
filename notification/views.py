@@ -28,12 +28,15 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
 
     def create(self, request, *args, **kwargs):
         try:
+            fcm_token = request.data.get('fcm_token', None)
+            if not fcm_token:
+                return Response({"message": "Token not found"}, status=400)
             content_type = ContentType.objects.get(model='user')
             FCMDevice.objects.get_or_create(
                 type='web',
+                device_id=fcm_token,
                 object_id=request.user.id,
                 content_type=content_type,
-                device_id=request.data.get('fcm_token')
             )
             return Response({"message": "Token Created"}, status=201)
         except Exception as error:

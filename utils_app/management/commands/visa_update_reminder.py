@@ -18,6 +18,7 @@ class Command(BaseCommand):
             thirty_days = date.today() + timedelta(days=30)
             fifteen_days = date.today() + timedelta(days=15)
             consultants = Consultant.objects.filter(status='on_bench')
+            mail_error = []
             for consultant in consultants:
                 marketers = []
                 queryset = consultant.marketing.filter(status='open')
@@ -34,8 +35,12 @@ class Command(BaseCommand):
                             'to': [config.RECRUITMENT, config.RELATIONS],
                             'subject': f"Reminder: Visa is expiring: {consultant.name}",
                             'body': f"{consultant.name} {visa.get_visa_type_display()} is expiring on {expiry_date} "
-                                    f"Update the work authorisation on log1."
+                                    f"Please Update the work authorisation on log1."
                         }
-                        send_email_without_template(mail_data, "Log1")
+                        res, ok = send_email_without_template(mail_data, "log1@consultadd.com")
+                        if not ok:
+                            mail_error.append((consultant.id, res))
+            if len(mail_error) > 0:
+                create_cron_error(job, mail_error)
         except Exception as error:
             create_cron_error(job, error)
