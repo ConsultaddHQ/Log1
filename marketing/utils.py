@@ -10,7 +10,7 @@ from marketing.models import Submission, Interview
 
 
 def vendor_account_manager(vendor_company):
-    file = open('am_config.json', 'r')
+    file = open('fixtures/am_config.json', 'r')
     data = json.loads(file.read())
     vendor_company = vendor_company.replace(" ", "").replace(",", "").replace("-", "").replace("_", "").lower()
     for email, vendors in data.items():
@@ -34,7 +34,7 @@ def get_users_and_attendees(request, interview):
 
     email = vendor_account_manager(interview.submission.lead.vendor_company.name)
     if email:
-        attendees.append(email)
+        attendees.append({"email": email})
 
     return user_list, attendees
 
