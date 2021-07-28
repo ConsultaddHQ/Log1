@@ -109,6 +109,10 @@ class ProjectUtil:
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
         if project.end_date:
             self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        if self.project.employer:
+            self.employer = self.project.employer
+        else:
+            self.employer = self.project.submission.employer
 
     @staticmethod
     def fetch_project_status():
@@ -156,7 +160,7 @@ class ProjectUtil:
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
-                employer__iexact=self.project.employer,
+                employer__iexact=self.employer,
             ).count()
 
             if self.project.is_remote or self.project.submission.lead.is_w2:
@@ -175,19 +179,18 @@ class ProjectUtil:
         try:
             emojis = self.fetch_emojis()
             total, team, con_str = self.fetch_project_count("joined", emojis['consultant_gender'])
-
             data = {
                 "title": "Project Joined  &#129304;&#128516;&#129304;",
                 "text": f"""{con_str}<br>
                 {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
                 {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                {emojis['employer']} Employer :  {self.project.employer}<br>
+                {emojis['employer']} Employer :  {self.employer}<br>
                 {emojis['employer']} Team :  {self.project.submission.created_by.team.name}<br>
                 🇺🇸 Location :  {self.project.city}<br>
                 {emojis['client']} Client :  {self.project.submission.client}<br>
                 {emojis['role']} Role :  {self.project.submission.lead.job_title}<br>
                 &#128221; Joining Date :  {self.project_start}<br><br>
-                Project Joined count of {self.project.employer} for this month - {team}<br>
+                Project Joined count of {self.employer} for this month - {team}<br>
                 Total Project Joined count of this month - {total}"""
             }
             # Sending message on Messaging Tool
@@ -216,13 +219,13 @@ class ProjectUtil:
                 "text": f"""{con_str} <br>
                     {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
                     {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                    {emojis['employer']} Employer :  {self.project.employer}<br>
+                    {emojis['employer']} Employer :  {self.employer}<br>
                     {emojis['employer']} Team :  {self.project.submission.created_by.team.name}<br>
                     {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul> 🇺🇸 Location :  {self.project.city}
                     <br> {emojis['client']} Client :  {self.project.submission.client}
                     <br> {emojis['role']} Role :  {self.project.submission.lead.job_title}
                     <br> &#128221; Start Date :  {self.project_start}
-                    <br> <br> Offer count of {self.project.employer} for this month - {team}
+                    <br> <br> Offer count of {self.employer} for this month - {team}
                     <br> Total offer count of this month - {total}"""
             }
             # Sending message on Messaging Tool
@@ -240,7 +243,7 @@ class ProjectUtil:
             text = f"""{emojis['consultant_gender']} Consultant :  **{self.consultant}** <br>
                 {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
                 {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                {emojis['employer']} Employer :  {self.project.employer} <br>
+                {emojis['employer']} Employer :  {self.employer} <br>
                 {emojis['employer']} Team :  {self.project.submission.created_by.team.name} <br>
                 {emojis['client']} Client :  {self.project.submission.client} <br>
                 {emojis['role']} Role :  {self.project.submission.lead.job_title} <br>
@@ -268,7 +271,7 @@ class ProjectUtil:
             text = f"""{emojis['consultant_gender']} Consultant :  **{self.consultant}** <br>
                 {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
                 {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                {emojis['employer']} Employer :  {self.project.employer}<br>
+                {emojis['employer']} Employer :  {self.employer}<br>
                 {emojis['employer']} Team :  {self.project.submission.created_by.team.name}<br>
                  🇺🇸 Location :  {self.project.city}<br>
                 {emojis['client']} Client :  {self.project.submission.client}<br>
