@@ -173,7 +173,7 @@ class LeadViewSets(viewsets.ModelViewSet):
 
     @staticmethod
     def get_data(queryset, first=None, last=None):
-        if first:
+        if first is not None:
             queryset = queryset[first:last]
 
         return queryset.annotate(
@@ -1366,7 +1366,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 return Response(
                     {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
                 )
-            return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(serializer.errors)}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

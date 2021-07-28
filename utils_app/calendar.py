@@ -156,7 +156,7 @@ def book_ms_calendar(data):
         data = json.loads(response.text.encode('utf-8'))
         if response.status_code == 201:
             return data, "ok"
-        return data, "error"
+        return str(data), "error"
     except Exception as error:
         write_exception(message=error)
         return str(error), "error"
@@ -206,8 +206,8 @@ def update_ms_calendar(event_id, data):
             response_data, msg = book_ms_calendar(data)
             if msg == 'ok':
                 return response_data, "booked"
-            return response_data, "error"
-        return data, "error"
+            return str(response_data), "error"
+        return str(data), "error"
     except Exception as error:
         write_exception(message=error)
         return str(error), "error"
