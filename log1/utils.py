@@ -8,6 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 from logging.config import dictConfig
+from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +35,11 @@ def log_request(request):
 
     query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
     query_params = query_params if query_params else ''
-    if hasattr(request.user, "name"):
-        logger.error(f"User : {request.user.id} :: {request.user.name}")
-    else:
-        logger.error(f"User : {request.user.id} :: {request.user.employee_name}")
+    if type(request.user) is not AnonymousUser:
+        if hasattr(request.user, "name"):
+            logger.error(f"User : {request.user.id} :: {request.user.name}")
+        else:
+            logger.error(f"User : {request.user.id} :: {request.user.employee_name}")
     logger.error(f"[{method}] : {address}{request_path}, Params: {query_params}, Data: {data}")
 
 

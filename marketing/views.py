@@ -679,12 +679,16 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             lead_id = request.data.get('lead', None)
 
             if not lead_id:
+                position_id = request.data.get('position', None)
+                if not position_id or position_id == 'null':
+                    return Response({"message": "Job Position is empty"}, status=400)
+
                 lead = Lead.objects.create(
                     owner=request.user,
+                    position_id=position_id,
                     city=request.data['city'],
                     job_desc=request.data['job_desc'],
                     job_title=request.data['job_title'],
-                    position_id=request.data['position'],
                     vendor_company_id=request.data['vendor_company'],
                     is_w2=True if request.data.get('is_w2', False) == 'true' else False,
                 )
