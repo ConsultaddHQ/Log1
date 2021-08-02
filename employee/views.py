@@ -22,7 +22,7 @@ from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
-from log1.utils import write_exception, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, \
     get_password_reset_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
@@ -61,7 +61,7 @@ class EmployeeAuthViewSets(GenericViewSet):
                 user.role.add(r)
             return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
         except Exception as error:
-            write_exception(error, request)
+            write_exception(message=error)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='login')
@@ -97,7 +97,7 @@ class EmployeeAuthViewSets(GenericViewSet):
                 return Response({"data": self.login_serializer_class(user).data}, status=202)
             return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
         except Exception as error:
-            write_exception(error, request)
+            write_exception(message=error)
             return Response({"message": "Unable to Login", "error": str(error)}, status=400)
 
 
@@ -304,7 +304,7 @@ class ResetPasswordViewSets(GenericViewSet):
                 if error == "ok":
                     return Response({"message": "Mail sent", "data": res}, status=200)
                 else:
-                    write_exception(res, request)
+                    write_info(message=res, function='token_request')
                     return Response({"message": "Something went wrong", "error": str(res)}, status=400)
             else:
                 return Response({"message": "User is not active"}, status=400)
@@ -312,31 +312,35 @@ class ResetPasswordViewSets(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
-        serializer = self.pass_serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        password = serializer.validated_data['password']
-        token = serializer.validated_data['token']
+        try:
+            serializer = self.pass_serializer_class(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            password = serializer.validated_data['password']
+            token = serializer.validated_data['token']
 
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+            password_reset_token_validation_time = get_password_reset_token_expiry_time()
 
-        reset_password_token = ResetPasswordToken.objects.filter(key=token).first()
+            reset_password_token = ResetPasswordToken.objects.filter(key=token).first()
 
-        if reset_password_token is None:
-            return Response({'message': 'Token not found'}, status=404)
+            if reset_password_token is None:
+                return Response({'message': 'Token not found'}, status=404)
 
-        expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
+            expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
 
-        if timezone.now() > expiry_date:
-            reset_password_token.delete()
-            return Response({'message': 'Token Expired'}, status=404)
+            if timezone.now() > expiry_date:
+                reset_password_token.delete()
+                return Response({'message': 'Token Expired'}, status=404)
 
-        reset_password_token.user.set_password(password)
-        reset_password_token.user.save()
+            reset_password_token.user.set_password(password)
+            reset_password_token.user.save()
 
-        # Delete all password reset tokens for this user
-        ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
+            # Delete all password reset tokens for this user
+            ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
 
-        return Response({'message': 'Password changed successfully'}, status=200)
+            return Response({'message': 'Password changed successfully'}, status=200)
+        except Exception as error:
+            write_exception(message=error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /assets/
@@ -349,9 +353,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
 
     def retrieve(self, request, *args, **kwargs):
-        asset_id = kwargs.get('pk')
         try:
-            asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
+            asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
             serializer = self.serializer_class(asset)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -402,9 +405,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
-        asset_id = kwargs.get('pk')
         try:
-            asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
+            asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
             password = asset.password
             alter_num = asset.alter_number
             serializer = self.serializer_class(asset, data=request.data, partial=True)
@@ -433,9 +435,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def destroy(self, request, *args, **kwargs):
-        asset_id = kwargs.get('pk')
         try:
-            asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
+            asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
             asset.is_deleted = True
             asset.save()
             desc = f"{request.user.employee_name.title()} deleted {asset.asset_type} asset"
@@ -476,11 +477,9 @@ class AssetsViewSets(viewsets.ModelViewSet):
 
     @action(methods=['put'], detail=True, url_path='un_share')
     def un_share(self, request, *args, **kwargs):
-        asset_id = kwargs.get('pk')
-        user_id = request.data.get('user')
         try:
-            asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
-            user = User.objects.get(id=user_id)
+            asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
+            user = User.objects.get(id=request.data.get('user'))
             asset.shared_to.remove(user)
             desc = f"{request.user.employee_name} Unshared {user.employee_name} from {asset.asset_type} asset"
             create_activity(asset.id, 'asset', request.user, desc, 'updated')

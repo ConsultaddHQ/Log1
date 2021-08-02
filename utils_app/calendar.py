@@ -1,128 +1,82 @@
 import os
 import json
 import requests
-import httplib2
-from googleapiclient.discovery import build
-from oauth2client.client import OAuth2Credentials
 
 from log1.utils import write_exception, write_info
 
 
-def create_ms_token():
-    tenant_id = os.environ.get('tenant_id')
-    client_id = os.environ.get('client_id')
-    client_secret = os.environ.get('client_secret')
-    scope = 'https%3A//graph.microsoft.com/.default'
+class Calendar:
+    def __init__(self):
+        self.headers = self.get_ms_header()
 
-    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-    payload = f'client_id={client_id}&client_secret={client_secret}&scope={scope}&grant_type=client_credentials'
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    @staticmethod
+    def get_ms_header():
+        try:
+            tenant_id = os.environ.get('tenant_id')
+            client_id = os.environ.get('client_id')
+            client_secret = os.environ.get('client_secret')
+            scope = 'https%3A//graph.microsoft.com/.default'
 
-    response = requests.request("POST", url, headers=headers, data=payload)
+            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+            url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+            payload = f'client_id={client_id}&client_secret={client_secret}&scope={scope}&grant_type=client_credentials'
 
-    data = json.loads(response.text.encode('utf8'))
-    access_token = None
-    if response.status_code == 200:
-        access_token = data["access_token"]
-    return access_token
+            response = requests.request("POST", url, headers=headers, data=payload)
+            data = json.loads(response.text.encode('utf8'))
 
+            access_token = None
+            if response.status_code == 200:
+                access_token = data["access_token"]
 
-def calendar_con():
-    refresh_token = os.environ.get('REFRESH_TOKEN')
-    expires_in = 3599
-    token = os.environ.get('ACCESS_TOKEN')
-    credential = OAuth2Credentials(token, os.environ.get('CLIENT_ID'),
-                                   os.environ.get('CLIENT_SECRET'), refresh_token, expires_in,
-                                   'https://accounts.google.com/o/oauth2/token', "")
+            headers = {
+                "Authorization": "bearer " + access_token,
+                "Content-Type": "application/json"
+            }
+            return headers
+        except Exception as error:
+            write_exception(message=error)
+            return None
 
-    http = httplib2.Http()
-    credential.authorize(http)
-    service = build('calendar', 'v3', http=http)
-    return service
+    @staticmethod
+    def calendar_ms_description(data):
+        description = f'''
 
+        <div><Strong>Calling Details</Strong></div> 
+            {data["call_details"]} </br></br>
 
-def calendar_description(data):
-    description = f'''
-    <strong>Calling Details</strong>
-        {data["call_details"]}
+        <div><Strong>Marketer Name -</Strong> {data["user"].employee_name}</div> 
+        <div><Strong>Employer - </Strong>{data["submission"].employer}</div> </br>
 
-    <strong>Marketer Name - {data["user"].employee_name}</strong>
-    <strong>Employer - {data["submission"].employer}</strong>
+        <div><Strong>consultant Details:</Strong> </div>
 
-    <strong>consultant Details: </strong>
+           <Strong> Name -</Strong> {data["consultant"].name}  </br>
+           <Strong> DOB - </Strong>{data["submission"].date_of_birth}</br> 
+            <Strong>SSN -</Strong> {data["consultant"].ssn} </br>
+            <Strong>VISA - </Strong>{data["submission"].visa_type}</br> 
+            <Strong>Visa Start -</Strong> {data["submission"].visa_start}</br> 
+            <Strong>Visa End -</Strong>{data["submission"].visa_end}</br>
 
-        Name - {data["consultant"].name}
-        DOB - {data["submission"].date_of_birth}
-        SSN - {data["consultant"].ssn}
-        VISA - {data["submission"].visa_type}
-        Visa Start - {data["submission"].visa_start}
-        Visa End - {data["submission"].visa_end}
+           <Strong> Skype id </Strong>- {data["consultant"].skype}</br>
 
-        Skype id - {data["consultant"].skype}
+            <Strong>Education </Strong>- {data["submission"].education}</br></br>
 
-        Education - {data["submission"].education}
+        <div><Strong>Position Details:</Strong></div>
 
-    <strong>Position Details:</strong>
+           <Strong> Location - </Strong>{data["lead"].city}</br>
+           <Strong> Job Title - </Strong>{data["lead"].job_title}</br>
+           <Strong> Client Name - </Strong>{data["submission"].client}</br></br>
 
-        Location = {data["lead"].city}
-        Job Title - {data["lead"].job_title}
-        Client Name - {data["submission"].client}
+        <div><Strong>Extra details:</Strong> </div>
+            {data["description"]}</br></br>
 
-    <strong>Extra details:</strong> 
-        {data["description"]}
+        <div><Strong>Job Description:</Strong></div>
+            {data["lead"].job_desc}</br></br>
 
-    <strong>Job Description:</strong>
-        {data["lead"].job_desc}
+        '''
+        return description
 
-    '''
-    return description
-
-
-def calendar_ms_description(data):
-    description = f'''
-
-    <div><Strong>Calling Details</Strong></div> 
-        {data["call_details"]} </br></br>
-
-    <div><Strong>Marketer Name -</Strong> {data["user"].employee_name}</div> 
-    <div><Strong>Employer - </Strong>{data["submission"].employer}</div> </br>
-
-    <div><Strong>consultant Details:</Strong> </div>
-
-       <Strong> Name -</Strong> {data["consultant"].name}  </br>
-       <Strong> DOB - </Strong>{data["submission"].date_of_birth}</br> 
-        <Strong>SSN -</Strong> {data["consultant"].ssn} </br>
-        <Strong>VISA - </Strong>{data["submission"].visa_type}</br> 
-        <Strong>Visa Start -</Strong> {data["submission"].visa_start}</br> 
-        <Strong>Visa End -</Strong>{data["submission"].visa_end}</br>
-
-       <Strong> Skype id </Strong>- {data["consultant"].skype}</br>
-
-        <Strong>Education </Strong>- {data["submission"].education}</br></br>
-
-    <div><Strong>Position Details:</Strong></div>
-
-       <Strong> Location - </Strong>{data["lead"].city}</br>
-       <Strong> Job Title - </Strong>{data["lead"].job_title}</br>
-       <Strong> Client Name - </Strong>{data["submission"].client}</br></br>
-
-    <div><Strong>Extra details:</Strong> </div>
-        {data["description"]}</br></br>
-
-    <div><Strong>Job Description:</Strong></div>
-        {data["lead"].job_desc}</br></br>
-
-    '''
-    return description
-
-
-def book_ms_calendar(data):
-    try:
-        token = create_ms_token()
-        if not token:
-            return False, "error"
-
-        description = calendar_ms_description(data)
+    def get_ms_body(self, data):
+        description = self.calendar_ms_description(data)
         attendees = []
         for i in data['attendees']:
             attendees.append({
@@ -131,7 +85,7 @@ def book_ms_calendar(data):
                 },
             })
 
-        event = json.dumps({
+        return json.dumps({
             "Subject": data["summary"],
             "Body": {
                 "ContentType": "HTML",
@@ -147,222 +101,66 @@ def book_ms_calendar(data):
             },
             "Attendees": attendees
         })
-        headers = {
-            "Authorization": "bearer " + token,
-            "Content-Type": "application/json"
-        }
-        url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/"
-        response = requests.post(url, headers=headers, data=event)
-        data = json.loads(response.text.encode('utf-8'))
-        if response.status_code == 201:
-            return data, "ok"
-        return str(data), "error"
-    except Exception as error:
-        write_exception(message=error)
-        return str(error), "error"
 
+    def book_ms_calendar(self, data):
+        try:
+            headers = self.get_ms_header()
+            if not headers:
+                return False, "error"
+            event = self.get_ms_body(data)
 
-def update_ms_calendar(event_id, data):
-    try:
-        token = create_ms_token()
-        if not token:
-            return False, "error"
-
-        description = calendar_ms_description(data)
-        attendees = []
-        for i in data['attendees']:
-            attendees.append({
-                "EmailAddress": {
-                    "Address": i['email'],
-                },
-            })
-
-        event = json.dumps({
-            "Subject": data["summary"],
-            "Body": {
-                "ContentType": "HTML",
-                "Content": description
-            },
-            "Start": {
-                "DateTime": data["start"],
-                "TimeZone": "Eastern Standard Time"
-            },
-            "End": {
-                "DateTime": data["end"],
-                "TimeZone": "Eastern Standard Time"
-            },
-            "Attendees": attendees
-        })
-        headers = {
-            "Authorization": "bearer " + token,
-            "Content-Type": "application/json"
-        }
-        url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
-        response = requests.patch(url, headers=headers, data=event)
-        response_data = json.loads(response.text.encode('utf-8'))
-        if response.status_code == 200:
-            return response_data, "updated"
-        if response.status_code == 404:
-            response_data, msg = book_ms_calendar(data)
-            if msg == 'ok':
-                return response_data, "booked"
-            return str(response_data), "error"
-        return str(data), "error"
-    except Exception as error:
-        write_exception(message=error)
-        return str(error), "error"
-
-
-def delete_ms_calendar(event_id):
-    try:
-        token = create_ms_token()
-        if not token:
-            return False, "error"
-
-        headers = {
-            "Authorization": "bearer " + token,
-            "Content-Type": "application/json"
-        }
-        url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
-        response = requests.delete(url, headers=headers)
-        if response.status_code == 204:
-            return True, "ok"
-        return False, "error"
-    except Exception as error:
-        write_exception(message=error)
-        return str(error), "error"
-
-
-def get_user_id(email):
-    token = create_ms_token()
-    headers = {
-        "Authorization": "bearer " + token,
-        "Content-Type": "application/json"
-    }
-    url = f"https://graph.microsoft.com/v1.0/users/?$select=displayName,id&$filter=identities/any(c:c/issuerAssignedId eq '{email}')"
-    response = requests.get(url, headers=headers)
-    data = json.loads(response.text.encode('utf-8'))
-    return data
-
-
-def book_calendar(data):
-    service = calendar_con()
-    description = calendar_description(data)
-
-    event = {
-        'summary': data["summary"],
-
-        'description': description,
-
-        'start': {
-            'dateTime': data["start"],
-            'timeZone': 'America/New_York',
-        },
-
-        'end': {
-            'dateTime': data["end"],
-            'timeZone': 'America/New_York',
-        },
-
-        'recurrence': [
-            'RRULE:FREQ=DAILY;COUNT=1'
-        ],
-
-        'attendees': data["attendees"],
-
-        'reminders': {
-            'useDefault': False,
-            'overrides': [
-                {'method': 'email', 'minutes': 24 * 60},
-                {'method': 'popup', 'minutes': 10},
-            ],
-        },
-    }
-    event = service.events().insert(calendarId='admin@log1.com', body=event, sendUpdates='all').execute()
-    return event
-
-
-def update_calendar(event_id, data):
-    service = calendar_con()
-    description = calendar_description(data)
-    event = {
-        'summary': data["summary"],
-        'description': description,
-
-        'start': {
-            'dateTime': data["start"],
-            'timeZone': 'America/New_York',
-        },
-
-        'end': {
-            'dateTime': data["end"],
-            'timeZone': 'America/New_York',
-        },
-
-        'recurrence': [
-            'RRULE:FREQ=DAILY;COUNT=1'
-        ],
-
-        'attendees': data["attendees"],
-
-        'reminders': {
-            'useDefault': False,
-            'overrides': [
-                {'method': 'email', 'minutes': 24 * 60},
-                {'method': 'popup', 'minutes': 10},
-            ],
-        },
-    }
-    updated_event = service.events().update(calendarId='admin@log1.com', eventId=event_id, body=event,
-                                            sendUpdates='all').execute()
-    return updated_event['id']
-
-
-def get_interviews(data):
-    service = calendar_con()
-    page_token = None
-    calendar_data = []
-    time_min = data["start"] + '06:00:00-04:00'
-    time_max = data["end"] + '23:59:00-04:00'
-    while True:
-        events = service.events().list(calendarId=data["email"],
-                                       pageToken=page_token,
-                                       singleEvents=True,
-                                       orderBy="startTime",
-                                       timeMin=time_min,
-                                       timeMax=time_max
-                                       ).execute()
-        visibility = True
-        for event in events["items"]:
-            if "visibility" in event:
-                visibility = False
-                data = {
-                    "id": event["id"],
-                    "visibility": False,
-                    "updated": event["updated"],
-                    "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
-                    "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"]["date"],
-                }
+            url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/"
+            response = requests.post(url, headers=headers, data=event)
+            data = json.loads(response.text.encode('utf-8'))
+            if response.status_code == 201:
+                return data, "ok"
             else:
-                data = {
-                    "id": event["id"],
-                    "visibility": True,
-                    "created": event["created"],
-                    "updated": event["updated"],
-                    "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
-                    "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"]["date"],
-                    "title": event["summary"] if "summary" in event else "",
-                    "description": event["description"] if "description" in event else "",
-                    "attendees": [i["email"] for i in event["attendees"]] if "attendees" in event else [],
-                    "attachments": [{"fileUrl": i["fileUrl"], "title": i["title"]} for i in
-                                    event["attachments"]] if "attachments" in event else []
-                }
-            calendar_data.append(data)
-        page_token = events.get('nextPageToken')
-        if not page_token:
-            return calendar_data, visibility
+                write_info(message=data, function='book_ms_calendar')
+                return str(data), "error"
+        except Exception as error:
+            write_exception(message=error)
+            return str(error), "error"
 
+    def update_ms_calendar(self, event_id, data):
+        try:
+            headers = self.get_ms_header()
+            if not headers:
+                return False, "error"
 
-def delete_calendar_booking(event_id):
-    service = calendar_con()
-    service.events().delete(calendarId='admin@log1.com', eventId=event_id, sendUpdates='all').execute()
+            event = self.get_ms_body(data)
+            url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
+            response = requests.patch(url, headers=headers, data=event)
+            response_data = json.loads(response.text.encode('utf-8'))
+            if response.status_code == 200:
+                return response_data, "updated"
+            if response.status_code == 404:
+                response_data, msg = self.book_ms_calendar(data)
+                if msg == 'ok':
+                    return response_data, "booked"
+                else:
+                    write_info(message=response_data, function='update_ms_calendar')
+                    return str(response_data), "error"
+            else:
+                write_info(message=response_data, function='update_ms_calendar')
+                return str(response_data), "error"
+        except Exception as error:
+            write_exception(message=error)
+            return str(error), "error"
+
+    def delete_ms_calendar(self, event_id):
+        try:
+            headers = self.get_ms_header()
+            if not headers:
+                return False, "error"
+
+            url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
+            response = requests.delete(url, headers=headers)
+            if response.status_code == 204:
+                return True, "ok"
+            else:
+                response_data = json.loads(response.text.encode('utf-8'))
+                write_info(message=response_data, function='delete_ms_calendar')
+                return False, "error"
+        except Exception as error:
+            write_exception(message=error)
+            return str(error), "error"
