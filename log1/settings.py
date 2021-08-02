@@ -99,9 +99,9 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': os.environ.get('DB_NAME', ''),
         'USER': os.environ.get('DB_USER', ''),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'consultadd'),
+        'PORT': os.environ.get('DB_PORT', ''),
+        'HOST': os.environ.get('DB_HOST', ''),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
     }
 }
 
@@ -119,14 +119,14 @@ REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSc
 CORS_ORIGIN_ALLOW_ALL = True
 
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
     'uuid',
+    'accept',
     'origin',
     'user-agent',
     'x-csrftoken',
+    'content-type',
+    'authorization',
+    'accept-encoding',
     'x-requested-with',
 ]
 
@@ -226,7 +226,6 @@ NOTIFICATIONS_CHANNELS = {
 }
 
 # Constance Config
-
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([

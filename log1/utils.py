@@ -8,6 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 from logging.config import dictConfig
+from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +30,22 @@ def log_request(request):
     method = str(getattr(request, 'method', '')).upper()
     request_path = str(getattr(request, 'path', ''))
     data = ''
-    if method in ['POST', 'PUT']:
-        data = str(["%s: %s" % (k, v) for k, v in request.data.items()])
 
-    query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
-    query_params = query_params if query_params else ''
-    if hasattr(request.user, "name"):
-        logger.error(f"User : {request.user.id} :: {request.user.name}")
-    else:
-        logger.error(f"User : {request.user.id} :: {request.user.employee_name}")
-    logger.error(f"[{method}] : {address}{request_path}, Params: {query_params}, Data: {data}")
+    try:
+        if method in ['POST', 'PUT']:
+            data = str(["%s: %s" % (k, v) for k, v in request.data.items()])
+
+        query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
+        query_params = query_params if query_params else ''
+        if type(request.user) is not AnonymousUser:
+            if hasattr(request.user, "name"):
+                logger.error(f"User : {request.user.id} :: {request.user.name}")
+            else:
+                logger.error(f"User : {request.user.id} :: {request.user.employee_name}")
+        logger.error(f"[{method}] : {address}{request_path}, Params: {query_params}, Data: {data}")
+    except Exception as error:
+        logger.error(f"Log Request error: {error}")
+        logger.error(f"[{method}] : {address}{request_path}")
 
 
 def write_info(message, function, request=None):

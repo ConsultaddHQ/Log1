@@ -55,14 +55,11 @@ class Command(BaseCommand):
                     if expiry_date == fifteen_days or expiry_date == thirty_days:
                         data.append({'name': consultant.name.title(), 'end_date': expiry_date})
 
-            if consultants:
-                if os.environ.get('env', 'local') == 'prod':
-                    to = [config.SUPERADMIN, config.RECRUITMENT, config.RELATIONS]
-                else:
-                    to = ['sarang.m@consultadd.com']
+            if len(data) > 0:
                 mail_data = {
-                    'to': to, 'cc': [], 'bcc': [],
+                    'cc': [], 'bcc': ['sarang.m@consultadd.com'],
                     'template': '../templates/visa_reminder.html',
+                    'to': [config.SUPERADMIN, config.RECRUITMENT, config.RELATIONS],
                     'subject': f"Reminder: Visa expiry reminder of On-Project consultants",
                     'context': {'data': data}
                 }

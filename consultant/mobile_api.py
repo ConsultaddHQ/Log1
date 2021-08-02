@@ -241,7 +241,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 }
                 res, error = consultant.send_mail(mail_data)
                 if error == 'error':
-                    write_info(message=res, function='token_request', request=request)
+                    write_info(message=res, function='token_request')
                     return Response({'error': str(res)}, status=400)
         return Response({'status': 'OK'}, status=200)
 

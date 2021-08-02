@@ -1876,5 +1876,5 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
             else:
                 return Response({"message": str(data)}, status=400)
         except Exception as error:
-            write_exception(error, request)
+            write_exception(message=error)
             return Response({"message": str(error)}, status=400)

@@ -22,6 +22,7 @@ from constance import config
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
+from utils_app.calendar import Calendar
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
@@ -30,7 +31,6 @@ from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
-from utils_app.calendar import book_ms_calendar, update_ms_calendar, delete_ms_calendar
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
     date_filter, get_users_and_attendees
@@ -679,12 +679,16 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             lead_id = request.data.get('lead', None)
 
             if not lead_id:
+                position_id = request.data.get('position', None)
+                if not position_id or position_id == 'null':
+                    return Response({"message": "Job Position is empty"}, status=400)
+
                 lead = Lead.objects.create(
                     owner=request.user,
+                    position_id=position_id,
                     city=request.data['city'],
                     job_desc=request.data['job_desc'],
                     job_title=request.data['job_title'],
-                    position_id=request.data['position'],
                     vendor_company_id=request.data['vendor_company'],
                     is_w2=True if request.data.get('is_w2', False) == 'true' else False,
                 )
@@ -1170,7 +1174,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 booking_res = 'Development Server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     try:
-                        cal_res, msg = book_ms_calendar(event)
+                        calendar = Calendar()
+                        cal_res, msg = calendar.book_ms_calendar(event)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
@@ -1317,8 +1322,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             booking_res = 'Development Server'
                             if os.environ.get('ENV', 'local') == 'prod':
                                 calendar_id = interview.calendar_id
+                                calendar = Calendar()
                                 if not calendar_id:
-                                    res, msg = book_ms_calendar(event)
+                                    res, msg = calendar.book_ms_calendar(event)
                                     if msg == 'error':
                                         return Response({"message": "Calendar booking failed", "error": res},
                                                         status=400)
@@ -1327,7 +1333,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                     interview.save()
                                 else:
                                     try:
-                                        res, msg = update_ms_calendar(calendar_id, event)
+                                        res, msg = calendar.update_ms_calendar(calendar_id, event)
                                         booking_res = 'updated'
                                         if msg == 'booked':
                                             interview.calendar_id = res['id']
@@ -1381,7 +1387,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        delete_ms_calendar(interview.calendar_id)
+                        calendar = Calendar()
+                        calendar.delete_ms_calendar(interview.calendar_id)
                 except Exception as error:
                     write_exception(f"Booking deletion failed: {error}", request)
                     return Response({"data": "Calendar booking deletion failed", "error": str(error)}, status=400)
@@ -1472,9 +1479,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 # Updating calendar Booking
                 if os.environ.get('ENV', 'local') == 'prod':
                     calendar_id = interview.calendar_id
+                    calendar = Calendar()
                     if not calendar_id:
                         try:
-                            cal_res, msg = book_ms_calendar(event)
+                            cal_res, msg = calendar.book_ms_calendar(event)
                             if msg == "error":
                                 return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
@@ -1485,7 +1493,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                     else:
                         try:
-                            res, msg = update_ms_calendar(calendar_id, event)
+                            res, msg = calendar.update_ms_calendar(calendar_id, event)
                             booking_res = 'updated'
                             if msg == 'booked':
                                 interview.calendar_id = res['id']
@@ -1541,7 +1549,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        delete_ms_calendar(interview.calendar_id)
+                        calendar = Calendar()
+                        calendar.delete_ms_calendar(interview.calendar_id)
                 except Exception as error:
                     write_exception(f"Booking cancellation failed: {error}", request)
                     return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
