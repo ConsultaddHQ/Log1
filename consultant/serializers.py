@@ -93,7 +93,7 @@ class ConsultantMarketingSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantMarketing
         fields = ('id', 'teams', 'marketer', 'status', 'in_pool', 'rtg', 'start', 'end', 'preferred_location',
-                  'primary_marketer')
+                  'primary_marketer', 'previous_marketing_days')
 
 
 class ConsultantMarketingCycleSerializer(serializers.ModelSerializer):

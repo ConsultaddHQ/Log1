@@ -453,7 +453,7 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     def get_permission(self, obj):
         user = self.context.get('user')
         update = False
-        if user == obj.submission.created_by:
+        if user == obj.submission.created_by or 'finance' in user.roles:
             update = True
         return {'update': update}
 

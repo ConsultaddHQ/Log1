@@ -29,6 +29,7 @@ from utils_app.utils import delete_temp_file
 from activity.serializers import ActivitySerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
+from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
@@ -603,31 +604,32 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
             # Team submissions for Scrum master and Proxy Scrum Master
             if 'admin' in roles or 'proxy' in roles:
-                consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
+                consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
+                                 list(ConsultantMarketing.objects.filter(
+                                     in_pool=True, status='open').values_list('consultant_id'))
                 queryset = queryset.filter(
                     Q(created_by__team=team) |
                     Q(consultant_marketing__teams=team) |
                     Q(consultant_marketing__consultant__in=consultant_ids) |
                     Q(consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter') |
-                    Q(consultant_marketing__in_pool=True, consultant_marketing__status='open')
+                      consultant_marketing__consultant__pocs__poc_type='recruiter')
                 )
 
             # Submissions of a marketer and pool consultant submissions (except those are on project)
             elif 'marketer' in roles:
-                consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
+                consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id')) + \
+                                 list(ConsultantMarketing.objects.filter(
+                                     in_pool=True, status='open').values_list('consultant_id'))
                 if 'recruiter' in roles or 'retention_manager' in roles:
                     queryset = queryset.filter(
                         Q(created_by=request.user) |
-                        Q(consultant_marketing__in_pool=True) |
                         Q(consultant_marketing__consultant__in=consultant_ids) |
                         Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
                     )
                 else:
                     queryset = queryset.filter(
                         Q(created_by=request.user) |
-                        Q(consultant_marketing__consultant__in=consultant_ids) |
-                        Q(consultant_marketing__in_pool=True, consultant_marketing__status='open')
+                        Q(consultant_marketing__consultant__in=consultant_ids)
                     )
 
             if filter_for == 'my':
@@ -1300,54 +1302,53 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             }
                             post_msg_using_webhook(config.announcement_url, data)
 
+                    if interview.status not in ['offer', 'failed', 'next_round']:
                         _, attendees = get_users_and_attendees(request, interview)
+                        start = serializer.data["start_time"].replace("Z", "")
+                        end = serializer.data["end_time"].replace("Z", "")
+                        event = {
+                            "end": end,
+                            "start": start,
+                            "summary": title,
+                            "user": request.user,
+                            "attendees": attendees,
+                            "lead": submission.lead,
+                            "submission": submission,
+                            "consultant": submission.consultant,
+                            "description": request.data["description"],
+                            "call_details": request.data["call_details"]
+                        }
 
-                        if interview.status not in ['offer', 'failed', 'next_round']:
-                            start = serializer.data["start_time"].replace("Z", "")
-                            end = serializer.data["end_time"].replace("Z", "")
-                            event = {
-                                "end": end,
-                                "start": start,
-                                "summary": title,
-                                "user": request.user,
-                                "attendees": attendees,
-                                "lead": submission.lead,
-                                "submission": submission,
-                                "consultant": submission.consultant,
-                                "description": request.data["description"],
-                                "call_details": request.data["call_details"]
-                            }
-
-                            # Updating calendar Booking
-                            booking_res = 'Development Server'
-                            if os.environ.get('ENV', 'local') == 'prod':
-                                calendar_id = interview.calendar_id
-                                calendar = Calendar()
-                                if not calendar_id:
-                                    res, msg = calendar.book_ms_calendar(event)
-                                    if msg == 'error':
-                                        return Response({"message": "Calendar booking failed", "error": res},
+                        # Updating calendar Booking
+                        booking_res = 'Development Server'
+                        if os.environ.get('ENV', 'local') == 'prod':
+                            calendar_id = interview.calendar_id
+                            calendar = Calendar()
+                            if not calendar_id:
+                                res, msg = calendar.book_ms_calendar(event)
+                                if msg == 'error':
+                                    return Response({"message": "Calendar booking failed", "error": res},
+                                                    status=400)
+                                interview.calendar_id = res['id']
+                                booking_res = 'booked'
+                                interview.save()
+                            else:
+                                try:
+                                    res, msg = calendar.update_ms_calendar(calendar_id, event)
+                                    booking_res = 'updated'
+                                    if msg == 'booked':
+                                        interview.calendar_id = res['id']
+                                        booking_res = 'booked'
+                                        interview.save()
+                                    if msg == "error":
+                                        return Response({"message": "Calendar update failed", "error": res},
                                                         status=400)
-                                    interview.calendar_id = res['id']
-                                    booking_res = 'booked'
-                                    interview.save()
-                                else:
-                                    try:
-                                        res, msg = calendar.update_ms_calendar(calendar_id, event)
-                                        booking_res = 'updated'
-                                        if msg == 'booked':
-                                            interview.calendar_id = res['id']
-                                            booking_res = 'booked'
-                                            interview.save()
-                                        if msg == "error":
-                                            return Response({"message": "Calendar update failed", "error": res},
-                                                            status=400)
-                                    except Exception as error:
-                                        write_exception(f"Booking update failed: {error}", request)
-                                        return Response(
-                                            {"message": "Calendar booking update failed", "error": str(error)},
-                                            status=400
-                                        )
+                                except Exception as error:
+                                    write_exception(f"Booking update failed: {error}", request)
+                                    return Response(
+                                        {"message": "Calendar booking update failed", "error": str(error)},
+                                        status=400
+                                    )
 
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
                 data = queryset.annotate(

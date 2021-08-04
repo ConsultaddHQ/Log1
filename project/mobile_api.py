@@ -249,7 +249,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         # last, first = page * page_size, page * page_size - page_size
         try:
             project_id = kwargs.get('pk', None)
-            if project_id == 'null' or project_id is not None:
+            if project_id == 'null' or project_id is None:
                 return Response({"error": "Project not found"}, status=400)
 
             pending = TimeSheet.objects.filter(project_id=project_id, is_active=True, status='draft').order_by('start')

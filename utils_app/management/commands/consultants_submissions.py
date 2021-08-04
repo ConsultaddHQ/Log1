@@ -28,8 +28,7 @@ class Command(BaseCommand):
                 days = 2
                 last_2_days = today - timedelta(days=2)
             for consultant in consultants:
-                submission_ids = []
-                scrum_masters = []
+                submission_ids, scrum_masters = [], []
                 queryset = Submission.objects.filter(consultant_marketing__consultant=consultant,
                                                      created__gte=last_2_days,
                                                      is_complete=True)
