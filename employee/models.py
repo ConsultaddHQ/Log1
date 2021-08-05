@@ -9,10 +9,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from api_key.models import APIKey
+from log1.utils import write_exception
 from utils_app.mailing import send_email
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
-from log1.utils import write_exception, write_info
 
 GENDER_CHOICE = (
     ('male', 'Male'),
@@ -169,7 +169,7 @@ class ResetPasswordToken(models.Model):
         return f'{self.user}-{self.key}'
 
 
-def get_password_reset_token_expiry_time():
+def get_token_expiry_time():
     return getattr(settings, 'RESET_TOKEN_EXPIRY_TIME', 24)
 
 

@@ -23,8 +23,7 @@ from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, \
-    get_password_reset_token_expiry_time
+from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, get_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer
 
@@ -72,6 +71,8 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         try:
             employee_id = request.data.get('employee_id')
+            if type(employee_id) != int:
+                return Response({"message": "Employee ID should be number"}, status=400)
             if employee_id:
                 queryset = User.objects.filter(employee_id=employee_id)
                 if not queryset:
@@ -257,7 +258,7 @@ class ResetPasswordViewSets(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+        password_reset_token_validation_time = get_token_expiry_time()
 
         now_minus_expiry_time = timezone.now() - timedelta(hours=password_reset_token_validation_time)
 
@@ -318,7 +319,7 @@ class ResetPasswordViewSets(GenericViewSet):
             password = serializer.validated_data['password']
             token = serializer.validated_data['token']
 
-            password_reset_token_validation_time = get_password_reset_token_expiry_time()
+            password_reset_token_validation_time = get_token_expiry_time()
 
             reset_password_token = ResetPasswordToken.objects.filter(key=token).first()
 

@@ -7,11 +7,9 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
-
-from ckiller.views import CkillerSubmissionViewSet
-
 from activity.views import CommentViewSet
 from impersonate.views import ImpersonateViewSets
+from ckiller.views import CkillerSubmissionViewSet
 from utils_app.views import CityViewSets, ChoiceViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
@@ -20,16 +18,12 @@ from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeS
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
-
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectSupportViewSet, ProjectOrderViewSet
-
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet
-
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets, SubmissionV2ViewSets
-
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     FeedbackViewSet, ConsultantImportViewSet, ConsultantV2ViewSets

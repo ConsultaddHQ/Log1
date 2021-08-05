@@ -31,7 +31,8 @@ from utils_app.mailing import send_email_attachment_multiple, send_email
 from log1.utils import ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import create_notification, push_notification, push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
-from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status
+from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
+    fetch_project_status
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
@@ -515,9 +516,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project = get_object_or_404(Project, id=project_id)
             prev_status_obj = project.statuses.get(is_current=True)
 
-            util = ProjectUtil(project)
-
-            all_status, cancellation_status, termination_status = util.statuses
+            all_status, cancellation_status, termination_status = fetch_project_status()
 
             if new_status not in all_status:
                 return Response({"message": 'Project status does not exist'}, status=400)
@@ -540,6 +539,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = consultant
             project.is_remote = request.data.get('is_remote', False)
             project.save()
+            util = ProjectUtil(project)
 
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
