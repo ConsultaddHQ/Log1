@@ -100,34 +100,35 @@ def get_project_check_list(project):
     }
 
 
+def fetch_project_status():
+    other_status = ['new', 'other', 'joined', 'received', 'signed', 'extended', 'on_boarded', 'complete']
+    cancellation_status = [
+        'cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled', 'cancelled-contract_conflicts',
+        'cancelled-candidate_denied', 'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+        'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location'
+    ]
+    termination_status = [
+        'terminated', 'terminated-resigned', 'terminated-resigned_rate_issue', 'terminated-fired_performance_issue',
+        'terminated-resigned_technology_issue', 'terminated-fired_budget_issue', 'terminated-fired_security_issue',
+        'terminated-resigned_location_issue', 'terminated-fired', 'terminated-resigned_full_time_offer'
+    ]
+    return cancellation_status + termination_status + other_status, cancellation_status, termination_status
+
+
 class ProjectUtil:
     def __init__(self, project):
         self.project = project
-        self.project_end = None
-        self.statuses = self.fetch_project_status()
+        self.statuses = fetch_project_status()
         self.consultant = project.submission.consultant_marketing.consultant
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
         if project.end_date:
             self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        else:
+            self.project_end = None
         if self.project.employer:
             self.employer = self.project.employer
         else:
             self.employer = self.project.submission.employer
-
-    @staticmethod
-    def fetch_project_status():
-        other_status = ['new', 'other', 'joined', 'received', 'signed', 'extended', 'on_boarded', 'complete']
-        cancellation_status = [
-            'cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled', 'cancelled-contract_conflicts',
-            'cancelled-candidate_denied', 'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
-            'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location'
-        ]
-        termination_status = [
-            'terminated', 'terminated-resigned', 'terminated-resigned_rate_issue', 'terminated-fired_performance_issue',
-            'terminated-resigned_technology_issue', 'terminated-fired_budget_issue', 'terminated-fired_security_issue',
-            'terminated-resigned_location_issue', 'terminated-fired', 'terminated-resigned_full_time_offer'
-        ]
-        return cancellation_status + termination_status + other_status, cancellation_status, termination_status
 
     def fetch_emojis(self):
         emoji = dict()
