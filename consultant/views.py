@@ -494,6 +494,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 start=data['employer_start_date'],
             )
 
+            desc = f"{request.user.employee_name} added consultant manually"
+            create_activity(consultant.id, 'consultant', request.user, desc, 'created')
+
             return Response({"data": ConsultantSerializer(consultant).data}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -619,7 +622,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Activity
                 desc = f"{request.user.employee_name} added Education details"
-                create_activity(education.consultant.id, 'consultant', request.user, desc, 'updated')
+                create_activity(education.consultant.id, 'consultant', request.user, desc, 'created')
                 return Response({"data": serializer.data, "message": "Education details added"}, status=201)
             except Exception as error:
                 write_exception(error, request)
@@ -670,7 +673,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
 
                 # Activity
                 desc = f"{request.user.employee_name} added Experience details"
-                create_activity(experience.consultant.id, 'consultant', request.user, desc, 'updated')
+                create_activity(experience.consultant.id, 'consultant', request.user, desc, 'created')
                 return Response({"data": serializer.data, "message": "Experience details added"}, status=201)
             except Exception as error:
                 write_exception(error, request)
@@ -747,6 +750,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         elif request.method == 'PUT':
             try:
                 employer = PayrollEmployer.objects.get(id=kwargs.get('pk'))
+                prev_start = employer.start
                 serializer = PayrollEmployerSerializer(employer, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
@@ -756,7 +760,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 send_notification_for_user(employer.consultant, request.user, title, 'payrollemployer')
 
                 # Activity
-                desc = f"{request.user.employee_name} updated Employer"
+                desc = f"{request.user.employee_name} updated Employer start date from {prev_start} to {employer.start}"
                 create_activity(employer.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Employer updated"}, status=202)
             except Exception as error:
@@ -774,8 +778,8 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 send_notification_for_user(consultant, request.user, title, 'payrollemployer')
 
                 # Activity
-                desc = f"{request.user.employee_name} added Employer"
-                create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
+                desc = f"{request.user.employee_name} added employer - {serializer.data['name']}"
+                create_activity(consultant.id, 'consultant', request.user, desc, 'created')
                 return Response({"data": serializer.data, "message": "Employer added"}, status=201)
             except Exception as error:
                 write_exception(error, request)
@@ -798,10 +802,11 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 )
                 prev_rate = 0
                 if prev_rate_obj:
+                    prev_rate = prev_rate_obj.rate
                     prev_rate_obj = prev_rate_obj.first()
                     prev_rate_obj.end = datetime.today()
                     prev_rate_obj.save()
-                    prev_rate = prev_rate_obj.rate
+
                 rate_obj = ConsultantRateRevision.objects.create(
                     previous_rate=prev_rate,
                     rate=request.data['rate'],
@@ -812,12 +817,12 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 serializer = ConsultantRateRevisionSerializer(rate_obj)
 
                 # Push Notification
-                title = f"{rate_obj.consultant.name}'s rate revised by {request.user.employee_name}"
+                title = f"{rate_obj.consultant.name}'s rate revised to {rate_obj.rate} by {request.user.employee_name}"
                 send_notification_for_user(rate_obj.consultant, request.user, title, 'consultantraterevision')
 
                 # Activity
-                desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {request.data['rate']}"
-                create_activity(rate_obj.id, 'consultantraterevision', request.user, desc, 'updated')
+                desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {rate_obj.rate}"
+                create_activity(rate_obj.consultant.id, 'consultant', request.user, desc, 'updated')
                 return Response({"data": serializer.data, "message": "Rate revised"}, status=201)
             except Exception as error:
                 write_exception(error, request)
@@ -1037,7 +1042,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
             # Activity
             desc = f"{request.user.employee_name} started Marketing from {consultant_marketing.start}"
-            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
+            create_activity(consultant.id, 'consultant', request.user, desc, 'created')
             return Response({"message": "Marketing started"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -1380,12 +1385,13 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             serializer.save()
 
             # Push Notification
-            title = f"{instance.poc.employee_name} is updated as {instance.poc_type.title()} on " \
-                    f"{instance.consultant.name}"
+            poc_type = instance.poc_type.title()
+            poc_name = instance.poc.employee_name
+            title = f"{poc_name} is updated as {poc_type} on {instance.consultant.name}"
             send_notification_for_user(instance.consultant, request.user, title, 'consultant')
 
             # Activity
-            desc = f"{request.user.employee_name} updated {instance.poc.employee_name} as {instance.poc_type.title()}"
+            desc = f"{request.user.employee_name} updated {poc_name} as {poc_type}"
             create_activity(instance.consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "POC updated"}, status=202)
         except Exception as error:
@@ -1701,8 +1707,9 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                     "tags": tags
                 }
                 tag_users(tag_data)
-
-            title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
+            employee_name = request.user.employee_name
+            consultant = feedback.consultant
+            title = f"{employee_name} tagged you in a {consultant.name}'s feedback"
             notification_data = {
                 'title': title,
                 'category': 'info',
@@ -1710,10 +1717,10 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 'target_id': feedback.id,
                 'sender_user_type': 'user',
                 'target_type': 'feedback',
+                'parent_id': consultant.id,
                 'parent_type': 'consultant',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
-                'parent_id': request.data.get('consultant'),
             }
             create_notification(user_list, notification_data)
 
@@ -1729,22 +1736,22 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                     'is_deleted': False,
                     'target': 'consultant',
                     'sub_target': 'feedback',
+                    'target_id': consultant.id,
                     'sub_target_id': feedback.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': feedback.consultant.id,
                 },
             }
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
 
             # Push Notification
-            poc_title = f"{feedback.get_feedback_type_display()} feedback added for {feedback.consultant.name} " \
-                        f"by {request.user.employee_name}"
-            send_notification_for_user(feedback.consultant, request.user, poc_title, 'feedback', feedback.id)
+            feedback_type = feedback.get_feedback_type_display()
+            poc_title = f"{feedback_type} feedback added for {consultant.name} by {employee_name}"
+            send_notification_for_user(consultant, request.user, poc_title, 'feedback', feedback.id)
 
             # Activity
-            desc = f"{request.user.employee_name} added {feedback.get_feedback_type_display()} feedback"
-            create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
+            desc = f"{employee_name} added {feedback_type} feedback"
+            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
             serializer = self.serializer_class(feedback)
             return Response({"data": serializer.data, "message": "Feedback added"}, status=201)
         except Exception as error:
@@ -1768,7 +1775,10 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                     user = get_object_or_404(User, id=tag)
                     user_list.append(user)
                     user_tag.tagged_user.add(user)
-            title = f"{request.user.employee_name} tagged you in a {feedback.consultant.name}'s feedback"
+
+            employee_name = request.user.employee_name
+            consultant = feedback.consultant
+            title = f"{employee_name} tagged you in a {consultant.name}'s feedback"
             notification_data = {
                 'title': title,
                 'category': 'info',
@@ -1776,10 +1786,10 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                 'target_id': feedback.id,
                 'target_type': 'feedback',
                 'sender_user_type': 'user',
+                'parent_id': consultant.id,
                 'parent_type': 'consultant',
                 'sender_id': request.user.id,
                 'recipient_user_type': 'user',
-                'parent_id': feedback.consultant.id,
             }
             create_notification(user_list, notification_data)
 
@@ -1796,22 +1806,21 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
                     'is_deleted': False,
                     'target': 'consultant',
                     'sub_target': 'feedback',
+                    'target_id': consultant.id,
                     'sub_target_id': feedback.id,
                     'timestamp': str(datetime.now()),
-                    'target_id': feedback.consultant.id,
                 },
             }
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
 
             # Push Notification
-            title = f"{serializer.data['feedback_type']} feedback updated for {feedback.consultant.name} " \
-                    f"by {request.user.employee_name}"
-            send_notification_for_user(feedback.consultant, request.user, title, 'feedback', feedback.id)
+            title = f"{serializer.data['feedback_type']} feedback updated for {consultant.name} by {employee_name}"
+            send_notification_for_user(consultant, request.user, title, 'feedback', feedback.id)
 
             # Activity
-            desc = f"{request.user.employee_name} updated {feedback.get_feedback_type_display()} feedback"
-            create_activity(feedback.consultant.id, 'consultant', request.user, desc, 'updated')
+            desc = f"{employee_name} updated {feedback.get_feedback_type_display()} feedback"
+            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
             return Response({"data": serializer.data, "message": "Feedback updated"}, status=202)
         except Exception as error:
             write_exception(error, request)

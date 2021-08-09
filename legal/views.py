@@ -113,6 +113,15 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @action(methods=['get'], detail=False, url_path='employer')
+    def employer(self, request):
+        try:
+            data = ['Consultadd', 'NetResolute', 'Pythonwise', 'Zioqu']
+            return Response({"result": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
     @staticmethod
     def rejection_mail(beneficiary_name, petition, document):
         try:
