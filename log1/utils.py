@@ -71,7 +71,12 @@ def write_exception(message, request=None):
 def get_page_limits(request):
     try:
         page = int(request.GET.get("page", 1))
-        page_size = int(request.GET.get("page_size", 10))
+        if 'page_size' in request.GET:
+            page_size = int(request.GET.get("page_size", 10))
+        elif 'size' in request.GET:
+            page_size = int(request.GET.get("size", 10))
+        else:
+            page_size = 20
         return page * page_size - page_size, page * page_size
     except Exception as error:
         write_exception(message=error, request=request)

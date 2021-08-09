@@ -147,7 +147,7 @@ class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
 class PayrollEmployerSerializer(serializers.ModelSerializer):
     class Meta:
         model = PayrollEmployer
-        fields = '__all__'
+        fields = ('id', 'name', 'start', 'created')
 
 
 class ConsultantPOCSerializer(serializers.ModelSerializer):
