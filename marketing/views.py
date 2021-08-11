@@ -1176,7 +1176,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 booking_res = 'Development Server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     try:
-                        calendar = Calendar()
+                        calendar = Calendar(request=request)
                         cal_res, msg = calendar.book_ms_calendar(event)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
@@ -1323,7 +1323,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         booking_res = 'Development Server'
                         if os.environ.get('ENV', 'local') == 'prod':
                             calendar_id = interview.calendar_id
-                            calendar = Calendar()
+                            calendar = Calendar(request=request)
                             if not calendar_id:
                                 res, msg = calendar.book_ms_calendar(event)
                                 if msg == 'error':
@@ -1388,7 +1388,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        calendar = Calendar()
+                        calendar = Calendar(request=request)
                         calendar.delete_ms_calendar(interview.calendar_id)
                 except Exception as error:
                     write_exception(f"Booking deletion failed: {error}", request)
@@ -1480,7 +1480,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 # Updating calendar Booking
                 if os.environ.get('ENV', 'local') == 'prod':
                     calendar_id = interview.calendar_id
-                    calendar = Calendar()
+                    calendar = Calendar(request=request)
                     if not calendar_id:
                         try:
                             cal_res, msg = calendar.book_ms_calendar(event)
@@ -1550,7 +1550,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        calendar = Calendar()
+                        calendar = Calendar(request=request)
                         calendar.delete_ms_calendar(interview.calendar_id)
                 except Exception as error:
                     write_exception(f"Booking cancellation failed: {error}", request)

@@ -93,8 +93,8 @@ class VendorCompany(models.Model):
 
 class VendorContact(TimeStampedModel):
     name = models.CharField(_('Name'), max_length=50)
-    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
-    number = models.CharField(_('Number'), max_length=25, null=True, blank=True)
+    email = models.EmailField(_('Email'), max_length=100, null=True, blank=True)
+    number = models.CharField(_('Number'), max_length=100, null=True, blank=True)
     company = models.ForeignKey(
         VendorCompany, on_delete=models.CASCADE,
         related_name='vendors',
@@ -129,7 +129,12 @@ class Lead(TimeStampedModel):
     primary_skill = models.CharField(_('Primary Skill'), max_length=50, blank=True, null=True)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='new')
     secondary_skills = ArrayField(models.CharField(_('Secondary Skills'), max_length=30), blank=True, null=True)
-    position = models.ForeignKey(Choice, on_delete=models.SET_NULL, related_name='position_lead', null=True, blank=True)
+
+    position = models.ForeignKey(
+        Choice, on_delete=models.SET_NULL,
+        related_name='position_lead',
+        null=True, blank=True
+    )
     vendor_company = models.ForeignKey(
         VendorCompany, on_delete=models.PROTECT,
         null=True, blank=True,
@@ -143,8 +148,7 @@ class Lead(TimeStampedModel):
         verbose_name='Lead Owner'
     )
     shared_to = models.ManyToManyField(
-        User,
-        blank=True,
+        User, blank=True,
         related_name='shared_leads',
         verbose_name='Lead Shared to',
     )

@@ -6,11 +6,11 @@ from log1.utils import write_exception, write_info
 
 
 class Calendar:
-    def __init__(self):
+    def __init__(self, request):
         self.headers = self.get_ms_header()
+        self.request = request
 
-    @staticmethod
-    def get_ms_header():
+    def get_ms_header(self):
         try:
             tenant_id = os.environ.get('tenant_id')
             client_id = os.environ.get('client_id')
@@ -34,7 +34,7 @@ class Calendar:
             }
             return headers
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
             return None
 
     @staticmethod
@@ -115,10 +115,10 @@ class Calendar:
             if response.status_code == 201:
                 return data, "ok"
             else:
-                write_info(message=data, function='book_ms_calendar')
+                write_info(message=data, function='book_ms_calendar', request=self.request)
                 return str(data), "error"
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
             return str(error), "error"
 
     def update_ms_calendar(self, event_id, data):
@@ -138,13 +138,13 @@ class Calendar:
                 if msg == 'ok':
                     return response_data, "booked"
                 else:
-                    write_info(message=response_data, function='update_ms_calendar')
+                    write_info(message=response_data, function='update_ms_calendar', request=self.request)
                     return str(response_data), "error"
             else:
-                write_info(message=response_data, function='update_ms_calendar')
+                write_info(message=response_data, function='update_ms_calendar', request=self.request)
                 return str(response_data), "error"
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
             return str(error), "error"
 
     def delete_ms_calendar(self, event_id):
@@ -159,8 +159,8 @@ class Calendar:
                 return True, "ok"
             else:
                 response_data = json.loads(response.text.encode('utf-8'))
-                write_info(message=response_data, function='delete_ms_calendar')
+                write_info(message=response_data, function='delete_ms_calendar', request=self.request)
                 return False, "error"
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
             return str(error), "error"
