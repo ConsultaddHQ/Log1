@@ -41,7 +41,7 @@ def get_users_and_attendees(request, interview):
 
 def date_filter(queryset, created, field_str):
     filters = dict()
-    if created:
+    if created and type(created) == dict:
         lte = created.get('lte', None)
         gte = created.get('gte', None)
         if lte:
