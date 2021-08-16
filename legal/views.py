@@ -123,7 +123,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @staticmethod
-    def rejection_mail(beneficiary_name, petition, document):
+    def rejection_mail(beneficiary_name, petition, document, request):
         try:
             to = ['sarang.m@consultadd.com']
             if os.environ.get('ENV') == 'prod':
@@ -139,7 +139,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     'petitioner_name': petition.assigned_to.employee_name,
                 },
             }
-            res, msg = send_email(mail_data, petition.assigned_to.email)
+            res, msg = send_email(mail_data, petition.assigned_to.email, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -218,7 +218,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 documents.update(remark=remark)
                 if documents:
                     petition = documents.first().petition
-                    res, error = self.rejection_mail(petition.beneficiary.name, petition, documents.first())
+                    res, error = self.rejection_mail(petition.beneficiary.name, petition, documents.first(), request)
                     if error == 'error':
                         message = str(res)
                     else:

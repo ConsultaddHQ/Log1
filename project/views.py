@@ -120,7 +120,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def send_support_mail(project, scrum_masters):
+    def send_support_mail(project, scrum_masters, request):
         try:
             submission = project.submission
             path, recordings = [], []
@@ -171,7 +171,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email)
+                res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -180,8 +180,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, "error"
 
-    def send_support_offer_mail(self, project, scrum_masters):
-        support_res, support_msg = self.send_support_mail(project, scrum_masters)
+    def send_support_offer_mail(self, project, scrum_masters, request):
+        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters)
 
         message = "Project created"
@@ -201,7 +201,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         return message, exception_msg
 
     @staticmethod
-    def po_mail(project, path, scrum_master_email, po_type):
+    def po_mail(project, path, scrum_master_email, po_type, request):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -246,7 +246,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email_attachment_multiple(mail_data, marketer.email)
+                res, msg = send_email_attachment_multiple(mail_data, marketer.email, request=request)
                 if not msg:
                     return res, "error"
             return res, "ok"
@@ -496,12 +496,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 sub.status = 'project'
                 sub.save()
 
-                message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request))
+                message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({
                     "message": message,
                     "data": serializer.data,
-                    "exception": exception_msg,
+                    "exception": error_msg,
                 }, status=201)
             return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
@@ -673,7 +673,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project_id = kwargs.get('pk')
             project = get_object_or_404(Project, id=project_id)
 
-            message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request))
+            message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
 
             if exception_msg != 'Mail sent':
                 return Response({

@@ -6,7 +6,7 @@ from log1.utils import write_exception
 
 
 @shared_task
-def send_email(mail_data, from_email, reply_to=None):
+def send_email(mail_data, from_email, reply_to=None, request=None):
     if reply_to is None:
         reply_to = []
     try:
@@ -27,12 +27,12 @@ def send_email(mail_data, from_email, reply_to=None):
         msg.send()
         return "mail sent", True
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
         return str(error), False
 
 
 @shared_task
-def send_email_without_template(mail_data, from_email):
+def send_email_without_template(mail_data, from_email, request=None):
     try:
         msg = EmailMultiAlternatives(
             subject=mail_data["subject"],
@@ -45,12 +45,12 @@ def send_email_without_template(mail_data, from_email):
         msg.send()
         return "mail sent", True
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
         return str(error), False
 
 
 @shared_task
-def send_email_attachment_multiple(mail_data, from_email, reply_to=None):
+def send_email_attachment_multiple(mail_data, from_email, reply_to=None, request=None):
     if reply_to is None:
         reply_to = []
     try:
@@ -73,5 +73,5 @@ def send_email_attachment_multiple(mail_data, from_email, reply_to=None):
         msg.send()
         return "mail sent", True
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
         return str(error), False
