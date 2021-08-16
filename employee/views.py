@@ -555,7 +555,7 @@ class AssetsViewSets(viewsets.ModelViewSet):
                         'failed': failed,
                     },
                 }
-                send_email(mail_data, "Log1")
+                send_email(mail_data, "log1@consultadd.com", request=request)
                 return Response({"message": "Upload Complete", "count": mail_data['context']}, status=201)
             return Response({"message": "Empty File"}, status=404)
         except Exception as error:

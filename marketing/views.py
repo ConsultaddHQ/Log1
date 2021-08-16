@@ -2089,7 +2089,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return error, 'error'
 
     @staticmethod
-    def send_test_mail(test, data, test_status):
+    def send_test_mail(test, data, test_status, request):
         try:
             consultant = test.submission.consultant
             queryset = User.objects.filter(
@@ -2153,7 +2153,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res, msg = send_email_attachment_multiple(mail_data, created_by.email)
+                res, msg = send_email_attachment_multiple(mail_data, created_by.email, request=request)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2192,7 +2192,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email)
+                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"

@@ -181,7 +181,7 @@ def terminate_consultant(terminate):
         # App Notification
         recruiter = consultant.recruiter
         user_list = [recruiter]
-        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'], is_active=True)
         for user in scrum_masters:
             user_list.append(user)
 
@@ -229,7 +229,7 @@ def terminate_consultant(terminate):
         return error
 
 
-def send_exit_process_mail(terminate, exit_status):
+def send_exit_process_mail(terminate, exit_status, request):
     try:
         consultant = terminate.consultant
         recruiter = consultant.recruiter
@@ -241,7 +241,7 @@ def send_exit_process_mail(terminate, exit_status):
         to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
         cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
 
-        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'])
+        scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'], is_active=True)
         for user in scrum_masters:
             cc.append(user.email)
 
@@ -292,7 +292,7 @@ def send_exit_process_mail(terminate, exit_status):
                 'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
             },
         }
-        res, msg = send_email(mail_data, terminate.created_by.email)
+        res, msg = send_email(mail_data, terminate.created_by.email, request=request)
         if not msg:
             return res, "error"
         return res, "ok"

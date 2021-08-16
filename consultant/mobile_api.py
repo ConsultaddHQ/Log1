@@ -54,7 +54,7 @@ class ConsultantAuthViewSet(GenericViewSet):
                 },
             }
 
-            send_email(customer_mail_data, "log1@consultadd.com")
+            send_email(customer_mail_data, "log1@consultadd.com", request=request)
 
             mail_data = {
                 'to': [config.TIMESHEET_APP_ADMIN],
@@ -70,7 +70,7 @@ class ConsultantAuthViewSet(GenericViewSet):
                     'designation': designation,
                 },
             }
-            send_email(mail_data, "log1@consultadd.com")
+            send_email(mail_data, "log1@consultadd.com", request=request)
             return Response({"result": "mail sent"}, status=200)
         except Exception as error:
             write_exception(error, request)

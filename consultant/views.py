@@ -797,11 +797,12 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
-                prev_rate_obj = ConsultantRateRevision.objects.filter(
+                qs = ConsultantRateRevision.objects.filter(
                     consultant_id=request.data['consultant'], end=None
                 )
                 prev_rate = 0
-                if prev_rate_obj:
+                if qs:
+                    prev_rate_obj = qs.first()
                     prev_rate = prev_rate_obj.rate
                     prev_rate_obj = prev_rate_obj.first()
                     prev_rate_obj.end = datetime.today()

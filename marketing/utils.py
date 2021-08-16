@@ -26,7 +26,7 @@ def get_scrum_masters(request):
 def get_users_and_attendees(request, interview):
     user_list = [interview.supervisor]
     attendees = [{'email': interview.supervisor.email}, {'email': request.user.email}]
-    scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
+    scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
 
     for user in interview.guest.all().union(scrum_masters):
         user_list.append(user)
