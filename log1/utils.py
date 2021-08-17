@@ -24,7 +24,7 @@ def load_config(file_path):
         logger.error(error)
 
 
-def log_request(request):
+def log_request(request, login):
     """Log the request"""
     address = request.META['REMOTE_ADDR']
     method = str(getattr(request, 'method', '')).upper()
@@ -32,40 +32,46 @@ def log_request(request):
     data = ''
 
     try:
-        if method in ['POST', 'PUT']:
-            data = str(["%s: %s" % (k, v) for k, v in request.data.items()])
+        if not login:
+            if method in ['POST', 'PUT']:
+                data = str(["%s: %s" % (k, v) for k, v in request.data.items()])
 
-        query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
-        query_params = query_params if query_params else ''
-        if type(request.user) is not AnonymousUser:
-            if hasattr(request.user, "name"):
-                logger.error(f"User : {request.user.id} :: {request.user.name}")
-            else:
-                logger.error(f"User : {request.user.id} :: {request.user.employee_name}")
-        logger.error(f"[{method}] : {address}{request_path}, Params: {query_params}, Data: {data}")
+            query_params = str(["%s: %s" % (k, v) for k, v in request.GET.items()])
+            query_params = query_params if query_params else ''
+            if type(request.user) is not AnonymousUser:
+                if hasattr(request.user, "name"):
+                    logger.error(f"User : {request.user.id} :: {request.user.name}")
+                else:
+                    logger.error(f"User : {request.user.id} :: {request.user.employee_name}")
+            logger.error(f"[{method}] : {address}{request_path}, Params: {query_params}, Data: {data}")
+        else:
+            logger.error(f"[{method}] : {address}{request_path}")
     except Exception as error:
         logger.error(f"Log Request error: {error}")
         logger.error(f"[{method}] : {address}{request_path}")
 
 
-def write_info(message, function, request=None):
+def write_info(message, function, request=None, login=False):
     if request:
-        log_request(request)
+        log_request(request, login)
     logger.error(f'Function - {function}, Info: {message}')
 
 
-def write_exception(message, request=None):
-    if request:
-        log_request(request)
-    _, _, tb = sys.exc_info()
-    f = tb.tb_frame
-    lineno = tb.tb_lineno
-    function = f.f_code.co_name
-    filename = f.f_code.co_filename
-    classname = None
-    if 'self' in f.f_locals:
-        classname = f.f_locals["self"].__class__.__name__
-    logger.error(f'Error in {filename}, Class - {classname}, Function - {function}, Line no - {lineno}, {message}')
+def write_exception(message, request=None, login=False):
+    try:
+        if request:
+            log_request(request, login)
+        _, _, tb = sys.exc_info()
+        f = tb.tb_frame
+        lineno = tb.tb_lineno
+        function = f.f_code.co_name
+        filename = f.f_code.co_filename
+        classname = None
+        if 'self' in f.f_locals:
+            classname = f.f_locals["self"].__class__.__name__
+        logger.error(f'Error in {filename}, Class - {classname}, Function - {function}, Line no - {lineno}, {message}')
+    except Exception as error:
+        logger.error(error)
 
 
 def get_page_limits(request):
