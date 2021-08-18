@@ -163,11 +163,11 @@ class ProjectUtil:
                 statuses__created__gte=day_one,
                 employer__iexact=self.employer,
             ).count()
-
+            submitted_on = self.project.submission.consultant_marketing.consultant.name.strip()
             if self.project.is_remote or self.project.submission.lead.is_w2:
                 con_str = f"**Remote Project** <br>"
                 con_str += f"{emoji} Consultant Joined: **{self.consultant.name.strip()}** <br>"
-                con_str += f"{emoji} Submitted On: **{self.consultant.name.strip()}** "
+                con_str += f"{emoji} Submitted On: **{submitted_on}** "
             else:
                 con_str = f"{emoji} Consultant :  **{self.consultant.name.strip()}** "
 

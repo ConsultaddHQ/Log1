@@ -39,8 +39,10 @@ def beats_to_log1(file_path, file_name, obj_id, model):
         creator = User.objects.get(employee_id=1000)
         response, error = download_s3_object_beats(file_path, file_name)
         if error:
+            write_info(message=str(error), function='beats_to_log1')
             return False, response
         if not os.path.exists(response):
+            write_info(message="File not found", function='beats_to_log1')
             return False, "File not found"
         local_file = open(response, 'rb')
         file = ContentFile(local_file.read())

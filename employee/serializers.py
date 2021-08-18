@@ -9,7 +9,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone')
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone',
+                  'is_superuser')
 
     @staticmethod
     def get_team(obj):

@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
-from django.db.models import F, Value, CharField
+from django.db.models import Q, F, Value, CharField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 
@@ -191,9 +191,9 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             query = request.GET.get('query', None)
             if query == 'all':
-                teams = Team.objects.exclude(dept='marketing').values('id', 'name', 'dept')
+                teams = Team.objects.exclude(dept='marketing').values('id', 'name')
             else:
-                teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
+                teams = Team.objects.filter(dept='Marketing').values('id', 'name')
             return Response({"data": teams}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -237,6 +237,25 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 request.user.save()
                 return Response({"message": "password updated"}, status=200)
             return Response({"message": "Wrong Password"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='directory')
+    def directory(self, request):
+        try:
+            if request.user.is_superuser:
+                query = request.GET.get('query', None)
+                users = User.objects.all().exclude(role__name='consultant')
+                if query:
+                    query = query.lstrip().replace(':amp:', '&')
+                    users = users.filter(
+                        Q(employee_name__istartswith=query) |
+                        Q(email__iexact=query)
+                    )
+                data = users.values('id', 'employee_name', 'employee_id', 'email', 'team', 'role', 'is_active')
+                return Response({"data": data}, status=200)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

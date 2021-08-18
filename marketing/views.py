@@ -2347,7 +2347,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'new')
+                res, error = self.send_test_mail(test, data, 'new', request)
                 if error == 'error':
                     write_exception(res, request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
@@ -2495,7 +2495,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # test submit mail
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'submit')
+                res, error = self.send_test_mail(test, data, 'submit', request)
                 if error == 'error':
                     write_exception(res, request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
