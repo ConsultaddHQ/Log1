@@ -496,6 +496,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 sub.status = 'project'
                 sub.save()
 
+                # Activity
+                desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
+                create_activity(sub.id, 'submission', request.user, desc, 'created')
+
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({
@@ -539,8 +543,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = consultant
             project.is_remote = request.data.get('is_remote', False)
             project.save()
-            util = ProjectUtil(project)
 
+            util = ProjectUtil(project)
+            desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 scrum_masters = self.fetch_scrum_masters(request)
@@ -559,6 +564,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 # PO Received
                 if new_status == 'received' and not project.is_msg_sent:
                     # Offer received message
+                    desc = f"Purchase order status changed to Received"
                     util.send_receive_notification(request.user)
                     project.is_msg_sent = True
                     project.save()
@@ -567,6 +573,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 elif new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
+                    desc = f"Purchase order status changed to Joined and Timesheet APP access mail is sent to consultant"
                     if marketing.status == 'open':
                         marketing.end = date.today()
                         marketing.status = 'close'
@@ -586,6 +593,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     marketing.status = 'open'
                     marketing.save()
                     project.support.update(end=datetime.now())
+                    desc = f"Purchase order status changed to Cancelled and cancellation mail is updated"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
                     util.send_cancellation_notification(request.user)
 
@@ -594,6 +602,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
+                    desc = f"Purchase order status changed to Terminated and termination mail is sent"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     po_status = project_status_obj.get_status_display()
                     util.send_termination_notification(po_status, request.user)
@@ -603,9 +612,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
+                    desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
                     util.send_completion_notification(request.user)
 
+            # Activity
+            create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
@@ -659,6 +671,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         if created:
                             prev_status.is_current = False
                             prev_status.save()
+                        desc = "Purchase order status is updated to Onboarded and Onboarding mail is sent"
+
+                        # Activity
+                        create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
                     return Response({"message": "On-boarding mail sent", "error": res}, status=200)
                 return Response({"data": str(res)}, status=400)
             else:
