@@ -16,7 +16,8 @@ from rest_framework.authtoken.models import Token
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, \
+    DestroyModelMixin
 
 from consultant.models import Consultant
 from utils_app.mailing import send_email
@@ -174,11 +175,12 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    def update(self, request, *args, **kwargs):
+    @action(methods=['put'], detail=False, url_path='profile')
+    def profile(self, request, *args, **kwargs):
         try:
             user_id = request.data.get('user_id')
+            role_ids = request.data.get('role_id', [])
             team_id = request.data.get('team_id', None)
-            role_id = request.data.get('role_id', None)
             if request.user.is_superuser:
                 user = get_object_or_404(User, id=user_id)
                 desc = ""
@@ -188,14 +190,17 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                     user.team = team
                     desc += f"{request.user.employee_name} changed team from {prev_team} to {team.name} "
 
-                if role_id:
-                    prev_role = user.role.name
-                    role = get_object_or_404(Role, id=role_id)
-                    user.role = role
+                if role_ids:
+                    role_names = []
+                    user.role.clear()
+                    for role_id in role_ids:
+                        role = get_object_or_404(Role, id=role_id)
+                        user.role.add(role)
+                        role_names.append(role.name)
                     if team_id:
-                        desc += f"and changed role from {prev_role} to {role.name}"
+                        desc += f"and changed role to {', '.join(role_names)}"
                     else:
-                        desc += f"{request.user.employee_name} changed role from {prev_role} to {role.name}"
+                        desc += f"{request.user.employee_name} changed role to {', '.join(role_names)}"
 
                 user.save()
                 if len(desc) > 0:
@@ -218,7 +223,12 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                     user.save()
                 else:
                     return Response({"message": "Parameter is not correct", "error": str(is_active)}, status=400)
-            return Response({"message": "Account deactivated"}, status=202)
+
+            if is_active:
+                message = "Activated"
+            else:
+                message = "Deactivated"
+            return Response({"message": f"Account {message}"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -672,7 +682,7 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
     def update(self, request, *args, **kwargs):
         try:
             if 'superadmin' in request.user.roles:
-                user_id = request.data.get('user_id')
+                user_id = kwargs.get('pk', None)
                 user = get_object_or_404(User, id=user_id)
                 handover_to = get_object_or_404(User, id=request.data.get('handover_to_id'))
                 qs = Handover.objects.filter(user_id=user_id)
@@ -697,7 +707,7 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
     def destroy(self, request, *args, **kwargs):
         try:
             if 'superadmin' in request.user.roles:
-                user_id = request.GET.get('user_id', None)
+                user_id = kwargs.get('pk', None)
                 if not user_id:
                     return Response({"message": f"User is not provided"}, status=400)
                 user = get_object_or_404(User, id=user_id)

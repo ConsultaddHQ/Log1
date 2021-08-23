@@ -92,11 +92,20 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                consultants = consultants.filter(
-                    Q(name__icontains=query) |
-                    Q(email__iexact=query) |
-                    Q(pocs__poc__employee_name__icontains=query, pocs__end=None)
+                keywords = query.split()
+                or_lookup = (
+                        Q(email__iexact=keywords[0]) |
+                        Q(name__icontains=keywords[0]) |
+                        Q(pocs__poc__employee_name__icontains=keywords[0], pocs__end=None)
                 )
+                for keyword in keywords[1:]:
+                    or_lookup.add((
+                            Q(email__iexact=keyword) |
+                            Q(name__icontains=keyword) |
+                            Q(pocs__poc__employee_name__icontains=keyword)
+                        ), or_lookup.connector)
+
+                consultants = consultants.filter(or_lookup)
 
             consultants = consultants.distinct('id')
 
