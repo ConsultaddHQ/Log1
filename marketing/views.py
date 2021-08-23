@@ -276,11 +276,23 @@ class LeadViewSets(viewsets.ModelViewSet):
             if serializer.is_valid():
                 serializer.save()
 
+                # Activity
+                fields = []
+                lead_fields = {'job_desc': "Job Description", "city": "City", "is_w2": "W2"}
+                lead_fields_keys = lead_fields.keys()
+                for field in request.data.keys():
+                    if field in lead_fields_keys:
+                        fields.append(lead_fields[field])
+                desc = f"{request.user.employee_name} updated {', '.join(fields)}"
+
                 if len(lead.job_desc) < 20:
                     submissions = lead.submission.all()
                     submissions.update(is_complete=False)
                 for submission in lead.submission.all():
                     submission_is_complete(submission)
+
+                    # Activity
+                    create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
                 data = self.get_data(queryset)
                 return Response({"data": data[0], "message": "Requirement updated"}, status=202)
@@ -699,6 +711,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 lead = get_object_or_404(Lead, id=lead_id)
 
             sub, msg = create_submission(request, lead_id)
+
+            # Activity
+            desc = f"{request.user.employee_name} added submission"
+            create_activity(sub.id, 'submission', request.user, desc, 'created')
+
             if msg == "error":
                 return Response({"message": "Submission not created", "error": str(sub)}, status=400)
             if sub and sub.vendor_contact and sub.client:
@@ -731,6 +748,19 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if serializer.is_valid():
                 serializer.save()
 
+                # Activity
+                fields = []
+                sub_fields = {
+                    "client": "Client", "employer": "Employer",
+                    "rate": "Rate", "email": "Email", "phone": "Phone Number",
+                }
+                sub_fields_keys = sub_fields.keys()
+                for field in request.data.keys():
+                    if field in sub_fields_keys:
+                        fields.append(sub_fields[field])
+                desc = f"{request.user.employee_name} updated {', '.join(fields)}"
+                create_activity(submission.id, 'submission', request.user, desc, 'updated')
+
                 if submission.vendor_contact and submission.client:
                     submission.is_active = True
                 else:
@@ -756,6 +786,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
             attachment.attachment_file = request.FILES.get('file')
             attachment.save()
+
+            # Activity
+            desc = f"{request.user.employee_name} added resume"
+            create_activity(attachment.object_id, 'submission', request.user, desc, 'updated')
+
             serializer = AttachmentSerializer(attachment)
             return Response({"data": serializer.data, "message": "Resume updated"}, status=202)
         except Exception as error:
@@ -862,6 +897,10 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
                 vendor_company_id=request.data.get('company')
             )
 
+            # Activity
+            desc = f"{request.user.employee_name} added {vendor_layer.vendor_company.name} as Vendor Layer"
+            create_activity(submission_id, 'submission', request.user, desc, 'updated')
+
             serializer = self.serializer_class(vendor_layer)
             return Response({"data": serializer.data, "message": "Vendor layer added"}, status=201)
         except Exception as error:
@@ -883,7 +922,14 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
     def destroy(self, request, *args, **kwargs):
         try:
             vendor_layer = get_object_or_404(VendorLayer, id=kwargs.get('pk'))
+            vendor_name = vendor_layer.vendor_company.name
+            submission_id = vendor_layer.submission.id
             vendor_layer.delete()
+
+            # Activity
+            desc = f"{request.user.employee_name} removed {vendor_name} from Vendor Layer"
+            create_activity(submission_id, 'submission', request.user, desc, 'updated')
+
             return Response(status=204)
         except Exception as error:
             write_exception(error, request)
@@ -1132,7 +1178,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.round = round_count + 1
                 interview.save()
 
-                desc = f"Round {interview.round} is scheduled for {interview.start_time} to {interview.end_time}"
+                # Activity
+                end = interview.end_time
+                start = interview.start_time
+                desc = f"Interview round {interview.round} is scheduled for {start.date()}-{start.time()} " \
+                       f"to {end.date()}-{end.time()}"
                 create_activity(submission_id, 'submission', request.user, desc, 'created')
 
                 # Closing Submission for scheduling Interview
@@ -1249,9 +1299,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 return Response({"message": "Interview not found"}, status=400)
 
             interview = queryset.first()
+            prev_status = interview.status
+            desc = f"Round {interview.round} is updated"
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                if status_change == 'false' and prev_status == 'cancelled':
+                    interview.status = 'scheduled'
+                    interview.save()
+                    desc = f"Interview round {interview.round} is scheduled again"
 
                 # Setting Submission is_active value
                 submission = interview.submission
@@ -1270,12 +1326,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     if interview.status == 'next_round':
                         interview_status = "Next Round"
                         interview_status_emoji = "&#128077;"
+                        desc = f"Interview round {interview.round} status is changed to Next round"
                     elif interview.status == 'offer':
                         interview_status = "Offer"
                         interview_status_emoji = "&#9996; "
+                        desc = f"Interview round {interview.round} status is changed to Offer"
                     else:
                         interview_status = "Failed"
                         interview_status_emoji = "&#128078;"
+                        desc = f"Interview round {interview.round} is Failed"
 
                     text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
                     text += interview.feedback
@@ -1286,14 +1345,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.interview_feedback_url, data)
 
-                desc = f"Round {interview.round} is updated"
                 if status_change == 'false':
                     desc = f"Round {interview.round} status is updated"
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
                         interview.save()
-                        desc = f"Round {interview.round} is rescheduled for {interview.start_time} to" \
-                               f" {interview.end_time}"
+                        end = interview.end_time
+                        start = interview.start_time
+                        desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: " \
+                               f"{start.time()} to {end.date()} :: {end.time()}"
                         # Message to mattermost for interview timing updating
                         if date.today() == interview.start_time.date():
                             data = {
@@ -1349,8 +1409,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                         {"message": "Calendar booking update failed", "error": str(error)},
                                         status=400
                                     )
-
+                # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
+
                 data = queryset.annotate(
                     client=F('submission__client'),
                     project=F('submission__project'),
@@ -1398,7 +1459,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview.save()
 
             submission = interview.submission
-            desc = f"Round {interview.round} is cancelled"
+            desc = f"Interview round {interview.round} is cancelled"
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
             if interview.round == 1:
@@ -1415,16 +1476,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                     {interview.marketer.employee_name}"""
 
             notification_data = {
-                'category': 'info',
-                'description': title,
-                'target_id': interview.id,
-                'parent_id': submission.id,
-                'target_type': 'interview',
-                'parent_type': 'submission',
-                'sender_user_type': 'user',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'title': 'Interview Cancelled',
+                'category': 'info', 'description': title,
+                'target_id': interview.id, 'parent_id': submission.id,
+                'target_type': 'interview', 'parent_type': 'submission',
+                'sender_id': request.user.id, 'sender_user_type': 'user',
+                'recipient_user_type': 'user', 'title': 'Interview Cancelled',
             }
             user_list, _ = get_users_and_attendees(request, interview)
             create_notification(user_list, notification_data)
@@ -1458,7 +1514,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
             user_list, attendees = get_users_and_attendees(request, interview)
             title = get_interview_title(interview)
 
-            desc = f"Round {interview.round} is rescheduled for {interview.start_time} to {interview.end_time}"
+            # Activity
+            end = interview.end_time
+            start = interview.start_time
+            desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: {start.time()} " \
+                   f"to {end.date()} :: {end.time()}"
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
             if interview.status not in ['offer', 'failed', 'next_round']:
@@ -1504,6 +1564,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 return Response({"message": "Calendar reschedule failed", "error": res}, status=400)
                         except Exception as error:
                             return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
+
+                # Activity
+                end = interview.end_time
+                start = interview.start_time
+                desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: {start.time()} " \
+                       f"to {end.date()} :: {end.time()}"
+                create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
                 if date.today() == interview.start_time.date():
                     data = {
@@ -1561,7 +1628,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview.save()
 
             submission = interview.submission
-            desc = f"Round {interview.round} is cancelled"
+
+            # Activity
+            desc = f"Interview round {interview.round} is cancelled"
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
             if interview.round == 1:
@@ -1578,16 +1647,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                     {interview.marketer.employee_name}"""
 
             notification_data = {
-                'category': 'info',
-                'description': title,
-                'target_id': interview.id,
-                'parent_id': submission.id,
-                'target_type': 'interview',
-                'parent_type': 'submission',
-                'sender_user_type': 'user',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'title': 'Interview Cancelled',
+                'category': 'info', 'description': title,
+                'target_id': interview.id, 'parent_id': submission.id,
+                'target_type': 'interview', 'parent_type': 'submission',
+                'sender_id': request.user.id, 'sender_user_type': 'user',
+                'recipient_user_type': 'user', 'title': 'Interview Cancelled',
             }
             user_list, _ = get_users_and_attendees(request, interview)
             create_notification(user_list, notification_data)
@@ -1626,7 +1690,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.notes = request.data.get('notes')
                 interview.save()
 
-                desc = f"Notes updated by {request.user.employee_name}"
+                # Activity
+                desc = f"Notes updated on round {interview.round} of Interview by {request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 serializer = InterviewCreateSerializer(interview)
@@ -1651,7 +1716,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
                 interview.save()
 
-                desc = f"Recording: {file_name} uploaded by {request.user.employee_name}"
+                # Activity
+                desc = f"Recording: {file_name} uploaded on round {interview.round} of Interview by {request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response({"data": response, "message": "Recording uploaded"}, status=202)
@@ -1664,7 +1730,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.attachment_link = None
                 interview.save()
 
-                desc = f"Recording: {file_name} deleted by {request.user.employee_name}"
+                # Activity
+                desc = f"Recording: {file_name} deleted from round {interview.round} of Interview by {request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response(status=204)
@@ -2330,7 +2397,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 additional_details=data['additional_details'],
             )
 
-            desc = f"Test created with deadline {str(test.deadline)}"
+            # Activity
+            if data['is_video']:
+                desc = f"Video test created with deadline {str(test.deadline)}"
+            elif data['is_offline']:
+                desc = f"Offline test created with deadline {str(test.deadline)}"
+            else:
+                desc = f"Test created with deadline {str(test.deadline)}"
             create_activity(submission.id, 'submission', request.user, desc, 'created')
 
             # upload attachments
@@ -2347,7 +2420,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'new')
+                res, error = self.send_test_mail(test, data, 'new', request)
                 if error == 'error':
                     write_exception(res, request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
@@ -2363,6 +2436,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             serializer = TestUpdateSerializer(test, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+
+                # Activity
+                desc = f"Test details updated"
+                create_activity(test.submission.id, 'submission', request.user, desc, 'created')
+
                 return Response({"data": serializer.data, "message": "Test updated"}, status=202)
             else:
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
@@ -2399,14 +2477,21 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             users = request.data.get('assign_to')
             test.assign_to.clear()
             user_list = []
+            user_names = []
             for user_id in users:
                 user = get_object_or_404(User, id=user_id)
                 test.assign_to.add(user)
                 user_list.append(user)
+                user_names.append(user.employee_name)
+
             test.status = 'assigned'
             test.save()
-
             submission = test.submission
+
+            # Activity
+            desc = f"{request.user.employee_name} assigned test to {', '.join(user_names)}"
+            create_activity(test.submission.id, 'submission', request.user, desc, 'created')
+
             # notification
             skills = ", ".join(skill.title() for skill in test.skills)
             test_type = 'Online'
@@ -2414,6 +2499,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 test_type = "Video"
             if test.is_offline:
                 test_type = 'Offline'
+
             title = f"Test assigned :: {submission.consultant.name} :: {submission.client} :: {test_type} :: {skills}"
             notification_data = {
                 'title': title,
@@ -2482,6 +2568,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.engineer_remarks = data['remarks']
             test.save()
 
+            # Activity
+            desc = f"{request.user.employee_name} completed test and submitted"
+            create_activity(test.submission.id, 'submission', request.user, desc, 'created')
+
             # upload attachments
             for file in request.FILES.getlist('file'):
                 file_data = {
@@ -2495,7 +2585,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # test submit mail
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'submit')
+                res, error = self.send_test_mail(test, data, 'submit', request)
                 if error == 'error':
                     write_exception(res, request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
@@ -2512,6 +2602,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.save()
+
+            # Activity
+            desc = f"Test status updated to {test.get_status_display()} by {request.user.employee_name}"
+            create_activity(test.submission.id, 'submission', request.user, desc, 'update')
+
             file = request.FILES.get('file')
             if file:
                 file_data = {

@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
-from django.db.models import F, Value, CharField
+from django.db.models import Q, F, Value, CharField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 
@@ -16,16 +16,17 @@ from rest_framework.authtoken.models import Token
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, \
+    DestroyModelMixin
 
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from employee.models import User, Role, Team, Asset, ResetPasswordToken, clear_expired, get_token_expiry_time
+from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
-    AssetSerializer
+    AssetSerializer, UserDirectorySerializer, HandoverSerializer
 
 
 # Route - /auth/
@@ -54,7 +55,9 @@ class EmployeeAuthViewSets(GenericViewSet):
             if user:
                 return Response({"message": "User already exist",
                                  "data": self.serializer_class(user, many=True).data[0]['email']}, status=406)
-            user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
+            user = User.objects.create_user(
+                employee_id, email, name, team, gender, phone, password
+            )
             for i in role:
                 r = Role.objects.get(name=i)
                 user.role.add(r)
@@ -96,12 +99,12 @@ class EmployeeAuthViewSets(GenericViewSet):
                 return Response({"data": self.login_serializer_class(user).data}, status=202)
             return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, login=True)
             return Response({"message": "Unable to Login", "error": str(error)}, status=400)
 
 
 # Route - /employee/
-class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin):
+class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
@@ -161,11 +164,71 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             if user:
                 return Response({"message": "User already exist",
                                  "data": self.serializer_class(user, many=True).data[0]['email']}, status=406)
-            user = User.objects.create_user(employee_id, email, name, team, gender, phone, password)
+            user = User.objects.create_user(
+                employee_id, email, name, team, gender, phone, password
+            )
             for i in role:
                 r = Role.objects.get(id=i)
                 user.role.add(r)
             return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=False, url_path='profile')
+    def profile(self, request, *args, **kwargs):
+        try:
+            user_id = request.data.get('user_id')
+            role_ids = request.data.get('role_id', [])
+            team_id = request.data.get('team_id', None)
+            if request.user.is_superuser:
+                user = get_object_or_404(User, id=user_id)
+                desc = ""
+                if team_id:
+                    prev_team = user.team.name
+                    team = get_object_or_404(Team, id=team_id)
+                    user.team = team
+                    desc += f"{request.user.employee_name} changed team from {prev_team} to {team.name} "
+
+                if role_ids:
+                    role_names = []
+                    user.role.clear()
+                    for role_id in role_ids:
+                        role = get_object_or_404(Role, id=role_id)
+                        user.role.add(role)
+                        role_names.append(role.name)
+                    if team_id:
+                        desc += f"and changed role to {', '.join(role_names)}"
+                    else:
+                        desc += f"{request.user.employee_name} changed role to {', '.join(role_names)}"
+
+                user.save()
+                if len(desc) > 0:
+                    create_activity(user.id, 'user', request.user, desc, 'updated')
+                return Response({"message": f"{user.employee_name}'s Profile updated"}, status=202)
+            return Response({"message": DONT_HAVE_ACCESS}, status=401)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=False, url_path='account')
+    def account(self, request):
+        try:
+            user_id = request.data.get('user_id')
+            is_active = request.data.get('active', None)
+            if request.user.is_superuser:
+                user = get_object_or_404(User, id=user_id)
+                if is_active is not None:
+                    user.is_active = is_active
+                    user.save()
+                else:
+                    return Response({"message": "Parameter is not correct", "error": str(is_active)}, status=400)
+
+            if is_active:
+                message = "Activated"
+            else:
+                message = "Deactivated"
+            return Response({"message": f"Account {message}"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -191,9 +254,9 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             query = request.GET.get('query', None)
             if query == 'all':
-                teams = Team.objects.exclude(dept='marketing').values('id', 'name', 'dept')
+                teams = Team.objects.exclude(dept='marketing').values('id', 'name')
             else:
-                teams = Team.objects.filter(dept='Marketing').values('id', 'name', 'dept')
+                teams = Team.objects.filter(dept='Marketing').values('id', 'name')
             return Response({"data": teams}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -211,22 +274,6 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             fcm_token.delete()
         return Response(status=204)
 
-    @action(methods=['put'], detail=False, url_path='change_team')
-    def change_team(self, request):
-        try:
-            user_id = request.data.get('user_id')
-            team_id = request.data.get('team_id')
-            if request.user.is_superuser:
-                user = get_object_or_404(User, id=user_id)
-                team = get_object_or_404(Team, id=team_id)
-                user.team = team
-                user.save()
-                return Response({"message": f"{user.employee_name}'s team update to {team.name}"}, status=202)
-            return Response({"message": DONT_HAVE_ACCESS}, status=401)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
         try:
@@ -237,6 +284,25 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 request.user.save()
                 return Response({"message": "password updated"}, status=200)
             return Response({"message": "Wrong Password"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='directory')
+    def directory(self, request):
+        try:
+            if request.user.is_superuser:
+                query = request.GET.get('query', None)
+                users = User.objects.all().exclude(role__name='consultant')
+                if query:
+                    query = query.lstrip().replace(':amp:', '&')
+                    users = users.filter(
+                        Q(employee_name__istartswith=query) |
+                        Q(email__iexact=query)
+                    )
+                serializer = UserDirectorySerializer(users, many=True)
+                return Response({"data": serializer.data}, status=200)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -586,3 +652,78 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /handover/
+class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset = Handover.objects.all()
+    serializer_class = HandoverSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            if 'superadmin' in request.user.roles:
+                user = get_object_or_404(User, id=request.data.get('user_id'))
+                handover_to = get_object_or_404(User, id=request.data.get('handover_to_id'))
+                handover, created = Handover.objects.get_or_create(user=user)
+                handover_to_name = handover_to.employee_name
+                handover.handover_to = handover_to
+                handover.save()
+                desc = f"{request.user.employee_name} handed-over {user.employee_name} to {handover_to_name}"
+                create_activity(user.id, 'user', request.user, desc, 'created')
+                return Response({"message": f"User handed over to {handover_to_name}"}, status=201)
+            else:
+                return Response({"message": "You don't have permission to Handover"}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            if 'superadmin' in request.user.roles:
+                user_id = kwargs.get('pk', None)
+                user = get_object_or_404(User, id=user_id)
+                handover_to = get_object_or_404(User, id=request.data.get('handover_to_id'))
+                qs = Handover.objects.filter(user_id=user_id)
+                if qs:
+                    handover = qs.first()
+                    prev_handover = handover.handover_to.employee_name
+                    handover_to_name = handover_to.employee_name
+                    handover.handover_to = handover_to
+                    handover.save()
+                    desc = f"{request.user.employee_name} changed handover of {user.employee_name} from " \
+                           f"{prev_handover}  to {handover_to_name}"
+                    create_activity(user.id, 'user', request.user, desc, 'update')
+                    return Response({"message": f"User handed over to {handover_to_name}"}, status=202)
+                else:
+                    return Response({"message": "Handover not found"}, status=404)
+            else:
+                return Response({"message": "You don't have permission to Handover"}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            if 'superadmin' in request.user.roles:
+                user_id = kwargs.get('pk', None)
+                if not user_id:
+                    return Response({"message": f"User is not provided"}, status=400)
+                user = get_object_or_404(User, id=user_id)
+                handovers = Handover.objects.filter(user_id=user_id)
+                if handovers:
+                    desc = f"{request.user.employee_name} removed handover of {user.employee_name}"
+                    create_activity(user.id, 'user', request.user, desc, 'update')
+                    handovers.delete()
+                    return Response({"message": f"User handover removed"}, status=202)
+                else:
+                    return Response({"message": "Handover not found"}, status=404)
+            else:
+                return Response({"message": "You don't have permission to Handover"}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)

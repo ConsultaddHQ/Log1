@@ -64,6 +64,7 @@ INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 AUTH_USER_MODEL = 'employee.User'
 
 MIDDLEWARE = [
+    'log1.middleware.AddressLogMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -188,7 +189,10 @@ logging.config.dictConfig({
     'formatters': {
         'file': {
             'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-        }
+        },
+        'address_format': {
+            'format': '%(message)s :: %(asctime)s'
+        },
     },
     'handlers': {
         'console': {
@@ -198,18 +202,31 @@ logging.config.dictConfig({
         },
         'file': {
             'level': 'ERROR',
-            'backupCount': 20,
+            'backupCount': 5,
             'encoding': 'utf8',
             'formatter': 'file',
             'maxBytes': 10485760,
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': f"{os.path.join(BASE_DIR, 'logs/debug.log')}",
-        }
+        },
+        'access': {
+            'level': 'INFO',
+            'backupCount': 5,
+            'encoding': 'utf8',
+            'maxBytes': 10485760,
+            'formatter': 'address_format',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs/address.log'),
+        },
     },
     'loggers': {
         '': {
             'level': 'ERROR',
             'handlers': ['console', 'file']
+        },
+        'address': {
+            'level': 'INFO',
+            'handlers': ['access']
         }
     }
 })

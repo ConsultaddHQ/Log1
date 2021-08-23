@@ -21,7 +21,7 @@ from project.models import ProjectStatus
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
-from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
     terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
 
@@ -92,11 +92,20 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                consultants = consultants.filter(
-                    Q(name__icontains=query) |
-                    Q(email__iexact=query) |
-                    Q(pocs__poc__employee_name__icontains=query, pocs__end=None)
+                keywords = query.split()
+                or_lookup = (
+                        Q(email__iexact=keywords[0]) |
+                        Q(name__icontains=keywords[0]) |
+                        Q(pocs__poc__employee_name__icontains=keywords[0], pocs__end=None)
                 )
+                for keyword in keywords[1:]:
+                    or_lookup.add((
+                            Q(email__iexact=keyword) |
+                            Q(name__icontains=keyword) |
+                            Q(pocs__poc__employee_name__icontains=keyword)
+                        ), or_lookup.connector)
+
+                consultants = consultants.filter(or_lookup)
 
             consultants = consultants.distinct('id')
 
@@ -1845,24 +1854,23 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
             Normal Login
             :param request, email, password
         """
-        email = request.data.get('email').lower()
-        if email:
-            consultant = get_object_or_404(Consultant, email=email)
-        else:
-            return Response({"error": "Email is Empty"}, status=400)
-        consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
-        if consultant:
-            consultant = consultant.first()
-            if not consultant.p_is_active:
-                return Response({"error": "User account is not Active"}, status=400)
-            try:
+        try:
+            email = request.data.get('email').lower()
+            if email:
+                consultant = get_object_or_404(Consultant, email=email)
+            else:
+                return Response({"error": "Email is Empty"}, status=400)
+            consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
+            if consultant:
+                consultant = consultant.first()
+                if not consultant.p_is_active:
+                    return Response({"error": "User account is not Active"}, status=400)
                 serializer = self.serializer_class(consultant)
                 return Response({"result": serializer.data}, status=202)
-            except Exception as error:
-                write_exception(error, request)
-                return Response({"error": str(error)}, status=400)
-        write_exception("Incorrect Email Id OR Password", request)
-        return Response({"error": "Incorrect Email Id OR Password"}, status=400)
+            return Response({"error": "Incorrect Email Id OR Password"}, status=400)
+        except Exception as error:
+            write_exception(message=error, login=True)
+            return Response({"error": str(error)}, status=400)
 
 
 # Route - /beats_consultant/

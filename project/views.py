@@ -52,7 +52,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         return scrum_masters
 
     @staticmethod
-    def consultant_mail_on_joining(project, password, new_user):
+    def consultant_mail_on_joining(project, password, new_user, request):
         try:
             mail_data = {
                 'template': '../templates/consultant_account_creation.html',
@@ -66,7 +66,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email(mail_data, config.RELATIONS)
+                res, msg = send_email(mail_data, config.RELATIONS, request=request)
                 if not msg:
                     return res, "error"
             return res, "ok"
@@ -75,7 +75,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def send_offer_received_mail(project, scrum_masters):
+    def send_offer_received_mail(project, scrum_masters, request):
         try:
             submission = project.submission
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.team.email]
@@ -111,7 +111,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email(mail_data, submission.created_by.email)
+                res, msg = send_email(mail_data, submission.created_by.email, request=request)
                 if not msg:
                     return res, "error"
             return res, "ok"
@@ -182,7 +182,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
     def send_support_offer_mail(self, project, scrum_masters, request):
         support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
-        offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters)
+        offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
 
         message = "Project created"
         exception_msg = "Mail sent"
@@ -255,7 +255,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def po_end_mail(project, scrum_master_email, po_type):
+    def po_end_mail(project, scrum_master_email, po_type, request):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -310,7 +310,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res1 = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res1, msg1 = send_email(mail_data, marketer.email)
+                res1, msg1 = send_email(mail_data, marketer.email, request=request)
 
             mail_data_eng = {
                 'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
@@ -326,7 +326,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res2 = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res2, msg2 = send_email(mail_data_eng, marketer.email)
+                res2, msg2 = send_email(mail_data_eng, marketer.email, request=request)
 
             return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
@@ -496,6 +496,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 sub.status = 'project'
                 sub.save()
 
+                # Activity
+                desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
+                create_activity(sub.id, 'submission', request.user, desc, 'created')
+
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({
@@ -539,8 +543,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 project.consultant = consultant
             project.is_remote = request.data.get('is_remote', False)
             project.save()
-            util = ProjectUtil(project)
 
+            util = ProjectUtil(project)
+            desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 scrum_masters = self.fetch_scrum_masters(request)
@@ -559,6 +564,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 # PO Received
                 if new_status == 'received' and not project.is_msg_sent:
                     # Offer received message
+                    desc = f"Purchase order status changed to Received"
                     util.send_receive_notification(request.user)
                     project.is_msg_sent = True
                     project.save()
@@ -567,6 +573,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 elif new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
+                    desc = f"Purchase order status changed to Joined and Timesheet APP access mail is sent to consultant"
                     if marketing.status == 'open':
                         marketing.end = date.today()
                         marketing.status = 'close'
@@ -577,7 +584,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                     # Setting password for User (consultant)
                     password, new_user = set_consultant_password(project.consultant)
-                    resp, err = self.consultant_mail_on_joining(project, password, new_user)
+                    resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
 
                     util.send_join_notification(request.user)
 
@@ -586,7 +593,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     marketing.status = 'open'
                     marketing.save()
                     project.support.update(end=datetime.now())
-                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled')
+                    desc = f"Purchase order status changed to Cancelled and cancellation mail is updated"
+                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
                     util.send_cancellation_notification(request.user)
 
                 # Project Terminated
@@ -594,7 +602,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
-                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated')
+                    desc = f"Purchase order status changed to Terminated and termination mail is sent"
+                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     po_status = project_status_obj.get_status_display()
                     util.send_termination_notification(po_status, request.user)
 
@@ -603,9 +612,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
-                    resp, err = self.po_end_mail(project, scrum_masters, 'project completed')
+                    desc = f"Purchase order status changed to Complete"
+                    resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
                     util.send_completion_notification(request.user)
 
+            # Activity
+            create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
@@ -644,7 +656,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 res, error = 'development server', 'development server'
                 if os.environ.get('ENV', 'local') == 'prod':
-                    res, error = self.po_mail(project, path, self.fetch_scrum_masters(request), po_type)
+                    res, error = self.po_mail(project, path, self.fetch_scrum_masters(request), po_type, request)
                 delete_temp_file(path)
                 if not error == 'error':
                     project.submission.consultant_marketing.status = 'close'
@@ -659,6 +671,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         if created:
                             prev_status.is_current = False
                             prev_status.save()
+                        desc = "Purchase order status is updated to Onboarded and Onboarding mail is sent"
+
+                        # Activity
+                        create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
                     return Response({"message": "On-boarding mail sent", "error": res}, status=200)
                 return Response({"data": str(res)}, status=400)
             else:

@@ -21,7 +21,7 @@ from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringRe
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectSupportViewSet, ProjectOrderViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
-    AllUsersViewSet
+    AllUsersViewSet, HandoverViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets, SubmissionV2ViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
@@ -34,7 +34,9 @@ router.register(r'users', AllUsersViewSet)
 router.register(r'assets', AssetsViewSets)
 router.register(r'auth', EmployeeAuthViewSets)
 router.register(r'employee', EmployeeViewSets)
+router.register(r'handover', HandoverViewSets)
 router.register(r'password', ResetPasswordViewSets)
+
 
 router.register(r'attachment', AttachmentView)
 router.register(r'get_attachment', AttachmentGetView)

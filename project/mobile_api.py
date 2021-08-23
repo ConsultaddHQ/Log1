@@ -299,7 +299,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     "message": message,
                 },
             }
-            send_email(mail_data, 'log1@consultadd.com')
+            send_email(mail_data, 'log1@consultadd.com', request=request)
 
             user_list = User.objects.filter(role__name='finance')
             title = f"{request.user.name} has Timesheet issue, please check mail."

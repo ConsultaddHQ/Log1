@@ -249,7 +249,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                         'link': f"https://{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
                     },
                 }
-                send_email(mail_data, petition.assigned_to.email)
+                send_email(mail_data, petition.assigned_to.email, request=request)
             petition.status = "doc_request_sent"
             petition.save()
             return Response({
@@ -584,7 +584,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                     'consultant_email': petition.beneficiary.email,
                 },
             }
-            send_email(mail_data, beneficiary.email)
+            send_email(mail_data, beneficiary.email, request=request)
             return Response({"result": {"message": "mail sent"}}, status=200)
         except Exception as error:
             write_exception(error, request)
