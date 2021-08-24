@@ -23,7 +23,7 @@ from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
-from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer, UserDirectorySerializer, HandoverSerializer
@@ -83,6 +83,8 @@ class EmployeeAuthViewSets(GenericViewSet):
             user = queryset.first()
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:
+                if not user.account_login:
+                    return Response({"message": "Your account is not active"}, status=400)
                 user.last_login = datetime.now()
                 user.save()
                 fcm_token = request.data.get("fcm_token", None)
@@ -215,16 +217,16 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     def account(self, request):
         try:
             user_id = request.data.get('user_id')
-            is_active = request.data.get('active', None)
+            account_login = request.data.get('active', None)
             if request.user.is_superuser:
                 user = get_object_or_404(User, id=user_id)
-                if is_active is not None:
-                    user.is_active = is_active
+                if account_login is not None:
+                    user.account_login = account_login
                     user.save()
                 else:
-                    return Response({"message": "Parameter is not correct", "error": str(is_active)}, status=400)
+                    return Response({"message": "Parameter is not correct", "error": str(account_login)}, status=400)
 
-            if is_active:
+            if account_login:
                 message = "Activated"
             else:
                 message = "Deactivated"
@@ -290,6 +292,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
 
     @action(methods=['get'], detail=False, url_path='directory')
     def directory(self, request):
+        first, last = get_page_limits(request)
         try:
             if request.user.is_superuser:
                 query = request.GET.get('query', None)
@@ -297,11 +300,12 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 if query:
                     query = query.lstrip().replace(':amp:', '&')
                     users = users.filter(
-                        Q(employee_name__istartswith=query) |
+                        Q(employee_name__icontains=query) |
                         Q(email__iexact=query)
                     )
-                serializer = UserDirectorySerializer(users, many=True)
-                return Response({"data": serializer.data}, status=200)
+                total = users.count()
+                serializer = UserDirectorySerializer(users[first:last], many=True)
+                return Response({"data": serializer.data, "total": total}, status=200)
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(error, request)
