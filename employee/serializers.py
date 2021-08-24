@@ -51,9 +51,15 @@ class TeamSerializer(serializers.ModelSerializer):
 
 
 class RoleSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
     class Meta:
         model = Role
         fields = ('id', 'name')
+
+    @staticmethod
+    def get_name(obj):
+        return obj.name.title().replace("_", " ")
 
 
 class UserDirectorySerializer(serializers.ModelSerializer):
@@ -63,7 +69,7 @@ class UserDirectorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'email', 'employee_name', 'team', 'role', 'is_active', 'handover_to')
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'team', 'role', 'account_login', 'handover_to')
 
     @staticmethod
     def get_handover_to(obj):

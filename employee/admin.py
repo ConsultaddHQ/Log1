@@ -16,7 +16,7 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     fieldsets = (
         (None, {'fields': ('team', 'employee_id', 'username', 'email', 'password')}),
         ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role')}),
-        ('Permissions', {'fields': ('is_active', 'is_superuser', 'is_staff', 'user_permissions', 'groups')}),
+        ('Permissions', {'fields': ('account_login', 'is_active', 'is_superuser', 'is_staff', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
 
@@ -24,7 +24,7 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     date_hierarchy = 'last_login'
     list_filter = ('team', 'role', 'is_active')
     search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
-    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'roles')
+    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'account_login', 'roles')
 
     def roles(self, obj):
         return ", ".join([

@@ -21,7 +21,7 @@ from project.models import ProjectStatus
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
-from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
     terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
 
@@ -52,8 +52,8 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             if filter_json:
                 filters = json.loads(filter_json)
 
-                if 'days' in filters:
-                    day_filter = marketing_days_filter(filters['days'])
+                if 'days_on_bench' in filters:
+                    day_filter = marketing_days_filter(filters['days_on_bench'])
                     consultants = consultants.filter(**day_filter)
 
                 if 'gender' in filters:
@@ -813,7 +813,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 if qs:
                     prev_rate_obj = qs.first()
                     prev_rate = prev_rate_obj.rate
-                    prev_rate_obj = prev_rate_obj.first()
                     prev_rate_obj.end = datetime.today()
                     prev_rate_obj.save()
 
