@@ -82,7 +82,7 @@ def get_page_limits(request):
         elif 'size' in request.GET:
             page_size = int(request.GET.get("size", 10))
         else:
-            page_size = 20
+            page_size = 10
         return page * page_size - page_size, page * page_size
     except Exception as error:
         write_exception(message=error, request=request)

@@ -159,7 +159,7 @@ def send_exit_interview_detail(terminate, request):
         return error
 
 
-def terminate_consultant(terminate):
+def terminate_consultant(terminate, request):
     try:
         consultant = terminate.consultant
         consultant.status = 'terminated'
@@ -176,7 +176,7 @@ def terminate_consultant(terminate):
 
         # Email for Exit Process Cancelled
         if os.environ.get('ENV', 'local') == 'prod':
-            res, error = send_exit_process_mail(terminate, 'complete')
+            res, error = send_exit_process_mail(terminate, 'complete', request)
             if error == 'error':
                 write_info(message=error, function='terminate_consultant')
 
@@ -348,6 +348,58 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
         return error, "error"
 
 
+def fetch_consultant_count(team):
+    day_one = datetime.today().replace(day=1, hour=0, minute=0)
+    team_count = "NA"
+    if team:
+        team_count = Consultant.objects.filter(created__date__lte=day_one, pocs__poc__team=team).count()
+    total_count = Consultant.objects.filter(created__date__lte=day_one).count()
+    return total_count, team_count
+
+
+def new_recruit_notification(consultant, source, cfr):
+    try:
+        visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
+        recruiter_gender = '&#129490;'
+        qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
+        if qs:
+            recruiter = qs.first().poc
+            recruiter_team = recruiter.team
+            if recruiter.gender == 'female':
+                recruiter_gender = '&#128103;'
+
+        total_count, team_count = fetch_consultant_count(recruiter_team)
+        qs = WorkAuth.objects.filter(consultant=consultant)
+        if qs:
+            visa = qs.first().get_visa_type_display()
+        qs = ConsultantRateRevision.objects.filter(consultant=consultant)
+        if qs:
+            rate = qs.first().rate
+
+        consultant_gender = '&#128105;' if consultant.gender == 'female' else '&#128104;'
+        data = {
+            "title": "New Recruit on Bench  &#129304;&#128516;&#129304;",
+            "text": f""" **Consultant** <br>
+                {consultant_gender} Name :  {consultant.name} <br>
+                {consultant_gender} Email :  {consultant.email} <br>
+                {recruiter_gender} Recruiter :  {recruiter.employee_name} <br>
+                 ✨ Profile :  {consultant.skills} <br>
+                🇺🇸 Visa :  {visa}<br>
+                ✨ Source :  {source}<br> 
+                &#128181; Rate : {rate} <br>
+                 🇺🇸  Current Location :  {consultant.current_city} <br>
+                &#x1F4BC; Team :  {recruiter_team} <br> 
+                &#129490; CFR :  {cfr} <br>
+                <br> Recruit Count of {recruiter_team} for this month - {total_count}
+                <br> Total Recruit Count of this month - {team_count}"""
+        }
+        # Sending message on Messaging Tool
+        post_msg_using_webhook(config.offer_url, data)
+
+    except Exception as error:
+        write_exception(message=error)
+
+
 def add_other_details(request, consultant_id):
     try:
         work_auths, experiences, educations, documents = [], [], [], []
@@ -487,6 +539,7 @@ def create_consultant(request, creator_id):
             )
 
             add_other_details(request, consultant_id)
+            new_recruit_notification(consultant, request.data.get('source'), request.data.get('cfr'))
             return consultant, "ok"
     except Exception as error:
         write_exception(error, request)

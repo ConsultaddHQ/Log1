@@ -563,6 +563,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    def destroy(self, request, *args, **kwargs):
+        return Response({"detail": "Method DELETE not allowed."}, status=405)
+
     @action(methods=['get'], detail=True, url_path='activities')
     def activities(self, request, *args, **kwargs):
         try:
@@ -1578,11 +1581,11 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             res = "Development Server"
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
-                terminate_consultant(con_exit)
+                terminate_consultant(con_exit, request)
             else:
                 # Email for starting Exit Process
                 if os.environ.get('ENV', 'local') == 'prod':
-                    res, error = send_exit_process_mail(con_exit, 'start')
+                    res, error = send_exit_process_mail(con_exit, 'start', request)
                     if error == 'error':
                         write_exception(res, request)
                         return Response({"message": "Exit process mail not sent", "error": str(res)}, status=400)
@@ -1615,7 +1618,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             serializer.save()
 
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
-                terminate_consultant(con_exit)
+                terminate_consultant(con_exit, request)
 
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
@@ -1648,7 +1651,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 # Email for Exit Process Cancelled
                 res = "Development Server"
                 if os.environ.get('ENV', 'local') == 'prod':
-                    res, error = send_exit_process_mail(con_exit, 'cancel')
+                    res, error = send_exit_process_mail(con_exit, 'cancel', request)
                     if error == 'error':
                         write_exception(res, request)
                         return Response({"message": "Cancel Termination main not sent", "error": str(res)}, status=400)

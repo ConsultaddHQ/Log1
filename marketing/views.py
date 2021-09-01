@@ -2283,6 +2283,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 queryset = Test.objects.filter(
+                    Q(id__exact=query) |
                     Q(submission__client__istartswith=query) |
                     Q(submission__created_by__employee_name__istartswith=query) |
                     Q(submission__lead__vendor_company__name__istartswith=query) |
