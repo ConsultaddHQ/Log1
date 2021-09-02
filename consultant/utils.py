@@ -99,7 +99,10 @@ def send_exit_interview_detail(terminate, request):
         # Message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
         reason = ", ".join(reason.name for reason in terminate.reasons.all())
-        termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        if terminate.last_date:
+            termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        else:
+            termination_date = "NA"
         data = {
             "title": f"Exit interview for {terminate.consultant.name}",
             "text": f"**Reason for leaving** : {reason}<br>"
@@ -400,8 +403,9 @@ def new_recruit_notification(consultant, source, cfr):
         write_exception(message=error)
 
 
-def add_other_details(request, consultant_id):
+def add_other_details(request, consultant):
     try:
+        consultant_id = consultant
         work_auths, experiences, educations, documents = [], [], [], []
         if 'work_auth' in request.data:
             work_auths = json.loads(request.data.get('work_auth'))
@@ -451,16 +455,17 @@ def add_other_details(request, consultant_id):
         if 'documents' in request.data:
             documents = json.loads(request.data.get('documents'))
 
-        for document in documents:
-            res, res_data = beats_to_log1(
-                model='consultant',
-                obj_id=consultant_id,
-                file_path=document['file_path'],
-                file_name=document['file_name'],
-            )
-            if not res:
-                write_info(res_data, 'add_other_details', request)
-                return res_data, "error"
+        if consultant.attachments.all().exists():
+            for document in documents:
+                res, res_data = beats_to_log1(
+                    model='consultant',
+                    obj_id=consultant_id,
+                    file_path=document['file_path'],
+                    file_name=document['file_name'],
+                )
+                if not res:
+                    write_info(res_data, 'add_other_details', request)
+                    return res_data, "error"
         return "Details added", "ok"
     except Exception as error:
         write_exception(error, request)
@@ -483,8 +488,7 @@ def create_consultant(request, creator_id):
         qs = Consultant.objects.filter(email=request.data.get('email'))
         if qs:
             consultant = qs.first()
-            consultant_id = consultant.id
-            result, msg = add_other_details(request, consultant_id)
+            result, msg = add_other_details(request, consultant)
             if msg == 'error':
                 write_info(result, 'create_consultant', request)
             return consultant, "exists"
@@ -538,7 +542,7 @@ def create_consultant(request, creator_id):
                 current_city=request.data.get('current_location'),
             )
 
-            add_other_details(request, consultant_id)
+            add_other_details(request, consultant)
             new_recruit_notification(consultant, request.data.get('source'), request.data.get('cfr'))
             return consultant, "ok"
     except Exception as error:

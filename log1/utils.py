@@ -76,6 +76,8 @@ def write_exception(message, request=None, login=False):
 
 def get_page_limits(request):
     try:
+        if request.GET.get("page") == 'undefined':
+            return 1, 10
         page = int(request.GET.get("page", 1))
         if 'page_size' in request.GET:
             page_size = int(request.GET.get("page_size", 10))

@@ -26,7 +26,7 @@ from consultant.utils import close_marketing, start_marketing, send_exit_process
     terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter
 
 
-# Route - v2/consultant/
+# Route - /v2/consultant/
 class ConsultantV2ViewSets(viewsets.ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -93,6 +93,10 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 keywords = query.split()
+                consultants = consultants.filter(
+                    Q(name__icontains=query) |
+                    Q(pocs__poc__employee_name__icontains=query)
+                )
                 or_lookup = (
                         Q(email__iexact=keywords[0]) |
                         Q(name__icontains=keywords[0]) |
@@ -105,8 +109,8 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                             Q(pocs__poc__employee_name__icontains=keyword)
                         ), or_lookup.connector)
 
-                consultants = consultants.filter(or_lookup)
-
+                lookup_qs = consultants.filter(or_lookup)
+                consultants = consultants.union(lookup_qs)
             consultants = consultants.distinct('id')
 
             offer_candidates = consultants.filter(
@@ -1890,6 +1894,8 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
             creator_id = User.objects.get(employee_id=1000)
             data, msg = create_consultant(request, creator_id.id)
             if msg == 'ok':
+                desc = "Profile moved from Beats"
+                create_activity(data.id, 'consultant', request.user, desc, 'created')
                 return Response({"message": "Created"}, status=201)
             elif msg == "exists":
                 return Response({"message": "Consultant already exists"}, status=400)
