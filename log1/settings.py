@@ -277,6 +277,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('interview_feedback_url', ('URL', 'Interview Feedback')),
     ('exit_interview_url', ('URL', 'Exit Interview Channel')),
     ('project_termination_url', ('URL', 'Project Terminations')),
+    ('new_recruit_on_bench', ('URL', 'New Recruit On Bench Channel')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -291,6 +292,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
         'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
         'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
-        'products_dev'
+        'products_dev', 'new_recruit_on_bench'
     ),
 }
