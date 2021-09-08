@@ -573,7 +573,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 elif new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
-                    desc = f"Purchase order status changed to Joined and Timesheet APP access mail is sent to consultant"
+                    desc = f"PO status changed to Joined and Timesheet APP access mail is sent to consultant"
                     if marketing.status == 'open':
                         marketing.end = date.today()
                         marketing.status = 'close'

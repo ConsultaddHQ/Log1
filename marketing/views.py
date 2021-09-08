@@ -780,6 +780,26 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @action(methods=['get'], detail=False, url_path="feedback_check")
+    def feedback_check(self, request, *args, **kwargs):
+        try:
+            data = {'test': False, 'interview': False}
+            qs = Submission.objects.filter(id=kwargs.get('pk'))
+            if qs:
+                submission = qs.first()
+                test_qs = submission.test.filter(status='feedback_due')
+                interview_qs = submission.screening.filter(status='feedback_due')
+                if test_qs:
+                    data['test'] = True
+                if interview_qs:
+                    data['interview'] = True
+            else:
+                return Response({"message": "Submission not found"}, status=404)
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['put'], detail=True, url_path='resume')
     def resume(self, request, *args, **kwargs):
         try:
