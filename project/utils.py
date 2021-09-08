@@ -191,8 +191,8 @@ class ProjectUtil:
                 {emojis['client']} Client :  {self.project.submission.client}<br>
                 {emojis['role']} Role :  {self.project.submission.lead.job_title}<br>
                 &#128221; Joining Date :  {self.project_start}<br><br>
-                Project Joined count of {self.employer} for this month - {team}<br>
-                Total Project Joined count of this month - {total}"""
+                Project Joined from {self.employer} for this month - {team}<br>
+                Total Project Joined for this month - {total}"""
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.joined_url, data)

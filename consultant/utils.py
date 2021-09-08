@@ -355,8 +355,8 @@ def fetch_consultant_count(team):
     day_one = datetime.today().replace(day=1, hour=0, minute=0)
     team_count = "NA"
     if team:
-        team_count = Consultant.objects.filter(created__date__lte=day_one, pocs__poc__team=team).count()
-    total_count = Consultant.objects.filter(created__date__lte=day_one).count()
+        team_count = Consultant.objects.filter(created__date__gte=day_one, pocs__poc__team=team).count()
+    total_count = Consultant.objects.filter(created__date__gte=day_one).count()
     return total_count, team_count
 
 
@@ -388,16 +388,16 @@ def new_recruit_notification(consultant, source, cfr):
                 {recruiter_gender} Recruiter :  {recruiter.employee_name} <br>
                  ✨ Profile :  {consultant.skills} <br>
                 🇺🇸 Visa :  {visa}<br>
-                ✨ Source :  {source}<br> 
+                ✨ Source :  {source}<br>
                 &#128181; Rate : {rate} <br>
                  🇺🇸  Current Location :  {consultant.current_city} <br>
-                &#x1F4BC; Team :  {recruiter_team} <br> 
+                &#x1F4BC; Team :  {recruiter_team} <br>
                 &#129490; CFR :  {cfr} <br>
-                <br> Recruit Count of {recruiter_team} for this month - {total_count}
-                <br> Total Recruit Count of this month - {team_count}"""
+                <br> Recruit Count of {recruiter_team} for this month - {team_count}
+                <br> Total Recruit Count of this month - {total_count}"""
         }
         # Sending message on Messaging Tool
-        post_msg_using_webhook(config.offer_url, data)
+        post_msg_using_webhook(config.new_recruit_on_bench, data)
 
     except Exception as error:
         write_exception(message=error)
@@ -405,7 +405,7 @@ def new_recruit_notification(consultant, source, cfr):
 
 def add_other_details(request, consultant):
     try:
-        consultant_id = consultant
+        consultant_id = consultant.id
         work_auths, experiences, educations, documents = [], [], [], []
         if 'work_auth' in request.data:
             work_auths = json.loads(request.data.get('work_auth'))

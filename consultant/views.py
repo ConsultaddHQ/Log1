@@ -1895,7 +1895,8 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
             data, msg = create_consultant(request, creator_id.id)
             if msg == 'ok':
                 desc = "Profile moved from Beats"
-                create_activity(data.id, 'consultant', request.user, desc, 'created')
+                user = User.objects.get(employee_id=1000)
+                create_activity(data.id, 'consultant', user, desc, 'created')
                 return Response({"message": "Created"}, status=201)
             elif msg == "exists":
                 return Response({"message": "Consultant already exists"}, status=400)
