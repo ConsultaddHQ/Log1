@@ -8,6 +8,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.documentation import include_docs_urls
 
 from activity.views import CommentViewSet
+from engineering.views import EngineeringViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
 from utils_app.views import CityViewSets, ChoiceViewSet
@@ -36,7 +37,6 @@ router.register(r'auth', EmployeeAuthViewSets)
 router.register(r'employee', EmployeeViewSets)
 router.register(r'handover', HandoverViewSets)
 router.register(r'password', ResetPasswordViewSets)
-
 
 router.register(r'attachment', AttachmentView)
 router.register(r'get_attachment', AttachmentGetView)
@@ -85,6 +85,7 @@ router.register(r'fcm', FCMDeviceViewSet)
 router.register(r'emp_notify', EmployeeNotificationViewSet)
 router.register(r'con_notify', ConsultantNotificationViewSet)
 
+router.register(r'engineering', EngineeringViewSet)
 
 # Mobile App routes
 router.register(r'consultant_app', ConsultantAppViewSet)

@@ -780,7 +780,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @action(methods=['get'], detail=False, url_path="feedback_check")
+    @action(methods=['get'], detail=True, url_path="feedback_check")
     def feedback_check(self, request, *args, **kwargs):
         try:
             data = {'test': False, 'interview': False}

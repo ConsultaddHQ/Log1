@@ -39,11 +39,11 @@ def get_users_and_attendees(request, interview):
     return user_list, attendees
 
 
-def date_filter(queryset, created, field_str):
+def date_filter(queryset, timestamp, field_str):
     filters = dict()
-    if created and type(created) == dict:
-        lte = created.get('lte', None)
-        gte = created.get('gte', None)
+    if timestamp and type(timestamp) == dict:
+        lte = timestamp.get('lte', None)
+        gte = timestamp.get('gte', None)
         if lte:
             filters[f"{field_str}__lte"] = lte
         if gte:

@@ -57,6 +57,7 @@ PROJECT_APPS = [
     'notification.apps.NotificationConfig',
     'impersonate.apps.ImpersonateConfig',
     'messaging.apps.MessagingConfig',
+    'engineering.apps.EngineeringConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
