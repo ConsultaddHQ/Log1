@@ -1,3 +1,4 @@
+from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
@@ -11,21 +12,40 @@ class POCSerializer(serializers.ModelSerializer):
 
 
 class EngineeringSerializer(serializers.ModelSerializer):
-    status = serializers.SerializerMethodField()
+    project_status = serializers.SerializerMethodField()
+    support_status = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'status')
+        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status')
 
     @staticmethod
-    def get_status(obj):
+    def get_project_status(obj):
         status = obj.statuses.filter(is_current=True)
         if status:
             return status.first().status
         return None
+
+    @staticmethod
+    def get_support_status(obj):
+        qs = obj.support_status.filter(end=None)
+        if obj.statuses.filter(status__istartswith='terminated').first():
+            return 'terminated'
+        if qs:
+            support_status = qs.first()
+            if support_status.start and obj.project.start > date.today():
+                return 'training'
+            elif support_status.status == 'more_than_2_days':
+                return 'active'
+            elif support_status.status == 'less_than_3_days':
+                return 'less_active'
+            elif support_status.status in ('twice_a_month', 'independent'):
+                return 'independent'
+            else:
+                return None
 
     @staticmethod
     def get_support(obj):
@@ -66,15 +86,7 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'start_date', 'submission', 'status', 'remote_consultant',
-                  'marketer')
-
-    @staticmethod
-    def get_status(obj):
-        status = obj.statuses.filter(is_current=True)
-        if status:
-            return status.first().status
-        return None
+        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer')
 
     @staticmethod
     def get_marketer(obj):
@@ -88,7 +100,16 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_submission(obj):
         lead = obj.submission.lead
+        resume = None
+        qs = obj.submission.attachments.filter(attachment_type='resume')
+        if qs:
+            resume = qs.first()
+            resume = {
+                "id": resume.id,
+                "name": resume.attachment_file.name,
+            }
         return {
+            "resume": resume,
             "location": lead.city,
             "job_title": lead.job_title,
             "client": obj.submission.client,

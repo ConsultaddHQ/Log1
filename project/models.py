@@ -192,6 +192,19 @@ class SupportStatus(models.Model):
         return f'{self.id}:{self.support.support.employee_name} - {self.frequency}'
 
 
+class ProjectSupportStatus(TimeStampedModel):
+    end = models.DateField(_('End Date'), null=True)
+    start = models.DateField(_('Start Date'), null=True)
+    status = models.CharField(_('Status'), max_length=50)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE,
+        verbose_name='Project', related_name='support_status',
+    )
+
+    def __str__(self):
+        return f'{self.id} - {self.status}'
+
+
 class TimeSheet(TimeStampedModel):
     attachments = GenericRelation(Attachment)
     start = models.DateField(_('Start'), null=True, blank=True)
