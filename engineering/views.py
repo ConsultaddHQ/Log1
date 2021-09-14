@@ -12,6 +12,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from project.models import Project
 from marketing.utils import date_filter
 from engineering.serializers import ProjectSupportSerializer
+from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
 from engineering.serializers import EngineeringSerializer, EngineeringDetailSerializer
 
@@ -32,6 +33,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             projects = Project.objects.filter(
                 statuses__is_current=True, statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
             )
+            filters = {}
             if filter_json:
                 filters = json.loads(filter_json)
 
@@ -56,6 +58,51 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 if 'client' in filters:
                     projects = projects.filter(submission__client=filters['client'])
 
+                if 'support' in filters:
+                    projects = projects.filter(support__support_id=filters['support'])
+
+                start_date = filters.get('start_date', None)
+                projects = date_filter(projects, start_date, 'start_date')
+
+            if filter_for == 'my':
+                projects = projects.filter(
+                    support__support=request.user,
+                )
+
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                projects = projects.filter(
+                    Q(submission__client__istartswith=query) |
+                    Q(support__support__employee_name__istartswith=query) |
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                )
+
+            counts = {
+                "training": {
+                    "display_name": "Training",
+                    "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
+                                             support__statuses__frequency='more_than_2_days').count()
+                },
+                "active": {
+                    "display_name": "Active",
+                    "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
+                                             support__statuses__frequency='more_than_2_days').count()
+                },
+                "less_active": {
+                    "display_name": "Less Active",
+                    "count": projects.filter(support__statuses__is_current=True,
+                                             support__statuses__frequency='less_than_3_days').count()
+                },
+                "independent": {
+                    "display_name": "Independent",
+                    "count": projects.filter(support__statuses__is_current=True,
+                                             support__statuses__frequency__in=['independent', 'twice_a_month']).count()
+                },
+            }
+
+            if filter_json:
                 if 'support_status' in filters:
                     if filters['support_status'] == 'training':
                         projects = projects.filter(
@@ -80,29 +127,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             statuses__statuses__frequency__in=['independent', 'twice_a_month'],
                         )
 
-                if 'support' in filters:
-                    projects = projects.filter(support__support_id=filters['support'])
-
-                start_date = filters.get('start_date', None)
-                projects = date_filter(projects, start_date, 'start_date')
-
-            if filter_for == 'my':
-                projects = projects.filter(
-                    support__support=request.user,
-                )
-
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                projects = projects.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(support__support__employee_name__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                )
-
+            total = projects.count()
             serializer = self.serializer_class(projects[first:last], many=True)
-            return Response({"data": serializer.data}, status=200)
+            return Response({"data": serializer.data, "total": total, "counts": counts}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -156,3 +183,12 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path="activity")
+    def activity(self, request, *args, **kwargs):
+        try:
+            activities = Activity.objects.filter(object_id=kwargs.get('pk'), content_type__model='project_support')
+            serializer = ActivitySerializer(activities.order_by('-created'), many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

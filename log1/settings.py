@@ -198,7 +198,6 @@ logging.config.dictConfig({
     'handlers': {
         'console': {
             'formatter': 'file',
-            'stream': 'ext://sys.stdout',
             'class': 'logging.StreamHandler',
         },
         'file': {

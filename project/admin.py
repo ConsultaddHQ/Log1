@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from project.models import Project, ProjectSupport, SupportStatus, ProjectStatus, ProjectOrder, TimeSheet, \
-    PayrollSchedule, ProjectSupportStatus
+    PayrollSchedule
 
 
 @admin.register(Project)
@@ -65,22 +65,14 @@ class ProjectOrderAdmin(ExportActionModelAdmin):
 
 @admin.register(TimeSheet)
 class TimeSheetAdmin(ExportActionModelAdmin):
-    actions = ["export_as_csv"]
     list_filter = ('status',)
+    actions = ["export_as_csv"]
     search_fields = ('id', 'project__id', 'project__consultant__name', 'project__consultant__email')
-    list_display = ('id', 'project', 'is_active', 'status', 'hours', 'additional_hours', 'start', 'end', 'submitted_at',
-                    'con_comment')
+    list_display = ('id', 'project', 'status', 'hours', 'start', 'end', 'submitted_at', 'con_comment')
 
 
 @admin.register(PayrollSchedule)
 class PayrollScheduleAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
     list_display = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
     search_fields = ('id', 'pay_period_start', 'pay_period_end', 'processing_date', 'pay_date', 'pay_day')
-    actions = ["export_as_csv"]
-
-
-@admin.register(ProjectSupportStatus)
-class ProjectSupportStatusAdmin(ExportActionModelAdmin):
-    actions = ["export_as_csv"]
-    search_fields = ('id', "project__id", "status")
-    list_display = ('id', "project", "status", "start", "end")

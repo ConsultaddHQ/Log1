@@ -1,5 +1,8 @@
 import os
 import json
+from operator import or_
+from functools import reduce
+from django.db.models import Q
 from django.utils import timezone
 from datetime import date, datetime, timedelta
 from django.core.files.base import ContentFile
@@ -562,3 +565,175 @@ def marketing_days_filter(days):
     elif days == 'gt_36':
         day_filter['marketing__start__lte'] = timezone.now().date() - timedelta(days=36)
     return day_filter
+
+
+def queryset_filter_by_status(queryset, sub_status, offer_candidates=None):
+    if sub_status == 'non_pool':
+        queryset = queryset.filter(marketing__in_pool=False, marketing__status='open')
+
+    elif sub_status == 'in_pool':
+        queryset = queryset.filter(
+            marketing__in_pool=True, marketing__status='open'
+        ).exclude(id__in=offer_candidates)
+
+    elif sub_status == 'on_boarded':
+        queryset = queryset.filter(
+            projects__statuses__status='on_boarded',
+            projects__statuses__is_current=True
+        )
+
+    elif sub_status == 'in_offer':
+        queryset = queryset.filter(
+            projects__statuses__status__in=['new', 'received'],
+            projects__statuses__is_current=True
+        )
+
+    elif sub_status == 'fired':
+        queryset = queryset.filter(exit__type='fired')
+
+    elif sub_status == 'resigned':
+        queryset = queryset.filter(exit__type='resigned')
+
+    elif sub_status == 'absconded':
+        queryset = queryset.filter(exit__type='absconded')
+
+    return queryset.distinct('id')
+
+
+def status_filter_obj(consultants, open_candidates, offer_candidates):
+    return {
+        "all": consultants,
+        "terminated": consultants.filter(status='terminated'),
+
+        "marketing_candidate": consultants.filter(
+            status='on_bench', marketing__status='close'
+        ).exclude(id__in=open_candidates),
+
+        "on_project": consultants.filter(
+            projects__statuses__status='joined', projects__statuses__is_current=True
+        ).exclude(status='terminated'),
+
+        "offer": consultants.filter(
+            projects__statuses__is_current=True,
+            projects__statuses__status__in=['new', 'received', 'on_boarded'],
+        ).exclude(status='terminated'),
+
+        "on_bench": consultants.filter(marketing__status='open').exclude(id__in=offer_candidates)
+    }
+
+
+def sub_status_filter_obj(consultants, con_status, offer_candidates):
+    sub_status_obj = dict()
+    if con_status == 'on_bench':
+        sub_status_obj = {
+            'in_pool': queryset_filter_by_status(consultants, 'in_pool', offer_candidates).count(),
+            'non_pool': queryset_filter_by_status(consultants, 'non_pool', offer_candidates).count(),
+        }
+
+    elif con_status == 'offer':
+        sub_status_obj = {
+            'in_offer': queryset_filter_by_status(consultants, 'in_offer').count(),
+            'on_boarded': queryset_filter_by_status(consultants, 'on_boarded').count(),
+        }
+
+    elif con_status == 'terminated':
+        sub_status_obj = {
+            'fired': queryset_filter_by_status(consultants, 'fired').count(),
+            'resigned': queryset_filter_by_status(consultants, 'resigned').count(),
+            'absconded': queryset_filter_by_status(consultants, 'absconded').count(),
+        }
+    return sub_status_obj
+
+
+def candidate_filter(request):
+    try:
+        query = request.GET.get('query', None)
+        con_status = request.GET.get('status', '')
+        filter_json = request.GET.get('filter_json', None)
+        con_sub_status = request.GET.get('sub_status', None)
+        consultants = Consultant.objects.all()
+
+        if filter_json:
+            filters = json.loads(filter_json)
+
+            if 'gender' in filters:
+                consultants = consultants.filter(gender=filters['gender'])
+
+            if 'days_on_bench' in filters:
+                day_filter = marketing_days_filter(filters['days_on_bench'])
+                consultants = consultants.filter(**day_filter)
+
+            if 'recruiter' in filters:
+                consultants = consultants.filter(pocs__poc=filters['recruiter'])
+
+            if 'team' in filters and len(filters['team']) > 0:
+                consultants = consultants.filter(
+                    marketing__teams__name__iexact=filters['team'], marketing__status='open'
+                )
+
+            if 'visa' in filters:
+                consultants = consultants.filter(
+                    work_auth__visa_type__in=filters['visa'], work_auth__is_current=True
+                )
+
+            if 'visa_end' in filters:
+                consultants = consultants.filter(
+                    work_auth__visa_end__lte=filters['visa_end'], work_auth__is_current=True
+                )
+
+            if 'rtg' in filters:
+                consultants = consultants.filter(marketing__rtg=filters['rtg'], marketing__status='open')
+
+            if 'skills' in filters and len(filters["vendor"]) > 0:
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in filters['skills']]))
+
+            if 'dob' in filters:
+                if 'lte' in filters['dob']:
+                    consultants = consultants.filter(
+                        date_of_birth__year__lte=filters['dob']['lte']
+                    )
+                elif 'gte' in filters['dob']:
+                    consultants = consultants.filter(
+                        date_of_birth__year__gte=filters['dob']['gte']
+                    )
+
+        if query:
+            query = query.lstrip().replace(':amp:', '&')
+            all_consultants = consultants.filter(
+                Q(name__icontains=query)
+            )
+
+            keywords = query.split()
+            or_lookup = (
+                    Q(email__iexact=keywords[0]) |
+                    Q(name__icontains=keywords[0])
+            )
+            for keyword in keywords[1:]:
+                or_lookup.add((
+                        Q(email__iexact=keyword) |
+                        Q(name__icontains=keyword)
+                ), or_lookup.connector)
+
+            lookup_qs = consultants.filter(or_lookup)
+            consultants = all_consultants.union(lookup_qs)
+
+        consultants = Consultant.objects.filter(id__in=consultants.distinct('id').values_list('id', flat=True))
+
+        open_candidates = consultants.filter(marketing__status='open').values('id')
+        offer_candidates = consultants.filter(
+            projects__statuses__status__in=['new', 'received', 'on_boarded'], projects__statuses__is_current=True
+        ).values('id')
+
+        status_obj = status_filter_obj(consultants, open_candidates, offer_candidates)
+
+        if con_status and len(con_status) > 0:
+            consultants = status_obj[con_status]
+
+        sub_status_obj = sub_status_filter_obj(consultants, con_status, offer_candidates)
+
+        consultants = queryset_filter_by_status(consultants, con_sub_status, offer_candidates)
+
+        return consultants, {"status_obj": status_obj, "sub_status_obj": sub_status_obj}
+    except Exception as error:
+        write_exception(error, request)
+        return str(error), "error"
