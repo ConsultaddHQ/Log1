@@ -57,6 +57,7 @@ PROJECT_APPS = [
     'notification.apps.NotificationConfig',
     'impersonate.apps.ImpersonateConfig',
     'messaging.apps.MessagingConfig',
+    'engineering.apps.EngineeringConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -197,7 +198,6 @@ logging.config.dictConfig({
     'handlers': {
         'console': {
             'formatter': 'file',
-            'stream': 'ext://sys.stdout',
             'class': 'logging.StreamHandler',
         },
         'file': {

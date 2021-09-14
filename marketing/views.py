@@ -32,7 +32,7 @@ from utils_app.mailing import send_email_attachment_multiple
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
-from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
     date_filter, get_users_and_attendees
 
@@ -458,7 +458,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def activities(self, request, *args, **kwargs):
         try:
             activities = Activity.objects.filter(object_id=kwargs.get('pk'), content_type__model='submission')
-            serializer = ActivitySerializer(activities.order_by('created'), many=True)
+            serializer = ActivitySerializer(activities.order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -780,7 +780,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @action(methods=['get'], detail=False, url_path="feedback_check")
+    @action(methods=['get'], detail=True, url_path="feedback_check")
     def feedback_check(self, request, *args, **kwargs):
         try:
             data = {'test': False, 'interview': False}
@@ -2447,7 +2447,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'new', request)
                 if error == 'error':
-                    write_exception(res, request)
+                    write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
@@ -2612,7 +2612,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'submit', request)
                 if error == 'error':
-                    write_exception(res, request)
+                    write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test submitted"}, status=202)
