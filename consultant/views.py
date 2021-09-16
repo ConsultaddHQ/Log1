@@ -436,7 +436,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             return Response({"data": serializer.data, "message": "Consultant Updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": error}, status=400)
+            return Response({"message": str(error)}, status=400)
 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)

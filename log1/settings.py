@@ -133,7 +133,6 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # Send Grid Configuration
-
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_USE_TLS = True
 EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)

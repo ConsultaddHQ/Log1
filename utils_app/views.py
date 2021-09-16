@@ -6,9 +6,10 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from django.contrib.contenttypes.models import ContentType
 
+from api_key.models import APIKey
 from utils_app.models import City, Choice
 from utils_app.serializers import UtilSerializer
-from log1.utils import write_exception, ERROR_MSG
+from log1.utils import write_info, write_exception, ERROR_MSG
 
 
 # Route - /city/
@@ -65,3 +66,21 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+
+class UtilViewSets(CreateModelMixin, GenericViewSet):
+    queryset = City.objects.all()
+    serializer_class = UtilSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            api_key = request.query_params.get('api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+
+            return Response({"data": "data"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

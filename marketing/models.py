@@ -377,3 +377,21 @@ class Interview(TimeStampedModel):
     @property
     def consultant(self):
         return self.submission.consultant_marketing.consultant
+
+#
+# class InterviewGuest(TimeStampedModel):
+#     remark = models.TextField(_('Remark'), blank=True, null=True)
+#     coding_present = models.BooleanField(_('Coding Present'), null=True)
+#     guest_type = models.CharField(_('Guest Type'), max_length=50, null=True)
+#     tech_stack = models.TextField(_('Technology required'), null=True, blank=True)
+#     engineers = models.ManyToManyField(User, related_name='engineers', verbose_name='Guest', blank=True)
+#     interview = models.OneToOneField(Interview, on_delete=models.CASCADE, related_name='interview_guest')
+#
+#     def save(self, *args, **kwargs):
+#         if not self.id:
+#             self.created = timezone.now()
+#         self.modified = timezone.now()
+#         return super(InterviewGuest, self).save(*args, **kwargs)
+#
+#     def __str__(self):
+#         return f"{self.id} - {self.interview.id}"

@@ -6,9 +6,9 @@ from log1.utils import write_exception, write_info
 
 
 class Calendar:
-    def __init__(self, request):
-        self.headers = self.get_ms_header()
+    def __init__(self, request=None):
         self.request = request
+        self.headers = self.get_ms_header()
 
     def get_ms_header(self):
         try:
@@ -164,3 +164,24 @@ class Calendar:
         except Exception as error:
             write_exception(message=error, request=self.request)
             return str(error), "error"
+
+
+def get_profile_picture(user):
+    ca_logo_url = "https://media.glassdoor.com/sqll/713037/consultadd-squarelogo-1426147337577.png"
+    try:
+        file_path = f"media/avatar/{user.employee_id}.png"
+        if os.path.exists(file_path):
+            return file_path
+
+        obj = Calendar()
+        headers = obj.headers
+        url = f"https://graph.microsoft.com/v1.0/users/{user.email}/photo/$value"
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            with open(file_path, 'wb') as f:
+                f.write(response.content)
+            return file_path
+        return ca_logo_url
+    except Exception as error:
+        write_info(message=error, function='get_profile_picture')
+        return ca_logo_url
