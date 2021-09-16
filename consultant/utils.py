@@ -717,7 +717,9 @@ def candidate_filter(request):
             lookup_qs = consultants.filter(or_lookup)
             consultants = all_consultants.union(lookup_qs)
 
-        consultants = Consultant.objects.filter(id__in=consultants.distinct('id').values_list('id', flat=True))
+        consultants = Consultant.objects.filter(
+            id__in=consultants.distinct('id').order_by('id').values_list('id', flat=True)
+        )
 
         open_candidates = consultants.filter(marketing__status='open').values('id')
         offer_candidates = consultants.filter(

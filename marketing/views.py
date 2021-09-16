@@ -34,7 +34,7 @@ from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
-    date_filter, get_users_and_attendees
+    date_filter, get_users_and_attendees, test_received_notification
 
 
 # Route - /vendor_company/
@@ -1216,14 +1216,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     interview = self.rank_interviews(interview, 'create')
 
                 # Calendar title
-                title = f"CTB:{interview.supervisor.employee_name} " \
-                        f":: {interview.round}R " \
-                        f":: {interview.get_interview_mode_display()} " \
-                        f":: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} " \
-                        f":: {interview.submission.client} " \
-                        f":: {interview.consultant.name} " \
-                        f":: {interview.marketer.employee_name} " \
-                        f":: {interview.submission.employer}"
+                title = get_interview_title(interview)
 
                 # Calendar attendees and User for sending notification
                 user_list, attendees = get_users_and_attendees(request, interview)
@@ -1259,14 +1252,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date():
-                    text = f""" *CTB:{interview.supervisor.employee_name} :: Round:{interview.round} :: 
-                    {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
-                    {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} :: 
-                    {interview.consultant.name} :: {interview.submission.client} :: 
-                    {interview.marketer.employee_name}* """
-
                     data = {
-                        "text": text,
+                        "text": f" *{title}* ",
                         "title": "&#128220; New Interview Scheduled",
                     }
                     post_msg_using_webhook(config.announcement_url, data)
@@ -1356,7 +1343,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview_status_emoji = "&#128078;"
                         desc = f"Interview round {interview.round} is Failed"
 
-                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
+                    text = f"""* {title} ({interview_status}) * <br>"""
                     text += interview.feedback
 
                     data = {
@@ -1737,7 +1724,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.save()
 
                 # Activity
-                desc = f"Recording: {file_name} uploaded on round {interview.round} of Interview by {request.user.employee_name}"
+                desc = f"Recording: {file_name} uploaded on round {interview.round} of Interview by " \
+                       f"{request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response({"data": response, "message": "Recording uploaded"}, status=202)
@@ -1751,7 +1739,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.save()
 
                 # Activity
-                desc = f"Recording: {file_name} deleted from round {interview.round} of Interview by {request.user.employee_name}"
+                desc = f"Recording: {file_name} deleted from round {interview.round} of Interview by " \
+                       f"{request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response(status=204)
@@ -2206,10 +2195,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
                     "%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
-                    'to': to,
-                    'cc': cc,
-                    'bcc': [],
                     'subject': subject,
+                    'to': to, 'cc': cc, 'bcc': [],
                     'template': '../templates/test_mail.html',
                     'context': {
                         'skills': skills,
@@ -2445,6 +2432,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
+                test_received_notification(request.user, test, data['con_timezone'])
                 res, error = self.send_test_mail(test, data, 'new', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)

@@ -544,7 +544,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project.is_remote = request.data.get('is_remote', False)
             project.save()
 
-            util = ProjectUtil(project)
+            util = ProjectUtil(project, request.user)
             desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -565,7 +565,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if new_status == 'received' and not project.is_msg_sent:
                     # Offer received message
                     desc = f"Purchase order status changed to Received"
-                    util.send_receive_notification(request.user)
+                    util.send_receive_notification()
                     project.is_msg_sent = True
                     project.save()
 
@@ -586,16 +586,17 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
 
-                    util.send_join_notification(request.user)
+                    util.send_join_notification()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                     marketing.status = 'open'
                     marketing.save()
                     project.support.update(end=datetime.now())
-                    desc = f"Purchase order status changed to Cancelled and cancellation mail is updated"
+                    desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
-                    util.send_cancellation_notification(request.user)
+                    po_status = project_status_obj.get_status_display()
+                    util.send_cancellation_notification(po_status)
 
                 # Project Terminated
                 elif prev_status_obj.status not in termination_status and new_status in termination_status:
@@ -605,7 +606,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     po_status = project_status_obj.get_status_display()
-                    util.send_termination_notification(po_status, request.user)
+                    util.send_termination_notification(po_status)
 
                 # Project Completed
                 elif prev_status_obj.status != 'complete' and new_status == "complete":
@@ -614,7 +615,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     project.support.update(end=datetime.now())
                     desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
-                    util.send_completion_notification(request.user)
+                    util.send_completion_notification()
 
             # Activity
             create_activity(project.submission.id, 'submission', request.user, desc, 'updated')

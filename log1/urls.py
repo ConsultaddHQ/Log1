@@ -11,10 +11,10 @@ from activity.views import CommentViewSet
 from engineering.views import EngineeringViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
-from utils_app.views import CityViewSets, ChoiceViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
+from utils_app.views import CityViewSets, ChoiceViewSet, UtilViewSets
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeSheetV2ViewSets, Test
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
@@ -97,6 +97,7 @@ router.register(r'payroll', PayrollScheduleViewSets)
 router.register(r'timesheet_v2', TimeSheetV2ViewSets)
 
 router.register(r'test', Test)
+router.register(r'util', UtilViewSets)
 
 # Legal App routes
 router.register(r'petition', PetitionViewSets)
