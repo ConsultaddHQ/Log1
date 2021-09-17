@@ -80,7 +80,7 @@ def submission_is_complete(obj):
 
 def get_interview_title(interview):
     try:
-        return f"""Round - {interview.round} :: CTB - {interview.supervisor.employee_name} :: 
+        return f"""CTB - {interview.supervisor.employee_name} :: {interview.round}R :: 
             {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
             {interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} :: 
             {interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"""
@@ -247,6 +247,11 @@ def test_received_notification(user, test, timezone):
         else:
             test_data = "Online"
 
+        if type(test.deadline) == str:
+            deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B %Y')
+        else:
+            deadline = test.deadline.strftime('%a, %d %B %Y')
+
         data = {
             "@type": "MessageCard",
             "@context": "http://schema.org/extensions",
@@ -267,7 +272,7 @@ def test_received_notification(user, test, timezone):
                         },
                         {
                             "name": f"Deadline",
-                            "value": f"{test.deadline.strftime('%a, %d %B %Y')}"
+                            "value": deadline
                         }
                     ],
                     "markdown": True

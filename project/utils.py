@@ -221,7 +221,7 @@ class ProjectUtil:
                     "@type": "ViewAction",
                     "name": "View in Log1",
                     "target": [
-                        "https://app.log1.com/"
+                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
                     ]
                 }
                 ]
@@ -259,30 +259,12 @@ class ProjectUtil:
                     "activityText": self.activity_text,
                     "activityImage": f"https://api.log1.com/{profile_path}",
                     "facts": [
-                        {
-                            "name": "Employer",
-                            "value": self.employer
-                        },
-                        {
-                            "name": "Start Date",
-                            "value": self.project_start
-                        },
-                        {
-                            "name": "Location",
-                            "value": self.project.city
-                        },
-                        {
-                            "name": "Role",
-                            "value": self.project.submission.lead.job_title
-                        },
-                        {
-                            "name": "Recruiter",
-                            "value": recruiter_name
-                        },
-                        {
-                            "name": "Supervisors",
-                            "value": supervisors
-                        }
+                        {"name": "Employer", "value": self.employer},
+                        {"name": "Start Date", "value": self.project_start},
+                        {"name": "Location", "value": self.project.city},
+                        {"name": "Role", "value": self.project.submission.lead.job_title},
+                        {"name": "Recruiter", "value": recruiter_name},
+                        {"name": "Supervisors", "value": supervisors},
                     ],
                     "markdown": True
                 }],
@@ -307,7 +289,7 @@ class ProjectUtil:
                     "@type": "ViewAction",
                     "name": "View in Log1",
                     "target": [
-                        "https://app.log1.com/"
+                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
                     ]
                 }
                 ]
@@ -316,7 +298,7 @@ class ProjectUtil:
             post_msg_using_webhook(config.offer_url, data)
 
             title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.consultant, self.user, title, 'self.project')
+            send_notification_for_user(self.consultant, self.user, title, "project")
         except Exception as error:
             write_exception(message=error)
 
@@ -344,43 +326,23 @@ class ProjectUtil:
                     "activityText": self.activity_text,
                     "activityImage": f"https://api.log1.com/{profile_path}",
                     "facts": [
-                        {
-                            "name": f"Project duration",
-                            "value": f"{months} months"
-                        },
-                        {
-                            "name": f"Employer",
-                            "value": self.employer
-                        },
-                        {
-                            "name": f"Location",
-                            "value": self.project.city
-                        },
-                        {
-                            "name": f"Recruiter",
-                            "value": recruiter_name
-                        },
-                        {
-                            "name": f"Status",
-                            "value": status
-                        },
-                        {
-                            "name": f"Feedback",
-                            "value": reason
-                        }
+                        {"name": f"Project duration", "value": f"{months} months"},
+                        {"name": f"Employer", "value": self.employer},
+                        {"name": f"Location", "value": self.project.city},
+                        {"name": f"Recruiter", "value": recruiter_name},
+                        {"name": f"Status", "value": status},
+                        {"name": f"Feedback", "value": reason},
                     ],
                     "markdown": True
                 }],
-                "potentialAction": [
-                    {
+                "potentialAction": [{
                         "@context": "http://schema.org",
                         "@type": "ViewAction",
                         "name": "View in Log1",
                         "target": [
-                            "https://app.log1.com/"
+                            f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
                         ]
-                    }
-                ]
+                    }]
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.project_termination_url, data)
@@ -414,26 +376,11 @@ class ProjectUtil:
                     "activityText": self.activity_text,
                     "activityImage": f"https://api.log1.com/{profile_path}",
                     "facts": [
-                        {
-                            "name": f"Employer",
-                            "value": self.employer
-                        },
-                        {
-                            "name": f"Location",
-                            "value": self.project.city
-                        },
-                        {
-                            "name": f"Recruiter",
-                            "value": recruiter_name
-                        },
-                        {
-                            "name": f"Status",
-                            "value": status
-                        },
-                        {
-                            "name": f"Feedback",
-                            "value": reason
-                        }
+                        {"name": f"Employer", "value": self.employer},
+                        {"name": f"Location", "value": self.project.city},
+                        {"name": f"Recruiter", "value": recruiter_name},
+                        {"name": f"Status", "value": status},
+                        {"name": f"Feedback", "value": reason},
                     ],
                     "markdown": True
                 }],
@@ -443,7 +390,7 @@ class ProjectUtil:
                         "@type": "ViewAction",
                         "name": "View in Log1",
                         "target": [
-                            "https://app.log1.com/"
+                            f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
                         ]
                     }
                 ]
@@ -452,7 +399,7 @@ class ProjectUtil:
             post_msg_using_webhook(config.offer_failure_url, data)
 
             title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
-            send_notification_for_user(self.project.consultant, self.user, title, 'self.project')
+            send_notification_for_user(self.project.consultant, self.user, title, 'project')
         except Exception as error:
             write_exception(message=error)
 

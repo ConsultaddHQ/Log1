@@ -78,11 +78,11 @@ class VendorLayerAdmin(ExportActionModelAdmin):
 @admin.register(Interview)
 class InterviewAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv', 'make_status_feedback_due']
-    list_filter = ('status', 'interview_mode', 'screening_type')
+    list_filter = ('status', 'interview_mode', 'screening_type', 'coding_present', 'guest_type')
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
                      'calendar_id', 'submission__created_by__employee_name')
     list_display = ('id', 'round', 'supervisor', 'status', 'screening_type', 'start_time', 'end_time', 'submission',
-                    'interview_mode', 'feedback', 'calendar_id', 'guest_display')
+                    'guest_type', 'tech_stack', 'coding_present', 'interview_mode', 'feedback', 'calendar_id', 'guest_display')
 
     def guest_display(self, obj):
         return ", ".join([

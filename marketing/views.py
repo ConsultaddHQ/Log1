@@ -34,7 +34,8 @@ from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
-    date_filter, get_users_and_attendees, test_received_notification
+    date_filter, get_users_and_attendees, test_received_notification, coder_request_notification, \
+    coder_assigned_notification
 
 
 # Route - /vendor_company/
@@ -1022,19 +1023,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 order_by = "-modified"
 
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
-            data = queryset[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                marketer_id=F('submission__created_by'),
-                job_title=F('submission__lead__job_title'),
-                supervisor_name=F('supervisor__employee_name'),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
-                     'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'screening_type', 'project', 'job_title', 'modified', 'feedback')
-            return data, data_counts
+            serializer = InterviewListSerializer(queryset[first:last], many=True)
+            return serializer.data, data_counts
         except Exception as error:
             write_exception(message=error)
             return error, 'error'
@@ -1258,6 +1248,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.announcement_url, data)
 
+                if interview.guest_type in ['coder', 'assistance']:
+                    coder_request_notification(request.user, interview)
+
                 data = queryset.annotate(
                     rank=F('submission__rank'),
                     client=F('submission__client'),
@@ -1343,7 +1336,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview_status_emoji = "&#128078;"
                         desc = f"Interview round {interview.round} is Failed"
 
-                    text = f"""* {title} ({interview_status}) * <br>"""
+                    text = f"""*{title} ({interview_status})* <br>"""
                     text += interview.feedback
 
                     data = {
@@ -1413,8 +1406,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 except Exception as error:
                                     write_exception(f"Booking update failed: {error}", request)
                                     return Response(
-                                        {"message": "Calendar booking update failed", "error": str(error)},
-                                        status=400
+                                        {"message": "Calendar booking update failed", "error": str(error)}, status=400
                                     )
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -2432,8 +2424,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                test_received_notification(request.user, test, data['con_timezone'])
                 res, error = self.send_test_mail(test, data, 'new', request)
+                test_received_notification(request.user, test, data['con_timezone'])
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
