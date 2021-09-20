@@ -20,8 +20,8 @@ from engineering.serializers import EngineeringSerializer, EngineeringDetailSeri
 class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     queryset = Project.objects.all()
     permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
     serializer_class = EngineeringSerializer
+    authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -132,7 +132,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"data": serializer.data, "total": total, "counts": counts}, status=200)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -143,7 +143,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": "Project not found"}, status=404)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path="filters")
     def filters(self, request, *args, **kwargs):
@@ -170,7 +170,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path="support")
     def support(self, request, *args, **kwargs):
@@ -182,7 +182,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": "Project not found"}, status=404)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path="activity")
     def activity(self, request, *args, **kwargs):

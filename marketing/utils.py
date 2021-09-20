@@ -152,8 +152,8 @@ def coder_request_notification(user, interview):
         profile_path = get_profile_picture(user)
         data = {
             "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
             "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
@@ -195,8 +195,8 @@ def coder_assigned_notification(user, interview):
         coding_experts = ", ".join(interview.guest.all().values_list('employee_name', flat=True))
         data = {
             "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
             "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
@@ -254,8 +254,8 @@ def test_received_notification(user, test, timezone):
 
         data = {
             "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
             "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {

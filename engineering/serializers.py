@@ -31,21 +31,25 @@ class EngineeringSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_status(obj):
-        qs = obj.support_status.filter(end=None)
         if obj.statuses.filter(status__istartswith='terminated').first():
             return 'terminated'
-        if qs:
-            support_status = qs.first()
-            if support_status.start and obj.project.start > date.today():
-                return 'training'
-            elif support_status.status == 'more_than_2_days':
-                return 'active'
-            elif support_status.status == 'less_than_3_days':
-                return 'less_active'
-            elif support_status.status in ('twice_a_month', 'independent'):
-                return 'independent'
-            else:
-                return None
+
+        support_qs = obj.support.filter(end=None)
+        if support_qs:
+            qs = support_qs.first().statuses.filter(is_current=True)
+            if qs:
+                support_status = qs.first()
+                if obj.start_date > date.today():
+                    return 'training'
+                elif support_status.frequency == 'more_than_2_days':
+                    return 'active'
+                elif support_status.frequency == 'less_than_3_days':
+                    return 'less_active'
+                elif support_status.frequency in ('twice_a_month', 'independent'):
+                    return 'independent'
+                else:
+                    return None
+        return None
 
     @staticmethod
     def get_support(obj):

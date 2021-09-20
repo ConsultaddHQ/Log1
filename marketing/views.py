@@ -1300,6 +1300,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             interview = queryset.first()
             prev_status = interview.status
+            prev_guest_type = interview.guest_type
             desc = f"Round {interview.round} is updated"
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
@@ -1408,6 +1409,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                     return Response(
                                         {"message": "Calendar booking update failed", "error": str(error)}, status=400
                                     )
+
+                        if interview.guest_type in ['coder', 'assistance'] and prev_guest_type is None:
+                            coder_request_notification(request.user, interview)
+
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
@@ -1818,6 +1823,40 @@ class InterviewViewSets(viewsets.ModelViewSet):
             ).values('submission', 'supervisor_name', 'feedback', 'screening_type', 'client', 'marketer_name', 'status',
                      'consultant_name', 'start_time', 'end_time', 'location', 'company_name', 'interview_mode', )
             return Response({"data": data, "total": total}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='assign_guest')
+    def assign_guest(self, request, *args, **kwargs):
+        try:
+            if 'engineer' in request.user.roles:
+                queryset = Interview.objects.filter(id=kwargs.get('pk'))
+                if not queryset:
+                    return Response({"message": "Interview not found"}, status=404)
+
+                interview = queryset.first()
+                for user_id in request.data.get('guest', []):
+                    interview.guest.add(user_id)
+
+                coder_assigned_notification(request.user, interview)
+            return Response({"data": "Coders assigned"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='guest_feedback')
+    def guest_feedback(self, request, *args, **kwargs):
+        try:
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), guest__in=[request.user])
+            if not queryset:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            interview = queryset.first()
+            interview.guest_remark = request.data.get('guest_remark', None)
+            interview.coding_present = request.data.get('coding_present', None)
+            interview.save()
+            return Response({"data": "Feedback updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)

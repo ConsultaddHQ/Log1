@@ -204,11 +204,12 @@ class InterviewListSerializer(serializers.ModelSerializer):
     submission = serializers.SerializerMethodField()
     supervisor_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
+    allow_status_change = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
         exclude = ('notes', 'calendar_id', 'guest_remark', 'description', 'call_details', 'attachment_link',
-                   'failure_reason', 'supervisor',)
+                   'failure_reason', 'supervisor')
 
     @staticmethod
     def get_submission(obj):
@@ -231,12 +232,18 @@ class InterviewListSerializer(serializers.ModelSerializer):
     def get_guest(obj):
         data = []
         for guest in obj.guest.all():
-            data.append({'name': guest.employee_name, 'email': guest.email})
+            data.append({'id': guest.id, 'name': guest.employee_name, 'email': guest.email})
         return data
 
     @staticmethod
     def get_consultant_name(obj):
         return obj.consultant.name
+
+    @staticmethod
+    def get_allow_status_change(obj):
+        if obj.coding_present is not None:
+            return True
+        return False
 
 
 class TestListSerializer(serializers.ModelSerializer):

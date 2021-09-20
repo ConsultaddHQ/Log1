@@ -1,4 +1,5 @@
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
@@ -9,7 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 from api_key.models import APIKey
 from utils_app.models import City, Choice
 from utils_app.serializers import UtilSerializer
-from log1.utils import write_info, write_exception, ERROR_MSG
+from log1.utils import write_exception, ERROR_MSG
 
 
 # Route - /city/
@@ -81,6 +82,15 @@ class UtilViewSets(CreateModelMixin, GenericViewSet):
                 return Response({"message": "Unauthorized"}, status=401)
 
             return Response({"data": "data"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='technology')
+    def technology(self, request, *args, **kwargs):
+        try:
+            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular']
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
