@@ -34,7 +34,8 @@ from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
-    date_filter, get_users_and_attendees, test_received_notification
+    date_filter, get_users_and_attendees, test_received_notification, coder_request_notification, \
+    coder_assigned_notification
 
 
 # Route - /vendor_company/
@@ -1022,19 +1023,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 order_by = "-modified"
 
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
-            data = queryset[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                marketer_id=F('submission__created_by'),
-                job_title=F('submission__lead__job_title'),
-                supervisor_name=F('supervisor__employee_name'),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
-                     'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'screening_type', 'project', 'job_title', 'modified', 'feedback')
-            return data, data_counts
+            serializer = InterviewListSerializer(queryset[first:last], many=True)
+            return serializer.data, data_counts
         except Exception as error:
             write_exception(message=error)
             return error, 'error'
@@ -1048,10 +1038,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if request.user in [interview.marketer, interview.supervisor]:
                 permission['update'] = True
 
-            if request.user in [interview.marketer, interview.supervisor] + list(interview.guest.all()):
-                serializer = InterviewDetailSerializer(interview)
-            else:
-                serializer = self.serializer_class(interview)
+            serializer = InterviewDetailSerializer(interview)
+            # if request.user in [interview.marketer, interview.supervisor] + list(interview.guest.all()):
+            #     serializer = InterviewDetailSerializer(interview)
+            # else:
+            #     serializer = self.serializer_class(interview)
 
             return Response({"data": serializer.data, "permission": permission}, status=200)
         except Exception as error:
@@ -1132,6 +1123,20 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             if filter_json:
                 filters = json.loads(filter_json)
+
+                if 'assignment' in filters:
+                    if filters["assignment"] is True:
+                        queryset = queryset.exclude(guest=None)
+                    if filters["assignment"] is False:
+                        queryset = queryset.filter(guest=None)
+
+                if 'guest_type' in filters:
+                    if filters["guest_type"] == 'coding':
+                        queryset = queryset.filter(guest_type='coder')
+                    if filters["guest_type"] == 'assistance':
+                        queryset = queryset.filter(guest_type='assistance')
+                    if filters["guest_type"] == 'all':
+                        queryset = queryset.filter(guest_type__in=['coder', 'assistance'])
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1258,6 +1263,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.announcement_url, data)
 
+                if interview.guest_type in ['coder', 'assistance']:
+                    coder_request_notification(request.user, interview, "Request for Coding Expert for the Interview")
+
                 data = queryset.annotate(
                     rank=F('submission__rank'),
                     client=F('submission__client'),
@@ -1307,6 +1315,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             interview = queryset.first()
             prev_status = interview.status
+            prev_guest_type = interview.guest_type
             desc = f"Round {interview.round} is updated"
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
@@ -1343,7 +1352,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview_status_emoji = "&#128078;"
                         desc = f"Interview round {interview.round} is Failed"
 
-                    text = f"""* {title} ({interview_status}) * <br>"""
+                    text = f"""*{title} ({interview_status})* <br>"""
                     text += interview.feedback
 
                     data = {
@@ -1356,6 +1365,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     desc = f"Round {interview.round} status is updated"
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
+                        interview.guest.clear()
                         interview.save()
                         end = interview.end_time
                         start = interview.start_time
@@ -1368,6 +1378,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 "title": "&#9201; Interview Rescheduled",
                             }
                             post_msg_using_webhook(config.announcement_url, data)
+
+                        if date.today() < interview.start_time.date():
+                            data = {
+                                "text": title,
+                                "title": "&#9201; Interview Rescheduled",
+                            }
+                            post_msg_using_webhook(config.announcement_url, data)
+
+                        if datetime.now() < interview.start_time:
+                            title = "Interview Rescheduled, request for Coding Expert for the Interview"
+                            coder_request_notification(request.user, interview, title)
 
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         _, attendees = get_users_and_attendees(request, interview)
@@ -1413,9 +1434,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 except Exception as error:
                                     write_exception(f"Booking update failed: {error}", request)
                                     return Response(
-                                        {"message": "Calendar booking update failed", "error": str(error)},
-                                        status=400
+                                        {"message": "Calendar booking update failed", "error": str(error)}, status=400
                                     )
+
+                    if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
+                        title = "Request for Coding Expert for the Interview"
+                        coder_request_notification(request.user, interview, title)
+
+                    if prev_guest_type in ['coder', 'assistance'] and interview.guest_type == 'not_required':
+                        title = "Coding or assistance not required for this Interview"
+                        coder_request_notification(request.user, interview, title)
+                        interview.guest.clear()
+
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
@@ -1826,6 +1856,60 @@ class InterviewViewSets(viewsets.ModelViewSet):
             ).values('submission', 'supervisor_name', 'feedback', 'screening_type', 'client', 'marketer_name', 'status',
                      'consultant_name', 'start_time', 'end_time', 'location', 'company_name', 'interview_mode', )
             return Response({"data": data, "total": total}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='assign_guest')
+    def assign_guest(self, request, *args, **kwargs):
+        try:
+            if 'engineer' in request.user.roles:
+                queryset = Interview.objects.filter(id=kwargs.get('pk'))
+                if not queryset:
+                    return Response({"message": "Interview not found"}, status=404)
+
+                interview = queryset.first()
+                for user_id in request.data.get('guest', []):
+                    interview.guest.add(user_id)
+
+                coder_assigned_notification(request.user, interview)
+            return Response({"data": "Coders assigned"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='guest_feedback')
+    def guest_feedback(self, request, *args, **kwargs):
+        try:
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), guest__in=[request.user])
+            if not queryset:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            remark = ""
+            interview = queryset.first()
+            for i in request.data.get('answers', []):
+                remark += f"(Q) : {i['question']} -> (ANS) : {i['answer']}"
+
+            remark += f"REMARK : {request.data.get('guest_remark')}"
+            interview.guest_remark = remark
+            interview.coding_present = request.data.get('coding_present', None)
+            interview.save()
+            return Response({"data": "Feedback updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='feedback_questions')
+    def feedback_questions(self, request):
+        try:
+            data = [
+                "Question1",
+                "Question2",
+                "Question3",
+                "Question4",
+                "Question5",
+            ]
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
@@ -2432,8 +2516,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                test_received_notification(request.user, test, data['con_timezone'])
                 res, error = self.send_test_mail(test, data, 'new', request)
+                test_received_notification(request.user, test, data['con_timezone'])
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)

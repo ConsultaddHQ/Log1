@@ -458,7 +458,7 @@ def add_other_details(request, consultant):
         if 'documents' in request.data:
             documents = json.loads(request.data.get('documents'))
 
-        if consultant.attachments.all().exists():
+        if not consultant.attachments.all().exists():
             for document in documents:
                 res, res_data = beats_to_log1(
                     model='consultant',
@@ -597,7 +597,7 @@ def queryset_filter_by_status(queryset, sub_status, offer_candidates=None):
     elif sub_status == 'absconded':
         queryset = queryset.filter(exit__type='absconded')
 
-    return queryset.distinct('id')
+    return queryset
 
 
 def status_filter_obj(consultants, open_candidates, offer_candidates):
@@ -699,23 +699,24 @@ def candidate_filter(request):
 
         if query:
             query = query.lstrip().replace(':amp:', '&')
-            all_consultants = consultants.filter(
+            consultants = consultants.filter(
                 Q(name__icontains=query)
             )
 
-            keywords = query.split()
-            or_lookup = (
-                    Q(email__iexact=keywords[0]) |
-                    Q(name__icontains=keywords[0])
-            )
-            for keyword in keywords[1:]:
-                or_lookup.add((
-                        Q(email__iexact=keyword) |
-                        Q(name__icontains=keyword)
-                ), or_lookup.connector)
-
-            lookup_qs = consultants.filter(or_lookup)
-            consultants = all_consultants.union(lookup_qs)
+            # keywords = query.split()
+            # if len(keywords) > 2:
+            #     or_lookup = (
+            #             Q(email__iexact=keywords[0]) |
+            #             Q(name__icontains=keywords[0])
+            #     )
+            #     for keyword in keywords[1:]:
+            #         or_lookup.add((
+            #                 Q(email__iexact=keyword) |
+            #                 Q(name__icontains=keyword)
+            #         ), or_lookup.connector)
+            #
+            #     lookup_qs = consultants.filter(or_lookup)
+            #     consultants = all_consultants.union(lookup_qs)
 
         consultants = Consultant.objects.filter(
             id__in=consultants.distinct('id').order_by('id').values_list('id', flat=True)

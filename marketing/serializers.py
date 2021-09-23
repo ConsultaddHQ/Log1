@@ -168,6 +168,7 @@ class InterviewSerializer(serializers.ModelSerializer):
 
 
 class InterviewDetailSerializer(serializers.ModelSerializer):
+    allow_status_change = serializers.SerializerMethodField()
     submission = SubmissionCreateSerializer()
     guest = UserSerializer(many=True)
     supervisor = UserSerializer()
@@ -175,6 +176,12 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
         exclude = ('calendar_id',)
+
+    @staticmethod
+    def get_allow_status_change(obj):
+        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+            return False
+        return True
 
 
 class InterviewCreateSerializer(serializers.ModelSerializer):
@@ -197,6 +204,53 @@ class InterviewGetSerializer(serializers.ModelSerializer):
         if obj.attachment_link:
             return obj.attachment_link.split('/')[-1]
         return None
+
+
+class InterviewListSerializer(serializers.ModelSerializer):
+    guest = serializers.SerializerMethodField()
+    submission = serializers.SerializerMethodField()
+    supervisor_name = serializers.SerializerMethodField()
+    consultant_name = serializers.SerializerMethodField()
+    allow_status_change = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Interview
+        exclude = ('notes', 'calendar_id', 'guest_remark', 'description', 'call_details', 'attachment_link',
+                   'failure_reason', 'supervisor')
+
+    @staticmethod
+    def get_submission(obj):
+        submission = obj.submission
+        return {
+            "id": submission.id,
+            "client": submission.client,
+            "marketer_id": obj.marketer.id,
+            "job_title": submission.lead.job_title,
+            "marketer_name": obj.marketer.employee_name,
+            "vendor": submission.lead.vendor_company.name,
+            "project": True if hasattr(submission, "project") else False,
+        }
+
+    @staticmethod
+    def get_supervisor_name(obj):
+        return obj.supervisor.employee_name
+
+    @staticmethod
+    def get_guest(obj):
+        data = []
+        for guest in obj.guest.all():
+            data.append({'id': guest.id, 'name': guest.employee_name, 'email': guest.email})
+        return data
+
+    @staticmethod
+    def get_consultant_name(obj):
+        return obj.consultant.name
+
+    @staticmethod
+    def get_allow_status_change(obj):
+        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+            return False
+        return True
 
 
 class TestListSerializer(serializers.ModelSerializer):

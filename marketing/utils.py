@@ -80,7 +80,7 @@ def submission_is_complete(obj):
 
 def get_interview_title(interview):
     try:
-        return f"""Round - {interview.round} :: CTB - {interview.supervisor.employee_name} :: 
+        return f"""CTB - {interview.supervisor.employee_name} :: {interview.round}R :: 
             {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
             {interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} :: 
             {interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"""
@@ -147,17 +147,17 @@ def create_submission(request, lead_id):
         return error, "error"
 
 
-def coder_request_notification(user, interview):
+def coder_request_notification(user, interview, title):
     try:
         profile_path = get_profile_picture(user)
         data = {
             "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
             "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
-                    "activityTitle": f"Request for Coding Expert for the Interview",
+                    "activityTitle": title,
                     "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
                                         f"***{interview.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
@@ -195,8 +195,8 @@ def coder_assigned_notification(user, interview):
         coding_experts = ", ".join(interview.guest.all().values_list('employee_name', flat=True))
         data = {
             "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
             "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
@@ -247,10 +247,15 @@ def test_received_notification(user, test, timezone):
         else:
             test_data = "Online"
 
+        if type(test.deadline) == str:
+            deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B %Y')
+        else:
+            deadline = test.deadline.strftime('%a, %d %B %Y')
+
         data = {
             "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
             "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
@@ -267,7 +272,7 @@ def test_received_notification(user, test, timezone):
                         },
                         {
                             "name": f"Deadline",
-                            "value": f"{test.deadline.strftime('%a, %d %B %Y')}"
+                            "value": deadline
                         }
                     ],
                     "markdown": True

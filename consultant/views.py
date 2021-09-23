@@ -1765,15 +1765,16 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
                 return Response({"message": "Api Key not found"}, status=401)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"message": "Unauthorized"}, status=401)
+
             creator_id = User.objects.get(employee_id=1000)
             data, msg = create_consultant(request, creator_id.id)
             if msg == 'ok':
                 desc = "Profile moved from Beats"
                 user = User.objects.get(employee_id=1000)
                 create_activity(data.id, 'consultant', user, desc, 'created')
-                return Response({"message": "Created"}, status=201)
+                return Response({"message": "Consultant Created on Log1"}, status=201)
             elif msg == "exists":
-                return Response({"message": "Consultant already exists"}, status=400)
+                return Response({"message": "Consultant already exists, Details updated on Log1"}, status=201)
             else:
                 return Response({"message": str(data)}, status=400)
         except Exception as error:

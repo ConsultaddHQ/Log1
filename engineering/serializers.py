@@ -2,7 +2,8 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
-from project.models import Project, ProjectSupport, SupportStatus
+from attachment.serializers import AttachmentURLSerializer
+from project.models import Project, ProjectSupport, SupportStatus, TimeSheet
 
 
 class POCSerializer(serializers.ModelSerializer):
@@ -26,26 +27,30 @@ class EngineeringSerializer(serializers.ModelSerializer):
     def get_project_status(obj):
         status = obj.statuses.filter(is_current=True)
         if status:
-            return status.first().status
+            return status.first().get_status_display()
         return None
 
     @staticmethod
     def get_support_status(obj):
-        qs = obj.support_status.filter(end=None)
         if obj.statuses.filter(status__istartswith='terminated').first():
             return 'terminated'
-        if qs:
-            support_status = qs.first()
-            if support_status.start and obj.project.start > date.today():
-                return 'training'
-            elif support_status.status == 'more_than_2_days':
-                return 'active'
-            elif support_status.status == 'less_than_3_days':
-                return 'less_active'
-            elif support_status.status in ('twice_a_month', 'independent'):
-                return 'independent'
-            else:
-                return None
+
+        support_qs = obj.support.filter(end=None)
+        if support_qs:
+            qs = support_qs.first().statuses.filter(is_current=True)
+            if qs:
+                support_status = qs.first()
+                if obj.start_date > date.today():
+                    return "Training"
+                elif support_status.frequency == 'more_than_2_days':
+                    return "Active"
+                elif support_status.frequency == 'less_than_3_days':
+                    return "Less Active"
+                elif support_status.frequency in ('twice_a_month', 'independent'):
+                    return "Independent"
+                else:
+                    return None
+        return None
 
     @staticmethod
     def get_support(obj):
@@ -78,7 +83,6 @@ class EngineeringSerializer(serializers.ModelSerializer):
 
 
 class EngineeringDetailSerializer(serializers.ModelSerializer):
-    status = serializers.SerializerMethodField()
     marketer = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
@@ -167,3 +171,26 @@ class ProjectSupportSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_status(obj):
         return SupportStatusSerializer(obj.statuses.filter(is_current=True).first()).data
+
+
+class TimesheetSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimeSheet
+        fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
+                  'status_updated_by', 'modified', 'attachments', 'remark', 'con_comment')
+
+    @staticmethod
+    def get_start(obj):
+        return obj.start.strftime("%m/%d/%Y")
+
+    @staticmethod
+    def get_end(obj):
+        return obj.end.strftime("%m/%d/%Y")
+
+    @staticmethod
+    def get_attachments(obj):
+        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
