@@ -73,7 +73,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             :param request, email, password
         """
         try:
-            employee_id = request.data.get('employee_id')
+            employee_id = request.data.get('employee_id', None)
             if employee_id:
                 queryset = User.objects.filter(employee_id=employee_id)
                 if not queryset:

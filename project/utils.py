@@ -118,6 +118,10 @@ def fetch_project_status():
 
 
 def diff_month_days(start, end):
+    if type(start) == str:
+        start = datetime.strptime(str(start), '%Y-%m-%d')
+    if type(end) == str:
+        end = datetime.strptime(str(end), '%Y-%m-%d')
     return (end.year - start.year) * 12 + end.month - start.month
 
 
@@ -128,10 +132,9 @@ class ProjectUtil:
         self.statuses = fetch_project_status()
         self.consultant = project.submission.consultant_marketing.consultant
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
+        self.project_end = None
         if project.end_date:
             self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
-        else:
-            self.project_end = None
         if self.project.employer:
             self.employer = self.project.employer
         else:

@@ -147,7 +147,7 @@ def create_submission(request, lead_id):
         return error, "error"
 
 
-def coder_request_notification(user, interview):
+def coder_request_notification(user, interview, title):
     try:
         profile_path = get_profile_picture(user)
         data = {
@@ -157,7 +157,7 @@ def coder_request_notification(user, interview):
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
-                    "activityTitle": f"Request for Coding Expert for the Interview",
+                    "activityTitle": title,
                     "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
                                         f"***{interview.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "

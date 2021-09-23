@@ -168,6 +168,7 @@ class InterviewSerializer(serializers.ModelSerializer):
 
 
 class InterviewDetailSerializer(serializers.ModelSerializer):
+    allow_status_change = serializers.SerializerMethodField()
     submission = SubmissionCreateSerializer()
     guest = UserSerializer(many=True)
     supervisor = UserSerializer()
@@ -175,6 +176,12 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
         exclude = ('calendar_id',)
+
+    @staticmethod
+    def get_allow_status_change(obj):
+        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+            return False
+        return True
 
 
 class InterviewCreateSerializer(serializers.ModelSerializer):
@@ -241,9 +248,9 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.coding_present is not None:
-            return True
-        return False
+        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+            return False
+        return True
 
 
 class TestListSerializer(serializers.ModelSerializer):

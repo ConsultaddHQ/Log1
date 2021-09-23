@@ -1772,9 +1772,9 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
                 desc = "Profile moved from Beats"
                 user = User.objects.get(employee_id=1000)
                 create_activity(data.id, 'consultant', user, desc, 'created')
-                return Response({"message": "Created"}, status=201)
+                return Response({"message": "Consultant Created on Log1"}, status=201)
             elif msg == "exists":
-                return Response({"message": "Consultant already exists"}, status=201)
+                return Response({"message": "Consultant already exists, Details updated on Log1"}, status=201)
             else:
                 return Response({"message": str(data)}, status=400)
         except Exception as error:

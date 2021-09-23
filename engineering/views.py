@@ -11,9 +11,9 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
 from project.models import Project
 from marketing.utils import date_filter
-from engineering.serializers import ProjectSupportSerializer
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
+from engineering.serializers import ProjectSupportSerializer, TimesheetSerializer
 from engineering.serializers import EngineeringSerializer, EngineeringDetailSerializer
 
 
@@ -190,5 +190,23 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             activities = Activity.objects.filter(object_id=kwargs.get('pk'), content_type__model='project_support')
             serializer = ActivitySerializer(activities.order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path="timesheets")
+    def timesheets(self, request, *args, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            start = request.GET.get('start', None)
+            end = request.GET.get('end', date.today())
+            qs = Project.objects.filter(id=kwargs.get('pk', None))
+            if qs:
+                timesheets = qs.first().timesheets.exclude(status='draft')
+                if start:
+                    timesheets = timesheets.filter(start__range=[start, end])
+                total = timesheets.count()
+                serializer = TimesheetSerializer(timesheets[first:last], many=True)
+                return Response({"data": serializer.data, 'total': total}, status=200)
+            return Response({"message": "Project not found"}, status=404)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

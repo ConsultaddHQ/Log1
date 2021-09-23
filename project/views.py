@@ -1025,7 +1025,6 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_name = request.GET.get('consultant_name', None)
 
         try:
-
             project_status = [
                 'terminated-fired_performance_issue', 'terminated-fired_security_issue',
                 'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',

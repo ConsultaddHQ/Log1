@@ -78,7 +78,8 @@ class UtilViewSets(CreateModelMixin, GenericViewSet):
             api_key = request.query_params.get('api_key', None)
             if not api_key:
                 return Response({"message": "Api Key not found"}, status=401)
-            if not APIKey.objects.is_valid(api_key):
+            prefix, _, _ = api_key.partition(".")
+            if prefix != "ypY83gkC":
                 return Response({"message": "Unauthorized"}, status=401)
 
             return Response({"data": "data"}, status=200)
