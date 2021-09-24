@@ -166,7 +166,7 @@ def coder_request_notification(user, interview, title):
                     "facts": [
                         {
                             "name": f"Technology",
-                            "value": f"Python"
+                            "value": f"{interview.tech_stack}"
                         },
                         {
                             "name": f"Date",
@@ -209,7 +209,7 @@ def coder_assigned_notification(user, interview):
                     "facts": [
                         {
                             "name": f"Technology",
-                            "value": f"Python"
+                            "value": f"{interview.tech_stack}"
                         },
                         {
                             "name": f"Date",

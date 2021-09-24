@@ -673,7 +673,7 @@ def candidate_filter(request):
 
             if 'visa' in filters:
                 consultants = consultants.filter(
-                    work_auth__visa_type__in=filters['visa'], work_auth__is_current=True
+                    work_auth__visa_type=filters['visa'], work_auth__is_current=True
                 )
 
             if 'visa_end' in filters:
