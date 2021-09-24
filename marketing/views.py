@@ -1,4 +1,5 @@
 import os
+import pytz
 import json
 import difflib
 from datetime import date, datetime, timedelta
@@ -1125,9 +1126,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 filters = json.loads(filter_json)
 
                 if 'assignment' in filters:
-                    if filters["assignment"] is True:
+                    if filters["assignment"] == 'assigned':
                         queryset = queryset.exclude(guest=None)
-                    if filters["assignment"] is False:
+                    if filters["assignment"] == 'unassigned':
                         queryset = queryset.filter(guest=None)
 
                 if 'guest_type' in filters:
@@ -1386,9 +1387,17 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             }
                             post_msg_using_webhook(config.announcement_url, data)
 
-                        if datetime.now() < interview.start_time:
-                            title = "Interview Rescheduled, request for Coding Expert for the Interview"
-                            coder_request_notification(request.user, interview, title)
+                        est = pytz.timezone('US/Eastern')
+                        today = datetime.now().astimezone(est)
+                        start_date = interview.start_time.astimezone(est)
+
+                        if today.date() < start_date.date():
+                            notification_title = "Interview Rescheduled, requesting Coding Expert for the Interview"
+                            coder_request_notification(request.user, interview, notification_title)
+
+                        if today.date() == start_date.date() and today.time() < start_date.time():
+                            notification_title = "Interview Rescheduled, requesting Coding Expert for the Interview"
+                            coder_request_notification(request.user, interview, notification_title)
 
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         _, attendees = get_users_and_attendees(request, interview)
@@ -1539,11 +1548,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 return Response({"message": "Interview not found"}, status=400)
 
             interview = queryset.first()
+            prev_guest_type = interview.guest_type
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
 
             interview.status = 'rescheduled'
+            interview.guest.clear()
             interview.save()
 
             booking_res = 'error'
@@ -1616,6 +1627,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.announcement_url, data)
 
+                est = pytz.timezone('US/Eastern')
+                today = datetime.now().astimezone(est)
+                start_date = interview.start_time.astimezone(est)
+
+                if today.date() < start_date.date():
+                    title = "Interview Rescheduled, requesting Coding Expert for the Interview"
+                    coder_request_notification(request.user, interview, title)
+
+                if today.date() == start_date.date() and today.time() < start_date.time():
+                    title = "Interview Rescheduled, requesting Coding Expert for the Interview"
+                    coder_request_notification(request.user, interview, title)
+
+                if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
+                    title = "Request for Coding Expert for the Interview"
+                    coder_request_notification(request.user, interview, title)
+
                 data = queryset.annotate(
                     client=F('submission__client'),
                     project=F('submission__project'),
@@ -1676,6 +1703,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             submission.is_active = True
             submission.save()
+
+            title = "This interview is cancelled, coding is not required"
+            coder_request_notification(request.user, interview, title)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
@@ -1872,8 +1902,55 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 for user_id in request.data.get('guest', []):
                     interview.guest.add(user_id)
 
-                coder_assigned_notification(request.user, interview)
-            return Response({"data": "Coders assigned"}, status=202)
+                title = get_interview_title(interview)
+                _, attendees = get_users_and_attendees(request, interview)
+                event = {
+                    "summary": title,
+                    "user": request.user,
+                    "attendees": attendees,
+                    "end": interview.end_time,
+                    "start": interview.start_time,
+                    "lead": interview.submission.lead,
+                    "submission": interview.submission,
+                    "description": interview.description,
+                    "call_details": request.call_details,
+                    "consultant": interview.submission.consultant,
+                }
+
+                # Updating calendar Booking
+                booking_res = 'Development Server'
+                if os.environ.get('ENV', 'local') == 'prod':
+                    calendar_id = interview.calendar_id
+                    calendar = Calendar(request=request)
+                    if not calendar_id:
+                        res, msg = calendar.book_ms_calendar(event)
+                        if msg == 'error':
+                            return Response({"message": "Calendar booking failed", "error": res}, status=400)
+                        booking_res = 'booked'
+                        interview.calendar_id = res['id']
+                        interview.save()
+                    else:
+                        booking_res = 'updated'
+                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        if msg == 'booked':
+                            booking_res = 'booked'
+                            interview.calendar_id = res['id']
+                            interview.save()
+                        if msg == "error":
+                            return Response({"message": "Calendar update failed", "error": res}, status=400)
+
+                est = pytz.timezone('US/Eastern')
+                today = datetime.now().astimezone(est)
+                start_date = interview.start_time.astimezone(est)
+
+                if today.date() < start_date.date():
+                    coder_assigned_notification(request.user, interview)
+
+                if today.date() == start_date.date() and today.time() < start_date.time():
+                    coder_assigned_notification(request.user, interview)
+
+                return Response({"data": "Coders assigned", "booking_response": booking_res}, status=202)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
@@ -1888,7 +1965,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             remark = ""
             interview = queryset.first()
             for i in request.data.get('answers', []):
-                remark += f"(Q) : {i['question']} -> (ANS) : {i['answer']}"
+                remark += f"(Q) : {i['question']} -> (ANS) : {i['answer']} "
 
             remark += f"REMARK : {request.data.get('guest_remark')}"
             interview.guest_remark = remark
@@ -1903,11 +1980,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def feedback_questions(self, request):
         try:
             data = [
-                "Question1",
-                "Question2",
-                "Question3",
-                "Question4",
-                "Question5",
+                "Coding Language?",
+                "How many questions were there ?",
+                "Were you able to solve the questions ?",
             ]
             return Response({"data": data}, status=200)
         except Exception as error:

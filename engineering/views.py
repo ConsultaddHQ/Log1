@@ -107,24 +107,24 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     if filters['support_status'] == 'training':
                         projects = projects.filter(
                             start_date__gt=date.today(),
-                            statuses__statuses__is_current=True,
-                            statuses__statuses__frequency='more_than_2_days',
+                            support__statuses__is_current=True,
+                            support__statuses__frequency='more_than_2_days',
                         )
                     elif filters['support_status'] == 'active':
                         projects = projects.filter(
                             start_date__lte=date.today(),
-                            statuses__statuses__is_current=True,
-                            statuses__statuses__frequency='more_than_2_days',
+                            support__statuses__is_current=True,
+                            support__statuses__frequency='more_than_2_days',
                         )
                     elif filters['support_status'] == 'less_active':
                         projects = projects.filter(
-                            statuses__statuses__is_current=True,
-                            statuses__statuses__frequency='less_than_3_days',
+                            support__statuses__is_current=True,
+                            support__statuses__frequency='less_than_3_days',
                         )
                     elif filters['support_status'] == 'independent':
                         projects = projects.filter(
-                            statuses__statuses__is_current=True,
-                            statuses__statuses__frequency__in=['independent', 'twice_a_month'],
+                            support__statuses__is_current=True,
+                            support__statuses__frequency__in=['independent', 'twice_a_month'],
                         )
 
             total = projects.count()
