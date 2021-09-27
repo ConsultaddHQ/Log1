@@ -167,7 +167,7 @@ class Calendar:
 
 
 def get_profile_picture(user):
-    ca_logo_url = "https://media.glassdoor.com/sqll/713037/consultadd-squarelogo-1426147337577.png"
+    ca_logo_url = f"{os.environ.get('base_domain', 'http://localhost:8000')}/media/avatar/ca.png"
     try:
         file_path = f"media/avatar/{user.employee_id}.png"
         if os.path.exists(file_path):
@@ -180,7 +180,7 @@ def get_profile_picture(user):
         if response.status_code == 200:
             with open(file_path, 'wb') as f:
                 f.write(response.content)
-            return file_path
+            return f"{os.environ.get('base_domain', 'http://localhost:8000')}/{file_path}"
         return ca_logo_url
     except Exception as error:
         write_info(message=error, function='get_profile_picture')

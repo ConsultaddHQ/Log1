@@ -7,7 +7,6 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from django.contrib.contenttypes.models import ContentType
 
-from api_key.models import APIKey
 from utils_app.models import City, Choice
 from utils_app.serializers import UtilSerializer
 from log1.utils import write_exception, ERROR_MSG
@@ -78,6 +77,7 @@ class UtilViewSets(CreateModelMixin, GenericViewSet):
             api_key = request.query_params.get('api_key', None)
             if not api_key:
                 return Response({"message": "Api Key not found"}, status=401)
+
             prefix, _, _ = api_key.partition(".")
             if prefix != "ypY83gkC":
                 return Response({"message": "Unauthorized"}, status=401)
@@ -90,7 +90,8 @@ class UtilViewSets(CreateModelMixin, GenericViewSet):
     @action(methods=['get'], detail=False, url_path='technology')
     def technology(self, request, *args, **kwargs):
         try:
-            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular']
+            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'AWS', 'DevOps', 'BA', 'DA',
+                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)

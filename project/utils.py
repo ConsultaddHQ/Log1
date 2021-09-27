@@ -129,10 +129,10 @@ class ProjectUtil:
     def __init__(self, project, user):
         self.user = user
         self.project = project
+        self.project_end = None
         self.statuses = fetch_project_status()
         self.consultant = project.submission.consultant_marketing.consultant
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
-        self.project_end = None
         if project.end_date:
             self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
         if self.project.employer:
@@ -186,7 +186,7 @@ class ProjectUtil:
                     "activityTitle": "Project Joined",
                     "activitySubtitle": activity_title,
                     "activityText": self.activity_text,
-                    "activityImage": f"https://api.log1.com/{profile_path}",
+                    "activityImage": profile_path,
                     "facts": [
                         {
                             "name": f"Submitted On",
@@ -260,7 +260,7 @@ class ProjectUtil:
                     "activitySubtitle": f"***Paper work*** received from ***{self.project.submission.client}*** for "
                                         f"***{self.consultant.name}***",
                     "activityText": self.activity_text,
-                    "activityImage": f"https://api.log1.com/{profile_path}",
+                    "activityImage": profile_path,
                     "facts": [
                         {"name": "Employer", "value": self.employer},
                         {"name": "Start Date", "value": self.project_start},
@@ -327,7 +327,7 @@ class ProjectUtil:
                     "activityTitle": "Project Termination Feedback",
                     "activitySubtitle": activity_sub_title,
                     "activityText": self.activity_text,
-                    "activityImage": f"https://api.log1.com/{profile_path}",
+                    "activityImage": profile_path,
                     "facts": [
                         {"name": f"Project duration", "value": f"{months} months"},
                         {"name": f"Employer", "value": self.employer},
@@ -339,13 +339,13 @@ class ProjectUtil:
                     "markdown": True
                 }],
                 "potentialAction": [{
-                        "@context": "http://schema.org",
-                        "@type": "ViewAction",
-                        "name": "View in Log1",
-                        "target": [
-                            f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                        ]
-                    }]
+                    "@context": "http://schema.org",
+                    "@type": "ViewAction",
+                    "name": "View in Log1",
+                    "target": [
+                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
+                    ]
+                }]
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.project_termination_url, data)
@@ -377,7 +377,7 @@ class ProjectUtil:
                     "activityTitle": "Offer Cancellation Feedback",
                     "activitySubtitle": activity_sub_title,
                     "activityText": self.activity_text,
-                    "activityImage": f"https://api.log1.com/{profile_path}",
+                    "activityImage": profile_path,
                     "facts": [
                         {"name": f"Employer", "value": self.employer},
                         {"name": f"Location", "value": self.project.city},
