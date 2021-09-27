@@ -401,6 +401,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     guest = UserDetailSerializer(many=True)
     permission = serializers.SerializerMethodField()
     attachment_link = serializers.SerializerMethodField()
+    allow_status_change = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
@@ -418,6 +419,12 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         if obj.attachment_link:
             return obj.attachment_link.split('/')[-1]
         return None
+
+    @staticmethod
+    def get_allow_status_change(obj):
+        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+            return False
+        return True
 
 
 class TestGetSerializer(serializers.ModelSerializer):

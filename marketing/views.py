@@ -1176,10 +1176,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
-        submission_id = request.data['submission']
         try:
             # Change status of past Interview to feedback due
             change_to_feedback_due()
+
+            submission_id = request.data.get('submission', None)
+            if not submission_id:
+                return Response({"message": 'Missing Submission ID'}, status=400)
 
             submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
             if not submissions:
@@ -1232,8 +1235,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     "summary": title,
                     "user": request.user,
                     "attendees": attendees,
-                    "lead": interview.submission.lead,
-                    "submission": interview.submission,
+                    "lead": submission.lead,
+                    "submission": submission,
                     "consultant": interview.consultant,
                     "description": interview.description,
                     "call_details": interview.call_details,
@@ -1899,6 +1902,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     return Response({"message": "Interview not found"}, status=404)
 
                 interview = queryset.first()
+                interview.guest.clear()
                 for user_id in request.data.get('guest', []):
                     interview.guest.add(user_id)
 
@@ -1913,7 +1917,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     "lead": interview.submission.lead,
                     "submission": interview.submission,
                     "description": interview.description,
-                    "call_details": request.call_details,
+                    "call_details": interview.call_details,
                     "consultant": interview.submission.consultant,
                 }
 

@@ -162,7 +162,7 @@ def coder_request_notification(user, interview, title):
                                         f"***{interview.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
                                     f"***{interview.submission.created_by.team.name}***",
-                    "activityImage": f"https://api.log1.com/{profile_path}",
+                    "activityImage": profile_path,
                     "facts": [
                         {
                             "name": f"Technology",
@@ -205,7 +205,7 @@ def coder_assigned_notification(user, interview):
                                         f" ***{interview.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
                                     f"***{interview.submission.created_by.team.name}***",
-                    "activityImage": f"https://api.log1.com/{profile_path}",
+                    "activityImage": profile_path,
                     "facts": [
                         {
                             "name": f"Technology",
@@ -264,7 +264,7 @@ def test_received_notification(user, test, timezone):
                                         f"***{test.submission.client}*** for ***{test.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{test.marketer.employee_name}*** from "
                                     f"***{test.marketer.team.name}***",
-                    "activityImage": f"https://api.log1.com/{profile_path}",
+                    "activityImage": profile_path,
                     "facts": [
                         {
                             "name": f"Timezone",

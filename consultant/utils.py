@@ -557,11 +557,11 @@ def marketing_days_filter(days):
     day_filter = dict()
     day_filter["marketing__status"] = 'open'
     if days == 'lt_12':
-        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=12)
+        day_filter['marketing__start__gt'] = timezone.now().date() - timedelta(days=12)
     elif days == 'lt_24':
-        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
+        day_filter['marketing__start__gt'] = timezone.now().date() - timedelta(days=24)
     elif days == 'lt_36':
-        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=36)
+        day_filter['marketing__start__gt'] = timezone.now().date() - timedelta(days=36)
     elif days == 'gt_36':
         day_filter['marketing__start__lte'] = timezone.now().date() - timedelta(days=36)
     return day_filter
@@ -684,8 +684,8 @@ def candidate_filter(request):
             if 'rtg' in filters:
                 consultants = consultants.filter(marketing__rtg=filters['rtg'], marketing__status='open')
 
-            if 'skills' in filters and len(filters["vendor"]) > 0:
-                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in filters['skills']]))
+            if 'skill' in filters and len(filters["skill"]) > 0:
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in filters['skill']]))
 
             if 'dob' in filters:
                 if 'lte' in filters['dob']:
@@ -700,7 +700,8 @@ def candidate_filter(request):
         if query:
             query = query.lstrip().replace(':amp:', '&')
             consultants = consultants.filter(
-                Q(name__icontains=query)
+                Q(name__icontains=query) |
+                Q(email__iexact=query)
             )
 
             # keywords = query.split()
