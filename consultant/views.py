@@ -6,7 +6,7 @@ from django.db import transaction
 from datetime import date, datetime
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.db.models import Subquery, OuterRef, Q, Count
+from django.db.models import Subquery, OuterRef, Q
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -41,7 +41,6 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             close_marketing()
             start_marketing()
             first, last = get_page_limits(request)
-            con_status = request.GET.get('status', '')
             sort_by = request.GET.get('sort_by', None)
 
             consultants, sub_data = candidate_filter(request)
@@ -51,6 +50,12 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
             if sort_by in ['name', 'created']:
                 consultants = consultants.order_by(sort_by)
+
+            consultants = consultants.filter(
+                status__in=['on_bench', 'on_project'], marketing__status='open'
+            ).union(
+                consultants.exclude(status__in=['on_bench', 'on_project'], marketing__status='open')
+            )
 
             status_obj = sub_data["status_obj"]
             count = {
@@ -63,43 +68,8 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
 
-            termination = ConsultantExit.objects.filter(consultant=OuterRef("pk"))
-            work_auth = WorkAuth.objects.filter(consultant=OuterRef("pk"), is_current=True)
-            rate = ConsultantRateRevision.objects.filter(consultant=OuterRef("pk"), end=None)
-            marketing = ConsultantMarketing.objects.filter(consultant=OuterRef("pk"), status='open')
-            poc = ConsultantPOC.objects.filter(consultant=OuterRef("pk"), end=None, poc_type='recruiter')
-
-            if con_status == 'terminated':
-                data = consultants[first:last].annotate(
-                    rate=Subquery(rate.values('rate')[:1]),
-                    rtg=Subquery(marketing.values('rtg')[:1]),
-                    rehire=Subquery(termination.values('rehire')[:1]),
-                    in_pool=Subquery(marketing.values('in_pool')[:1]),
-                    visa_end=Subquery(work_auth.values('visa_end')[:1]),
-                    visa_type=Subquery(work_auth.values('visa_type')[:1]),
-                    exit_status=Subquery(termination.values('status')[:1]),
-                    marketing_start=Subquery(marketing.values('start')[:1]),
-                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
-                    exit_last_date=Subquery(termination.values('last_date')[:1]),
-                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
-                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
-                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
-                         'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end', 'rehire',
-                         'exit_last_date', 'exit_status')
-            else:
-                data = consultants[first:last].annotate(
-                    rate=Subquery(rate.values('rate')[:1]),
-                    rtg=Subquery(marketing.values('rtg')[:1]),
-                    in_pool=Subquery(marketing.values('in_pool')[:1]),
-                    visa_end=Subquery(work_auth.values('visa_end')[:1]),
-                    visa_type=Subquery(work_auth.values('visa_type')[:1]),
-                    marketing_start=Subquery(marketing.values('start')[:1]),
-                    recruiter=Subquery(poc.values('poc__employee_name')[:1]),
-                    preferred_location=Subquery(marketing.values('preferred_location')[:1]),
-                    previous_marketing_days=Subquery(marketing.values('previous_marketing_days')[:1]),
-                ).values('id', 'name', 'skills', 'preferred_location', 'recruiter', 'rtg', 'rate', 'in_pool',
-                         'marketing_start', 'previous_marketing_days', 'visa_type', 'visa_end')
-            return Response({"count": count, "data": data}, status=200)
+            serializer = ConsultantV2ListSerializer(consultants[first:last], many=True)
+            return Response({"count": count, "data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -273,8 +243,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 if 'recruiter' in roles:
                     recruits = consultants.filter(pocs__poc=request.user)
                 consultants = consultants.filter(
-                    Q(marketing__in_pool=True, marketing__status='open') |
-                    Q(marketing__marketer=request.user)
+                    Q(marketing__marketer=request.user) |
+                    Q(marketing__primary_marketer=request.user) |
+                    Q(marketing__in_pool=True, marketing__status='open')
                 )
                 consultants = (consultants | recruits).distinct()
 
@@ -445,11 +416,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         return Response({"detail": "Method DELETE not allowed."}, status=405)
 
     @action(methods=['get'], detail=True, url_path='activities')
-    def activities(self, request, *args, **kwargs):
+    def activities(self, request, pk):
         try:
-            consultant_id = kwargs.get('pk')
             activities = Activity.objects.filter(
-                object_id=consultant_id, content_type__model='consultant'
+                object_id=pk, content_type__model='consultant'
             ).order_by('created')
             serializer = ActivitySerializer(activities, many=True)
             return Response({"data": serializer.data}, status=200)
@@ -471,7 +441,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='search')
-    def search(self, request, *args, **kwargs):
+    def search(self, request):
         try:
             query = request.GET.get('query', None)
             if query:
@@ -487,7 +457,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='education')
-    def education(self, request, *args, **kwargs):
+    def education(self, request, pk):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
@@ -496,13 +466,13 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             try:
                 data = request.data
                 education = Education.objects.create(
+                    consultant_id=pk,
                     city=data['city'],
                     major=data['major'],
                     remark=data['remark'],
                     org_name=data['org_name'],
                     edu_type=data['edu_type'],
                     end_date=data['end_date'],
-                    consultant_id=kwargs.get('pk'),
                 )
                 serializer = EducationSerializer(education)
 
@@ -519,7 +489,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
-                education = get_object_or_404(Education, id=kwargs.get('pk'))
+                education = get_object_or_404(Education, id=pk)
                 serializer = EducationSerializer(education, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
@@ -537,7 +507,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post', 'put'], detail=True, url_path='experience')
-    def experience(self, request, *args, **kwargs):
+    def experience(self, request, pk):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
@@ -546,6 +516,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             try:
                 data = request.data
                 experience = Experience.objects.create(
+                    consultant_id=pk,
                     city=data['city'],
                     title=data['title'],
                     remark=data['remark'],
@@ -553,7 +524,6 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                     exp_type=data['exp_type'],
                     end_date=data['end_date'],
                     start_date=data['start_date'],
-                    consultant_id=kwargs.get('pk'),
                 )
                 serializer = ExperienceSerializer(experience)
 
@@ -570,7 +540,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
-                experience = get_object_or_404(Experience, id=kwargs.get('pk'))
+                experience = get_object_or_404(Experience, id=pk)
                 serializer = ExperienceSerializer(experience, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
@@ -588,26 +558,25 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='marketing')
-    def marketing(self, request, *args, **kwargs):
+    def marketing(self, request, pk):
         first, last = get_page_limits(request)
         marketing_stage = request.GET.get('stage')
         filter_by_status = request.GET.get("filter_by_status", None)
 
         try:
-            consultant_id = kwargs.get('pk')
             if marketing_stage == 'interview':
                 interviews = Interview.objects.filter(
                     submission__consultant_marketing__end=None,
                     submission__consultant_marketing__status='open',
-                    submission__consultant_marketing__consultant_id=consultant_id,
+                    submission__consultant_marketing__consultant_id=pk,
                 )
                 data, counts = self.get_interview_data(interviews, filter_by_status, first, last)
                 if counts == "error":
                     return Response({"error": str(data)}, status=400)
             else:
                 projects = Project.objects.filter(
-                    Q(consultant_id=consultant_id) |
-                    Q(submission__consultant_marketing__consultant_id=consultant_id)
+                    Q(consultant_id=pk) |
+                    Q(submission__consultant_marketing__consultant_id=pk)
                 )
                 data, counts = self.get_project_data(projects, filter_by_status)
                 if counts == "error":
@@ -618,9 +587,9 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='documents')
-    def documents(self, request, *args, **kwargs):
+    def documents(self, request, pk):
         try:
-            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+            consultant = get_object_or_404(Consultant, id=pk)
             queryset = consultant.attachments.all()
             serializer = AttachmentSerializer(queryset, many=True)
             return Response({'data': serializer.data}, status=200)
@@ -629,17 +598,17 @@ class ConsultantViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get', 'post', 'put'], detail=True, url_path='payroll_employer')
-    def payroll_employer(self, request, *args, **kwargs):
+    def payroll_employer(self, request, pk):
         if request.method == 'GET':
             try:
-                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+                consultant = get_object_or_404(Consultant, id=pk)
                 serializer = PayrollEmployerSerializer(consultant.employers.all().order_by('-start'), many=True)
                 return Response({"data": serializer.data}, status=200)
             except Exception as error:
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         elif request.method == 'PUT':
             try:
-                employer = PayrollEmployer.objects.get(id=kwargs.get('pk'))
+                employer = PayrollEmployer.objects.get(id=pk)
                 prev_start = employer.start
                 serializer = PayrollEmployerSerializer(employer, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
@@ -658,7 +627,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
-                consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+                consultant = get_object_or_404(Consultant, id=pk)
                 serializer = PayrollEmployerSerializer(data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save(consultant=consultant)
@@ -676,10 +645,10 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
-    def rate_revision(self, request, *args, **kwargs):
+    def rate_revision(self, request, pk):
         if request.method == 'GET':
             try:
-                rate_revision = ConsultantRateRevision.objects.filter(consultant=kwargs.get('pk')).order_by('-id')
+                rate_revision = ConsultantRateRevision.objects.filter(consultant=pk).order_by('-id')
                 data = rate_revision.values('id', 'rate', 'start', 'end', 'previous_rate', 'feedback', 'consultant')
                 return Response({"data": data}, status=200)
             except Exception as error:
@@ -725,13 +694,6 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
-
-    @action(methods=['get'], detail=False, url_path='map')
-    def map(self, request):
-        consultants = Consultant.objects.filter(
-            marketing__status='open'
-        ).values('current_city').annotate(total=Count('current_city')).order_by('current_city')
-        return Response({"data": consultants}, status=200)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -855,7 +817,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantMarketing.objects.all()
     authentication_classes = (TokenAuthentication,)
-    serializer_class = ConsultantMarketingSerializer
+    serializer_class = ConsultantMarketingCycleSerializer
 
     def list(self, request, *args, **kwargs):
         try:
@@ -864,7 +826,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             marketing = ConsultantMarketing.objects.filter(
                 consultant_id=request.GET.get('consultant')
             )
-            serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
+            serializer = self.serializer_class(marketing, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -961,9 +923,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='stop_marketing')
-    def stop_marketing(self, request, *args, **kwargs):
+    def stop_marketing(self, request, pk):
         try:
-            marketing = get_object_or_404(ConsultantMarketing, id=kwargs.get('pk'))
+            marketing = get_object_or_404(ConsultantMarketing, id=pk)
             marketing.end = request.data.get('end')
             marketing.save()
             close_marketing()
@@ -977,23 +939,23 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='remarketing')
-    def remarketing(self, request, *args, **kwargs):
+    def remarketing(self, request):
         try:
             marketing = ConsultantMarketing.objects.filter(
                 consultant_id=request.GET.get('consultant')
             )
-            serializer = ConsultantMarketingCycleSerializer(marketing, many=True)
+            serializer = self.serializer_class(marketing, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='previous_marketing')
-    def previous_marketing(self, request, *args, **kwargs):
+    def previous_marketing(self, request):
         try:
             qs = ConsultantMarketing.objects.filter(consultant_id=request.GET.get('consultant'))
             if qs:
-                data = ConsultantMarketingCycleSerializer(qs.latest('end')).data
+                data = self.serializer_class(qs.latest('end')).data
             else:
                 data = []
             return Response({"data": data}, status=200)
@@ -1003,9 +965,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     # Marketer assignment
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
-    def marketer_assignment(self, request, *args, **kwargs):
+    def marketer_assignment(self, request, pk):
         try:
-            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
+            queryset = ConsultantMarketing.objects.filter(id=pk)
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -1041,9 +1003,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     # Team Assignment
     @action(methods=['put'], detail=True, url_path='team_assignment')
-    def team_assignment(self, request, *args, **kwargs):
+    def team_assignment(self, request, pk):
         try:
-            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
+            queryset = ConsultantMarketing.objects.filter(id=pk)
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -1072,9 +1034,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     # Remove assigned Marketer from Consultant
     @action(methods=['put'], detail=True, url_path='remove_marketer')
-    def remove_marketer(self, request, *args, **kwargs):
+    def remove_marketer(self, request, pk):
         try:
-            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
+            queryset = ConsultantMarketing.objects.filter(id=pk)
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -1107,9 +1069,9 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     # Remove team from Consultant
     @action(methods=['put'], detail=True, url_path='remove_team')
-    def remove_team(self, request, *args, **kwargs):
+    def remove_team(self, request, pk):
         try:
-            queryset = ConsultantMarketing.objects.filter(id=kwargs.get('pk'))
+            queryset = ConsultantMarketing.objects.filter(id=pk)
             if queryset:
                 consultant_marketing = queryset.first()
             else:
@@ -1512,14 +1474,13 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='cancel')
-    def cancel_termination(self, request, *args, **kwargs):
+    def cancel_termination(self, request, pk):
         try:
             roles = request.user.roles
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles):
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            exit_id = kwargs.get('pk')
-            con_exit = get_object_or_404(ConsultantExit, id=exit_id)
+            con_exit = get_object_or_404(ConsultantExit, id=pk)
 
             if request.data.get('cancel_reason', None) and not con_exit.last_date or con_exit.last_date > date.today():
                 con_exit.status = 'cancelled'

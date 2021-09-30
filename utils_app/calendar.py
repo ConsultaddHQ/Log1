@@ -92,11 +92,11 @@ class Calendar:
                 "Content": description
             },
             "Start": {
-                "DateTime": data["start"],
+                "DateTime": str(data["start"]),
                 "TimeZone": "Eastern Standard Time"
             },
             "End": {
-                "DateTime": data["end"],
+                "DateTime": str(data["end"]),
                 "TimeZone": "Eastern Standard Time"
             },
             "Attendees": attendees
@@ -171,7 +171,7 @@ def get_profile_picture(user):
     try:
         file_path = f"media/avatar/{user.employee_id}.png"
         if os.path.exists(file_path):
-            return file_path
+            return f"{os.environ.get('base_domain', 'http://localhost:8000')}/{file_path}"
 
         obj = Calendar()
         headers = obj.headers

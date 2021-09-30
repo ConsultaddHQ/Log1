@@ -27,14 +27,14 @@ from attachment.models import create_attachment
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
+from notification.utils import push_notification_consultant
 from utils_app.mailing import send_email_attachment_multiple, send_email
+from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet
 from log1.utils import ERROR_MSG, get_time_filter, get_page_limits, write_exception
-from notification.utils import create_notification, push_notification, push_notification_consultant
-from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
-    ProjectSupportSerializer, ConsultantTimeSheetSerializer
+    ConsultantTimeSheetSerializer
 
 
 # Route - /project/
@@ -502,11 +502,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
-                return Response({
-                    "message": message,
-                    "data": serializer.data,
-                    "exception": error_msg,
-                }, status=201)
+                return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
             return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
             write_exception(error, request)
@@ -685,18 +681,16 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path="send_support_mail")
-    def send_support_and_offer_mail(self, request, *args, **kwargs):
+    def send_support_and_offer_mail(self, request, pk):
         try:
-            project_id = kwargs.get('pk')
-            project = get_object_or_404(Project, id=project_id)
+            project = get_object_or_404(Project, id=pk)
 
             message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
 
             if exception_msg != 'Mail sent':
-                return Response({
-                    "exception": exception_msg,
-                    "message": "Unable to send Support or Offer mail"
-                }, status=400)
+                return Response(
+                    {"exception": exception_msg, "message": "Unable to send Support or Offer mail"}, status=400
+                )
 
             return Response({"data": exception_msg, "message": "Support and Offer mail sent"}, status=200)
         except Exception as error:
@@ -704,9 +698,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='fields')
-    def fields(self, request, *args, **kwargs):
+    def fields(self, request, pk):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            project = get_object_or_404(Project, id=pk)
             fields, group = [], None
             status = project.statuses.filter(is_current=True).first().status
             if project.submission.created_by.id == request.user.id:
@@ -722,127 +716,121 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
 
 # Route - /project_support/
-class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
-    queryset = ProjectSupport.objects.all()
-    serializer_class = ProjectSupportSerializer
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
-
-    def list(self, request, *args, **kwargs):
-        try:
-            project = get_object_or_404(Project, id=request.GET.get('project_id'))
-            serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
-            return Response({"data": serializer.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def create(self, request, *args, **kwargs):
-        try:
-            project = get_object_or_404(Project, id=request.data['project_id'])
-            users = request.data.get('support', [])
-            support_names = []
-            for user in users:
-                support = get_object_or_404(User, id=user['id'])
-                support_names.append(support.employee_name)
-                if not user['start']:
-                    return Response({"message": "Start date can not be empty"}, status=400)
-                project_support = ProjectSupport.objects.create(
-                    project=project,
-                    support=support,
-                    start=user['start'],
-                    is_primary=user['primary'],
-                )
-                SupportStatus.objects.create(
-                    is_current=True,
-                    support=project_support,
-                    change_date=user['start'],
-                    frequency=user['frequency'],
-                )
-            # notification
-            user_list = []
-            aux_verb = "is"
-            if len(support_names) > 1:
-                aux_verb = "are"
-            consultant = project.submission.consultant
-            names = ", ".join(name for name in support_names)
-            pocs = consultant.pocs.all()
-            for data in pocs:
-                user_list.append(data.poc)
-            user_list.append(project.submission.created_by)
-            title = f"""{names} {aux_verb} assigned as support to {consultant.name}'s project of 
-                {project.submission.client}"""
-            notification_data = {
-                'category': 'info', 'target_type': 'projectsupport', 'parent_type': 'project',
-                'title': title, 'target_id': None, 'description': title, 'parent_id': project.id,
-                'sender_id': request.user.id, 'recipient_user_type': 'user', 'sender_user_type': 'user',
-            }
-            create_notification(user_list, notification_data)
-            # Push Notification
-            message_body = {
-                "click_action": "https://app.log1.com", "show_in_foreground": True,
-                "body": title, "title": title, "category": "alert",
-                "data": {
-                    'is_read': False, 'sub_target': 'support', 'timestamp': str(datetime.now()),
-                    'is_deleted': False, 'target': 'submission', 'target_id': project.submission.id,
-                },
-            }
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
-            serializer = ProjectSupportSerializer(project.support.all(), many=True)
-            return Response({"data": serializer.data, "message": "Support is added"}, status=201)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def update(self, request, *args, **kwargs):
-        try:
-            support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
-            project = support.project
-            all_support = project.support.filter(end=None)
-            primary_support = [user for user in all_support if user.is_primary is True]
-
-            if len(primary_support) == 1 and primary_support[0] == support and request.data.get('is_primary') is False:
-                return Response({"message": 'At least one support should be primary'}, status=400)
-
-            support.is_primary = request.data.get('is_primary')
-            support.save()
-            start = request.data.get('start')
-            new_freq = request.data.get('frequency')
-            prev = support.statuses.filter(is_current=True)
-            if prev.first() and prev.first().frequency != new_freq:
-                prev.update(is_current=False)
-                SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
-            elif not prev.first():
-                SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
-            serializer = ProjectSupportSerializer(support)
-            return Response({"data": serializer.data, "message": "Support is updated"}, status=202)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def partial_update(self, request, *args, **kwargs):
-        return Response({"detail": "Method PATCH not allowed."}, status=405)
-
-    @action(methods=['put'], detail=True, url_path="remove")
-    def remove_support(self, request, *args, **kwargs):
-        try:
-            support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
-            support.end = request.data.get('end')
-            support.feedback = request.data.get('feedback', None)
-            support.save()
-            serializer = ProjectSupportSerializer(support)
-            return Response({"data": serializer.data, "message": "Support is removed"}, status=202)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+# class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+#     queryset = ProjectSupport.objects.all()
+#     serializer_class = ProjectSupportSerializer
+#     permission_classes = (IsAuthenticated,)
+#     authentication_classes = (TokenAuthentication,)
+#
+#     def list(self, request, *args, **kwargs):
+#         try:
+#             project = get_object_or_404(Project, id=request.GET.get('project_id'))
+#             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
+#             return Response({"data": serializer.data}, status=200)
+#         except Exception as error:
+#             write_exception(error, request)
+#             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+#
+#     def create(self, request, *args, **kwargs):
+#         try:
+#             project = get_object_or_404(Project, id=request.data['project_id'])
+#             users = request.data.get('support', [])
+#             support_names = []
+#             for user in users:
+#                 support = get_object_or_404(User, id=user['id'])
+#                 support_names.append(support.employee_name)
+#                 if not user['start']:
+#                     return Response({"message": "Start date can not be empty"}, status=400)
+#                 project_support = ProjectSupport.objects.create(
+#                     project=project, support=support, start=user['start'], is_primary=user['primary'],
+#                 )
+#                 SupportStatus.objects.create(
+#                     is_current=True, support=project_support, change_date=user['start'], frequency=user['frequency'],
+#                 )
+#             # notification
+#             user_list = []
+#             aux_verb = "is"
+#             if len(support_names) > 1:
+#                 aux_verb = "are"
+#             consultant = project.submission.consultant
+#             names = ", ".join(name for name in support_names)
+#             pocs = consultant.pocs.all()
+#             for data in pocs:
+#                 user_list.append(data.poc)
+#             user_list.append(project.submission.created_by)
+#             title = f"""{names} {aux_verb} assigned as support to {consultant.name}'s project of
+#                 {project.submission.client}"""
+#             notification_data = {
+#                 'category': 'info', 'target_type': 'projectsupport', 'parent_type': 'project',
+#                 'title': title, 'target_id': None, 'description': title, 'parent_id': project.id,
+#                 'sender_id': request.user.id, 'recipient_user_type': 'user', 'sender_user_type': 'user',
+#             }
+#             create_notification(user_list, notification_data)
+#             # Push Notification
+#             message_body = {
+#                 "click_action": "https://app.log1.com", "show_in_foreground": True,
+#                 "body": title, "title": title, "category": "alert",
+#                 "data": {
+#                     'is_read': False, 'sub_target': 'support', 'timestamp': str(datetime.now()),
+#                     'is_deleted': False, 'target': 'submission', 'target_id': project.submission.id,
+#                 },
+#             }
+#             object_ids = [user.id for user in user_list]
+#             push_notification(object_ids, message_body)
+#             serializer = ProjectSupportSerializer(project.support.all(), many=True)
+#             return Response({"data": serializer.data, "message": "Support is added"}, status=201)
+#         except Exception as error:
+#             write_exception(error, request)
+#             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+#
+#     def update(self, request, *args, **kwargs):
+#         try:
+#             support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+#             project = support.project
+#             all_support = project.support.filter(end=None)
+#             primary_support = [user for user in all_support if user.is_primary is True]
+#
+#             if len(primary_support) == 1 and primary_support[0] == support and request.data.get('is_primary') is False:
+#                 return Response({"message": 'At least one support should be primary'}, status=400)
+#
+#             support.is_primary = request.data.get('is_primary')
+#             support.save()
+#             start = request.data.get('start')
+#             new_freq = request.data.get('frequency')
+#             prev = support.statuses.filter(is_current=True)
+#             if prev.first() and prev.first().frequency != new_freq:
+#                 prev.update(is_current=False)
+#                 SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
+#             elif not prev.first():
+#                 SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
+#             serializer = ProjectSupportSerializer(support)
+#             return Response({"data": serializer.data, "message": "Support is updated"}, status=202)
+#         except Exception as error:
+#             write_exception(error, request)
+#             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+#
+#     def partial_update(self, request, *args, **kwargs):
+#         return Response({"detail": "Method PATCH not allowed."}, status=405)
+#
+#     @action(methods=['put'], detail=True, url_path="remove")
+#     def remove_support(self, request, *args, **kwargs):
+#         try:
+#             support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+#             support.end = request.data.get('end')
+#             support.feedback = request.data.get('feedback', None)
+#             support.save()
+#             serializer = ProjectSupportSerializer(support)
+#             return Response({"data": serializer.data, "message": "Support is removed"}, status=202)
+#         except Exception as error:
+#             write_exception(error, request)
+#             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /project_order/
 class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectOrder.objects.all()
-    serializer_class = ProjectOrderSerializer
     permission_classes = (IsAuthenticated,)
+    serializer_class = ProjectOrderSerializer
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
@@ -1126,9 +1114,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=["get"], detail=True, url_name="from_notification")
-    def from_notification(self, request, *args, **kwargs):
+    def from_notification(self, request, pk):
         try:
-            queryset = TimeSheet.objects.filter(id=kwargs.get('pk'))
+            queryset = TimeSheet.objects.filter(id=pk)
             serializer = self.serializer_class(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:

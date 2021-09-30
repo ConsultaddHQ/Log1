@@ -169,6 +169,10 @@ def coder_request_notification(user, interview, title):
                             "value": f"{interview.tech_stack}"
                         },
                         {
+                            "name": f"Supervisor",
+                            "value": f"{interview.supervisor.employee_name}"
+                        },
+                        {
                             "name": f"Date",
                             "value": f"{interview.start_time.strftime('%a, %d %B %Y')}"
                         },
@@ -200,7 +204,7 @@ def coder_assigned_notification(user, interview):
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
-                    "activityTitle": f"Coding expert assignment for Interview",
+                    "activityTitle": f"Coding assignment",
                     "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
                                         f" ***{interview.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
@@ -210,6 +214,10 @@ def coder_assigned_notification(user, interview):
                         {
                             "name": f"Technology",
                             "value": f"{interview.tech_stack}"
+                        },
+                        {
+                            "name": f"Supervisor",
+                            "value": f"{interview.supervisor.employee_name}"
                         },
                         {
                             "name": f"Date",

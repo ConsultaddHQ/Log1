@@ -216,17 +216,18 @@ class SupportStatusSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ProjectSupportSerializer(serializers.ModelSerializer):
-    support = UserSerializer()
-    status = serializers.SerializerMethodField()
-
+class ProjectSupportCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectSupport
         fields = '__all__'
 
-    @staticmethod
-    def get_status(obj):
-        return SupportStatusSerializer(obj.statuses.filter(is_current=True).first()).data
+
+class ProjectSupportSerializer(serializers.ModelSerializer):
+    support = UserSerializer()
+
+    class Meta:
+        model = ProjectSupport
+        exclude = ('project',)
 
 
 class ProjectSupportDetailSerializer(serializers.ModelSerializer):

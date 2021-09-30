@@ -90,6 +90,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                'staticfiles': 'django.templatetags.static',
+            }
         },
     },
 ]
@@ -115,7 +118,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'}
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
+    )
+}
 
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
@@ -131,6 +140,31 @@ CORS_ALLOW_HEADERS = [
     'accept-encoding',
     'x-requested-with',
 ]
+
+# Swagger
+SWAGGER_SETTINGS = {
+    "exclude_namespaces": [],
+    "api_version": '2.0',
+    "api_path": "/",
+    "enabled_methods": [
+        'get',
+        'post',
+        'put',
+        'delete'
+    ],
+    'SECURITY_DEFINITIONS': {
+        "apiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Token Authentication"
+        }
+    },
+
+    "api_key": '',
+    "is_superuser": False,
+    'USE_SESSION_AUTH': True,
+    "is_authenticated": True,
+}
 
 # Send Grid Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

@@ -35,6 +35,31 @@ class PetitionViewSets(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @staticmethod
+    def rejection_mail(beneficiary_name, petition, document, request):
+        try:
+            to = ['sarang.m@consultadd.com']
+            if os.environ.get('ENV') == 'prod':
+                to = [petition.beneficiary.email]
+            mail_data = {
+                'to': to, 'cc': [], 'bcc': [],
+                'template': '../templates/rejection_email.html',
+                'subject': f'Your H1B process - Need correction in documents',
+                'context': {
+                    'name': beneficiary_name,
+                    'remark': document.remark,
+                    'doc_type': document.doc_type.name,
+                    'petitioner_name': petition.assigned_to.employee_name,
+                },
+            }
+            res, msg = send_email(mail_data, petition.assigned_to.email, request=request)
+            if not msg:
+                return res, "error"
+            return res, "ok"
+        except Exception as error:
+            write_exception(message=error)
+            return error, 'error'
+
     def retrieve(self, request, *args, **kwargs):
         try:
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
@@ -122,41 +147,16 @@ class PetitionViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @staticmethod
-    def rejection_mail(beneficiary_name, petition, document, request):
-        try:
-            to = ['sarang.m@consultadd.com']
-            if os.environ.get('ENV') == 'prod':
-                to = [petition.beneficiary.email]
-            mail_data = {
-                'to': to, 'cc': [], 'bcc': [],
-                'template': '../templates/rejection_email.html',
-                'subject': f'Your H1B process - Need correction in documents',
-                'context': {
-                    'name': beneficiary_name,
-                    'remark': document.remark,
-                    'doc_type': document.doc_type.name,
-                    'petitioner_name': petition.assigned_to.employee_name,
-                },
-            }
-            res, msg = send_email(mail_data, petition.assigned_to.email, request=request)
-            if not msg:
-                return res, "error"
-            return res, "ok"
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
-
     @action(methods=['get'], detail=True, url_path='doc_types')
-    def doc_types(self, request, *args, **kwargs):
+    def doc_types(self, request, pk):
         try:
             data = dict()
-            doc_types = DocumentList.objects.filter(petition_id=kwargs.get('pk'))
+            doc_types = DocumentList.objects.filter(petition_id=pk)
             categories = Types.objects.all().order_by('category').distinct('category')
             for category in categories:
                 data[category.category] = []
             for i in doc_types:
-                documents = Document.objects.filter(petition_id=kwargs.get('pk'), doc_type=i.doc_type)
+                documents = Document.objects.filter(petition_id=pk, doc_type=i.doc_type)
                 if documents:
                     document = documents.first()
                     remark = document.remark
@@ -230,9 +230,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='doc_request')
-    def doc_request(self, request, *args, **kwargs):
+    def doc_request(self, request, pk):
         try:
-            petition = get_object_or_404(Petition, id=kwargs.get('pk'))
+            petition = get_object_or_404(Petition, id=pk)
             beneficiary = petition.beneficiary
             petition_type = petition.get_petition_type_display()
             if os.environ.get('ENV') == 'prod':
@@ -260,7 +260,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='doc_url')
-    def doc_url(self, request, *args, **kwargs):
+    def doc_url(self, request):
         try:
             document_id = request.GET.get('document_id')
             document = get_object_or_404(Document, id=document_id)
@@ -287,10 +287,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='lca')
-    def lca(self, request, *args, **kwargs):
+    def lca(self, request, pk):
         try:
-            petition_id = kwargs.get('pk')
-            petition = get_object_or_404(Petition, id=petition_id)
+            petition = get_object_or_404(Petition, id=pk)
             lca_no = request.data.get('lca_no', None)
             file = request.FILES.get('file', None)
             if lca_no:
@@ -301,9 +300,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 Document.objects.create(
                     file=file,
                     verified=True,
+                    petition_id=pk,
                     doc_type_id='25',
                     creator=request.user,
-                    petition_id=petition_id,
                 )
             else:
                 return Response({'error': 'Data is missing'}, status=400)
@@ -315,25 +314,24 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='petition_file')
-    def final_petition_file(self, request, *args, **kwargs):
+    def final_petition_file(self, request, pk):
         try:
-            petition_id = kwargs.get('pk')
             file = request.FILES.get('file')
             request_status = request.data.get('status')
             doc_type_id = request.data.get('doc_type')
-            petition = get_object_or_404(Petition, id=petition_id)
+            petition = get_object_or_404(Petition, id=pk)
 
             if file:
                 Document.objects.create(
                     file=file,
                     verified=True,
+                    petition_id=pk,
                     creator=request.user,
                     doc_type_id=doc_type_id,
-                    petition_id=petition_id,
                 )
 
             if request_status in ['reviewed', 'print']:
-                document = Document.objects.filter(petition=petition_id, doc_type_id='26').first()
+                document = Document.objects.filter(petition_id=pk, doc_type_id='26').first()
                 if not document:
                     return Response({"error": "Please upload document before moving further"},
                                     status=400)
@@ -347,9 +345,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='petition_status')
-    def petition_shipping_status(self, request, *args, **kwargs):
+    def petition_shipping_status(self, request, pk):
         try:
-            petition_id = kwargs.get('pk')
             file = request.FILES.get('file')
             rfe_doc = request.FILES.get('rfe_doc')
             fedex_no = request.data.get('fedex_no')
@@ -358,8 +355,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
             request_status = request.data.get('status')
             denied_doc = request.FILES.get('denied_doc')
             approved_doc = request.FILES.get('approved_doc')
-            petition = get_object_or_404(Petition, id=petition_id)
 
+            petition = get_object_or_404(Petition, id=pk)
             if petition.status == 'print' and request_status == 'shipped':
                 if fedex_no:
                     petition.fedex_no = fedex_no
@@ -371,9 +368,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     Document.objects.create(
                         file=file,
                         verified=True,
-                        creator=request.user,
+                        petition_id=pk,
                         doc_type_id='27',
-                        petition_id=petition_id,
+                        creator=request.user,
                     )
                     petition.uscis_no = receipt_no
                 else:
@@ -383,9 +380,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 Document.objects.create(
                     file=rfe_doc,
                     verified=True,
-                    creator=request.user,
+                    petition_id=pk,
                     doc_type_id='28',
-                    petition_id=petition_id,
+                    creator=request.user,
                 )
 
             elif petition.status == 'rfe' and request_status == 'rfe_responded':
@@ -393,9 +390,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     Document.objects.create(
                         file=file,
                         verified=True,
-                        creator=request.user,
+                        petition_id=pk,
                         doc_type_id='29',
-                        petition_id=petition_id,
+                        creator=request.user,
                     )
                 else:
                     return Response({"error": "File is missing"}, status=400)
@@ -404,26 +401,26 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 Document.objects.create(
                     file=denied_doc,
                     verified=True,
-                    creator=request.user,
+                    petition_id=pk,
                     doc_type_id='30',
-                    petition_id=petition_id,
+                    creator=request.user,
                 )
 
             elif approved_doc:
                 Document.objects.create(
-                    file=approved_doc,
                     verified=True,
-                    creator=request.user,
+                    petition_id=pk,
                     doc_type_id='31',
-                    petition_id=petition_id,
+                    file=approved_doc,
+                    creator=request.user,
                 )
 
             if reason:
                 Reason.objects.create(
                     reason=reason,
-                    petition_status=request_status,
-                    petition_id=petition_id,
+                    petition_id=pk,
                     created_by=request.user,
+                    petition_status=request_status,
                 )
 
             petition.status = request_status
@@ -435,12 +432,11 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=True, url_path='document')
-    def document(self, request, *args, **kwargs):
+    def document(self, request, pk):
         try:
-            petition_id = kwargs.get('pk')
             doc_id = request.GET.get('doc_id', None)
             if doc_id:
-                petition = get_object_or_404(Petition, id=petition_id)
+                petition = get_object_or_404(Petition, id=pk)
                 doc = get_object_or_404(Document, id=doc_id)
                 doc.delete()
                 serializer = PetitionGetSerializer(petition)
@@ -451,13 +447,13 @@ class PetitionViewSets(viewsets.ModelViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='comment')
-    def comment(self, request, *args, **kwargs):
-        object_id = kwargs.get('pk')
+    def comment(self, request, pk):
         try:
             if request.method == 'GET':
                 if not ('legal' in request.user.roles or 'superadmin' in request.user.roles):
                     return Response({"result": DONT_HAVE_ACCESS}, status=403)
-                petition = get_object_or_404(Petition, id=object_id)
+
+                petition = get_object_or_404(Petition, id=pk)
                 comments = petition.consultant_comments.filter(parent_comment=None).order_by('-created')
                 serializer = ConsultantCommentGetSerializer(comments, many=True)
                 return Response({'results': serializer.data}, status=200)
@@ -468,7 +464,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 content_type = ContentType.objects.get(model='petition')
                 created_by_content_type = ContentType.objects.get(model='user')
                 comment = ConsultantComment.objects.create(
-                    object_id=object_id,
+                    object_id=pk,
                     content_type=content_type,
                     created_by_id=request.user.id,
                     created_by_content_type=created_by_content_type,
@@ -591,10 +587,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get', 'post'], detail=True, url_path='comment')
-    def comment(self, request, *args, **kwargs):
-        object_id = kwargs.get('pk')
+    def comment(self, request, pk):
         try:
-            petition = get_object_or_404(Petition, id=object_id)
+            petition = get_object_or_404(Petition, id=pk)
             if petition.beneficiary != request.user:
                 return Response({"result": DONT_HAVE_ACCESS}, status=403)
 
@@ -607,7 +602,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
                 content_type = ContentType.objects.get(model='petition')
                 created_by_content_type = ContentType.objects.get(model='consultant')
                 comment = ConsultantComment.objects.create(
-                    object_id=object_id,
+                    object_id=pk,
                     content_type=content_type,
                     created_by_id=request.user.id,
                     created_by_content_type=created_by_content_type,
@@ -695,7 +690,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='doc_url')
-    def doc_url(self, request, *args, **kwargs):
+    def doc_url(self, request):
         try:
             document_id = request.GET.get('document_id')
             document = get_object_or_404(Document, id=document_id, petition__beneficiary=request.user)

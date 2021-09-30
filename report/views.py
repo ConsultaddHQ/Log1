@@ -318,7 +318,7 @@ command - {command}\n\n
         return text
 
     @action(methods=['get'], detail=False, url_path='consultant')
-    def consultant(self, request, *args, **kwargs):
+    def consultant(self, request):
         try:
             api_key = request.GET.get('api_key', None)
             if not APIKey.objects.is_valid(api_key):
