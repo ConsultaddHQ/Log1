@@ -436,7 +436,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 consultant.save()
                 return Response({'message': 'Password Changed Successfully'}, status=200)
             else:
-                return Response({'message': DONT_HAVE_ACCESS}, status=401)
+                return Response({'message': DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 

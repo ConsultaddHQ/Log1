@@ -4,7 +4,7 @@ from rest_framework import serializers
 from employee.models import User
 from attachment.serializers import AttachmentURLSerializer
 from project.models import Project, SupportStatus, TimeSheet
-from engineering.models import ProjectSupportStatus, ProjectDescription, ProjectSupportUpdate
+from engineering.models import ProjectDescription, ProjectSupportUpdate
 
 
 class POCSerializer(serializers.ModelSerializer):
@@ -182,12 +182,6 @@ class TimesheetSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_attachments(obj):
         return AttachmentURLSerializer(obj.attachments.all(), many=True).data
-
-
-class ProjectSupportStatusSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectSupportStatus
-        fields = '__all__'
 
 
 class ProjectSupportUpdateSerializer(serializers.ModelSerializer):

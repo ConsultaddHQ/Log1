@@ -223,11 +223,30 @@ class ProjectSupportCreateSerializer(serializers.ModelSerializer):
 
 
 class ProjectSupportSerializer(serializers.ModelSerializer):
-    support = UserSerializer()
+    status = serializers.SerializerMethodField()
+    support = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
         exclude = ('project',)
+
+    @staticmethod
+    def get_support(obj):
+        return {
+            'id': obj.support.id,
+            'email': obj.support.email,
+            'name': obj.support.employee_name,
+        }
+
+    @staticmethod
+    def get_status(obj):
+        status = obj.statuses.filter(is_current=True)
+        if status:
+            return {
+                "value": status.first().frequency,
+                "change_date": status.first().change_date,
+            }
+        return None
 
 
 class ProjectSupportDetailSerializer(serializers.ModelSerializer):
