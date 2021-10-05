@@ -1,0 +1,58 @@
+from datetime import datetime
+from django.shortcuts import get_object_or_404
+
+from employee.models import User, Tagging
+from notification.utils import create_notification, push_notification
+
+
+def tag_and_notify(update, tags, user, tag_type='create'):
+    user_list = []
+    if tag_type == 'create':
+        tag_obj = Tagging.objects.create(
+            content_type='projectupdate',
+            object_id=update.id,
+        )
+        for tag in tags:
+            user = get_object_or_404(User, id=tag)
+            user_list.append(user)
+            tag_obj.tagged_user.add(user)
+
+    elif tag_type == 'update':
+        if update.tagged_user.exists():
+            for tag in tags:
+                user = get_object_or_404(User, id=tag)
+                user_list.append(user)
+                update.tagged_user.first().tagged_user.add(user)
+
+    title = f"{user.employee_name} tagged you in a project update of {update.project.consultant.name}"
+    notification_data = {
+        'title': title,
+        'category': 'info',
+        'description': title,
+        'sender_id': user.id,
+        'target_id': update.id,
+        'sender_user_type': 'user',
+        'parent_user_type': 'project',
+        'recipient_user_type': 'user',
+        'target_type': 'projectupdate',
+        'parent_id': update.project.id,
+    }
+    create_notification(user_list, notification_data)
+
+    # Push Notification
+    message_body = {
+        "category": "alert",
+        "show_in_foreground": True,
+        "title": title, "body": title,
+        "click_action": "https://app.log1.com",
+        "data": {
+            'is_read': False,
+            'is_deleted': False,
+            'target': 'project',
+            'sub_target_id': update.id,
+            'sub_target': 'projectupdate',
+            'target_id': update.project.id,
+            'timestamp': str(datetime.now()),
+        },
+    }
+    push_notification(tags, message_body)

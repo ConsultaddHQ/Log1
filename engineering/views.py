@@ -1,5 +1,4 @@
 import json
-from datetime import datetime
 from django.db.models import Q
 
 from rest_framework.response import Response
@@ -12,12 +11,12 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 
 from engineering.serializers import *
 from marketing.utils import date_filter
+from engineering.utils import tag_and_notify
 from project.models import Project, ProjectSupport
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
-from notification.utils import create_notification, push_notification
 from project.serializers import ProjectSupportSerializer, ProjectSupportCreateSerializer
-from engineering.serializers import TimesheetSerializer, ProjectSupportUpdateSerializer, ProjectDescriptionSerializer
+from engineering.serializers import TimesheetSerializer, ProjectUpdateSerializer, ProjectDescriptionSerializer
 
 
 # Route - /engineering/
@@ -204,17 +203,17 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /project/<project_id>/updates/
-class ProjectSupportUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+# Route - /project/<project_id>/update/
+class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+    queryset = ProjectUpdate.objects.all()
     permission_classes = (IsAuthenticated,)
-    queryset = ProjectSupportUpdate.objects.all()
+    serializer_class = ProjectUpdateSerializer
     authentication_classes = (TokenAuthentication,)
-    serializer_class = ProjectSupportUpdateSerializer
 
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('id'))
-            serializer = ProjectSupportUpdateSerializer(project.updates.all(), many=True)
+            serializer = ProjectUpdateGetSerializer(project.updates.all(), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -222,9 +221,17 @@ class ProjectSupportUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMix
 
     def create(self, request, *args, **kwargs):
         try:
-            serializer = ProjectSupportUpdateSerializer(data=request.data, partial=True)
+            data = request.data.copy()
+            data['project'] = kwargs.get('id')
+            data['update_by'] = request.user.id
+            serializer = self.serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
+            tags = request.data.get('tagged_user', [])
+            update = ProjectUpdate.objects.get(id=serializer.data['id'])
+            tag_and_notify(update, tags, request.user, 'create')
+
             return Response({"message": "Update is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -232,11 +239,61 @@ class ProjectSupportUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMix
 
     def update(self, request, *args, **kwargs):
         try:
-            update = get_object_or_404(ProjectSupportUpdate, id=kwargs.get('pk'))
-            serializer = ProjectSupportUpdateSerializer(update, data=request.data, partial=True)
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            serializer = self.serializer_class(update, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
+            tags = request.data.get('tagged_user', [])
+            tag_and_notify(update, tags, request.user, 'update')
+
             return Response({"message": "Update is edited"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
+
+# Route - /project/<project_id>/description/
+class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = ProjectDescription.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ProjectDescriptionSerializer
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('id'))
+            if hasattr(project, 'description'):
+                serializer = self.serializer_class(project.description)
+                return Response({"data": serializer.data}, status=200)
+            return Response({"data": []}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data.copy()
+            data['project'] = kwargs.get('id')
+            data['update_by'] = request.user.id
+            serializer = self.serializer_class(data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"message": "Description added"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            description = get_object_or_404(ProjectDescription, id=kwargs.get('pk'))
+            serializer = self.serializer_class(description, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"message": "Description Updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

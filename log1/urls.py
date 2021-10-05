@@ -9,7 +9,6 @@ from rest_framework_swagger.views import get_swagger_view
 from rest_framework.documentation import include_docs_urls
 
 from activity.views import CommentViewSet
-from engineering.views import EngineeringViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
@@ -22,7 +21,7 @@ from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, C
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
      ProjectOrderViewSet, ProjectSupportViewSet
-from engineering.views import ProjectSupportUpdateViewSet
+from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectDescriptionViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
@@ -68,8 +67,9 @@ router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'project_order', ProjectOrderViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
+router.register(r'project/(?P<id>[0-9]+)/updates', ProjectUpdateViewSet)
 router.register(r'project/(?P<id>[0-9]+)/support', ProjectSupportViewSet)
-router.register(r'project/(?P<id>[0-9]+)/updates', ProjectSupportUpdateViewSet)
+router.register(r'project/(?P<id>[0-9]+)/description', ProjectDescriptionViewSet)
 
 router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)

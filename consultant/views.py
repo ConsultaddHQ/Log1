@@ -1710,7 +1710,7 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
                 return Response({"result": serializer.data}, status=202)
             return Response({"error": "Incorrect Email Id OR Password"}, status=400)
         except Exception as error:
-            write_exception(message=error, login=True)
+            write_exception(message=error)
             return Response({"error": str(error)}, status=400)
 
 

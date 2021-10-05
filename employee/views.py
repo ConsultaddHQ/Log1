@@ -101,7 +101,7 @@ class EmployeeAuthViewSets(GenericViewSet):
                 return Response({"data": self.login_serializer_class(user).data}, status=202)
             return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
         except Exception as error:
-            write_exception(message=error, login=True)
+            write_exception(message=error)
             return Response({"message": "Unable to Login", "error": str(error)}, status=400)
 
 

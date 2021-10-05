@@ -1386,15 +1386,16 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                         est = pytz.timezone('US/Eastern')
                         today = datetime.now().astimezone(est)
-                        start_date = interview.start_time.astimezone(est)
 
-                        if today.date() < start_date.date():
-                            notification_title = "Coding request, Interview Rescheduled"
-                            coder_request_notification(request.user, interview, notification_title)
+                        if pre_guest_type in ['coder', 'assistance',
+                                              'assigned'] and interview.guest_type == 'not_required':
+                            if today.date() < interview.start_time.date():
+                                notification_title = "Coding request, Interview Rescheduled"
+                                coder_request_notification(request.user, interview, notification_title)
 
-                        if today.date() == start_date.date() and today.time() < start_date.time():
-                            notification_title = "Coding Request, Interview Rescheduled"
-                            coder_request_notification(request.user, interview, notification_title)
+                            if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
+                                notification_title = "Coding Request, Interview Rescheduled"
+                                coder_request_notification(request.user, interview, notification_title)
 
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         _, attendees = get_users_and_attendees(request, interview)
@@ -1625,21 +1626,21 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.announcement_url, data)
 
-                est = pytz.timezone('US/Eastern')
-                today = datetime.now().astimezone(est)
-                start_date = interview.start_time.astimezone(est)
+                if prev_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
+                    est = pytz.timezone('US/Eastern')
+                    today = datetime.now().astimezone(est)
 
-                if today.date() < start_date.date():
-                    title = "Coding request, Interview Rescheduled"
-                    coder_request_notification(request.user, interview, title)
+                    if today.date() < interview.start_time.date():
+                        title = "Coding request, Interview Rescheduled"
+                        coder_request_notification(request.user, interview, title)
 
-                if today.date() == start_date.date() and today.time() < start_date.time():
-                    title = "Coding request, Interview Rescheduled"
-                    coder_request_notification(request.user, interview, title)
+                    if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
+                        title = "Coding request, Interview Rescheduled"
+                        coder_request_notification(request.user, interview, title)
 
-                if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
-                    title = "Coding request"
-                    coder_request_notification(request.user, interview, title)
+                    if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
+                        title = "Coding request"
+                        coder_request_notification(request.user, interview, title)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1895,7 +1896,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     return Response({"message": "Interview not found"}, status=404)
 
                 interview = queryset.first()
-                interview.guest.clear()
                 guest = request.data.get('guest', [])
                 if guest:
                     interview.guest_type = 'assigned'
@@ -1903,6 +1903,15 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 for user_id in guest:
                     interview.guest.add(user_id)
+
+                est = pytz.timezone('US/Eastern')
+                today = datetime.now().astimezone(est)
+
+                if today.date() < interview.start_time.date():
+                    coder_assigned_notification(request.user, interview)
+
+                if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
+                    coder_assigned_notification(request.user, interview)
 
                 title = get_interview_title(interview)
                 _, attendees = get_users_and_attendees(request, interview)
@@ -1940,16 +1949,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                             interview.save()
                         if msg == "error":
                             return Response({"message": "Calendar update failed", "error": res}, status=400)
-
-                est = pytz.timezone('US/Eastern')
-                today = datetime.now().astimezone(est)
-                start_date = interview.start_time.astimezone(est)
-
-                if today.date() < start_date.date():
-                    coder_assigned_notification(request.user, interview)
-
-                if today.date() == start_date.date() and today.time() < start_date.time():
-                    coder_assigned_notification(request.user, interview)
 
                 return Response({"data": "Coders assigned", "booking_response": booking_res}, status=202)
             return Response({"message": DONT_HAVE_ACCESS}, status=403)

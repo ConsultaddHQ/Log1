@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 from constance import config
 from employee.models import User
 from consultant.models import Consultant
+from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
 from utils_app.calendar import get_profile_picture
 from consultant.utils import send_notification_for_user
@@ -126,10 +127,11 @@ def diff_month_days(start, end):
 
 
 class ProjectUtil:
-    def __init__(self, project, user):
-        self.user = user
+    def __init__(self, project, request=None):
+        self.request = request
         self.project = project
         self.project_end = None
+        self.user = request.user
         self.statuses = fetch_project_status()
         self.consultant = project.submission.consultant_marketing.consultant
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
@@ -156,7 +158,7 @@ class ProjectUtil:
             ).count()
             return total_count, team_count
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
     def send_join_notification(self):
         # Emoji for Message
@@ -235,7 +237,7 @@ class ProjectUtil:
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
     def send_receive_notification(self):
         try:
@@ -303,7 +305,7 @@ class ProjectUtil:
             title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, "project")
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
     def send_termination_notification(self, status):
         try:
@@ -353,7 +355,7 @@ class ProjectUtil:
             title = f"Project Terminated :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
     def send_cancellation_notification(self, status):
         try:
@@ -404,14 +406,14 @@ class ProjectUtil:
             title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
             send_notification_for_user(self.project.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
     def send_completion_notification(self):
         try:
             title = f" Project Completed :: {self.consultant} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
     def create_timesheet(self):
         try:
@@ -430,4 +432,51 @@ class ProjectUtil:
                 start_date = end_date + timedelta(days=1)
                 end_date = end_date + timedelta(days=7)
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
+
+
+def fetch_scrum_masters(user):
+    scrum_masters = list(User.objects.filter(
+        team=user.team, role__name__in=['admin', 'proxy'], is_active=True
+    ).values_list('email', flat=True))
+    return scrum_masters
+
+
+def send_support_mail(project, support, request):
+    try:
+        submission = project.submission
+        consultant = project.submission.consultant
+        recruiter = consultant.recruiter
+        retention = consultant.relation
+        to = [submission.created_by.email]
+
+        cc = [config.RECRUITMENT, config.RELATIONS] + fetch_scrum_masters(submission.created_by)
+        if recruiter:
+            cc.append(recruiter.email)
+        if retention:
+            cc.append(retention.email)
+
+        project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+
+        mail_data = {
+            'template': '../templates/support.html',
+            'to': to, 'cc': cc, 'bcc': [],
+            'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
+            'context': {
+                'marketer_name': submission.created_by.employee_name,
+                'location': submission.lead.city, 'job_title': submission.lead.job_title,
+                'consultant_phone_no': consultant.phone_no, 'start': project_start_date,
+                'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                'client_name': submission.client, 'support_email': support.email, 'support_name': support.name
+            },
+        }
+
+        res = "Development Server"
+        if os.environ.get('ENV', 'local') == 'prod':
+            res, msg = send_email(mail_data, support.email, request=request)
+            if not msg:
+                return res, "error"
+        return res, "ok"
+    except Exception as error:
+        write_exception(message=error, request=request)
+        return error, "error"

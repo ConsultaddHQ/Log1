@@ -65,7 +65,6 @@ INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 AUTH_USER_MODEL = 'employee.User'
 
 MIDDLEWARE = [
-    'log1.middleware.AddressLogMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -74,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'log1.middleware.AddressLogMiddleware',
 ]
 
 ROOT_URLCONF = 'log1.urls'
@@ -225,7 +225,7 @@ logging.config.dictConfig({
             'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
         },
         'address_format': {
-            'format': '%(message)s :: %(asctime)s'
+            'format': '%(asctime)s %(levelname)-5s %(message)s'
         },
     },
     'handlers': {

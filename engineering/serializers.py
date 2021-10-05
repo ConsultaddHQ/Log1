@@ -2,9 +2,10 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
+from employee.serializers import TaggedUserSerializer
 from attachment.serializers import AttachmentURLSerializer
 from project.models import Project, SupportStatus, TimeSheet
-from engineering.models import ProjectDescription, ProjectSupportUpdate
+from engineering.models import ProjectDescription, ProjectUpdate
 
 
 class POCSerializer(serializers.ModelSerializer):
@@ -184,10 +185,30 @@ class TimesheetSerializer(serializers.ModelSerializer):
         return AttachmentURLSerializer(obj.attachments.all(), many=True).data
 
 
-class ProjectSupportUpdateSerializer(serializers.ModelSerializer):
+class ProjectUpdateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ProjectSupportUpdate
+        model = ProjectUpdate
         fields = '__all__'
+
+
+class ProjectUpdateGetSerializer(serializers.ModelSerializer):
+    tagged_user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectUpdate
+        exclude = ('project', )
+
+    @staticmethod
+    def get_tagged_user(obj):
+        data = []
+        if obj.tagged_user.exists():
+            for user in obj.tagged_user.first().tagged_user.all():
+                data.append({
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.employee_name,
+                })
+        return data
 
 
 class ProjectDescriptionSerializer(serializers.ModelSerializer):

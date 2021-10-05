@@ -540,7 +540,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project.is_remote = request.data.get('is_remote', False)
             project.save()
 
-            util = ProjectUtil(project, request.user)
+            util = ProjectUtil(project, request)
             desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
@@ -780,6 +780,24 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
             else:
                 SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
+            return Response({"message": "Support status is updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=False, url_path="initiate")
+    def initiate(self, request, pk):
+        try:
+            project = get_object_or_404(Project, id=pk)
+            support_id = request.data.get('support', None)
+            support = get_object_or_404(User, id=support_id)
+            start = request.data.get('start')
+
+            project_support = ProjectSupport.objects.create(project=project, support=support, start=start)
+            SupportStatus.objects.create(
+                is_current=True, support=project_support, change_date=start, frequency='active',
+            )
+
             return Response({"message": "Support status is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
