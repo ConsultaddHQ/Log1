@@ -64,7 +64,7 @@ def download_s3_object_beats(key, name):
     try:
         local_path = f'media/beats/{name}'
         s3 = get_aws_connection()
-        if s3:
+        if not s3:
             return "Unable to create Connection-download_s3_object_beats", True
         s3.download_file(os.getenv('AWS_BEATS_BUCKET'), key, local_path)
         return local_path, False

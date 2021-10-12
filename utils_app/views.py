@@ -1,4 +1,5 @@
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
@@ -12,7 +13,7 @@ from log1.utils import write_exception, ERROR_MSG
 
 
 # Route - /city/
-class CityViewSets(ListModelMixin, GenericViewSet):
+class CityViewSet(ListModelMixin, GenericViewSet):
     queryset = City.objects.all()
     serializer_class = UtilSerializer
     permission_classes = (IsAuthenticated,)
@@ -65,3 +66,40 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+
+class TeamsTargetViewSet(CreateModelMixin, GenericViewSet):
+    queryset = City.objects.all()
+    serializer_class = UtilSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            api_key = request.query_params.get('api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+
+            prefix, _, _ = api_key.partition(".")
+            if prefix != "ypY83gkC":
+                return Response({"message": "Unauthorized"}, status=401)
+
+            return Response({"data": "data"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class UtilityViewSet(CreateModelMixin, GenericViewSet):
+    queryset = City.objects.all()
+    serializer_class = UtilSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    @action(methods=['get'], detail=False, url_path='technology')
+    def technology(self, request):
+        try:
+            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'AWS', 'DevOps', 'BA', 'DA',
+                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

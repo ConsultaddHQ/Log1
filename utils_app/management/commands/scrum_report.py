@@ -17,9 +17,7 @@ def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
     try:
         path = [path]
         mail_data = {
-            'to': [scrum_masters],
-            'cc': [],
-            'bcc': [],
+            'to': scrum_masters, 'cc': [], 'bcc': [],
             'subject': 'Scrum Report of {} from {} to {}'.format(team_name, this_week, yesterday),
             'template': '../templates/scrum_report.html',
             'context': {

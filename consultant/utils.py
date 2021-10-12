@@ -1,5 +1,8 @@
 import os
 import json
+from operator import or_
+from functools import reduce
+from django.db.models import Q
 from django.utils import timezone
 from datetime import date, datetime, timedelta
 from django.core.files.base import ContentFile
@@ -99,7 +102,10 @@ def send_exit_interview_detail(terminate, request):
         # Message for Exit Interview
         exit_details = html_to_text(terminate.exit_details)
         reason = ", ".join(reason.name for reason in terminate.reasons.all())
-        termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        if terminate.last_date:
+            termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        else:
+            termination_date = "NA"
         data = {
             "title": f"Exit interview for {terminate.consultant.name}",
             "text": f"**Reason for leaving** : {reason}<br>"
@@ -159,7 +165,7 @@ def send_exit_interview_detail(terminate, request):
         return error
 
 
-def terminate_consultant(terminate):
+def terminate_consultant(terminate, request):
     try:
         consultant = terminate.consultant
         consultant.status = 'terminated'
@@ -176,7 +182,7 @@ def terminate_consultant(terminate):
 
         # Email for Exit Process Cancelled
         if os.environ.get('ENV', 'local') == 'prod':
-            res, error = send_exit_process_mail(terminate, 'complete')
+            res, error = send_exit_process_mail(terminate, 'complete', request)
             if error == 'error':
                 write_info(message=error, function='terminate_consultant')
 
@@ -348,8 +354,61 @@ def send_notification_for_user(consultant, sender, title, sub_target, target_id=
         return error, "error"
 
 
-def add_other_details(request, consultant_id):
+def fetch_consultant_count(team):
+    day_one = datetime.today().replace(day=1, hour=0, minute=0)
+    team_count = "NA"
+    if team:
+        team_count = Consultant.objects.filter(created__date__gte=day_one, pocs__poc__team=team).count()
+    total_count = Consultant.objects.filter(created__date__gte=day_one).count()
+    return total_count, team_count
+
+
+def new_recruit_notification(consultant, source, cfr):
     try:
+        visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
+        recruiter_gender = '&#129490;'
+        qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
+        if qs:
+            recruiter = qs.first().poc
+            recruiter_team = recruiter.team
+            if recruiter.gender == 'female':
+                recruiter_gender = '&#128103;'
+
+        total_count, team_count = fetch_consultant_count(recruiter_team)
+        qs = WorkAuth.objects.filter(consultant=consultant)
+        if qs:
+            visa = qs.first().get_visa_type_display()
+        qs = ConsultantRateRevision.objects.filter(consultant=consultant)
+        if qs:
+            rate = qs.first().rate
+
+        consultant_gender = '&#128105;' if consultant.gender == 'female' else '&#128104;'
+        data = {
+            "title": "New Recruit on Bench  &#129304;&#128516;&#129304;",
+            "text": f""" **Consultant** <br>
+                {consultant_gender} Name :  {consultant.name} <br>
+                {consultant_gender} Email :  {consultant.email} <br>
+                {recruiter_gender} Recruiter :  {recruiter.employee_name} <br>
+                 ✨ Profile :  {consultant.skills} <br>
+                🇺🇸 Visa :  {visa}<br>
+                ✨ Source :  {source}<br>
+                &#128181; Rate : {rate} <br>
+                 🇺🇸  Current Location :  {consultant.current_city} <br>
+                &#x1F4BC; Team :  {recruiter_team} <br>
+                &#129490; CFR :  {cfr} <br>
+                <br> Recruit Count of {recruiter_team} for this month - {team_count}
+                <br> Total Recruit Count of this month - {total_count}"""
+        }
+        # Sending message on Messaging Tool
+        post_msg_using_webhook(config.new_recruit_on_bench, data)
+
+    except Exception as error:
+        write_exception(message=error)
+
+
+def add_other_details(request, consultant):
+    try:
+        consultant_id = consultant.id
         work_auths, experiences, educations, documents = [], [], [], []
         if 'work_auth' in request.data:
             work_auths = json.loads(request.data.get('work_auth'))
@@ -399,16 +458,17 @@ def add_other_details(request, consultant_id):
         if 'documents' in request.data:
             documents = json.loads(request.data.get('documents'))
 
-        for document in documents:
-            res, res_data = beats_to_log1(
-                model='consultant',
-                obj_id=consultant_id,
-                file_path=document['file_path'],
-                file_name=document['file_name'],
-            )
-            if not res:
-                write_info(res_data, 'add_other_details', request)
-                return res_data, "error"
+        if not consultant.attachments.all().exists():
+            for document in documents:
+                res, res_data = beats_to_log1(
+                    model='consultant',
+                    obj_id=consultant_id,
+                    file_path=document['file_path'],
+                    file_name=document['file_name'],
+                )
+                if not res:
+                    write_info(res_data, 'add_other_details', request)
+                    return res_data, "error"
         return "Details added", "ok"
     except Exception as error:
         write_exception(error, request)
@@ -431,8 +491,7 @@ def create_consultant(request, creator_id):
         qs = Consultant.objects.filter(email=request.data.get('email'))
         if qs:
             consultant = qs.first()
-            consultant_id = consultant.id
-            result, msg = add_other_details(request, consultant_id)
+            result, msg = add_other_details(request, consultant)
             if msg == 'error':
                 write_info(result, 'create_consultant', request)
             return consultant, "exists"
@@ -486,7 +545,8 @@ def create_consultant(request, creator_id):
                 current_city=request.data.get('current_location'),
             )
 
-            add_other_details(request, consultant_id)
+            add_other_details(request, consultant)
+            new_recruit_notification(consultant, request.data.get('source'), request.data.get('cfr'))
             return consultant, "ok"
     except Exception as error:
         write_exception(error, request)
@@ -497,11 +557,187 @@ def marketing_days_filter(days):
     day_filter = dict()
     day_filter["marketing__status"] = 'open'
     if days == 'lt_12':
-        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=12)
+        day_filter['marketing__start__gt'] = timezone.now().date() - timedelta(days=12)
     elif days == 'lt_24':
-        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=24)
+        day_filter['marketing__start__gt'] = timezone.now().date() - timedelta(days=24)
     elif days == 'lt_36':
-        day_filter['marketing__start__gte'] = timezone.now().date() - timedelta(days=36)
+        day_filter['marketing__start__gt'] = timezone.now().date() - timedelta(days=36)
     elif days == 'gt_36':
         day_filter['marketing__start__lte'] = timezone.now().date() - timedelta(days=36)
     return day_filter
+
+
+def queryset_filter_by_status(queryset, sub_status, offer_candidates=None):
+    if sub_status == 'non_pool':
+        queryset = queryset.filter(marketing__in_pool=False, marketing__status='open')
+
+    elif sub_status == 'in_pool':
+        queryset = queryset.filter(
+            marketing__in_pool=True, marketing__status='open'
+        ).exclude(id__in=offer_candidates)
+
+    elif sub_status == 'on_boarded':
+        queryset = queryset.filter(
+            projects__statuses__status='on_boarded',
+            projects__statuses__is_current=True
+        )
+
+    elif sub_status == 'in_offer':
+        queryset = queryset.filter(
+            projects__statuses__status__in=['new', 'received'],
+            projects__statuses__is_current=True
+        )
+
+    elif sub_status == 'fired':
+        queryset = queryset.filter(exit__type='fired')
+
+    elif sub_status == 'resigned':
+        queryset = queryset.filter(exit__type='resigned')
+
+    elif sub_status == 'absconded':
+        queryset = queryset.filter(exit__type='absconded')
+
+    return queryset
+
+
+def status_filter_obj(consultants, open_candidates, offer_candidates):
+    return {
+        "all": consultants,
+        "terminated": consultants.filter(status='terminated'),
+
+        "marketing_candidate": consultants.filter(
+            status='on_bench', marketing__status='close'
+        ).exclude(id__in=open_candidates),
+
+        "on_project": consultants.filter(
+            projects__statuses__status='joined', projects__statuses__is_current=True
+        ).exclude(status='terminated'),
+
+        "offer": consultants.filter(
+            projects__statuses__is_current=True,
+            projects__statuses__status__in=['new', 'received', 'on_boarded'],
+        ).exclude(status='terminated'),
+
+        "on_bench": consultants.filter(marketing__status='open').exclude(id__in=offer_candidates)
+    }
+
+
+def sub_status_filter_obj(consultants, con_status, offer_candidates):
+    sub_status_obj = dict()
+    if con_status == 'on_bench':
+        sub_status_obj = {
+            'in_pool': queryset_filter_by_status(consultants, 'in_pool', offer_candidates).count(),
+            'non_pool': queryset_filter_by_status(consultants, 'non_pool', offer_candidates).count(),
+        }
+
+    elif con_status == 'offer':
+        sub_status_obj = {
+            'in_offer': queryset_filter_by_status(consultants, 'in_offer').count(),
+            'on_boarded': queryset_filter_by_status(consultants, 'on_boarded').count(),
+        }
+
+    elif con_status == 'terminated':
+        sub_status_obj = {
+            'fired': queryset_filter_by_status(consultants, 'fired').count(),
+            'resigned': queryset_filter_by_status(consultants, 'resigned').count(),
+            'absconded': queryset_filter_by_status(consultants, 'absconded').count(),
+        }
+    return sub_status_obj
+
+
+def candidate_filter(request):
+    try:
+        query = request.GET.get('query', None)
+        con_status = request.GET.get('status', '')
+        filter_json = request.GET.get('filter_json', None)
+        con_sub_status = request.GET.get('sub_status', None)
+        consultants = Consultant.objects.all()
+
+        if filter_json:
+            filters = json.loads(filter_json)
+
+            if 'gender' in filters:
+                consultants = consultants.filter(gender=filters['gender'])
+
+            if 'days_on_bench' in filters:
+                day_filter = marketing_days_filter(filters['days_on_bench'])
+                consultants = consultants.filter(**day_filter)
+
+            if 'recruiter' in filters:
+                consultants = consultants.filter(pocs__poc=filters['recruiter'])
+
+            if 'team' in filters and len(filters['team']) > 0:
+                consultants = consultants.filter(
+                    marketing__teams__name__iexact=filters['team'], marketing__status='open'
+                )
+
+            if 'visa' in filters:
+                consultants = consultants.filter(
+                    work_auth__visa_type=filters['visa'], work_auth__is_current=True
+                )
+
+            if 'visa_end' in filters:
+                consultants = consultants.filter(
+                    work_auth__visa_end__lte=filters['visa_end'], work_auth__is_current=True
+                )
+
+            if 'rtg' in filters:
+                consultants = consultants.filter(marketing__rtg=filters['rtg'], marketing__status='open')
+
+            if 'skill' in filters and len(filters["skill"]) > 0:
+                consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in filters['skill']]))
+
+            if 'dob' in filters:
+                if 'lte' in filters['dob']:
+                    consultants = consultants.filter(
+                        date_of_birth__year__lte=filters['dob']['lte']
+                    )
+                elif 'gte' in filters['dob']:
+                    consultants = consultants.filter(
+                        date_of_birth__year__gte=filters['dob']['gte']
+                    )
+
+        if query:
+            query = query.lstrip().replace(':amp:', '&')
+            consultants = consultants.filter(
+                Q(name__icontains=query) |
+                Q(email__iexact=query)
+            )
+
+            # keywords = query.split()
+            # if len(keywords) > 2:
+            #     or_lookup = (
+            #             Q(email__iexact=keywords[0]) |
+            #             Q(name__icontains=keywords[0])
+            #     )
+            #     for keyword in keywords[1:]:
+            #         or_lookup.add((
+            #                 Q(email__iexact=keyword) |
+            #                 Q(name__icontains=keyword)
+            #         ), or_lookup.connector)
+            #
+            #     lookup_qs = consultants.filter(or_lookup)
+            #     consultants = all_consultants.union(lookup_qs)
+
+        consultants = Consultant.objects.filter(
+            id__in=consultants.distinct('id').order_by('id').values_list('id', flat=True)
+        )
+
+        open_candidates = consultants.filter(marketing__status='open').values('id')
+        offer_candidates = consultants.filter(
+            projects__statuses__status__in=['new', 'received', 'on_boarded'], projects__statuses__is_current=True
+        ).values('id')
+
+        status_obj = status_filter_obj(consultants, open_candidates, offer_candidates)
+
+        if con_status and len(con_status) > 0:
+            consultants = status_obj[con_status]
+
+        sub_status_obj = sub_status_filter_obj(consultants, con_status, offer_candidates)
+
+        consultants = queryset_filter_by_status(consultants, con_sub_status, offer_candidates)
+
+        return consultants, {"status_obj": status_obj, "sub_status_obj": sub_status_obj}
+    except Exception as error:
+        write_exception(error, request)
+        return str(error), "error"

@@ -15,6 +15,6 @@ class Command(BaseCommand):
         try:
             queryset = ConsultantExit.objects.filter(last_date__lte=date.today(), status='in_process')
             for terminate in queryset:
-                terminate_consultant(terminate)
+                terminate_consultant(terminate, None)
         except Exception as error:
             create_cron_error(job, error)

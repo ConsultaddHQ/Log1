@@ -57,6 +57,7 @@ PROJECT_APPS = [
     'notification.apps.NotificationConfig',
     'impersonate.apps.ImpersonateConfig',
     'messaging.apps.MessagingConfig',
+    'engineering.apps.EngineeringConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -64,7 +65,6 @@ INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 AUTH_USER_MODEL = 'employee.User'
 
 MIDDLEWARE = [
-    'log1.middleware.AddressLogMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -73,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'log1.middleware.AddressLogMiddleware',
 ]
 
 ROOT_URLCONF = 'log1.urls'
@@ -89,6 +90,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                'staticfiles': 'django.templatetags.static',
+            }
         },
     },
 ]
@@ -114,7 +118,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'}
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
+    )
+}
 
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
@@ -131,8 +141,32 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-# Send Grid Configuration
+# Swagger
+SWAGGER_SETTINGS = {
+    "exclude_namespaces": [],
+    "api_version": '2.0',
+    "api_path": "/",
+    "enabled_methods": [
+        'get',
+        'post',
+        'put',
+        'delete'
+    ],
+    'SECURITY_DEFINITIONS': {
+        "apiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Token Authentication"
+        }
+    },
 
+    "api_key": '',
+    "is_superuser": False,
+    'USE_SESSION_AUTH': True,
+    "is_authenticated": True,
+}
+
+# Send Grid Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_USE_TLS = True
 EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)
@@ -191,13 +225,12 @@ logging.config.dictConfig({
             'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
         },
         'address_format': {
-            'format': '%(message)s :: %(asctime)s'
+            'format': '%(asctime)s %(levelname)-5s %(message)s'
         },
     },
     'handlers': {
         'console': {
             'formatter': 'file',
-            'stream': 'ext://sys.stdout',
             'class': 'logging.StreamHandler',
         },
         'file': {
@@ -277,6 +310,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('interview_feedback_url', ('URL', 'Interview Feedback')),
     ('exit_interview_url', ('URL', 'Exit Interview Channel')),
     ('project_termination_url', ('URL', 'Project Terminations')),
+    ('new_recruit_on_bench', ('URL', 'New Recruit On Bench Channel')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -291,6 +325,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
         'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
         'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
-        'products_dev'
+        'products_dev', 'new_recruit_on_bench'
     ),
 }
