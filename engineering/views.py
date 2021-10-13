@@ -12,10 +12,9 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 from engineering.serializers import *
 from marketing.utils import date_filter
 from engineering.utils import tag_and_notify
-from project.models import Project, ProjectSupport
+from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
-from project.serializers import ProjectSupportSerializer, ProjectSupportCreateSerializer
 from engineering.serializers import TimesheetSerializer, ProjectUpdateSerializer, ProjectDescriptionSerializer
 
 
@@ -203,7 +202,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /project/<project_id>/update/
+# Route - /project/:project_id:/update/
 class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
     queryset = ProjectUpdate.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -228,8 +227,18 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
-            tags = request.data.get('tagged_user', [])
             update = ProjectUpdate.objects.get(id=serializer.data['id'])
+            for file in request.FILES.getlist('files'):
+                file_data = {
+                    "file": file,
+                    "object_id": update.id,
+                    "creator": request.user,
+                    "model": "projectupdate",
+                    "type": 'project_update',
+                }
+                create_attachment(file_data)
+
+            tags = request.data.get('tagged_user', [])
             tag_and_notify(update, tags, request.user, 'create')
 
             return Response({"message": "Update is added"}, status=201)
@@ -255,8 +264,39 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @action(methods=['put'], detail=True, url_path='add_document')
+    def add_document(self, request, id, pk):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=pk)
+            file_data = {
+                "object_id": update.id,
+                "creator": request.user,
+                "model": "projectupdate",
+                "type": 'project_update',
+                "file": request.FILES.get('file'),
+            }
+            if create_attachment(file_data):
+                return Response({"message": "Document is uploaded"}, status=202)
+            return Response({"message": "Error in uploading document"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-# Route - /project/<project_id>/description/
+    @action(methods=['put'], detail=True, url_path='remove_document')
+    def remove_document(self, request, id, pk):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=pk)
+            attachment = get_object_or_404(Attachment, id=request.data.get('attachment_id'))
+            if update.update_by.id == request.user.id or attachment.creator.id == request.user.id:
+                attachment.delete()
+                return Response({"message": "Document removed"}, status=202)
+            return Response({"message": "Error in deleting document"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /project/:project_id:/description/
 class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
     permission_classes = (IsAuthenticated,)
     queryset = ProjectDescription.objects.all()
