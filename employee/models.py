@@ -60,7 +60,7 @@ class UserManager(BaseUserManager):
         """
         user = self.create_user(
             employee_id,
-            "admin@log1.com",
+            "admin@consultadd.com",
             "Admin",
             password=password
         )
@@ -131,7 +131,7 @@ class User(AbstractUser, PermissionsMixin):
 
     def send_mail(self, mail_data):
         try:
-            res, msg = send_email(mail_data, "admin@log1.com")
+            res, msg = send_email(mail_data, "admin@consultadd.com")
             if not msg:
                 return res, "error"
             return res, "ok"

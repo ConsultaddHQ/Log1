@@ -26,7 +26,7 @@ def create_cron_error(job, description):
             'body': f'Error :: {description}',
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
-        send_email_without_template(mail_data, 'admin@log1.com')
+        send_email_without_template(mail_data, 'admin@consultadd.com')
     except Exception as error:
         write_exception(message=error)
 
