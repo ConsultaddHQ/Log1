@@ -1,4 +1,5 @@
 import os
+import pytz
 import json
 import difflib
 from datetime import date, datetime, timedelta
@@ -32,9 +33,10 @@ from utils_app.mailing import send_email_attachment_multiple
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
-from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, DONT_HAVE_ACCESS, ERROR_MSG
+from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
-    date_filter, get_users_and_attendees
+    date_filter, get_users_and_attendees, test_received_notification, coder_request_notification, \
+    coder_assigned_notification
 
 
 # Route - /vendor_company/
@@ -315,10 +317,10 @@ class LeadViewSets(viewsets.ModelViewSet):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['get'], detail=True, url_path='fields')
-    def fields(self, request, *args, **kwargs):
+    def fields(self, request, pk):
         try:
             fields, group = [], None
-            lead = get_object_or_404(Lead, id=kwargs.get('pk'), owner=request.user)
+            lead = get_object_or_404(Lead, id=pk, owner=request.user)
 
             if lead.owner.id == request.user.id:
                 group = ObjectGroup.objects.filter(name='owner', model='lead', status=lead.status)
@@ -392,9 +394,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='tabs')
-    def tabs(self, request, *args, **kwargs):
+    def tabs(self, request, pk):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             data = {
                 "test": submission.test.exists(),
                 "project": hasattr(submission, 'project'),
@@ -406,10 +408,10 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='fields')
-    def fields(self, request, *args, **kwargs):
+    def fields(self, request, pk):
         try:
             fields, group = [], None
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
 
             if submission.created_by.id == request.user.id:
                 group = ObjectGroup.objects.filter(name='owner', model='submission', status=submission.status)
@@ -422,9 +424,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='documents')
-    def documents(self, request, *args, **kwargs):
+    def documents(self, request, pk):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
 
             attachments = Attachment.objects.none()
@@ -445,9 +447,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='profile')
-    def profile(self, request, *args, **kwargs):
+    def profile(self, request, pk):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             serializer = SubmissionConProfile(submission.consultant, context={'submission': submission})
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -455,20 +457,20 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='activities')
-    def activities(self, request, *args, **kwargs):
+    def activities(self, request, pk):
         try:
-            activities = Activity.objects.filter(object_id=kwargs.get('pk'), content_type__model='submission')
-            serializer = ActivitySerializer(activities.order_by('created'), many=True)
+            activities = Activity.objects.filter(object_id=pk, content_type__model='submission')
+            serializer = ActivitySerializer(activities.order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='resume')
-    def resume(self, request, *args, **kwargs):
+    def resume(self, request, pk):
         try:
             user_id = request.user.id
             data, visibility = list(), False
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
             if (submission.created_by.id == user_id) or (user_id in supervisors) or ('engineer' in request.user.roles):
                 visibility = True
@@ -498,10 +500,10 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='interviews')
-    def interviews(self, request, *args, **kwargs):
+    def interviews(self, request, pk):
         try:
             change_to_feedback_due()
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             serializer = InterviewV2Serializer(submission.screening.all(), many=True, context={'user': request.user})
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -509,9 +511,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='tests')
-    def tests(self, request, *args, **kwargs):
+    def tests(self, request, pk):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             serializer = TestGetSerializer(submission.test.all(), many=True, context={'user': request.user})
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -519,9 +521,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='support')
-    def support(self, request, *args, **kwargs):
+    def support(self, request, pk):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             if hasattr(submission, 'project'):
                 queryset = submission.project.support.all().order_by('-created')
                 serializer = SubmissionSupportSerializer(queryset, many=True)
@@ -533,9 +535,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='project')
-    def project(self, request, *args, **kwargs):
+    def project(self, request, pk):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            submission = get_object_or_404(Submission, id=pk)
             if hasattr(submission, 'project'):
                 serializer = ProjectV2Serializer(submission.project, context={'user': request.user})
                 return Response({"data": serializer.data}, status=200)
@@ -780,10 +782,30 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @action(methods=['put'], detail=True, url_path='resume')
-    def resume(self, request, *args, **kwargs):
+    @action(methods=['get'], detail=True, url_path="feedback_check")
+    def feedback_check(self, request, pk):
         try:
-            attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
+            data = {'test': False, 'interview': False}
+            qs = Submission.objects.filter(id=pk)
+            if qs:
+                submission = qs.first()
+                test_qs = submission.test.filter(status='feedback_due')
+                interview_qs = submission.screening.filter(status='feedback_due')
+                if test_qs:
+                    data['test'] = True
+                if interview_qs:
+                    data['interview'] = True
+            else:
+                return Response({"message": "Submission not found"}, status=404)
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='resume')
+    def resume(self, request, pk):
+        try:
+            attachment = get_object_or_404(Attachment, id=pk)
             attachment.attachment_file = request.FILES.get('file')
             attachment.save()
 
@@ -799,7 +821,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     # Suggestions for Submission
     @action(methods=['get'], detail=False, url_path='suggestions')
-    def suggestions(self, request, *args, **kwargs):
+    def suggestions(self, request):
         first, last = get_page_limits(request)
         client_name = request.GET.get('client_name', None)
         consultant_id = request.GET.get('consultant', None)
@@ -1002,19 +1024,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 order_by = "-modified"
 
             queryset = Interview.objects.filter(id__in=queryset.values('id')).order_by(order_by)
-            data = queryset[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                marketer_id=F('submission__created_by'),
-                job_title=F('submission__lead__job_title'),
-                supervisor_name=F('supervisor__employee_name'),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'company_name',
-                     'submission_id', 'supervisor_name', 'marketer_name', 'marketer_id', 'consultant_name', 'client',
-                     'screening_type', 'project', 'job_title', 'modified', 'feedback')
-            return data, data_counts
+            serializer = InterviewListSerializer(queryset[first:last], many=True)
+            return serializer.data, data_counts
         except Exception as error:
             write_exception(message=error)
             return error, 'error'
@@ -1028,11 +1039,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             if request.user in [interview.marketer, interview.supervisor]:
                 permission['update'] = True
 
-            if request.user in [interview.marketer, interview.supervisor] + list(interview.guest.all()):
-                serializer = InterviewDetailSerializer(interview)
-            else:
-                serializer = self.serializer_class(interview)
-
+            serializer = InterviewDetailSerializer(interview)
             return Response({"data": serializer.data, "permission": permission}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -1074,8 +1081,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=team)
 
-            # Interview List for Scrum Master and Proxy Scrum Master (team interviews) and marketer
-            if 'admin' in roles or 'proxy' in roles:
+            if 'engineer' in roles:
+                pass
+
+            elif 'admin' in roles or 'proxy' in roles:
                 consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
                 queryset = queryset.filter(
                     Q(supervisor_id=user_id) |
@@ -1107,11 +1116,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         Q(submission__consultant_marketing__consultant__in=consultant_ids)
                     )
 
-            elif 'superadmin' in roles:
-                queryset = queryset
-
             if filter_json:
                 filters = json.loads(filter_json)
+
+                if 'assignment' in filters:
+                    if filters["assignment"] == 'assigned':
+                        queryset = queryset.filter(guest_type='assigned')
+                    if filters["assignment"] == 'unassigned':
+                        queryset = queryset.filter(guest_type='coder')
+
+                if 'guest_type' in filters:
+                    if filters["guest_type"] == 'coding':
+                        queryset = queryset.filter(guest_type='coder')
+                    if filters["guest_type"] == 'assistance':
+                        queryset = queryset.filter(guest_type='assistance')
+                    if filters["guest_type"] == 'all':
+                        queryset = queryset.filter(guest_type__in=['coder', 'assistance'])
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1150,10 +1170,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
-        submission_id = request.data['submission']
         try:
             # Change status of past Interview to feedback due
             change_to_feedback_due()
+
+            submission_id = request.data.get('submission', None)
+            if not submission_id:
+                return Response({"message": 'Missing Submission ID'}, status=400)
 
             submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
             if not submissions:
@@ -1196,14 +1219,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     interview = self.rank_interviews(interview, 'create')
 
                 # Calendar title
-                title = f"CTB:{interview.supervisor.employee_name} " \
-                        f":: {interview.round}R " \
-                        f":: {interview.get_interview_mode_display()} " \
-                        f":: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} " \
-                        f":: {interview.submission.client} " \
-                        f":: {interview.consultant.name} " \
-                        f":: {interview.marketer.employee_name} " \
-                        f":: {interview.submission.employer}"
+                title = get_interview_title(interview)
 
                 # Calendar attendees and User for sending notification
                 user_list, attendees = get_users_and_attendees(request, interview)
@@ -1213,8 +1229,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     "summary": title,
                     "user": request.user,
                     "attendees": attendees,
-                    "lead": interview.submission.lead,
-                    "submission": interview.submission,
+                    "lead": submission.lead,
+                    "submission": submission,
                     "consultant": interview.consultant,
                     "description": interview.description,
                     "call_details": interview.call_details,
@@ -1239,17 +1255,14 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 # Mattermost message for Interview
                 if date.today() == interview.start_time.date():
-                    text = f""" *CTB:{interview.supervisor.employee_name} :: Round:{interview.round} :: 
-                    {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
-                    {interview.start_time.strftime('%m/%d/%Y::%I:%M EST')} :: 
-                    {interview.consultant.name} :: {interview.submission.client} :: 
-                    {interview.marketer.employee_name}* """
-
                     data = {
-                        "text": text,
+                        "text": f" *{title}* ",
                         "title": "&#128220; New Interview Scheduled",
                     }
                     post_msg_using_webhook(config.announcement_url, data)
+
+                if interview.guest_type in ['coder', 'assistance']:
+                    coder_request_notification(request.user, interview, "Coding request")
 
                 data = queryset.annotate(
                     rank=F('submission__rank'),
@@ -1300,6 +1313,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             interview = queryset.first()
             prev_status = interview.status
+            pre_guest_type = interview.guest_type
             desc = f"Round {interview.round} is updated"
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
@@ -1336,7 +1350,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview_status_emoji = "&#128078;"
                         desc = f"Interview round {interview.round} is Failed"
 
-                    text = f"""*CTB:{interview.supervisor.employee_name} :: {interview.round}R :: {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: {interview.submission.client} :: {interview.consultant.name} :: {interview.marketer.employee_name} ({interview_status})* <br>"""
+                    text = f"""*{title} ({interview_status})* <br>"""
                     text += interview.feedback
 
                     data = {
@@ -1349,6 +1363,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     desc = f"Round {interview.round} status is updated"
                     if reschedule == 'true':
                         interview.status = 'rescheduled'
+                        interview.guest.clear()
                         interview.save()
                         end = interview.end_time
                         start = interview.start_time
@@ -1361,6 +1376,26 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 "title": "&#9201; Interview Rescheduled",
                             }
                             post_msg_using_webhook(config.announcement_url, data)
+
+                        if date.today() < interview.start_time.date():
+                            data = {
+                                "text": title,
+                                "title": "&#9201; Interview Rescheduled",
+                            }
+                            post_msg_using_webhook(config.announcement_url, data)
+
+                        est = pytz.timezone('US/Eastern')
+                        today = datetime.now().astimezone(est)
+
+                        if pre_guest_type in ['coder', 'assistance',
+                                              'assigned'] and interview.guest_type == 'not_required':
+                            if today.date() < interview.start_time.date():
+                                notification_title = "Coding request, Interview Rescheduled"
+                                coder_request_notification(request.user, interview, notification_title)
+
+                            if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
+                                notification_title = "Coding Request, Interview Rescheduled"
+                                coder_request_notification(request.user, interview, notification_title)
 
                     if interview.status not in ['offer', 'failed', 'next_round']:
                         _, attendees = get_users_and_attendees(request, interview)
@@ -1406,9 +1441,19 @@ class InterviewViewSets(viewsets.ModelViewSet):
                                 except Exception as error:
                                     write_exception(f"Booking update failed: {error}", request)
                                     return Response(
-                                        {"message": "Calendar booking update failed", "error": str(error)},
-                                        status=400
+                                        {"message": "Calendar booking update failed", "error": str(error)}, status=400
                                     )
+
+                    if interview.guest_type in ['coder', 'assistance'] and (
+                            pre_guest_type == 'not_required' or pre_guest_type is None):
+                        title = "Coding request"
+                        coder_request_notification(request.user, interview, title)
+
+                    if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
+                        title = "Coding not required for this Interview"
+                        coder_request_notification(request.user, interview, title)
+                        interview.guest.clear()
+
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
@@ -1493,20 +1538,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='reschedule')
-    def reschedule(self, request, *args, **kwargs):
+    def reschedule(self, request, pk):
         # Change status of past Screening to feedback due
         change_to_feedback_due()
         try:
-            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
+            queryset = Interview.objects.filter(id=pk, submission__created_by=request.user)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=400)
 
             interview = queryset.first()
+            prev_guest_type = interview.guest_type
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
 
             interview.status = 'rescheduled'
+            interview.guest.clear()
             interview.save()
 
             booking_res = 'error'
@@ -1579,6 +1626,22 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     }
                     post_msg_using_webhook(config.announcement_url, data)
 
+                if prev_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
+                    est = pytz.timezone('US/Eastern')
+                    today = datetime.now().astimezone(est)
+
+                    if today.date() < interview.start_time.date():
+                        title = "Coding request, Interview Rescheduled"
+                        coder_request_notification(request.user, interview, title)
+
+                    if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
+                        title = "Coding request, Interview Rescheduled"
+                        coder_request_notification(request.user, interview, title)
+
+                    if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
+                        title = "Coding request"
+                        coder_request_notification(request.user, interview, title)
+
                 data = queryset.annotate(
                     client=F('submission__client'),
                     project=F('submission__project'),
@@ -1610,10 +1673,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='cancel_interview')
-    def cancel_interview(self, request, *args, **kwargs):
-        interview_id = kwargs.get('pk')
+    def cancel_interview(self, request, pk):
         try:
-            interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
+            interview = get_object_or_404(Interview, id=pk, submission__created_by=request.user)
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
@@ -1640,6 +1702,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
             submission.is_active = True
             submission.save()
 
+            title = "Interview cancelled, coding is not required"
+            coder_request_notification(request.user, interview, title)
+
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
                                     {interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST')} :: 
@@ -1661,10 +1726,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='fields')
-    def fields(self, request, *args, **kwargs):
+    def fields(self, request, pk):
         try:
             fields, group = list(), None
-            interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+            interview = get_object_or_404(Interview, id=pk)
 
             if interview.submission.created_by.id == request.user.id:
                 group = ObjectGroup.objects.filter(name='owner', model='interview', status=interview.status)
@@ -1680,10 +1745,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='update_notes')
-    def update_notes(self, request, *args, **kwargs):
+    def update_notes(self, request, pk):
         try:
             queryset = Interview.objects.filter(
-                Q(id=kwargs.get('pk')) & (Q(submission__created_by=request.user) | Q(supervisor=request.user))
+                Q(id=pk) & (Q(submission__created_by=request.user) | Q(supervisor=request.user))
             )
             if queryset:
                 interview = queryset.first()
@@ -1703,26 +1768,26 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put', 'delete'], detail=True, url_path='upload_recording')
-    def upload_recording(self, request, *args, **kwargs):
+    def upload_recording(self, request, pk):
         try:
             if request.method == 'PUT':
-                object_id = kwargs.get('pk')
                 file_name = request.data['file_name']
-                object_name = f'media/attachments/recordings/{object_id}/{file_name}'
-                interview = get_object_or_404(Interview, id=object_id)
+                object_name = f'media/attachments/recordings/{pk}/{file_name}'
+                interview = get_object_or_404(Interview, id=pk)
                 response, error = presigned_post_url(object_name=object_name)
                 if error:
                     return Response({"message": "Unable to upload recording", "error": response}, status=400)
-                interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{object_id}/{file_name}'
+                interview.attachment_link = settings.MEDIA_URL + f'attachments/recordings/{pk}/{file_name}'
                 interview.save()
 
                 # Activity
-                desc = f"Recording: {file_name} uploaded on round {interview.round} of Interview by {request.user.employee_name}"
+                desc = f"Recording: {file_name} uploaded on round {interview.round} of Interview by " \
+                       f"{request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response({"data": response, "message": "Recording uploaded"}, status=202)
             else:
-                interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+                interview = get_object_or_404(Interview, id=pk)
                 if interview.attachment_link:
                     file_name = interview.attachment_link.split("/")[-1]
                 else:
@@ -1731,7 +1796,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.save()
 
                 # Activity
-                desc = f"Recording: {file_name} deleted from round {interview.round} of Interview by {request.user.employee_name}"
+                desc = f"Recording: {file_name} deleted from round {interview.round} of Interview by " \
+                       f"{request.user.employee_name}"
                 create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
                 return Response(status=204)
@@ -1740,10 +1806,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='recording')
-    def recording(self, request, *args, **kwargs):
+    def recording(self, request, pk):
         try:
             from utils_app.aws_utils import get_s3_object
-            interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+            interview = get_object_or_404(Interview, id=pk)
             if interview.attachment_link:
                 response, error = get_s3_object("/".join(interview.attachment_link.split('/')[4:]))
                 if error:
@@ -1817,6 +1883,109 @@ class InterviewViewSets(viewsets.ModelViewSet):
             ).values('submission', 'supervisor_name', 'feedback', 'screening_type', 'client', 'marketer_name', 'status',
                      'consultant_name', 'start_time', 'end_time', 'location', 'company_name', 'interview_mode', )
             return Response({"data": data, "total": total}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='assign_guest')
+    def assign_guest(self, request, pk):
+        try:
+            if 'engineer' in request.user.roles:
+                queryset = Interview.objects.filter(id=pk)
+                if not queryset:
+                    return Response({"message": "Interview not found"}, status=404)
+
+                interview = queryset.first()
+                guest = request.data.get('guest', [])
+                if guest:
+                    interview.guest_type = 'assigned'
+                    interview.save()
+
+                for user_id in guest:
+                    interview.guest.add(user_id)
+
+                est = pytz.timezone('US/Eastern')
+                today = datetime.now().astimezone(est)
+
+                if today.date() < interview.start_time.date():
+                    coder_assigned_notification(request.user, interview)
+
+                if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
+                    coder_assigned_notification(request.user, interview)
+
+                title = get_interview_title(interview)
+                _, attendees = get_users_and_attendees(request, interview)
+                event = {
+                    "summary": title,
+                    "user": request.user,
+                    "attendees": attendees,
+                    "end": interview.end_time,
+                    "start": interview.start_time,
+                    "lead": interview.submission.lead,
+                    "submission": interview.submission,
+                    "description": interview.description,
+                    "call_details": interview.call_details,
+                    "consultant": interview.submission.consultant,
+                }
+
+                # Updating calendar Booking
+                booking_res = 'Development Server'
+                if os.environ.get('ENV', 'local') == 'prod':
+                    calendar_id = interview.calendar_id
+                    calendar = Calendar(request=request)
+                    if not calendar_id:
+                        res, msg = calendar.book_ms_calendar(event)
+                        if msg == 'error':
+                            return Response({"message": "Calendar booking failed", "error": res}, status=400)
+                        booking_res = 'booked'
+                        interview.calendar_id = res['id']
+                        interview.save()
+                    else:
+                        booking_res = 'updated'
+                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        if msg == 'booked':
+                            booking_res = 'booked'
+                            interview.calendar_id = res['id']
+                            interview.save()
+                        if msg == "error":
+                            return Response({"message": "Calendar update failed", "error": res}, status=400)
+
+                return Response({"data": "Coders assigned", "booking_response": booking_res}, status=202)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='guest_feedback')
+    def guest_feedback(self, request, pk):
+        try:
+            queryset = Interview.objects.filter(id=pk, guest__in=[request.user])
+            if not queryset:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            remark = ""
+            interview = queryset.first()
+            for i in request.data.get('answers', []):
+                remark += f"(Q) : {i['question']} -> (ANS) : {i['answer']} "
+
+            remark += f"REMARK : {request.data.get('guest_remark')}"
+            interview.guest_remark = remark
+            interview.coding_present = request.data.get('coding_present', None)
+            interview.save()
+            return Response({"data": "Feedback updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='feedback_questions')
+    def feedback_questions(self, request):
+        try:
+            data = [
+                "Coding Language?",
+                "How many questions were there ?",
+                "Were you able to solve the questions ?",
+            ]
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
@@ -2186,10 +2355,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
                     "%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
-                    'to': to,
-                    'cc': cc,
-                    'bcc': [],
                     'subject': subject,
+                    'to': to, 'cc': cc, 'bcc': [],
                     'template': '../templates/test_mail.html',
                     'context': {
                         'skills': skills,
@@ -2282,13 +2449,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Search Test by Client, VendorContact, Consultant and Marketer
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                queryset = Test.objects.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__email__istartswith=query)
-                )
+                if query.isnumeric():
+                    queryset = Test.objects.filter(
+                        Q(id__exact=query)
+                    )
+                else:
+                    queryset = Test.objects.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__istartswith=query)
+                    )
             else:
                 queryset = Test.objects.all()
 
@@ -2421,8 +2593,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'new', request)
+                test_received_notification(request.user, test, data['con_timezone'])
                 if error == 'error':
-                    write_exception(res, request)
+                    write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
@@ -2452,9 +2625,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['get'], detail=True, url_path='fields')
-    def fields(self, request, *args, **kwargs):
+    def fields(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
             fields, group = [], None
 
             if test.submission.created_by.id == request.user.id:
@@ -2471,9 +2644,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='assign')
-    def assign_test(self, request, *args, **kwargs):
+    def assign_test(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=kwargs.get('pk'))
+            test = get_object_or_404(Test, id=pk)
             users = request.data.get('assign_to')
             test.assign_to.clear()
             user_list = []
@@ -2551,9 +2724,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='submit')
-    def submit_test(self, request, *args, **kwargs):
+    def submit_test(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=kwargs.get('pk'))
+            test = get_object_or_404(Test, id=pk)
             data = {
                 'engineer': json.loads(request.data.get('engineer')),
                 'remarks': request.data.get('remarks', None),
@@ -2587,7 +2760,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'submit', request)
                 if error == 'error':
-                    write_exception(res, request)
+                    write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test submitted"}, status=202)
@@ -2596,9 +2769,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='feedback')
-    def submit_test_feedback(self, request, *args, **kwargs):
+    def submit_test_feedback(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.save()

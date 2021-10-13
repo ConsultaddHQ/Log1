@@ -1,10 +1,13 @@
+import os
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
 from consultant.models import Consultant
+from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
+from utils_app.calendar import get_profile_picture
 from consultant.utils import send_notification_for_user
 from log1.utils import post_msg_using_webhook, password_generator, write_exception
 
@@ -115,189 +118,302 @@ def fetch_project_status():
     return cancellation_status + termination_status + other_status, cancellation_status, termination_status
 
 
+def diff_month_days(start, end):
+    if type(start) == str:
+        start = datetime.strptime(str(start), '%Y-%m-%d')
+    if type(end) == str:
+        end = datetime.strptime(str(end), '%Y-%m-%d')
+    return (end.year - start.year) * 12 + end.month - start.month
+
+
 class ProjectUtil:
-    def __init__(self, project):
+    def __init__(self, project, request=None):
+        self.request = request
         self.project = project
+        self.project_end = None
+        self.user = request.user
         self.statuses = fetch_project_status()
         self.consultant = project.submission.consultant_marketing.consultant
-        self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
         if project.end_date:
-            self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-        else:
-            self.project_end = None
+            self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
         if self.project.employer:
             self.employer = self.project.employer
         else:
             self.employer = self.project.submission.employer
 
-    def fetch_emojis(self):
-        emoji = dict()
-        try:
-            # Emojis of messaging app
-            recruiter = self.consultant.recruiter
-            if recruiter:
-                emoji['recruiter_gender'] = '&#128103;' if recruiter.gender == 'female' else '&#129490;'
-                emoji['recruiter_name'] = recruiter.employee_name
-            else:
-                emoji['recruiter_gender'] = '&#129490; '
-                emoji['recruiter_name'] = "NA"
+        self.activity_text = f"Project by ***{self.project.marketer_name}*** from " \
+                             f"***{self.project.created_by.team.name}***"
 
-            emoji['role'] = '&#128074;'
-            emoji['client'] = '&#127913;'
-            emoji['employer'] = '&#x1F4BC;'
-            emoji['consultant_gender'] = '&#128105;' if self.consultant.gender == 'female' else '&#128104;'
-            emoji['marketer_gender'] = '&#128105;' if self.project.submission.created_by.gender == 'female' else '&#128104;'
-
-            return emoji
-        except Exception as error:
-            write_exception(message=error)
-            return emoji
-
-    def fetch_project_count(self, project_status, emoji):
+    def fetch_project_count(self, project_status):
         try:
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
-            total_count = Project.objects.filter(statuses__status=project_status, statuses__created__gte=day_one).count()
-
+            total_count = Project.objects.filter(
+                statuses__status=project_status, statuses__created__gte=day_one
+            ).count()
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
                 employer__iexact=self.employer,
             ).count()
-            submitted_on = self.project.submission.consultant_marketing.consultant.name.strip()
-            if self.project.is_remote or self.project.submission.lead.is_w2:
-                con_str = f"**Remote Project** <br>"
-                con_str += f"{emoji} Consultant Joined: **{self.consultant.name.strip()}** <br>"
-                con_str += f"{emoji} Submitted On: **{submitted_on}** "
-            else:
-                con_str = f"{emoji} Consultant :  **{self.consultant.name.strip()}** "
-
-            return total_count, team_count, con_str
+            return total_count, team_count
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
-    def send_join_notification(self, user):
+    def send_join_notification(self):
         # Emoji for Message
         try:
-            emojis = self.fetch_emojis()
-            total, team, con_str = self.fetch_project_count("joined", emojis['consultant_gender'])
+            recruiter_name = "NA"
+            recruiter = self.consultant.recruiter
+            total, team = self.fetch_project_count("joined")
+            if recruiter:
+                recruiter_name = self.consultant.recruiter.employee_name
+
+            if self.project.is_remote or self.project.submission.lead.is_w2:
+                activity_title = f"***{self.project.consultant.name.strip()}*** joined ***Remote*** project at " \
+                                 f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
+                                 f"***{self.project.submission.lead.job_title}***"
+            else:
+                activity_title = f"***{self.consultant.name.strip()}*** joined project at " \
+                                 f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
+                                 f"***{self.project.submission.lead.job_title}***"
+
+            profile_path = get_profile_picture(self.user)
             data = {
-                "title": "Project Joined  &#129304;&#128516;&#129304;",
-                "text": f"""{con_str}<br>
-                {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
-                {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                {emojis['employer']} Employer :  {self.employer}<br>
-                {emojis['employer']} Team :  {self.project.submission.created_by.team.name}<br>
-                🇺🇸 Location :  {self.project.city}<br>
-                {emojis['client']} Client :  {self.project.submission.client}<br>
-                {emojis['role']} Role :  {self.project.submission.lead.job_title}<br>
-                &#128221; Joining Date :  {self.project_start}<br><br>
-                Project Joined count of {self.employer} for this month - {team}<br>
-                Total Project Joined count of this month - {total}"""
+                "@type": "MessageCard",
+                "@context": "http://schema.org/extensions",
+                "themeColor": "#0076D7",
+                "summary": "Project Joined",
+                "sections": [{
+                    "activityTitle": "Project Joined",
+                    "activitySubtitle": activity_title,
+                    "activityText": self.activity_text,
+                    "activityImage": profile_path,
+                    "facts": [
+                        {
+                            "name": f"Submitted On",
+                            "value": self.consultant.name.strip()
+                        },
+                        {
+                            "name": f"Employer",
+                            "value": self.employer
+                        },
+                        {
+                            "name": f"Recruiter",
+                            "value": recruiter_name
+                        }
+                    ],
+                    "markdown": True
+                }],
+                "potentialAction": [{
+                    "@type": "ActionCard",
+                    "name": f"{self.employer} - {team}",
+                    "actions": [{
+                        "@type": "HttpPOST",
+                        "name": f"{self.employer} - {team}",
+                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                    }]
+                }, {
+                    "@type": "ActionCard",
+                    "name": f"Total - {total}",
+                    "actions": [{
+                        "@type": "HttpPOST",
+                        "name": f"Total - {total}",
+                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                    }]
+                }, {
+                    "@context": "http://schema.org",
+                    "@type": "ViewAction",
+                    "name": "View in Log1",
+                    "target": [
+                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
+                    ]
+                }
+                ]
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.joined_url, data)
 
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.consultant, user, title, 'project')
+            send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
-    def send_receive_notification(self, user):
-        # Emoji for Message
+    def send_receive_notification(self):
         try:
-            emojis = self.fetch_emojis()
-            total, team, con_str = self.fetch_project_count("received", emojis['consultant_gender'])
+            recruiter_name = "NA"
+            recruiter = self.consultant.recruiter
+            if recruiter:
+                recruiter_name = self.consultant.recruiter.employee_name
 
+            total, team = self.fetch_project_count("received")
             interviews = self.project.submission.screening.exclude(status='cancelled')
-            ctb_gender = interviews.last().supervisor.gender
-            supervisors = "\n".join(
-                [f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
-                 for interview in interviews if interview.supervisor])
-            ctb_gender_emoji = '&#128587;' if ctb_gender == 'female' else '&#129490;'
+            supervisors = "\n".join([f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
+                                     for interview in interviews if interview.supervisor])
 
+            profile_path = get_profile_picture(self.user)
             data = {
-                "title": "Offer  &#129304;&#128516;&#129304;",
-                "text": f"""{con_str} <br>
-                    {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
-                    {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                    {emojis['employer']} Employer :  {self.employer}<br>
-                    {emojis['employer']} Team :  {self.project.submission.created_by.team.name}<br>
-                    {ctb_gender_emoji} CTB :  <ul>{supervisors}</ul> 🇺🇸 Location :  {self.project.city}
-                    <br> {emojis['client']} Client :  {self.project.submission.client}
-                    <br> {emojis['role']} Role :  {self.project.submission.lead.job_title}
-                    <br> &#128221; Start Date :  {self.project_start}
-                    <br> <br> Offer count of {self.employer} for this month - {team}
-                    <br> Total offer count of this month - {total}"""
+                "@type": "MessageCard",
+                "@context": "http://schema.org/extensions",
+                "themeColor": "#0076D7",
+                "summary": "Project Joined",
+                "sections": [{
+                    "activityTitle": "Offer",
+                    "activitySubtitle": f"***Paper work*** received from ***{self.project.submission.client}*** for "
+                                        f"***{self.consultant.name}***",
+                    "activityText": self.activity_text,
+                    "activityImage": profile_path,
+                    "facts": [
+                        {"name": "Employer", "value": self.employer},
+                        {"name": "Start Date", "value": self.project_start},
+                        {"name": "Location", "value": self.project.city},
+                        {"name": "Role", "value": self.project.submission.lead.job_title},
+                        {"name": "Recruiter", "value": recruiter_name},
+                        {"name": "Supervisors", "value": supervisors},
+                    ],
+                    "markdown": True
+                }],
+                "potentialAction": [{
+                    "@type": "ActionCard",
+                    "name": f"{self.employer} - {team}",
+                    "actions": [{
+                        "@type": "HttpPOST",
+                        "name": f"{self.employer} - {team}",
+                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                    }]
+                }, {
+                    "@type": "ActionCard",
+                    "name": f"Total - {total}",
+                    "actions": [{
+                        "@type": "HttpPOST",
+                        "name": f"Total - {total}",
+                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                    }]
+                }, {
+                    "@context": "http://schema.org",
+                    "@type": "ViewAction",
+                    "name": "View in Log1",
+                    "target": [
+                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
+                    ]
+                }
+                ]
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.offer_url, data)
 
             title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.consultant, user, title, 'self.project')
+            send_notification_for_user(self.consultant, self.user, title, "project")
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
-    def send_termination_notification(self, po_status, user):
-        # Emoji for Message
+    def send_termination_notification(self, status):
         try:
-            emojis = self.fetch_emojis()
-            text = f"""{emojis['consultant_gender']} Consultant :  **{self.consultant}** <br>
-                {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
-                {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                {emojis['employer']} Employer :  {self.employer} <br>
-                {emojis['employer']} Team :  {self.project.submission.created_by.team.name} <br>
-                {emojis['client']} Client :  {self.project.submission.client} <br>
-                {emojis['role']} Role :  {self.project.submission.lead.job_title} <br>
-                &#128221; Start Date :  {self.project_start} <br>
-                &#128221; End Date :  {self.project_end} <br>
-                &#10060; Status :  {po_status} <br>"""
+            recruiter_name = "NA"
+            recruiter = self.consultant.recruiter
+            if recruiter:
+                recruiter_name = self.consultant.recruiter.employee_name
 
+            months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
+            activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
+                                 f"***{self.project.submission.lead.job_title}***, terminated from " \
+                                 f"***{self.project.submission.client}*** with the end date of ***{self.project_end}***"
+            profile_path = get_profile_picture(self.user)
             data = {
-                "title": "Offer Termination Feedback",
-                "text": text + f" **Reason:** {reason}"
+                "@type": "MessageCard",
+                "@context": "http://schema.org/extensions",
+                "themeColor": "#0076D7",
+                "summary": "Project Joined",
+                "sections": [{
+                    "activityTitle": "Project Termination Feedback",
+                    "activitySubtitle": activity_sub_title,
+                    "activityText": self.activity_text,
+                    "activityImage": profile_path,
+                    "facts": [
+                        {"name": f"Project duration", "value": f"{months} months"},
+                        {"name": f"Employer", "value": self.employer},
+                        {"name": f"Location", "value": self.project.city},
+                        {"name": f"Recruiter", "value": recruiter_name},
+                        {"name": f"Status", "value": status},
+                        {"name": f"Feedback", "value": reason},
+                    ],
+                    "markdown": True
+                }],
+                "potentialAction": [{
+                    "@context": "http://schema.org",
+                    "@type": "ViewAction",
+                    "name": "View in Log1",
+                    "target": [
+                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
+                    ]
+                }]
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.project_termination_url, data)
 
             title = f"Project Terminated :: {self.consultant.name} :: {self.project.submission.client}"
-            send_notification_for_user(self.consultant, user, title, 'project')
+            send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
-    def send_cancellation_notification(self, user):
-        # Emoji for Message
+    def send_cancellation_notification(self, status):
         try:
-            emojis = self.fetch_emojis()
-            text = f"""{emojis['consultant_gender']} Consultant :  **{self.consultant}** <br>
-                {emojis['marketer_gender']} Marketer :  {self.project.marketer_name} <br>
-                {emojis['recruiter_gender']} Recruiter :  {emojis['recruiter_name']} <br>
-                {emojis['employer']} Employer :  {self.employer}<br>
-                {emojis['employer']} Team :  {self.project.submission.created_by.team.name}<br>
-                 🇺🇸 Location :  {self.project.city}<br>
-                {emojis['client']} Client :  {self.project.submission.client}<br>
-                {emojis['role']} Role :  {self.project.submission.lead.job_title}<br>
-                &#128221; Joining Date :  {self.project_start}<br>"""
+            recruiter_name = "NA"
+            recruiter = self.consultant.recruiter
+            if recruiter:
+                recruiter_name = self.consultant.recruiter.employee_name
 
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
+
+            activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
+                                 f"***{self.project.submission.lead.job_title}***, cancelled at " \
+                                 f"***{self.project.submission.client}***"
+            profile_path = get_profile_picture(self.user)
             data = {
-                "title": "Offer Cancellation Feedback ",
-                "text": text + f" **Reason:** {reason}"
+                "@type": "MessageCard",
+                "@context": "http://schema.org/extensions",
+                "themeColor": "#0076D7",
+                "summary": "Project Joined",
+                "sections": [{
+                    "activityTitle": "Offer Cancellation Feedback",
+                    "activitySubtitle": activity_sub_title,
+                    "activityText": self.activity_text,
+                    "activityImage": profile_path,
+                    "facts": [
+                        {"name": f"Employer", "value": self.employer},
+                        {"name": f"Location", "value": self.project.city},
+                        {"name": f"Recruiter", "value": recruiter_name},
+                        {"name": f"Status", "value": status},
+                        {"name": f"Feedback", "value": reason},
+                    ],
+                    "markdown": True
+                }],
+                "potentialAction": [
+                    {
+                        "@context": "http://schema.org",
+                        "@type": "ViewAction",
+                        "name": "View in Log1",
+                        "target": [
+                            f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
+                        ]
+                    }
+                ]
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.offer_failure_url, data)
 
             title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
-            send_notification_for_user(self.project.consultant, user, title, 'self.project')
+            send_notification_for_user(self.project.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
-    def send_completion_notification(self, user):
+    def send_completion_notification(self):
         try:
             title = f" Project Completed :: {self.consultant} :: {self.project.submission.client}"
-            send_notification_for_user(self.consultant, user, title, 'project')
+            send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
 
     def create_timesheet(self):
         try:
@@ -316,4 +432,51 @@ class ProjectUtil:
                 start_date = end_date + timedelta(days=1)
                 end_date = end_date + timedelta(days=7)
         except Exception as error:
-            write_exception(message=error)
+            write_exception(message=error, request=self.request)
+
+
+def fetch_scrum_masters(user):
+    scrum_masters = list(User.objects.filter(
+        team=user.team, role__name__in=['admin', 'proxy'], is_active=True
+    ).values_list('email', flat=True))
+    return scrum_masters
+
+
+def send_support_mail(project, support, request):
+    try:
+        submission = project.submission
+        consultant = project.submission.consultant
+        recruiter = consultant.recruiter
+        retention = consultant.relation
+        to = [submission.created_by.email]
+
+        cc = [config.RECRUITMENT, config.RELATIONS] + fetch_scrum_masters(submission.created_by)
+        if recruiter:
+            cc.append(recruiter.email)
+        if retention:
+            cc.append(retention.email)
+
+        project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+
+        mail_data = {
+            'template': '../templates/support.html',
+            'to': to, 'cc': cc, 'bcc': [],
+            'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
+            'context': {
+                'marketer_name': submission.created_by.employee_name,
+                'location': submission.lead.city, 'job_title': submission.lead.job_title,
+                'consultant_phone_no': consultant.phone_no, 'start': project_start_date,
+                'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                'client_name': submission.client, 'support_email': support.email, 'support_name': support.name
+            },
+        }
+
+        res = "Development Server"
+        if os.environ.get('ENV', 'local') == 'prod':
+            res, msg = send_email(mail_data, support.email, request=request)
+            if not msg:
+                return res, "error"
+        return res, "ok"
+    except Exception as error:
+        write_exception(message=error, request=request)
+        return error, "error"

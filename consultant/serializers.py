@@ -236,6 +236,56 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
         return None
 
 
+class ConsultantV2ListSerializer(serializers.ModelSerializer):
+    rate = serializers.ReadOnlyField()
+    recruiter = serializers.SerializerMethodField()
+    work_auth = serializers.SerializerMethodField()
+    marketing = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Consultant
+        fields = ('id', 'name', 'skills', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit')
+
+    @staticmethod
+    def get_rate(obj):
+        qs = obj.rates.fliter(end=None)
+        if qs:
+            return qs.first().rate
+        return None
+
+    @staticmethod
+    def get_recruiter(obj):
+        queryset = obj.pocs.filter(end=None, poc_type='recruiter')
+        if queryset:
+            return queryset.first().poc.employee_name
+        return None
+
+    @staticmethod
+    def get_work_auth(obj):
+        qs = obj.work_auth.filter(is_current=True)
+        if qs:
+            return {
+                "visa_end": qs.first().visa_end,
+                "visa_type": qs.first().visa_type,
+                "visa_start": qs.first().visa_start,
+            }
+        return None
+
+    @staticmethod
+    def get_marketing(obj):
+        qs = obj.marketing.filter(status='open')
+        if qs:
+            marketing = qs.last()
+            return {
+                "rtg": marketing.rtg,
+                "start": marketing.start,
+                "in_pool": marketing.in_pool,
+                "preferred_location": marketing.preferred_location,
+                "previous_marketing_days": marketing.previous_marketing_days,
+            }
+        return None
+
+
 class ConsultantBenchSerializer(serializers.ModelSerializer):
     rate = serializers.ReadOnlyField()
     support = serializers.SerializerMethodField()

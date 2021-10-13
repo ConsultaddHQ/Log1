@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin
+from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin, DestroyModelMixin, ListModelMixin
 
 from project.models import Project
 from activity.views import create_activity
@@ -106,11 +106,27 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
 
 
 # Route - /get_attachment/
-class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
+class AttachmentGetView(RetrieveModelMixin, GenericViewSet, ListModelMixin):
     queryset = Attachment.objects.all()
     serializer_class = AttachmentSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            attachments = []
+            extensions = []
+            uploadedDocuments = self.queryset.filter(object_id=request.data["project_id"])
+            for attachment in uploadedDocuments:
+                response, error = get_s3_object(attachment.attachment_file.name)
+                attachments.append(response)
+                extensions.append(attachment.attachment_file.name.split(".")[-1])
+            if error:
+                return Response({"message": "Unable to fetch document", "error": response}, status=400)
+            return Response({"data": attachments, "file_type": extensions}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
         try:

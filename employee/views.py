@@ -50,7 +50,6 @@ class EmployeeAuthViewSets(GenericViewSet):
             password = request.data.get('password').strip()
             employee_id = int(request.data.get('employee_id'))
             team = Team.objects.get(name=request.data.get('team'))
-
             user = User.objects.filter(employee_id__exact=employee_id)
             if user:
                 return Response({"message": "User already exist",
@@ -73,7 +72,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             :param request, email, password
         """
         try:
-            employee_id = request.data.get('employee_id')
+            employee_id = request.data.get('employee_id', None)
             if employee_id:
                 queryset = User.objects.filter(employee_id=employee_id)
                 if not queryset:
@@ -101,7 +100,7 @@ class EmployeeAuthViewSets(GenericViewSet):
                 return Response({"data": self.login_serializer_class(user).data}, status=202)
             return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
         except Exception as error:
-            write_exception(message=error, login=True)
+            write_exception(message=error)
             return Response({"message": "Unable to Login", "error": str(error)}, status=400)
 
 
@@ -178,7 +177,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=False, url_path='profile')
-    def profile(self, request, *args, **kwargs):
+    def profile(self, request):
         try:
             user_id = request.data.get('user_id')
             role_ids = request.data.get('role_id', [])
@@ -265,7 +264,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='logout')
-    def logout(self, request, *args, **kwargs):
+    def logout(self, request):
         """
             Logout for authenticated user
         """
@@ -545,9 +544,9 @@ class AssetsViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='un_share')
-    def un_share(self, request, *args, **kwargs):
+    def un_share(self, request, pk):
         try:
-            asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
+            asset = get_object_or_404(Asset, id=pk, owner=request.user)
             user = User.objects.get(id=request.data.get('user'))
             asset.shared_to.remove(user)
             desc = f"{request.user.employee_name} Unshared {user.employee_name} from {asset.asset_type} asset"
