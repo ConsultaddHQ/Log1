@@ -273,7 +273,6 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-# Route - /project/<project_id>/description/
     @action(methods=['put'], detail=True, url_path='add_document')
     def add_document(self, request, id, pk):
         try:
