@@ -1,5 +1,5 @@
 import logging
-from django.contrib.auth.models import AnonymousUser
+import os
 
 logger = logging.getLogger('address')
 
@@ -18,12 +18,13 @@ class AddressLogMiddleware:
         address = request.META['REMOTE_ADDR']
         request_path = str(getattr(request, 'path', ''))
         method = str(getattr(request, 'method', '')).upper()
-        if str(request.user) == "AnonymousUser":
-            logger.info(f"{method} :: {address} :: {request_path} :: 1")
-        else:
-            if hasattr(request.user, "name"):
-                logger.info(f"Consultant :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
-                            f"{request.user.name}")
+        if os.environ.get('ENV', 'local') == 'prod':
+            if str(request.user) == "AnonymousUser":
+                logger.info(f"{method} :: {address} :: {request_path} :: 1")
             else:
-                logger.info(f"Employee :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
-                            f"{request.user.employee_name}")
+                if hasattr(request.user, "name"):
+                    logger.info(f"Consultant :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
+                                f"{request.user.name}")
+                else:
+                    logger.info(f"Employee :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
+                                f"{request.user.employee_name}")

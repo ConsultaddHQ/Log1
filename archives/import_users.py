@@ -45,16 +45,9 @@ class Command(BaseCommand):
                             print("Role not found")
                             print(row)
                             continue
-
-                        user = User.objects.create(
-                            role=role,
-                            team=team,
-                            gender='male',
-                            phone='1234567890',
-                            username=row[0].strip(),
-                            employee_id=row[0].strip(),
-                            email=row[2].strip().lower(),
-                            employee_name=row[1].strip().title(),
+                        User.objects.create(
+                            email=row[2].strip().lower(), employee_name=row[1].strip().title(), username=row[0].strip(),
+                            employee_id=row[0].strip(), role=role, team=team, gender='male', phone='1234567890',
                         )
                     except Exception as error:
                         print(row)

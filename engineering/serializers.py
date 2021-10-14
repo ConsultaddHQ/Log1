@@ -2,8 +2,9 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
-from employee.serializers import TaggedUserSerializer
-from attachment.serializers import AttachmentURLSerializer
+
+from attachment.serializers import AttachmentGetSerializer
+
 from project.models import Project, SupportStatus, TimeSheet
 from engineering.models import ProjectDescription, ProjectUpdate
 
@@ -182,7 +183,8 @@ class TimesheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
+        return AttachmentGetSerializer(obj.attachments.all(), many=True).data
+
 
 
 class ProjectUpdateSerializer(serializers.ModelSerializer):
@@ -193,6 +195,8 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
 
 class ProjectUpdateGetSerializer(serializers.ModelSerializer):
     tagged_user = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
 
     class Meta:
         model = ProjectUpdate
@@ -209,6 +213,10 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
                     "name": user.employee_name,
                 })
         return data
+
+    @staticmethod
+    def get_attachments(obj):
+        return AttachmentGetSerializer(obj.attachments.all(), many=True).data
 
 
 class ProjectDescriptionSerializer(serializers.ModelSerializer):

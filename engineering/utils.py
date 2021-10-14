@@ -6,10 +6,10 @@ from employee.models import User, Tagging
 from notification.utils import create_notification, push_notification
 
 
-def tag_and_notify(update, tags, user, tag_type, model):
+def tag_and_notify(update, tags, user, tag_type='create'):
     user_list = []
     if tag_type == 'create':
-        content_type = ContentType.objects.get(model=model)
+        content_type = ContentType.objects.get(model='projectupdate')
         tag_obj = Tagging.objects.create(
             content_type=content_type,
             object_id=update.id,
