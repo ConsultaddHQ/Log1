@@ -184,7 +184,6 @@ class TimesheetSerializer(serializers.ModelSerializer):
         return AttachmentGetSerializer(obj.attachments.all(), many=True).data
 
 
-
 class ProjectUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectUpdate
