@@ -1,0 +1,51 @@
+version: '3.7'
+
+services:
+  web:
+    build: .
+#    command: gunicorn log1.wsgi:application --bind 0.0.0.0:5000
+    volumes:
+      - ./:/usr/src/app/
+      - static_volume:/home/app/web/static
+    expose:
+      - 5000
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+    image: log1app
+    container_name: web_app
+    networks:
+      - nginx_network
+
+  db:
+    image: "postgres:13.0-alpine"
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  nginx:
+    build: ./nginx
+    volumes:
+      - ./config/nginx:/etc/nginx/conf.d
+      - static_volume:/home/app/web/static
+    expose:
+      - 80
+    ports:
+        - "1300:80"
+    depends_on:
+      - web
+    networks:
+      - nginx_network
+    restart: always
+
+volumes:
+  postgres_data:
+  static_volume:
+
+networks:
+   nginx_network:
+     driver: bridge

@@ -210,8 +210,6 @@ PUBLIC_MEDIA_LOCATION = 'media'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
 DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 
-MODELS_PATH = os.path.join(BASE_DIR, 'models')
-
 # Password Reset Token Expiry Time
 RESET_TOKEN_EXPIRY_TIME = 1
 
@@ -240,7 +238,7 @@ logging.config.dictConfig({
             'formatter': 'file',
             'maxBytes': 10485760,
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': f"{os.path.join(BASE_DIR, 'logs/debug.log')}",
+            'filename': f"{os.path.join(BASE_DIR, 'logs/error.log')}",
         },
         'access': {
             'level': 'INFO',

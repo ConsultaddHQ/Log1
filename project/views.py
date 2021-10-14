@@ -714,6 +714,21 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=True, url_path='remove_remote')
+    def remove_remote(self, request, pk):
+        try:
+            project = get_object_or_404(Project, id=pk)
+            if project.is_remote:
+                project.is_remote = False
+                project.consultant = project.submission.consultant
+                project.save()
+                return Response({"message": "Remote consultant is removed"}, status=200)
+            else:
+                return Response({"message": "Project is not remote"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /project/<id>/support/
 class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, UpdateModelMixin, CreateModelMixin):
