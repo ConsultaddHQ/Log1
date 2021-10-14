@@ -201,6 +201,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+
 # Route - /project/:project_id:/update/
 class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
     queryset = ProjectUpdate.objects.all()
@@ -219,8 +220,8 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('id'))
-            serializer = ProjectUpdateGetSerializer(project.updates.get(id=kwargs.get('pk')))
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            serializer = ProjectUpdateGetSerializer(update)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -248,6 +249,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
 
             tags = request.data.get('tagged_user', [])
             tag_and_notify(update, tags, request.user, 'create')
+
             return Response({"message": "Update is added"}, status=201)
         except Exception as error:
             write_exception(error, request)

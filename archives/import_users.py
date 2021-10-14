@@ -45,6 +45,7 @@ class Command(BaseCommand):
                             print("Role not found")
                             print(row)
                             continue
+
                         User.objects.create(
                             email=row[2].strip().lower(), employee_name=row[1].strip().title(), username=row[0].strip(),
                             employee_id=row[0].strip(), role=role, team=team, gender='male', phone='1234567890',

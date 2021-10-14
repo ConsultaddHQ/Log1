@@ -50,6 +50,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             password = request.data.get('password').strip()
             employee_id = int(request.data.get('employee_id'))
             team = Team.objects.get(name=request.data.get('team'))
+
             user = User.objects.filter(employee_id__exact=employee_id)
             if user:
                 return Response({"message": "User already exist",

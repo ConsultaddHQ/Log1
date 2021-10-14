@@ -2,9 +2,7 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
-
 from attachment.serializers import AttachmentGetSerializer
-
 from project.models import Project, SupportStatus, TimeSheet
 from engineering.models import ProjectDescription, ProjectUpdate
 
@@ -196,7 +194,6 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
 class ProjectUpdateGetSerializer(serializers.ModelSerializer):
     tagged_user = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
-
 
     class Meta:
         model = ProjectUpdate

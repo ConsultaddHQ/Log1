@@ -58,7 +58,6 @@ def create_attachment(data):
         )
         return True
     except Exception as error:
-        print(error)
         write_exception(message=error)
         return False
 
