@@ -191,12 +191,21 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateGetSerializer(serializers.ModelSerializer):
+    update_by = serializers.SerializerMethodField()
     tagged_user = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectUpdate
-        exclude = ('project', )
+        exclude = ('project',)
+
+    @staticmethod
+    def get_update_by(obj):
+        return {
+            "id": obj.update_by.id,
+            "email": obj.update_by.email,
+            "name": obj.update_by.employee_name,
+        }
 
     @staticmethod
     def get_tagged_user(obj):

@@ -196,7 +196,7 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
+            queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year).order_by('id')
             serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
