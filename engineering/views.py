@@ -203,7 +203,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
 
 # Route - /project/:project_id:/update/
-class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
     queryset = ProjectUpdate.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ProjectUpdateSerializer
@@ -213,6 +213,15 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
         try:
             project = get_object_or_404(Project, id=kwargs.get('id'))
             serializer = ProjectUpdateGetSerializer(project.updates.all(), many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            serializer = ProjectUpdateGetSerializer(update)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
