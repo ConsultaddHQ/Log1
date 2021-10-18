@@ -2,6 +2,7 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
+from attachment.models import Attachment
 from attachment.serializers import AttachmentGetSerializer
 from project.models import Project, SupportStatus, TimeSheet
 from engineering.models import ProjectDescription, ProjectUpdate
@@ -221,7 +222,8 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        return AttachmentGetSerializer(obj.attachments.all(), many=True).data
+        attachment = Attachment.objects.filter(object_id=obj.id)
+        return AttachmentGetSerializer(attachment, many=True).data
 
 
 class ProjectDescriptionSerializer(serializers.ModelSerializer):
