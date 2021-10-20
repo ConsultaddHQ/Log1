@@ -1,5 +1,7 @@
 from datetime import date
+from django.db.models import Q
 from rest_framework import serializers
+from django.contrib.contenttypes.models import ContentType
 
 from employee.models import User
 from attachment.models import Attachment
@@ -222,7 +224,7 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        attachment = Attachment.objects.filter(object_id=obj.id)
+        attachment = Attachment.objects.filter(Q(object_id=obj.id) & Q(attachment_type='project_update'))
         return AttachmentGetSerializer(attachment, many=True).data
 
 
