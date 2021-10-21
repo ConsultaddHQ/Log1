@@ -247,7 +247,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                 }
                 create_attachment(file_data)
 
-            tags = request.data.get('tagged_user', [])
+            tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'create')
 
             return Response({"message": "Update is added"}, status=201)
@@ -262,7 +262,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
-            tags = request.data.get('tagged_user', [])
+            tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'update')
 
             return Response({"message": "Update is edited"}, status=202)
