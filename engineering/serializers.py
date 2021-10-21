@@ -1,7 +1,5 @@
 from datetime import date
-from django.db.models import Q
 from rest_framework import serializers
-from django.contrib.contenttypes.models import ContentType
 
 from employee.models import User
 from attachment.models import Attachment

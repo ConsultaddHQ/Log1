@@ -247,8 +247,8 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                 }
                 create_attachment(file_data)
 
-            tags = request.data.get('tagged_user', [])
-            if tags: tag_and_notify(update, tags, request.user, 'create')
+            tags = request.data.get('tagged_user', '')
+            tag_and_notify(update, tags, request.user, 'create')
 
             return Response({"message": "Update is added"}, status=201)
         except Exception as error:
