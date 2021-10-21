@@ -224,7 +224,7 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        attachment = Attachment.objects.filter(Q(object_id=obj.id) & Q(attachment_type='project_update'))
+        attachment = Attachment.objects.filter(object_id=obj.id, content_type__model="projectupdate")
         return AttachmentGetSerializer(attachment, many=True).data
 
 

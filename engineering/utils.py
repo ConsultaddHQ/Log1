@@ -15,10 +15,11 @@ def tag_and_notify(update, tags, user, tag_type='create'):
             object_id=update.id,
         )
         for tag in tags.split(','):
-            user = get_object_or_404(User, id=int(tag))
-            user_list.append(user)
-            tag_obj.tagged_user.add(user)
-
+            if tag:
+                user = get_object_or_404(User, id=int(tag))
+                user_list.append(user)
+                tag_obj.tagged_user.add(user)
+            break
     elif tag_type == 'update':
         if update.tagged_user.exists():
             for tag in tags:
