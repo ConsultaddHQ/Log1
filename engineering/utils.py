@@ -14,8 +14,8 @@ def tag_and_notify(update, tags, user, tag_type='create'):
             content_type=content_type,
             object_id=update.id,
         )
-        for tag in tags:
-            user = get_object_or_404(User, id=tag)
+        for tag in tags.split(','):
+            user = get_object_or_404(User, id=int(tag))
             user_list.append(user)
             tag_obj.tagged_user.add(user)
 
