@@ -2,6 +2,7 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
+from attachment.models import Attachment
 from attachment.serializers import AttachmentGetSerializer
 from project.models import Project, SupportStatus, TimeSheet
 from engineering.models import ProjectDescription, ProjectUpdate
@@ -191,12 +192,21 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateGetSerializer(serializers.ModelSerializer):
+    update_by = serializers.SerializerMethodField()
     tagged_user = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectUpdate
-        exclude = ('project', )
+        exclude = ('project',)
+
+    @staticmethod
+    def get_update_by(obj):
+        return {
+            "id": obj.update_by.id,
+            "email": obj.update_by.email,
+            "name": obj.update_by.employee_name,
+        }
 
     @staticmethod
     def get_tagged_user(obj):
@@ -212,7 +222,8 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        return AttachmentGetSerializer(obj.attachments.all(), many=True).data
+        attachment = Attachment.objects.filter(object_id=obj.id, content_type__model="projectupdate")
+        return AttachmentGetSerializer(attachment, many=True).data
 
 
 class ProjectDescriptionSerializer(serializers.ModelSerializer):

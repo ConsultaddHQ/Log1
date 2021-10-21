@@ -26,23 +26,27 @@ def get_scrum_masters(request):
 
 
 def get_users_and_attendees(request, interview):
-    user_list = [interview.supervisor]
-    attendees = [{'email': interview.supervisor.email}, {'email': interview.submission.created_by.email}]
-    if 'engineer' not in request.user.roles:
-        scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
-        for user in scrum_masters:
+    try:
+        user_list = [interview.supervisor]
+        attendees = [{'email': interview.supervisor.email}, {'email': interview.submission.created_by.email}]
+        if 'engineer' not in request.user.roles:
+            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
+            for user in scrum_masters:
+                user_list.append(user)
+                attendees.append({"email": user.email})
+
+        for user in interview.guest.all():
             user_list.append(user)
             attendees.append({"email": user.email})
 
-    for user in interview.guest.all():
-        user_list.append(user)
-        attendees.append({"email": user.email})
+        email = vendor_account_manager(interview.submission.lead.vendor_company.name)
+        if email:
+            attendees.append({"email": email})
 
-    email = vendor_account_manager(interview.submission.lead.vendor_company.name)
-    if email:
-        attendees.append({"email": email})
-
-    return user_list, attendees
+        return user_list, attendees
+    except Exception as error:
+        print(error)
+        return None, None
 
 
 def date_filter(queryset, timestamp, field_str):

@@ -203,7 +203,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
 
 # Route - /project/:project_id:/update/
-class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
     queryset = ProjectUpdate.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ProjectUpdateSerializer
@@ -213,6 +213,15 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
         try:
             project = get_object_or_404(Project, id=kwargs.get('id'))
             serializer = ProjectUpdateGetSerializer(project.updates.all(), many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            serializer = ProjectUpdateGetSerializer(update)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -238,7 +247,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                 }
                 create_attachment(file_data)
 
-            tags = request.data.get('tagged_user', [])
+            tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'create')
 
             return Response({"message": "Update is added"}, status=201)
@@ -253,7 +262,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
-            tags = request.data.get('tagged_user', [])
+            tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'update')
 
             return Response({"message": "Update is edited"}, status=202)
