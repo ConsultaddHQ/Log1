@@ -260,8 +260,8 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectSupport
-        fields = ('id', 'created', 'is_primary', 'end', 'start', 'feedback', 'status',
-                  'client', 'consultant', 'technology', 'support', 'joining_date', 'frequency')
+        fields = ('id', 'created', 'end', 'start', 'feedback', 'status', 'client', 'consultant', 'technology',
+                  'support', 'joining_date', 'frequency')
 
     @staticmethod
     def get_status(obj):
