@@ -126,7 +126,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             query = request.GET.get('query', '')
             teams = request.GET.get('teams', None)
             user_type = request.GET.get('type', None)
-            users = User.objects.exclude(role__name='consultant').exclude(is_active=False)
+            users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
             if user_type == 'relation':
                 users = users.filter(team__name='Retention')
             elif user_type:

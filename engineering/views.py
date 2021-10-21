@@ -11,6 +11,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 
 from engineering.serializers import *
 from marketing.utils import date_filter
+from activity.views import create_activity
 from engineering.utils import tag_and_notify
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
@@ -177,7 +178,10 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path="activity")
     def activity(self, request, pk):
         try:
-            activities = Activity.objects.filter(object_id=pk, content_type__model='project_support')
+            activities = Activity.objects.filter(
+                object_id=pk,
+                content_type__model__in=['projectsupport', 'projectupdate', 'projectdescription']
+            )
             serializer = ActivitySerializer(activities.order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -250,6 +254,9 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'create')
 
+            # Activity
+            desc = f"{request.user.employee_name} added update"
+            create_activity(update.id, 'projectupdate', request.user, desc, 'created')
             return Response({"message": "Update is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -264,6 +271,10 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
 
             tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'update')
+
+            # Activity
+            desc = f"{request.user.employee_name} edited update"
+            create_activity(update.id, 'projectupdate', request.user, desc, 'update')
 
             return Response({"message": "Update is edited"}, status=202)
         except Exception as error:
@@ -285,6 +296,9 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                 "file": request.FILES.get('file'),
             }
             if create_attachment(file_data):
+                # Activity
+                desc = f"{request.user.employee_name} uploaded {file_data['file']} file"
+                create_activity(update.id, 'projectupdate', request.user, desc, 'update')
                 return Response({"message": "Document is uploaded"}, status=202)
             return Response({"message": "Error in uploading document"}, status=400)
         except Exception as error:
@@ -297,7 +311,11 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             update = get_object_or_404(ProjectUpdate, id=pk)
             attachment = get_object_or_404(Attachment, id=request.data.get('attachment_id'))
             if update.update_by.id == request.user.id or attachment.creator.id == request.user.id:
+                file_name = attachment.attachment_file.name
                 attachment.delete()
+                # Activity
+                desc = f"{request.user.employee_name} removed {file_name} file"
+                create_activity(update.id, 'projectupdate', request.user, desc, 'update')
                 return Response({"message": "Document removed"}, status=202)
             return Response({"message": "Error in deleting document"}, status=400)
         except Exception as error:
@@ -331,6 +349,9 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
             serializer = self.serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            # Activity
+            desc = f"{request.user.employee_name} added project description"
+            create_activity(serializer.data['id'], 'projectdescription', request.user, desc, 'create')
             return Response({"message": "Description added"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -342,6 +363,9 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
             serializer = self.serializer_class(description, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            # Activity
+            desc = f"{request.user.employee_name} updated project description"
+            create_activity(description.id, 'projectdescription', request.user, desc, 'update')
             return Response({"message": "Description Updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
