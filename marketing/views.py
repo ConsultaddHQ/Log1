@@ -1591,8 +1591,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 serializer.save()
 
             interview.status = 'rescheduled'
-            interview.guest.clear()
-            interview.save()
+            if interview.guest_type in ['coder', 'assistance']:
+                interview.guest.clear()
+                interview.save()
 
             booking_res = 'error'
             submission = interview.submission
@@ -1741,8 +1742,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
             submission.is_active = True
             submission.save()
 
-            title = "Interview cancelled, coding is not required"
-            coder_request_notification(request.user, interview, title)
+            if interview.guest_type in ['coder', 'assistance']:
+                title = "Interview cancelled, coding is not required"
+                coder_request_notification(request.user, interview, title)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 

@@ -752,11 +752,14 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             support_id = request.data.get('support', None)
             support = get_object_or_404(User, id=support_id)
 
+            end = request.data.get('end', None)
             start = request.data.get('start', None)
             if not start:
                 return Response({"message": "Start date can not be empty"}, status=400)
 
-            project_support = ProjectSupport.objects.create(project=project, support=support, start=start)
+            project_support = ProjectSupport.objects.create(
+                project=project, support=support, start=start, end=end, feedback=request.data.get('feedback')
+            )
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
             )
