@@ -1938,6 +1938,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview = queryset.first()
                 guest = request.data.get('guest', [])
                 if guest:
+                    interview.guest.clear()
                     interview.guest_type = 'assigned'
                     interview.save()
 
@@ -1955,12 +1956,18 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 title = get_interview_title(interview)
                 _, attendees = get_users_and_attendees(request, interview)
+
+                end_time = datetime.strptime(str(interview.end_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
+                    "%Y-%m-%dT%H:%M:%S")
+                start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
+                    "%Y-%m-%dT%H:%M:%S")
+
                 event = {
+                    "end": end_time,
                     "summary": title,
+                    "start": start_time,
                     "user": request.user,
                     "attendees": attendees,
-                    "end": interview.end_time,
-                    "start": interview.start_time,
                     "lead": interview.submission.lead,
                     "submission": interview.submission,
                     "description": interview.description,
@@ -1990,6 +1997,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         if msg == "error":
                             return Response({"message": "Calendar update failed", "error": res}, status=400)
 
+                # Activity
+                desc = f"{request.user.employee_name} added coder experts"
+                create_activity(interview.id, 'submission', request.user, desc, 'updated')
+
                 return Response({"data": "Coders assigned", "booking_response": booking_res}, status=202)
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
@@ -2012,6 +2023,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
             interview.guest_remark = remark
             interview.coding_present = request.data.get('coding_present', None)
             interview.save()
+
+            # Activity
+            desc = f"{request.user.employee_name} added coding feedback"
+            create_activity(interview.id, 'submission', request.user, desc, 'updated')
+
             return Response({"data": "Feedback updated"}, status=202)
         except Exception as error:
             write_exception(error, request)

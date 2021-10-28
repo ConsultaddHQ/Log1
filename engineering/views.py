@@ -274,7 +274,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
 
             # Activity
             desc = f"{request.user.employee_name} edited update"
-            create_activity(update.id, 'projectupdate', request.user, desc, 'update')
+            create_activity(update.project.id, 'projectupdate', request.user, desc, 'update')
 
             return Response({"message": "Update is edited"}, status=202)
         except Exception as error:
