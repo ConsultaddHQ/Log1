@@ -14,6 +14,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 
 from utils_app.mailing import send_email
+from consultant.models import Consultant
 from employee.token import get_token_generator
 from utils_app.aws_utils import presigned_post_url, get_s3_object
 from consultant.permissions import ConsultantPetitionIsAuthenticated
@@ -71,24 +72,38 @@ class PetitionViewSets(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-
         try:
-            filter_for = request.GET.get('filter', 'all')
             query = request.GET.get('query', None)
-            queryset = Petition.objects.filter(is_active=True)
+            filter_for = request.GET.get('filter', 'all')
+            consultants = Consultant.objects.filter(petitions__is_active=True)
             if filter_for == 'my':
-                queryset = queryset.filter(
-                    Q(assigned_to=request.user)
-                )
+                consultants = consultants.filter(petitions__assigned_to=request.user)
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                queryset = queryset.filter(
-                    Q(assigned_to__employee_name=query) |
-                    Q(beneficiary__name__istartswith=query)
+                consultants = consultants.filter(
+                    Q(petitions__assigned_to__employee_name=query) |
+                    Q(petitions__beneficiary__name__istartswith=query)
                 )
-            total = queryset.count()
-            serializer = self.serializer_class(queryset[first:last], many=True)
-            return Response({"results": serializer.data, "total": total}, status=200)
+            total = consultants.count()
+            data = []
+            for consultant in consultants[first:last]:
+                petition = consultant.petitions.latest('created')
+                data.append({
+                    'consultant': {
+                        "id": consultant.id,
+                        "name": consultant.name,
+                        "email": consultant.email,
+                    },
+                    'id': petition.id,
+                    'status': petition.status,
+                    'employer': petition.employer,
+                    'petition_type': petition.petition_type,
+                    'beneficiary_type': petition.beneficiary_type,
+                    'assigned_to': petition.assigned_to.employee_name,
+                    'uploaded_documents': Document.objects.filter(petition__beneficiary=consultant).count(),
+                    'total_documents': DocumentList.objects.filter(petition__beneficiary=consultant).count(),
+                })
+            return Response({"results": data, "total": total}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -138,10 +153,48 @@ class PetitionViewSets(viewsets.ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @action(methods=['get'], detail=False, url_path='documents')
+    def documents(self, request):
+        try:
+            consultant_id = request.GET.get('consultant')
+            petitions = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
+            documents = Document.objects.filter(petition_id__in=petitions).exclude(doc_type__name='other')
+            serializer = DocumentSerializer(documents.all(), many=True)
+            return Response({"result": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='employer')
+    def extension(self, request, pk):
+        try:
+            Petition.objects.create(
+                status='assigned',
+                created_by=request.user,
+                employer=request.data['employer'],
+                beneficiary_id=request.data['consultant'],
+                assigned_to_id=request.data['assigned_to'],
+                petition_type=request.data['petition_type'],
+                beneficiary_type=request.data['beneficiary_type'],
+            )
+            return Response({"message": "Extension created"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
     @action(methods=['get'], detail=False, url_path='employer')
     def employer(self, request):
         try:
             data = ['Consultadd', 'NetResolute', 'Pythonwise', 'Zioqu']
+            return Response({"result": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='petition_types')
+    def petition_types(self, request):
+        try:
+            data = ['Extension', 'Amendment', 'Transfer', 'Extension with Amendment']
             return Response({"result": data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -152,7 +205,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
         try:
             data = dict()
             doc_types = DocumentList.objects.filter(petition_id=pk)
-            categories = Types.objects.all().order_by('category').distinct('category')
+            categories = Types.objects.order_by('category').distinct('category')
             for category in categories:
                 data[category.category] = []
             for i in doc_types:

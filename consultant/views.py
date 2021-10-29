@@ -843,6 +843,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
             consultant = qs.first()
             queryset = consultant.marketing.filter(status='close')
+
+            fut_marketing = consultant.marketing.filter(start__gt=datetime.today())
+            if fut_marketing:
+                future_date = fut_marketing.first().start
+                return Response({"message": f"Marketing will start on {str(future_date)}"}, status=400)
+
             if queryset:
                 latest_marketing_cycle = queryset.latest('end')
             else:

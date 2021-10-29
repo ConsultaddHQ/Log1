@@ -684,14 +684,11 @@ class ProjectViewSets(viewsets.ModelViewSet):
     def send_support_and_offer_mail(self, request, pk):
         try:
             project = get_object_or_404(Project, id=pk)
-
             message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
-
             if exception_msg != 'Mail sent':
                 return Response(
                     {"exception": exception_msg, "message": "Unable to send Support or Offer mail"}, status=400
                 )
-
             return Response({"data": exception_msg, "message": "Support and Offer mail sent"}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -815,7 +812,25 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency='active',
             )
+            to = [project.created_by.email]
+            mail_data = {
+                'template': '../templates/support_initiate.html',
+                'to': to, 'cc': cc, 'bcc': [],
+                'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
+                'context': {
+                    'marketer_name': submission.created_by.employee_name,
+                    'location': submission.lead.city, 'job_title': submission.lead.job_title,
+                    'consultant_phone_no': consultant.phone_no, 'start': project_start_date,
+                    'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                    'client_name': submission.client, 'support_email': support.email, 'support_name': support.name
+                },
+            }
 
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, msg = send_email(mail_data, support.email, request=request)
+                if not msg:
+                    return res, "error"
             return Response({"message": "Support status is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
