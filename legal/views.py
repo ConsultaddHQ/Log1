@@ -19,11 +19,12 @@ from employee.token import get_token_generator
 from utils_app.aws_utils import presigned_post_url, get_s3_object
 from consultant.permissions import ConsultantPetitionIsAuthenticated
 from notification.utils import create_notification, push_notification
-from legal.models import Types, Petition, Reason, Document, DocumentList
 from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 from activity.serializers import ConsultantComment, ConsultantCommentGetSerializer
-from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer
+from legal.models import Types, Petition, Reason, Document, DocumentList, PETITION_TYPES
+from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer, \
+    PetitionType
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
@@ -100,8 +101,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     'petition_type': petition.petition_type,
                     'beneficiary_type': petition.beneficiary_type,
                     'assigned_to': petition.assigned_to.employee_name,
-                    'uploaded_documents': Document.objects.filter(petition__beneficiary=consultant).count(),
-                    'total_documents': DocumentList.objects.filter(petition__beneficiary=consultant).count(),
+                    'uploaded_documents': Document.objects.filter(petition__beneficiary=consultant).exclude(
+                        doc_type__name='other').count(),
+                    'total_documents': DocumentList.objects.filter(petition__beneficiary=consultant).exclude(
+                        doc_type__name='other').count(),
                 })
             return Response({"results": data, "total": total}, status=200)
         except Exception as error:
@@ -182,6 +185,17 @@ class PetitionViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='types')
+    def types(self, request):
+        try:
+            consultant_id = request.GET.get('consultant')
+            petitions = Petition.objects.filter(beneficiary_id=consultant_id)
+            serializer = PetitionType(petitions, many=True)
+            return Response({"result": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
     @action(methods=['get'], detail=False, url_path='employer')
     def employer(self, request):
         try:
@@ -194,8 +208,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='petition_types')
     def petition_types(self, request):
         try:
-            data = ['Extension', 'Amendment', 'Transfer', 'Extension with Amendment']
-            return Response({"result": data}, status=200)
+            return Response({"result": PETITION_TYPES}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
