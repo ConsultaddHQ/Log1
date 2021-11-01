@@ -168,8 +168,8 @@ class PetitionViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @action(methods=['post'], detail=False, url_path='employer')
-    def extension(self, request, pk):
+    @action(methods=['post'], detail=False, url_path='extension')
+    def extension(self, request):
         try:
             Petition.objects.create(
                 status='assigned',
