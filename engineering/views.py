@@ -54,11 +54,10 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
                 if 'assignment' in filters:
                     if filters['assignment'] == 'assigned':
-                        projects = projects.exclude(support__exact=None)
-                        # projects = projects.exclude(support__end=None)
+                        projects = projects.exclude(support=None)
                     if filters['assignment'] == 'unassigned':
-                        # projects = projects.filter(support__end=None)
-                        projects = projects.filter(support__exact=None)
+                        projects = projects.filter(support=None)
+
 
                 if 'client' in filters:
                     projects = projects.filter(submission__client=filters['client'])
