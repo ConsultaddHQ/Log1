@@ -57,6 +57,7 @@ PROJECT_APPS = [
     'notification.apps.NotificationConfig',
     'impersonate.apps.ImpersonateConfig',
     'messaging.apps.MessagingConfig',
+    'engineering.apps.EngineeringConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -72,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'log1.middleware.AddressLogMiddleware',
 ]
 
 ROOT_URLCONF = 'log1.urls'
@@ -88,6 +90,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                'staticfiles': 'django.templatetags.static',
+            }
         },
     },
 ]
@@ -99,9 +104,9 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': os.environ.get('DB_NAME', ''),
         'USER': os.environ.get('DB_USER', ''),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'consultadd'),
+        'PORT': os.environ.get('DB_PORT', ''),
+        'HOST': os.environ.get('DB_HOST', ''),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
     }
 }
 
@@ -113,25 +118,55 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'}
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
+    )
+}
 
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
 
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
     'uuid',
+    'accept',
     'origin',
     'user-agent',
     'x-csrftoken',
+    'content-type',
+    'authorization',
+    'accept-encoding',
     'x-requested-with',
 ]
 
-# Send Grid Configuration
+# Swagger
+SWAGGER_SETTINGS = {
+    "exclude_namespaces": [],
+    "api_version": '2.0',
+    "api_path": "/",
+    "enabled_methods": [
+        'get',
+        'post',
+        'put',
+        'delete'
+    ],
+    'SECURITY_DEFINITIONS': {
+        "apiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Token Authentication"
+        }
+    },
 
+    "api_key": '',
+    "is_superuser": False,
+    'USE_SESSION_AUTH': True,
+    "is_authenticated": True,
+}
+
+# Send Grid Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_USE_TLS = True
 EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)
@@ -175,8 +210,6 @@ PUBLIC_MEDIA_LOCATION = 'media'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
 DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 
-MODELS_PATH = os.path.join(BASE_DIR, 'models')
-
 # Password Reset Token Expiry Time
 RESET_TOKEN_EXPIRY_TIME = 1
 
@@ -188,28 +221,43 @@ logging.config.dictConfig({
     'formatters': {
         'file': {
             'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-        }
+        },
+        'address_format': {
+            'format': '%(asctime)s %(levelname)-5s %(message)s'
+        },
     },
     'handlers': {
         'console': {
             'formatter': 'file',
-            'stream': 'ext://sys.stdout',
             'class': 'logging.StreamHandler',
         },
         'file': {
             'level': 'ERROR',
-            'backupCount': 20,
+            'backupCount': 5,
             'encoding': 'utf8',
             'formatter': 'file',
             'maxBytes': 10485760,
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': f"{os.path.join(BASE_DIR, 'logs/debug.log')}",
-        }
+            'filename': f"{os.path.join(BASE_DIR, 'logs/error.log')}",
+        },
+        'access': {
+            'level': 'INFO',
+            'backupCount': 5,
+            'encoding': 'utf8',
+            'maxBytes': 10485760,
+            'formatter': 'address_format',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs/address.log'),
+        },
     },
     'loggers': {
         '': {
             'level': 'ERROR',
             'handlers': ['console', 'file']
+        },
+        'address': {
+            'level': 'INFO',
+            'handlers': ['access']
         }
     }
 })
@@ -226,7 +274,6 @@ NOTIFICATIONS_CHANNELS = {
 }
 
 # Constance Config
-
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
@@ -261,6 +308,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('interview_feedback_url', ('URL', 'Interview Feedback')),
     ('exit_interview_url', ('URL', 'Exit Interview Channel')),
     ('project_termination_url', ('URL', 'Project Terminations')),
+    ('new_recruit_on_bench', ('URL', 'New Recruit On Bench Channel')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -275,6 +323,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
         'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
         'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
-        'products_dev'
+        'products_dev', 'new_recruit_on_bench'
     ),
 }

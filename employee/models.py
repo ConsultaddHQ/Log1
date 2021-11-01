@@ -9,10 +9,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
 from api_key.models import APIKey
+from log1.utils import write_exception
 from utils_app.mailing import send_email
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
-from log1.utils import write_exception, write_info
 
 GENDER_CHOICE = (
     ('male', 'Male'),
@@ -60,7 +60,7 @@ class UserManager(BaseUserManager):
         """
         user = self.create_user(
             employee_id,
-            "admin@log1.com",
+            "admin@consultadd.com",
             "Admin",
             password=password
         )
@@ -93,11 +93,12 @@ class User(AbstractUser, PermissionsMixin):
     email = models.EmailField(_('Email'))
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    account_login = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
     role = models.ManyToManyField(Role, related_name='roles')
     employee_id = models.IntegerField(_('Employee ID'), unique=True)
-    employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
+    employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
@@ -130,7 +131,7 @@ class User(AbstractUser, PermissionsMixin):
 
     def send_mail(self, mail_data):
         try:
-            res, msg = send_email(mail_data, "admin@log1.com")
+            res, msg = send_email(mail_data, "admin@consultadd.com")
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -169,7 +170,7 @@ class ResetPasswordToken(models.Model):
         return f'{self.user}-{self.key}'
 
 
-def get_password_reset_token_expiry_time():
+def get_token_expiry_time():
     return getattr(settings, 'RESET_TOKEN_EXPIRY_TIME', 24)
 
 

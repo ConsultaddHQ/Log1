@@ -2,6 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, Test
+# InterviewGuest
 
 
 @admin.register(VendorCompany)
@@ -47,7 +48,8 @@ class SubmissionAdmin(ExportActionModelAdmin):
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
                      'consultant_marketing__consultant__email', 'consultant_marketing__consultant__name')
     list_display = ('id', 'consultant_marketing', 'client', 'rate', 'created_by', 'lead_owner_display', 'lead',
-                    'status', 'is_active', 'is_complete', 'employer', 'screening_display', 'vendor_contact', 'visa_type',
+                    'status', 'is_active', 'is_complete', 'employer', 'screening_display', 'vendor_contact',
+                    'visa_type',
                     'visa_start', 'visa_end', 'linkedin', 'date_of_birth', 'current_city', 'created', 'modified')
 
     def screening_display(self, obj):
@@ -76,16 +78,17 @@ class VendorLayerAdmin(ExportActionModelAdmin):
 @admin.register(Interview)
 class InterviewAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv', 'make_status_feedback_due']
-    list_filter = ('status', 'interview_mode', 'screening_type')
+    list_filter = ('status', 'interview_mode', 'screening_type', 'coding_present', 'guest_type')
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
                      'calendar_id', 'submission__created_by__employee_name')
     list_display = ('id', 'round', 'supervisor', 'status', 'screening_type', 'start_time', 'end_time', 'submission',
-                    'attachment_link', 'interview_mode', 'feedback', 'calendar_id', 'guest_display')
+                    'guest_type', 'tech_stack', 'coding_present', 'interview_mode', 'feedback', 'calendar_id', 'guest_display')
 
     def guest_display(self, obj):
         return ", ".join([
             user.employee_name for user in obj.guest.all()
         ])
+
     guest_display.short_description = "Guest"
 
     def make_status_feedback_due(self, request, queryset):
@@ -107,3 +110,17 @@ class TestAdmin(ExportActionModelAdmin):
                      'submission__created_by__employee_name', 'is_offline')
     list_display = ('id', 'submission', 'status', 'skills', 'is_video', 'is_offline', 'deadline', 'submit_date',
                     'submitted_by', 'feedback', 'cancel_reason')
+
+#
+# @admin.register(InterviewGuest)
+# class InterviewGuestAdmin(ExportActionModelAdmin):
+#     actions = ['export_as_csv']
+#     list_filter = ('guest_type', 'coding_present')
+#     search_fields = ('id', 'interview__id')
+#     list_display = ('id', 'interview', 'guest_type', 'coding_present', 'remark', 'tech_stack', 'engineers_display')
+#
+#     def engineers_display(self, obj):
+#         return ", ".join([
+#             user.employee_name for user in obj.engineers.all()
+#         ])
+#     engineers_display.short_description = "Engineers"

@@ -151,7 +151,6 @@ class ProjectOrder(TimeStampedModel):
 
 
 class ProjectSupport(TimeStampedModel):
-    is_primary = models.BooleanField(_('Is primary'), default=False)
     feedback = models.TextField(_("Feedback"), null=True, blank=True)
     end = models.DateField(_('Support End Date'), blank=True, null=True)
     start = models.DateField(_('Support Start Date'), blank=True, null=True)

@@ -196,7 +196,7 @@ class PayrollScheduleViewSets(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year)
+            queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year).order_by('id')
             serializer = self.serializer_class(queryset, many=True)
             return Response({"results": serializer.data}, status=200)
         except Exception as error:
@@ -243,16 +243,15 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     authentication_classes = (ConsultantTokenAuthentication,)
 
     @action(methods=['GET'], detail=True, url_path='history')
-    def history(self, request, *args, **kwargs):
-        # page = int(request.GET.get("page", 1))
-        # page_size = int(request.GET.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+    def history(self, request, pk):
         try:
-            project_id = kwargs.get('pk')
-            pending = TimeSheet.objects.filter(project_id=project_id, is_active=True, status='draft').order_by('start')
+            if pk == 'null' or pk is None:
+                return Response({"error": "Project not found"}, status=400)
+
+            pending = TimeSheet.objects.filter(project_id=pk, is_active=True, status='draft').order_by('start')
             data = [i for i in pending]
 
-            submitted = TimeSheet.objects.filter(project_id=project_id, is_active=True,
+            submitted = TimeSheet.objects.filter(project_id=pk, is_active=True,
                                                  status__in=['submitted', 'rejected', 'approved']).order_by('-start')
             for i in submitted:
                 data.append(i)
@@ -296,7 +295,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                     "message": message,
                 },
             }
-            send_email(mail_data, 'log1@consultadd.com')
+            send_email(mail_data, 'log1@consultadd.com', request=request)
 
             user_list = User.objects.filter(role__name='finance')
             title = f"{request.user.name} has Timesheet issue, please check mail."
@@ -335,10 +334,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['PUT'], detail=True, url_path='cancel')
-    def cancel_timesheet(self, request, *args, **kwargs):
+    def cancel_timesheet(self, request, pk):
         try:
-            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status='submitted',
-                                          project__consultant=request.user)
+            timesheet = get_object_or_404(TimeSheet, id=pk, status='submitted', project__consultant=request.user)
             timesheet.hours = 0
             timesheet.status = 'draft'
             timesheet.con_comment = None
@@ -351,9 +349,9 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['GET'], detail=True, url_path='attachments')
-    def attachments(self, request, *args, **kwargs):
+    def attachments(self, request, pk):
         try:
-            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), project__consultant=request.user)
+            timesheet = get_object_or_404(TimeSheet, id=pk, project__consultant=request.user)
             attachments = timesheet.attachments.all()
             data = []
             for attachment in attachments:
@@ -393,9 +391,6 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             return Response({'error': str(error)}, status=400)
 
     def retrieve(self, request, *args, **kwargs):
-        # page = int(request.GET.get("page", 1))
-        # page_size = int(request.GET.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
             queryset = TimeSheet.objects.filter(

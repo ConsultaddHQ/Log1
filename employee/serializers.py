@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from employee.models import User, Asset, Team, Tagging, Handover
+from employee.models import User, Asset, Team, Role, Tagging, Handover
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -9,7 +9,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone')
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone',
+                  'is_superuser')
 
     @staticmethod
     def get_team(obj):
@@ -47,6 +48,35 @@ class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
         fields = ('id', 'name', 'dept')
+
+
+class RoleSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Role
+        fields = ('id', 'name')
+
+    @staticmethod
+    def get_name(obj):
+        return obj.name.title().replace("_", " ")
+
+
+class UserDirectorySerializer(serializers.ModelSerializer):
+    team = TeamSerializer()
+    role = RoleSerializer(many=True)
+    handover_to = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'team', 'role', 'account_login', 'handover_to')
+
+    @staticmethod
+    def get_handover_to(obj):
+        if obj.handover_to.exists():
+            if obj.handover_to.first().handover_to:
+                return UserDetailSerializer(obj.handover_to.first().handover_to).data
+        return None
 
 
 class EmailSerializer(serializers.Serializer):

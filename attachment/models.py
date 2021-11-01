@@ -23,6 +23,7 @@ ATTACHMENT_TYPE = (
     ('academic', 'Academic Docs'),
     ('photo_id', 'Miscellaneous'),
     ('results', 'Assessment Results'),
+    ('project_update', 'Project Update'),
     ('msa_signed', 'MSA/Agreement Signed'),
     ('recordings', 'Interview Recordings'),
     ('test_submit', "Test Submission Docs"),
@@ -85,9 +86,9 @@ class Attachment(TimeStampedModel):
     content_object = GenericForeignKey('content_type', 'object_id')
 
     class Meta:
+        ordering = ['-created']
         verbose_name = _("attachment")
         verbose_name_plural = _("attachments")
-        ordering = ['-created']
         permissions = (
             ('delete_foreign_attachments', _('Can delete foreign attachments')),
         )

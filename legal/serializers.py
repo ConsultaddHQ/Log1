@@ -4,6 +4,21 @@ from rest_framework import serializers
 from legal.models import Petition, Document, DocumentList, Reason
 
 
+class PetitionType(serializers.ModelSerializer):
+    petition_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = ('id', 'petition_type')
+
+    @staticmethod
+    def get_petition_type(obj):
+        return {
+            "name": obj.petition_type,
+            "display_name": obj.get_petition_type_display(),
+        }
+
+
 class DocumentSerializer(serializers.ModelSerializer):
     doc_type_name = serializers.SerializerMethodField()
     file_name = serializers.SerializerMethodField()

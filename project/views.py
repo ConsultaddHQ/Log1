@@ -28,10 +28,11 @@ from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from utils_app.mailing import send_email_attachment_multiple, send_email
-from log1.utils import ERROR_MSG, get_time_filter, get_page_limits, write_exception
+from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import create_notification, push_notification, push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
-from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status
+from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
+    fetch_project_status
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
@@ -51,12 +52,12 @@ class ProjectViewSets(viewsets.ModelViewSet):
         return scrum_masters
 
     @staticmethod
-    def consultant_mail_on_joining(project, password, new_user):
+    def consultant_mail_on_joining(project, password, new_user, request):
         try:
             mail_data = {
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
-                'to': [project.consultant.email], 'cc': [config.FINANCE], 'bcc': [],
+                'to': [project.consultant.email], 'cc': [config.FINANCE], 'bcc': ['sarang.m@consultadd.com'],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK, 'android_link': config.ANDROID_APP_LINK,
                     'password': password, 'new_user': new_user, 'consultant_name': project.consultant.name,
@@ -65,7 +66,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email(mail_data, config.RELATIONS)
+                res, msg = send_email(mail_data, config.RELATIONS, request=request)
                 if not msg:
                     return res, "error"
             return res, "ok"
@@ -74,7 +75,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def send_offer_received_mail(project, scrum_masters):
+    def send_offer_received_mail(project, scrum_masters, request):
         try:
             submission = project.submission
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.team.email]
@@ -110,7 +111,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email(mail_data, submission.created_by.email)
+                res, msg = send_email(mail_data, submission.created_by.email, request=request)
                 if not msg:
                     return res, "error"
             return res, "ok"
@@ -119,7 +120,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def send_support_mail(project, scrum_masters):
+    def send_support_mail(project, scrum_masters, request):
         try:
             submission = project.submission
             path, recordings = [], []
@@ -170,7 +171,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email)
+                res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -179,9 +180,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(message=error)
             return error, "error"
 
-    def send_support_offer_mail(self, project, scrum_masters):
-        support_res, support_msg = self.send_support_mail(project, scrum_masters)
-        offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters)
+    def send_support_offer_mail(self, project, scrum_masters, request):
+        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
+        offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
 
         message = "Project created"
         exception_msg = "Mail sent"
@@ -200,7 +201,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
         return message, exception_msg
 
     @staticmethod
-    def po_mail(project, path, scrum_master_email, po_type):
+    def po_mail(project, path, scrum_master_email, po_type, request):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -245,7 +246,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email_attachment_multiple(mail_data, marketer.email)
+                res, msg = send_email_attachment_multiple(mail_data, marketer.email, request=request)
                 if not msg:
                     return res, "error"
             return res, "ok"
@@ -254,7 +255,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def po_end_mail(project, scrum_master_email, po_type):
+    def po_end_mail(project, scrum_master_email, po_type, request):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -309,7 +310,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res1 = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res1, msg1 = send_email(mail_data, marketer.email)
+                res1, msg1 = send_email(mail_data, marketer.email, request=request)
 
             mail_data_eng = {
                 'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
@@ -325,7 +326,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             }
             res2 = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res2, msg2 = send_email(mail_data_eng, marketer.email)
+                res2, msg2 = send_email(mail_data_eng, marketer.email, request=request)
 
             return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
@@ -394,7 +395,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     projects = projects.filter(
                         Q(submission__consultant_marketing__consultant_id__in=filters['consultant']) |
-                        Q(submission__consultant_id__in=filters['consultant'])
+                        Q(consultant_id__in=filters['consultant'])
                     )
 
                 created = filters.get('created', None)
@@ -495,13 +496,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 sub.status = 'project'
                 sub.save()
 
-                message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request))
+                # Activity
+                desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
+                create_activity(sub.id, 'submission', request.user, desc, 'created')
+
+                message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
-                return Response({
-                    "message": message,
-                    "data": serializer.data,
-                    "exception": exception_msg,
-                }, status=201)
+                return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
             return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
         except Exception as error:
             write_exception(error, request)
@@ -515,9 +516,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project = get_object_or_404(Project, id=project_id)
             prev_status_obj = project.statuses.get(is_current=True)
 
-            util = ProjectUtil(project)
-
-            all_status, cancellation_status, termination_status = util.statuses
+            all_status, cancellation_status, termination_status = fetch_project_status()
 
             if new_status not in all_status:
                 return Response({"message": 'Project status does not exist'}, status=400)
@@ -541,6 +540,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
             project.is_remote = request.data.get('is_remote', False)
             project.save()
 
+            util = ProjectUtil(project, request)
+            desc = f"Purchase order is updated"
             prev_statuses = list(project.statuses.all().values_list('status', flat=True))
             if new_status not in prev_statuses:
                 scrum_masters = self.fetch_scrum_masters(request)
@@ -559,7 +560,8 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 # PO Received
                 if new_status == 'received' and not project.is_msg_sent:
                     # Offer received message
-                    util.send_receive_notification(request.user)
+                    desc = f"Purchase order status changed to Received"
+                    util.send_receive_notification()
                     project.is_msg_sent = True
                     project.save()
 
@@ -567,6 +569,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 elif new_status == 'joined':
                     project.consultant.status = 'on_project'
                     project.consultant.save()
+                    desc = f"PO status changed to Joined and Timesheet APP access mail is sent to consultant"
                     if marketing.status == 'open':
                         marketing.end = date.today()
                         marketing.status = 'close'
@@ -577,35 +580,41 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                     # Setting password for User (consultant)
                     password, new_user = set_consultant_password(project.consultant)
-                    resp, err = self.consultant_mail_on_joining(project, password, new_user)
+                    resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
 
-                    util.send_join_notification(request.user)
+                    util.send_join_notification()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
                     marketing.status = 'open'
                     marketing.save()
                     project.support.update(end=datetime.now())
-                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled')
-                    util.send_cancellation_notification(request.user)
+                    desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
+                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
+                    po_status = project_status_obj.get_status_display()
+                    util.send_cancellation_notification(po_status)
 
                 # Project Terminated
                 elif prev_status_obj.status not in termination_status and new_status in termination_status:
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
-                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated')
+                    desc = f"Purchase order status changed to Terminated and termination mail is sent"
+                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     po_status = project_status_obj.get_status_display()
-                    util.send_termination_notification(po_status, request.user)
+                    util.send_termination_notification(po_status)
 
                 # Project Completed
                 elif prev_status_obj.status != 'complete' and new_status == "complete":
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
-                    resp, err = self.po_end_mail(project, scrum_masters, 'project completed')
-                    util.send_completion_notification(request.user)
+                    desc = f"Purchase order status changed to Complete"
+                    resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
+                    util.send_completion_notification()
 
+            # Activity
+            create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
@@ -644,7 +653,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 res, error = 'development server', 'development server'
                 if os.environ.get('ENV', 'local') == 'prod':
-                    res, error = self.po_mail(project, path, self.fetch_scrum_masters(request), po_type)
+                    res, error = self.po_mail(project, path, self.fetch_scrum_masters(request), po_type, request)
                 delete_temp_file(path)
                 if not error == 'error':
                     project.submission.consultant_marketing.status = 'close'
@@ -659,6 +668,10 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         if created:
                             prev_status.is_current = False
                             prev_status.save()
+                        desc = "Purchase order status is updated to Onboarded and Onboarding mail is sent"
+
+                        # Activity
+                        create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
                     return Response({"message": "On-boarding mail sent", "error": res}, status=200)
                 return Response({"data": str(res)}, status=400)
             else:
@@ -668,28 +681,23 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path="send_support_mail")
-    def send_support_and_offer_mail(self, request, *args, **kwargs):
+    def send_support_and_offer_mail(self, request, pk):
         try:
-            project_id = kwargs.get('pk')
-            project = get_object_or_404(Project, id=project_id)
-
-            message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request))
-
+            project = get_object_or_404(Project, id=pk)
+            message, exception_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
             if exception_msg != 'Mail sent':
-                return Response({
-                    "exception": exception_msg,
-                    "message": "Unable to send Support or Offer mail"
-                }, status=400)
-
+                return Response(
+                    {"exception": exception_msg, "message": "Unable to send Support or Offer mail"}, status=400
+                )
             return Response({"data": exception_msg, "message": "Support and Offer mail sent"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='fields')
-    def fields(self, request, *args, **kwargs):
+    def fields(self, request, pk):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            project = get_object_or_404(Project, id=pk)
             fields, group = [], None
             status = project.statuses.filter(is_current=True).first().status
             if project.submission.created_by.id == request.user.id:
@@ -703,9 +711,24 @@ class ProjectViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=True, url_path='remove_remote')
+    def remove_remote(self, request, pk):
+        try:
+            project = get_object_or_404(Project, id=pk)
+            if project.is_remote:
+                project.is_remote = False
+                project.consultant = project.submission.consultant
+                project.save()
+                return Response({"message": "Remote consultant is removed"}, status=200)
+            else:
+                return Response({"message": "Project is not remote"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-# Route - /project_support/
-class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+
+# Route - /project/<id>/support/
+class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectSupport.objects.all()
     serializer_class = ProjectSupportSerializer
     permission_classes = (IsAuthenticated,)
@@ -713,7 +736,7 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
 
     def list(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=request.GET.get('project_id'))
+            project = get_object_or_404(Project, id=kwargs.get('id'))
             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -722,58 +745,23 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
 
     def create(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=request.data['project_id'])
-            users = request.data.get('support', [])
-            support_names = []
-            for user in users:
-                support = get_object_or_404(User, id=user['id'])
-                support_names.append(support.employee_name)
-                if not user['start']:
-                    return Response({"message": "Start date can not be empty"}, status=400)
-                project_support = ProjectSupport.objects.create(
-                    project=project,
-                    support=support,
-                    start=user['start'],
-                    is_primary=user['primary'],
-                )
-                SupportStatus.objects.create(
-                    is_current=True,
-                    support=project_support,
-                    change_date=user['start'],
-                    frequency=user['frequency'],
-                )
-            # notification
-            user_list = []
-            aux_verb = "is"
-            if len(support_names) > 1:
-                aux_verb = "are"
-            consultant = project.submission.consultant
-            names = ", ".join(name for name in support_names)
-            pocs = consultant.pocs.all()
-            for data in pocs:
-                user_list.append(data.poc)
-            user_list.append(project.submission.created_by)
-            title = f"""{names} {aux_verb} assigned as support to {consultant.name}'s project of 
-                {project.submission.client}"""
-            notification_data = {
-                'category': 'info', 'target_type': 'projectsupport', 'parent_type': 'project',
-                'title': title, 'target_id': None, 'description': title, 'parent_id': project.id,
-                'sender_id': request.user.id, 'recipient_user_type': 'user', 'sender_user_type': 'user',
-            }
-            create_notification(user_list, notification_data)
-            # Push Notification
-            message_body = {
-                "click_action": "https://app.log1.com", "show_in_foreground": True,
-                "body": title, "title": title, "category": "alert",
-                "data": {
-                    'is_read': False, 'sub_target': 'support', 'timestamp': str(datetime.now()),
-                    'is_deleted': False, 'target': 'submission', 'target_id': project.submission.id,
-                },
-            }
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
-            serializer = ProjectSupportSerializer(project.support.all(), many=True)
-            return Response({"data": serializer.data, "message": "Support is added"}, status=201)
+            project = get_object_or_404(Project, id=kwargs.get('id'))
+            support_id = request.data.get('support', None)
+            support = get_object_or_404(User, id=support_id)
+
+            end = request.data.get('end', None)
+            start = request.data.get('start', None)
+            if not start:
+                return Response({"message": "Start date can not be empty"}, status=400)
+
+            project_support = ProjectSupport.objects.create(
+                project=project, support=support, start=start, end=end, feedback=request.data.get('feedback')
+            )
+            SupportStatus.objects.create(
+                is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
+            )
+
+            return Response({"message": "Support is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -781,25 +769,10 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     def update(self, request, *args, **kwargs):
         try:
             support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
-            project = support.project
-            all_support = project.support.filter(end=None)
-            primary_support = [user for user in all_support if user.is_primary is True]
-
-            if len(primary_support) == 1 and primary_support[0] == support and request.data.get('is_primary') is False:
-                return Response({"message": 'At least one support should be primary'}, status=400)
-
-            support.is_primary = request.data.get('is_primary')
-            support.save()
-            start = request.data.get('start')
-            new_freq = request.data.get('frequency')
-            prev = support.statuses.filter(is_current=True)
-            if prev.first() and prev.first().frequency != new_freq:
-                prev.update(is_current=False)
-                SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
-            elif not prev.first():
-                SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=new_freq)
-            serializer = ProjectSupportSerializer(support)
-            return Response({"data": serializer.data, "message": "Support is updated"}, status=202)
+            serializer = ProjectSupportSerializer(support, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"message": "Support is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -807,15 +780,70 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @action(methods=['put'], detail=True, url_path="remove")
+    @action(methods=['put'], detail=True, url_path="status")
+    def status(self, request, id, pk):
+        try:
+            support = get_object_or_404(ProjectSupport, id=pk)
+            status = request.data.get('status')
+            start = request.data.get('change_date')
+            prev_support = support.statuses.filter(is_current=True)
+            if prev_support:
+                prev_support = prev_support.first()
+                if prev_support.frequency != status:
+                    prev_support.is_current = False
+                    prev_support.save()
+                    SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
+            else:
+                SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
+            return Response({"message": "Support status is updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=False, url_path="initiate")
+    def initiate(self, request, pk):
+        try:
+            project = get_object_or_404(Project, id=pk)
+            support_id = request.data.get('support', None)
+            support = get_object_or_404(User, id=support_id)
+            start = request.data.get('start')
+
+            project_support = ProjectSupport.objects.create(project=project, support=support, start=start)
+            SupportStatus.objects.create(
+                is_current=True, support=project_support, change_date=start, frequency='active',
+            )
+            to = [project.created_by.email]
+            mail_data = {
+                'template': '../templates/support_initiate.html',
+                'to': to, 'cc': cc, 'bcc': [],
+                'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
+                'context': {
+                    'marketer_name': submission.created_by.employee_name,
+                    'location': submission.lead.city, 'job_title': submission.lead.job_title,
+                    'consultant_phone_no': consultant.phone_no, 'start': project_start_date,
+                    'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                    'client_name': submission.client, 'support_email': support.email, 'support_name': support.name
+                },
+            }
+
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, msg = send_email(mail_data, support.email, request=request)
+                if not msg:
+                    return res, "error"
+            return Response({"message": "Support status is updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['delete'], detail=True, url_path="remove")
     def remove_support(self, request, *args, **kwargs):
         try:
-            support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
-            support.end = request.data.get('end')
-            support.feedback = request.data.get('feedback', None)
-            support.save()
-            serializer = ProjectSupportSerializer(support)
-            return Response({"data": serializer.data, "message": "Support is removed"}, status=202)
+            if 'admin' in request.user.roles and 'engineer' in request.user.roles:
+                support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+                support.delete()
+                return Response({"message": "Support is removed"}, status=202)
+            return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -824,8 +852,8 @@ class ProjectSupportViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
 # Route - /project_order/
 class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectOrder.objects.all()
-    serializer_class = ProjectOrderSerializer
     permission_classes = (IsAuthenticated,)
+    serializer_class = ProjectOrderSerializer
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
@@ -1008,7 +1036,6 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_name = request.GET.get('consultant_name', None)
 
         try:
-
             project_status = [
                 'terminated-fired_performance_issue', 'terminated-fired_security_issue',
                 'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
@@ -1110,9 +1137,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=["get"], detail=True, url_name="from_notification")
-    def from_notification(self, request, *args, **kwargs):
+    def from_notification(self, request, pk):
         try:
-            queryset = TimeSheet.objects.filter(id=kwargs.get('pk'))
+            queryset = TimeSheet.objects.filter(id=pk)
             serializer = self.serializer_class(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:

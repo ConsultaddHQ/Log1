@@ -93,8 +93,8 @@ class VendorCompany(models.Model):
 
 class VendorContact(TimeStampedModel):
     name = models.CharField(_('Name'), max_length=50)
-    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
-    number = models.CharField(_('Number'), max_length=25, null=True, blank=True)
+    email = models.EmailField(_('Email'), max_length=100, null=True, blank=True)
+    number = models.CharField(_('Number'), max_length=100, null=True, blank=True)
     company = models.ForeignKey(
         VendorCompany, on_delete=models.CASCADE,
         related_name='vendors',
@@ -129,7 +129,12 @@ class Lead(TimeStampedModel):
     primary_skill = models.CharField(_('Primary Skill'), max_length=50, blank=True, null=True)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='new')
     secondary_skills = ArrayField(models.CharField(_('Secondary Skills'), max_length=30), blank=True, null=True)
-    position = models.ForeignKey(Choice, on_delete=models.SET_NULL, related_name='position_lead', null=True, blank=True)
+
+    position = models.ForeignKey(
+        Choice, on_delete=models.SET_NULL,
+        related_name='position_lead',
+        null=True, blank=True
+    )
     vendor_company = models.ForeignKey(
         VendorCompany, on_delete=models.PROTECT,
         null=True, blank=True,
@@ -143,8 +148,7 @@ class Lead(TimeStampedModel):
         verbose_name='Lead Owner'
     )
     shared_to = models.ManyToManyField(
-        User,
-        blank=True,
+        User, blank=True,
         related_name='shared_leads',
         verbose_name='Lead Shared to',
     )
@@ -319,11 +323,15 @@ class Test(TimeStampedModel):
 class Interview(TimeStampedModel):
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
+    guest_remark = models.TextField(_('Remark'), blank=True, null=True)
+    coding_present = models.BooleanField(_('Coding Present'), null=True)
     end_time = models.DateTimeField(_('End Date'), null=True, blank=True)
     notes = models.TextField(_('Interview Notes'), null=True, blank=True)
     description = models.TextField(_('Description'), null=True, blank=True)
+    guest_type = models.CharField(_('Guest Type'), max_length=50, null=True)
     start_time = models.DateTimeField(_('Start Date'), null=True, blank=True)
     call_details = models.TextField(_('Call Details'), null=True, blank=True)
+    tech_stack = models.TextField(_('Technology required'), null=True, blank=True)
     attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
     calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)

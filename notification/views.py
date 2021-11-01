@@ -28,12 +28,15 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
 
     def create(self, request, *args, **kwargs):
         try:
+            fcm_token = request.data.get('fcm_token', None)
+            if not fcm_token:
+                return Response({"message": "Token not found"}, status=400)
             content_type = ContentType.objects.get(model='user')
             FCMDevice.objects.get_or_create(
                 type='web',
+                device_id=fcm_token,
                 object_id=request.user.id,
                 content_type=content_type,
-                device_id=request.data.get('fcm_token')
             )
             return Response({"message": "Token Created"}, status=201)
         except Exception as error:
@@ -67,9 +70,9 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='mark_as_read')
-    def mark_as_read(self, request, *args, **kwargs):
+    def mark_as_read(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_as_read()
             notification.save()
             return Response({"message": 'read'}, status=202)
@@ -131,11 +134,9 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
 
     @never_cache
     def list(self, request, *args, **kwargs):
-        # first, last = get_page_limits(request)
         try:
             queryset = Notification.objects.active(request.user, 'consultant')
             total = queryset.count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'title', 'deleted', 'unread', 'timestamp', 'category', 'target_object_id')
             return Response({"results": data, "total": total}, status=200)
@@ -154,14 +155,12 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_delete')
-    def mark_as_delete(self, request, *args, **kwargs):
-        # first, last = get_page_limits(request)
+    def mark_as_delete(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_as_deleted()
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = Notification.objects.unread(request.user, 'consultant').count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
@@ -172,14 +171,12 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_not_delete')
-    def mark_not_delete(self, request, *args, **kwargs):
-        # first, last = get_page_limits(request)
+    def mark_not_delete(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_not_deleted()
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = Notification.objects.unread(request.user, 'consultant').count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
@@ -199,14 +196,12 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_read')
-    def mark_as_read(self, request, *args, **kwargs):
-        # first, last = get_page_limits(request)
+    def mark_as_read(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_as_read()
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = Notification.objects.unread(request.user, 'consultant').count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'

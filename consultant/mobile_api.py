@@ -17,8 +17,8 @@ from utils_app.mailing import send_email
 from log1.utils import write_exception, write_info
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.serializers import ConsultantLoginSerializer
+from employee.models import clear_expired, get_token_expiry_time
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
-from employee.models import clear_expired, get_password_reset_token_expiry_time
 from consultant.authentication import consultant_authenticate, ConsultantTokenAuthentication
 from consultant.models import Consultant, ConsultantToken, ConsultantResetPasswordToken, FCMDevice
 
@@ -118,7 +118,7 @@ class ConsultantAuthViewSet(GenericViewSet):
                 }
                 return Response({"result": data}, status=202)
             except Exception as error:
-                write_exception(error, request)
+                write_exception(error, request, True)
                 return Response({"error": str(error)}, status=400)
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
@@ -194,7 +194,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+        password_reset_token_validation_time = get_token_expiry_time()
 
         now_minus_expiry_time = timezone.now() - timedelta(hours=password_reset_token_validation_time)
 
@@ -241,7 +241,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 }
                 res, error = consultant.send_mail(mail_data)
                 if error == 'error':
-                    write_info(message=res, function='token_request', request=request)
+                    write_info(message=res, function='token_request')
                     return Response({'error': str(res)}, status=400)
         return Response({'status': 'OK'}, status=200)
 
@@ -252,7 +252,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
         password = serializer.validated_data['password']
         token = serializer.validated_data['token']
 
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+        password_reset_token_validation_time = get_token_expiry_time()
 
         reset_password_token = ConsultantResetPasswordToken.objects.filter(key=token).first()
 

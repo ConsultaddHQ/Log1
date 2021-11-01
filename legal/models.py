@@ -18,6 +18,7 @@ PETITION_TYPES = (
     ('h1b_extension', 'H1B Extension'),
     ('h1b_amendment', 'H1B Amendment'),
     ('h1b_cap_exempt', 'H1B Cap Exempt'),
+    ('h1b_ext_amend', 'H1B Extension with Amendment'),
 )
 
 PETITION_STATUSES = (

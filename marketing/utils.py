@@ -1,11 +1,24 @@
+import json
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 
+from constance import config
 from employee.models import User
-from log1.utils import write_exception
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from marketing.models import Submission, Interview
+from utils_app.calendar import get_profile_picture
+from log1.utils import write_info, write_exception, post_msg_using_webhook
+
+
+def vendor_account_manager(vendor_company):
+    file = open('fixtures/am_config.json', 'r')
+    data = json.loads(file.read())
+    vendor_company = vendor_company.replace(" ", "").replace(",", "").replace("-", "").replace("_", "").lower()
+    for email, vendors in data.items():
+        if vendor_company in vendors:
+            return email
+    return None
 
 
 def get_scrum_masters(request):
@@ -13,25 +26,34 @@ def get_scrum_masters(request):
 
 
 def get_users_and_attendees(request, interview):
-    user_list = [interview.supervisor]
+    try:
+        user_list = [interview.supervisor]
+        attendees = [{'email': interview.supervisor.email}, {'email': interview.submission.created_by.email}]
+        if 'engineer' not in request.user.roles:
+            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
+            for user in scrum_masters:
+                user_list.append(user)
+                attendees.append({"email": user.email})
 
-    scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'])
-    for user in scrum_masters:
-        user_list.append(user)
+        for user in interview.guest.all():
+            user_list.append(user)
+            attendees.append({"email": user.email})
 
-    attendees = [{'email': interview.supervisor.email}, {'email': request.user.email}]
-    for user in interview.guest.all():
-        user_list.append(user)
-        attendees.append({"email": user.email})
+        email = vendor_account_manager(interview.submission.lead.vendor_company.name)
+        if email:
+            attendees.append({"email": email})
 
-    return user_list, attendees
+        return user_list, attendees
+    except Exception as error:
+        print(error)
+        return None, None
 
 
-def date_filter(queryset, created, field_str):
+def date_filter(queryset, timestamp, field_str):
     filters = dict()
-    if created:
-        lte = created.get('lte', None)
-        gte = created.get('gte', None)
+    if timestamp and type(timestamp) == dict:
+        lte = timestamp.get('lte', None)
+        gte = timestamp.get('gte', None)
         if lte:
             filters[f"{field_str}__lte"] = lte
         if gte:
@@ -66,10 +88,10 @@ def submission_is_complete(obj):
 
 def get_interview_title(interview):
     try:
-        return f"""CTB: {interview.supervisor.employee_name} :: {interview.round}R :: 
+        return f"""CTB - {interview.supervisor.employee_name} :: {interview.round}R :: 
             {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
             {interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} :: 
-            {interview.consultant.name} :: {interview.marketer.employee_name}"""
+            {interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"""
     except Exception as error:
         write_exception(message=error)
         return False
@@ -131,3 +153,150 @@ def create_submission(request, lead_id):
     except Exception as error:
         write_exception(error, request)
         return error, "error"
+
+
+def coder_request_notification(user, interview, title):
+    try:
+        profile_path = get_profile_picture(user)
+        data = {
+            "@type": "MessageCard",
+            "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
+            "summary": f"Coding expert request for Interview ",
+            "sections": [
+                {
+                    "activityTitle": title,
+                    "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
+                                        f"***{interview.submission.consultant.name}*** ",
+                    "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
+                                    f"***{interview.submission.created_by.team.name}***",
+                    "activityImage": profile_path,
+                    "facts": [
+                        {
+                            "name": f"Technology",
+                            "value": f"{interview.tech_stack}"
+                        },
+                        {
+                            "name": f"Supervisor",
+                            "value": f"{interview.supervisor.employee_name}"
+                        },
+                        {
+                            "name": f"Date",
+                            "value": f"{interview.start_time.strftime('%a, %d %B %Y')}"
+                        },
+                        {
+                            "name": f"Time",
+                            "value": f"{interview.start_time.strftime('%I:%M %p EST')} - "
+                                     f"{interview.end_time.strftime('%I:%M %p EST')}"
+                        }
+                    ],
+                    "markdown": True
+                }
+            ]
+        }
+        post_msg_using_webhook(config.engineering_url, data)
+        return "ok"
+    except Exception as error:
+        write_info(message=error, function='coder_request_notification')
+        return str(error)
+
+
+def coder_assigned_notification(user, interview):
+    try:
+        profile_path = get_profile_picture(user)
+        coding_experts = ", ".join(interview.guest.all().values_list('employee_name', flat=True))
+        data = {
+            "@type": "MessageCard",
+            "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
+            "summary": f"Coding expert request for Interview ",
+            "sections": [
+                {
+                    "activityTitle": f"Coding assignment",
+                    "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
+                                        f" ***{interview.submission.consultant.name}*** ",
+                    "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
+                                    f"***{interview.submission.created_by.team.name}***",
+                    "activityImage": profile_path,
+                    "facts": [
+                        {
+                            "name": f"Technology",
+                            "value": f"{interview.tech_stack}"
+                        },
+                        {
+                            "name": f"Supervisor",
+                            "value": f"{interview.supervisor.employee_name}"
+                        },
+                        {
+                            "name": f"Date",
+                            "value": f"{interview.start_time.strftime('%a, %d %B')}"
+                        },
+                        {
+                            "name": f"Time",
+                            "value": f"{interview.start_time.strftime('%I:%M %p EST')} - "
+                                     f"{interview.end_time.strftime('%I:%M %p EST')}"
+                        },
+                        {
+                            "name": f"Coding Expert",
+                            "value": coding_experts
+                        }
+                    ],
+                    "markdown": True
+                }
+            ]
+        }
+        post_msg_using_webhook(config.engineering_url, data)
+        return "ok"
+    except Exception as error:
+        write_info(message=error, function='coder_request_notification')
+        return str(error)
+
+
+def test_received_notification(user, test, timezone):
+    try:
+        skills = ", ".join(skill.title() for skill in test.skills)
+        profile_path = get_profile_picture(user)
+        if test.is_offline:
+            test_data = "Offline"
+        elif test.is_video:
+            test_data = "Video"
+        else:
+            test_data = "Online"
+
+        if type(test.deadline) == str:
+            deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B %Y')
+        else:
+            deadline = test.deadline.strftime('%a, %d %B %Y')
+
+        data = {
+            "@type": "MessageCard",
+            "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
+            "summary": f"Coding expert request for Interview ",
+            "sections": [
+                {
+                    "activityTitle": f"Test Received",
+                    "activitySubtitle": f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from "
+                                        f"***{test.submission.client}*** for ***{test.submission.consultant.name}*** ",
+                    "activityText": f"Requested by ***{test.marketer.employee_name}*** from "
+                                    f"***{test.marketer.team.name}***",
+                    "activityImage": profile_path,
+                    "facts": [
+                        {
+                            "name": f"Timezone",
+                            "value": timezone
+                        },
+                        {
+                            "name": f"Deadline",
+                            "value": deadline
+                        }
+                    ],
+                    "markdown": True
+                }
+            ]
+        }
+        post_msg_using_webhook(config.engineering_url, data)
+        return "ok"
+    except Exception as error:
+        write_info(message=error, function='test_received_notification')
+        return str(error)

@@ -23,7 +23,7 @@ def get_s3_object(key):
     try:
         s3 = get_aws_connection()
         if not s3:
-            return "Unable to create Connection", True
+            return "Unable to create Connection-get_s3_object", True
 
         url = s3.generate_presigned_url(
             ClientMethod='get_object',
@@ -51,7 +51,7 @@ def download_s3_object(key):
 
         s3 = get_aws_connection()
         if not s3:
-            return "Unable to create Connection", True
+            return "Unable to create Connection-download_s3_object", True
 
         s3.download_file(os.getenv('AWS_STORAGE_BUCKET_NAME'), f'media/{key}', f'media/{file_name}')
         return f'media/{file_name}', False
@@ -64,8 +64,8 @@ def download_s3_object_beats(key, name):
     try:
         local_path = f'media/beats/{name}'
         s3 = get_aws_connection()
-        if s3:
-            return "Unable to create Connection", True
+        if not s3:
+            return "Unable to create Connection-download_s3_object_beats", True
         s3.download_file(os.getenv('AWS_BEATS_BUCKET'), key, local_path)
         return local_path, False
     except Exception as error:
@@ -77,7 +77,7 @@ def presigned_post_url(object_name, fields=None, conditions=None, expiration=360
     try:
         s3 = get_aws_connection()
         if not s3:
-            return "Unable to create Connection", True
+            return "Unable to create Connection-presigned_post_url", True
 
         bucket_name = os.getenv('AWS_STORAGE_BUCKET_NAME')
         response = s3.generate_presigned_post(

@@ -13,6 +13,7 @@ from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus,
 class ProjectSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     client = serializers.SerializerMethodField()
+    created = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
@@ -25,22 +26,35 @@ class ProjectSerializer(serializers.ModelSerializer):
                   'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
                   'is_remote', 'support', 'employer')
 
-    def get_status(self, obj):
+    @staticmethod
+    def get_created(obj):
+        return obj.start_date
+
+    @staticmethod
+    def get_client(obj):
+        return obj.submission.client
+
+    @staticmethod
+    def get_check_list(obj):
+        return get_project_check_list(obj)
+
+    @staticmethod
+    def get_status(obj):
         status = obj.statuses.filter(is_current=True)
         if status:
             return status.first().status
         return None
 
-    def get_support(self, obj):
-        return ProjectSupportSerializer(obj.support.all(), many=True).data
+    @staticmethod
+    def get_company_name(obj):
+        return obj.submission.lead.vendor_company.name
 
-    def get_marketer_name(self, obj):
+    @staticmethod
+    def get_marketer_name(obj):
         return obj.submission.created_by.employee_name
 
-    def get_client(self, obj):
-        return obj.submission.client
-
-    def get_consultant_name(self, obj):
+    @staticmethod
+    def get_consultant_name(obj):
         if obj.consultant:
             if obj.is_remote:
                 firstname = obj.consultant.name.split(' ')[0]
@@ -49,11 +63,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 return obj.consultant.name
         return None
 
-    def get_company_name(self, obj):
-        return obj.submission.lead.vendor_company.name
-
-    def get_check_list(self, obj):
-        return get_project_check_list(obj)
+    @staticmethod
+    def get_support(obj):
+        return ProjectSupportSerializer(obj.support.all(), many=True).data
 
 
 class PayrollScheduleSerializer(serializers.ModelSerializer):
@@ -73,16 +85,20 @@ class TimeSheetSerializer(serializers.ModelSerializer):
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
                   'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
 
-    def get_start(self, obj):
+    @staticmethod
+    def get_start(obj):
         return obj.start.strftime("%m/%d/%Y")
 
-    def get_end(self, obj):
+    @staticmethod
+    def get_end(obj):
         return obj.end.strftime("%m/%d/%Y")
 
-    def get_attachments(self, obj):
+    @staticmethod
+    def get_attachments(obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data
 
-    def get_project(self, obj):
+    @staticmethod
+    def get_project(obj):
         return {
             'id': obj.project.id,
             'employer': obj.project.employer,
@@ -103,16 +119,20 @@ class FinanceSerializer(serializers.ModelSerializer):
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
                   'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
 
-    def get_start(self, obj):
+    @staticmethod
+    def get_start(obj):
         return obj.start.strftime("%m/%d/%Y")
 
-    def get_end(self, obj):
+    @staticmethod
+    def get_end(obj):
         return obj.end.strftime("%m/%d/%Y")
 
-    def get_attachments(self, obj):
+    @staticmethod
+    def get_attachments(obj):
         return AttachmentURLSerializer(obj.attachments.all(), many=True).data
 
-    def get_project(self, obj):
+    @staticmethod
+    def get_project(obj):
         return {
             'id': obj.project.id,
             'employer': obj.project.employer,
@@ -130,7 +150,8 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         model = Consultant
         fields = ('id', 'name', 'email', 'ts_status', 'project')
 
-    def get_project(self, obj):
+    @staticmethod
+    def get_project(obj):
         project = Project.objects.filter(
             Q(consultant=obj, statuses__is_current=True) & (
                     Q(statuses__status__istartswith='terminated') |
@@ -148,7 +169,8 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
             }
         return None
 
-    def get_ts_status(self, obj):
+    @staticmethod
+    def get_ts_status(obj):
         queryset = TimeSheet.objects.filter(project__consultant=obj)
         submitted_ts = True if queryset.filter(status='submitted') else False
         rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
@@ -168,19 +190,23 @@ class ProjectGetSerializer(serializers.ModelSerializer):
                   'duration', 'invoicing_period', 'feedback', 'client_address', 'vendor_address', 'payment_term',
                   'start_date', 'end_date', 'rate', 'employer', 'reporting_details', 'is_remote', 'marketer_name')
 
-    def get_status(self, obj):
+    @staticmethod
+    def get_status(obj):
         status = obj.statuses.filter(is_current=True)
         if status:
             return status.first().status
         return None
 
-    def get_marketer_name(self, obj):
+    @staticmethod
+    def get_marketer_name(obj):
         return obj.submission.created_by.employee_name
 
-    def get_attachments(self, obj):
+    @staticmethod
+    def get_attachments(obj):
         return AttachmentSerializer(obj.attachments.all(), many=True).data
 
-    def get_check_list(self, obj):
+    @staticmethod
+    def get_check_list(obj):
         return get_project_check_list(obj)
 
 
@@ -190,16 +216,37 @@ class SupportStatusSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ProjectSupportSerializer(serializers.ModelSerializer):
-    support = UserSerializer()
-    status = serializers.SerializerMethodField()
-
+class ProjectSupportCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectSupport
         fields = '__all__'
 
-    def get_status(self, obj):
-        return SupportStatusSerializer(obj.statuses.filter(is_current=True).first()).data
+
+class ProjectSupportSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+    support = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSupport
+        exclude = ('project',)
+
+    @staticmethod
+    def get_support(obj):
+        return {
+            'id': obj.support.id,
+            'email': obj.support.email,
+            'name': obj.support.employee_name,
+        }
+
+    @staticmethod
+    def get_status(obj):
+        status = obj.statuses.filter(is_current=True)
+        if status:
+            return {
+                "value": status.first().frequency,
+                "change_date": status.first().change_date,
+            }
+        return None
 
 
 class ProjectSupportDetailSerializer(serializers.ModelSerializer):
@@ -213,10 +260,11 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectSupport
-        fields = ('id', 'created', 'is_primary', 'end', 'start', 'feedback', 'status',
-                  'client', 'consultant', 'technology', 'support', 'joining_date', 'frequency')
+        fields = ('id', 'created', 'end', 'start', 'feedback', 'status', 'client', 'consultant', 'technology',
+                  'support', 'joining_date', 'frequency')
 
-    def get_status(self, obj):
+    @staticmethod
+    def get_status(obj):
         status = obj.statuses.filter(is_current=True).first()
         if obj.project.statuses.filter(status__istartswith='terminated').first():
             return 'terminated'
@@ -232,25 +280,31 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
         else:
             return None
 
-    def get_frequency(self, obj):
+    @staticmethod
+    def get_frequency(obj):
         status = obj.statuses.filter(is_current=True).first()
         if status:
             return status.frequency
         return None
 
-    def get_client(self, obj):
+    @staticmethod
+    def get_client(obj):
         return obj.project.submission.client
 
-    def get_support(self, obj):
+    @staticmethod
+    def get_support(obj):
         return UserSerializer(obj.support).data
 
-    def get_technology(self, obj):
+    @staticmethod
+    def get_technology(obj):
         return obj.project.submission.lead.primary_skill
 
-    def get_joining_date(self, obj):
+    @staticmethod
+    def get_joining_date(obj):
         return obj.project.start_date
 
-    def get_consultant(self, obj):
+    @staticmethod
+    def get_consultant(obj):
         data = {
             'name': obj.project.consultant.name,
             'email': obj.project.consultant.email,
@@ -267,5 +321,6 @@ class ProjectOrderSerializer(serializers.ModelSerializer):
         model = ProjectOrder
         fields = '__all__'
 
-    def get_attachments(self, obj):
+    @staticmethod
+    def get_attachments(obj):
         return AttachmentSerializer(obj.project.attachments.all(), many=True).data
