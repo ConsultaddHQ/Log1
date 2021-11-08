@@ -261,13 +261,12 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                     "type": 'project_update',
                 }
                 create_attachment(file_data)
-
             tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'create')
 
             # Activity
             desc = f"{request.user.employee_name} added update"
-            create_activity(update.id, 'projectupdate', request.user, desc, 'created')
+            create_activity(data['project'], 'projectupdate', request.user, desc, 'created')
             return Response({"message": "Update is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
