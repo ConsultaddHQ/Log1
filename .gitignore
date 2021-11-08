@@ -12,4 +12,4 @@
 **/migrations/*
 **/media/*
 models
-/marketing/fixtures
+/fixtures
