@@ -10,7 +10,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from engineering.serializers import *
-from marketing.utils import date_filter, submission_is_complete
+from marketing.utils import date_filter
 from activity.views import create_activity
 from engineering.utils import tag_and_notify
 from attachment.models import Attachment, create_attachment
@@ -57,7 +57,6 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         projects = projects.exclude(support=None)
                     if filters['assignment'] == 'unassigned':
                         projects = projects.filter(support=None)
-
 
                 if 'client' in filters:
                     projects = projects.filter(submission__client=filters['client'])
@@ -133,8 +132,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             total = projects.count()
             serializer = self.serializer_class(projects[first:last], many=True)
-            return Response({"data": datas, "total": total, "counts": counts}, status=200)
-
+            return Response({"data": serializer.data, "total": total, "counts": counts}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)

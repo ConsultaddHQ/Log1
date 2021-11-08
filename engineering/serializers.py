@@ -47,7 +47,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 elif support_status.frequency == 'more_than_2_days':
                     return "Active"
                 elif support_status.frequency == 'less_than_3_days':
-                    return "Less_Active"
+                    return "Less Active"
                 elif support_status.frequency in ('twice_a_month', 'independent'):
                     return "Independent"
                 else:
