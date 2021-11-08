@@ -133,15 +133,6 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             total = projects.count()
             serializer = self.serializer_class(projects[first:last], many=True)
-
-            datas = []
-            if "support_status" in filters:
-                for data in serializer.data:
-                    if data["support_status"].lower() == filters['support_status'].lower():
-                        datas.append(data)
-            else:
-                datas = serializer.data
-
             return Response({"data": datas, "total": total, "counts": counts}, status=200)
 
         except Exception as error:
