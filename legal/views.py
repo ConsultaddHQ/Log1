@@ -87,7 +87,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 )
             total = consultants.count()
             data = []
-            for consultant in consultants[first:last]:
+            for consultant in consultants.distinct('id')[first:last]:
                 petition = consultant.petitions.latest('created')
                 data.append({
                     'consultant': {
@@ -171,7 +171,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['post'], detail=False, url_path='extension')
     def extension(self, request):
         try:
-            Petition.objects.create(
+            petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
                 employer=request.data['employer'],
@@ -180,7 +180,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 petition_type=request.data['petition_type'],
                 beneficiary_type=request.data['beneficiary_type'],
             )
-            return Response({"message": "Extension created"}, status=201)
+            return Response({"message": "Extension created", "data": {"petition": petition.id}}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -250,7 +250,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['post'], detail=False, url_path='upload_doc')
     def upload_doc(self, request):
         try:
-            petition_id = request.data.get('petition')
+            consultant_id = request.data.get('consultant')
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+            petition_id = consultant.petitions.last().id
             file_type = request.data.get('file_type')
             for file in request.FILES.getlist('file'):
                 Document.objects.create(
@@ -303,19 +305,21 @@ class PetitionViewSets(viewsets.ModelViewSet):
             petition_type = petition.get_petition_type_display()
             if os.environ.get('ENV') == 'prod':
                 to = [beneficiary.email]
-                mail_data = {
-                    'to': to, 'cc': [], 'bcc': [],
-                    'template': '../templates/doc_upload_request.html',
-                    'subject': f'Your H1B process - Request for documents',
-                    'context': {
-                        'visa': petition_type,
-                        'pin': beneficiary.pin,
-                        'name': beneficiary.name,
-                        'petitioner_name': petition.assigned_to.employee_name,
-                        'link': f"https://{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
-                    },
-                }
-                send_email(mail_data, petition.assigned_to.email, request=request)
+            else:
+                to = ['sarang.m@consultadd.com']
+            mail_data = {
+                'to': to, 'cc': [], 'bcc': [],
+                'template': '../templates/doc_upload_request.html',
+                'subject': f'Your H1B process - Request for documents',
+                'context': {
+                    'visa': petition_type,
+                    'pin': beneficiary.pin,
+                    'name': beneficiary.name,
+                    'petitioner_name': petition.assigned_to.employee_name,
+                    'link': f"https://{os.environ.get('PETITION_DOMAIN')}/#/?email={beneficiary.email}",
+                },
+            }
+            send_email(mail_data, petition.assigned_to.email, request=request)
             petition.status = "doc_request_sent"
             petition.save()
             return Response({
@@ -567,6 +571,8 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     def create(self, request, *args, **kwargs):
         try:
             petition_id = request.data.get('petition')
+            petition = get_object_or_404(Petition, id=petition_id)
+            petition_id = petition.beneficiary.petitions.last().id
             file_type = request.data.get('file_type')
             for file in request.FILES.getlist('file'):
                 Document.objects.create(
