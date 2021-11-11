@@ -92,7 +92,7 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer')
+        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote')
 
     @staticmethod
     def get_marketer(obj):
@@ -143,11 +143,13 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_remote_consultant(obj):
-        return {
-            'id': obj.consultant.id,
-            'name': obj.consultant.name,
-            'email': obj.consultant.email,
-        }
+        if obj.is_remote:
+            return {
+                'id': obj.consultant.id,
+                'name': obj.consultant.name,
+                'email': obj.consultant.email,
+            }
+        return None
 
 
 class SupportSerializer(serializers.ModelSerializer):

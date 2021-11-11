@@ -32,9 +32,11 @@ class Command(BaseCommand):
                 <th style="padding:5px 8px 5px 8px;">Consultant</th>
                 <th style="padding:5px 8px 5px 8px;">Client</th>
                 <th style="padding:5px 8px 5px 8px;">Marketer</th>
+                <th style="padding:5px 8px 5px 8px;">Job Position</th>
                 </tr>"""
 
             for index, interview in enumerate(interviews):
+                position = interview.submission.lead.position.display_name
                 text += f"""<tr>
                                 <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.supervisor.employee_name} </td>
@@ -45,6 +47,7 @@ class Command(BaseCommand):
                                 <td style="padding:5px 8px 5px 8px;"> {interview.consultant.name} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.submission.client} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.marketer.employee_name} </td>
+                                <td style="padding:5px 8px 5px 8px;"> {position} </td>
                             </tr>"""
 
             data = {

@@ -47,7 +47,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     @staticmethod
     def fetch_scrum_masters(request):
         scrum_masters = list(User.objects.filter(
-            team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True
+            team=request.user.team, role__name__in=['admin', 'proxy'], account_login=True
         ).values_list('email', flat=True))
         return scrum_masters
 
@@ -276,11 +276,13 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             recruiter = consultant.recruiter
             retention = consultant.relation
-
-            cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
-            if recruiter:
+            if marketer.account_login:
+                cc = [marketer.email, config.SUPERADMIN] + scrum_master_email
+            else:
+                cc = [config.SUPERADMIN] + scrum_master_email
+            if recruiter and recruiter.account_login:
                 cc.append(recruiter.email)
-            if retention:
+            if retention and retention.account_login:
                 cc.append(retention.email)
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
@@ -813,24 +815,24 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 is_current=True, support=project_support, change_date=start, frequency='active',
             )
             to = [project.created_by.email]
-            mail_data = {
-                'template': '../templates/support_initiate.html',
-                'to': to, 'cc': cc, 'bcc': [],
-                'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
-                'context': {
-                    'marketer_name': submission.created_by.employee_name,
-                    'location': submission.lead.city, 'job_title': submission.lead.job_title,
-                    'consultant_phone_no': consultant.phone_no, 'start': project_start_date,
-                    'consultant_name': consultant.name, 'consultant_email': consultant.email,
-                    'client_name': submission.client, 'support_email': support.email, 'support_name': support.name
-                },
-            }
-
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email(mail_data, support.email, request=request)
-                if not msg:
-                    return res, "error"
+            # mail_data = {
+            #     'template': '../templates/support_initiate.html',
+            #     'to': to, 'cc': cc, 'bcc': [],
+            #     'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
+            #     'context': {
+            #         'marketer_name': submission.created_by.employee_name,
+            #         'location': submission.lead.city, 'job_title': submission.lead.job_title,
+            #         'consultant_phone_no': consultant.phone_no, 'start': project_start_date,
+            #         'consultant_name': consultant.name, 'consultant_email': consultant.email,
+            #         'client_name': submission.client, 'support_email': support.email, 'support_name': support.name
+            #     },
+            # }
+            #
+            # res = "Development Server"
+            # if os.environ.get('ENV', 'local') == 'prod':
+            #     res, msg = send_email(mail_data, support.email, request=request)
+            #     if not msg:
+            #         return res, "error"
             return Response({"message": "Support status is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
