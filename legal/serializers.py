@@ -4,12 +4,12 @@ from rest_framework import serializers
 from legal.models import Petition, Document, DocumentList, Reason
 
 
-class PetitionType(serializers.ModelSerializer):
+class PetitionTypeSerializer(serializers.ModelSerializer):
     petition_type = serializers.SerializerMethodField()
 
     class Meta:
-        model = Document
-        fields = ('id', 'petition_type')
+        model = Petition
+        fields = ('id', 'petition_type', 'status')
 
     @staticmethod
     def get_petition_type(obj):
@@ -123,7 +123,7 @@ class PetitionGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_docs(obj):
-        return DocumentSerializer(obj.documents.all(), many=True).data
+        return DocumentSerializer(obj.documents.filter(doc_type__category='Petition Document'), many=True).data
 
     @staticmethod
     def get_reasons(obj):

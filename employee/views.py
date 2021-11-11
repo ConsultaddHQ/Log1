@@ -1,3 +1,6 @@
+import os
+import json
+import requests
 from itertools import chain
 from datetime import timedelta, datetime
 
@@ -19,6 +22,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, \
     DestroyModelMixin
 
+from api_key.models import APIKey
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
@@ -636,8 +640,8 @@ class AssetsViewSets(viewsets.ModelViewSet):
 # Route - /users/
 class AllUsersViewSet(GenericViewSet, ListModelMixin):
     queryset = User.objects.all()
-    authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -731,3 +735,68 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
+
+
+# Route - /login/
+class LoginViewSet(GenericViewSet, CreateModelMixin):
+    queryset = User.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        result = {}
+        try:
+            api_key = request.data.get('api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+
+            data = {
+                "role": request.data.get('role'),
+                "name": request.data.get('name'),
+                "team": request.data.get('team'),
+                "email": request.data.get('email'),
+                "phone": request.data.get('phone', None),
+                "gender": request.data.get('gender').lower(),
+                "password": request.data.get('password').strip(),
+                "employee_id": int(request.data.get('employee_id')),
+            }
+
+            # Beats login
+            headers = {
+                "Content-Type": "application/json",
+            }
+            url = f"{os.environ.get('beats_url')}"
+            data['api_key'] = os.environ.get('beats_api_key')
+            response = requests.request('post', url=url, headers=headers, data=json.dumps(data))
+            if response.status_code == 201:
+                result["Beats"] = "Created"
+            else:
+                result["Beats"] = response.text
+
+            # India Beats login
+            url = f"{os.environ.get('india_beats_url')}"
+            data['api_key'] = os.environ.get('india_beats_api_key')
+            response = requests.request('post', url=url, headers=headers, data=json.dumps(data))
+            if response.status_code == 201:
+                result["India Beats"] = "Created"
+            else:
+                result["India Beats"] = response.text
+
+            # Log1 login
+            user = User.objects.filter(employee_id__exact=data["employee_id"])
+            if user:
+                result["Log1"] = str({"message": "User already exist"})
+                return Response({"message": result}, status=400)
+
+            team = get_object_or_404(Team, name=data['team'])
+            user = User.objects.create_user(
+                data["employee_id"], data["email"], data["name"], team,
+                data["gender"], data["phone"], data["password"]
+            )
+            r = Role.objects.get(name=data['role'])
+            user.role.add(r)
+            result["Log1"] = "Created"
+            return Response({"message": result}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": result, "error": str(error)}, status=400)

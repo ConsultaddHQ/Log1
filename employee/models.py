@@ -40,12 +40,12 @@ class UserManager(BaseUserManager):
             raise ValueError('Users must have an email address')
         email = self.normalize_email(email)
         user = self.model(
-            employee_id=int(employee_id),
-            username=int(employee_id),
-            email=email,
             team=team,
-            employee_name=name,
+            email=email,
             gender=gender,
+            employee_name=name,
+            username=int(employee_id),
+            employee_id=int(employee_id),
         )
 
         user.phone = phone

@@ -109,7 +109,7 @@ class ReceiveSMSViewSet(GenericViewSet):
                 if user1:
                     user1 = user1.first()
                 else:
-                    write_info(message=f"Asset not found to: {to}", function='receive_sms')
+                    write_info(message=f"Asset not found: {to}", function='receive_sms')
                     return HttpResponse(status=400)
                 conversation, created = Conversation.objects.get_or_create(user1_id=user1.id, user2=from_)
                 Message.objects.create(text=body, read=False, is_sent=False, conversation_id=conversation.id)

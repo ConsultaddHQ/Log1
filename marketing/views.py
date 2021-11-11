@@ -233,6 +233,7 @@ class LeadViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
+            lead = Lead.objects.get(id=kwargs.get('pk'))
             lead = Lead.objects.filter(id=kwargs.get('pk'))
             if lead:
                 data = self.get_data(lead)
@@ -662,7 +663,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     queryset = queryset.filter(client__in=filters['client'])
 
                 if 'incomplete' in filters:
-                    queryset = queryset.filter(is_complete=filters['incomplete'])
+                    queryset = queryset.exclude(is_complete=filters['incomplete'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     queryset = queryset.filter(created_by_id__in=filters['marketer'])
@@ -1130,12 +1131,12 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         queryset = queryset.filter(guest_type='coder')
 
                 if 'guest_type' in filters:
-                    if filters["guest_type"] == 'coding':
+                    if filters["guest_type"] in ['coding', 'assigned']:
                         queryset = queryset.filter(guest_type='coder')
                     if filters["guest_type"] == 'assistance':
                         queryset = queryset.filter(guest_type='assistance')
                     if filters["guest_type"] == 'all':
-                        queryset = queryset.filter(guest_type__in=['coder', 'assistance'])
+                        queryset = queryset.filter(guest_type__in=['coder', 'assistance', 'assigned'])
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1261,7 +1262,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     except Exception as error:
                         return Response({"message": "Calendar booking failed", "error": str(error)}, status=400)
 
-                # Mattermost message for Interview
+                # Teams message for Interview
                 if date.today() == interview.start_time.date():
                     data = {
                         "text": f" *{title}* ",
@@ -2604,14 +2605,23 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
 
+            is_video, is_offline, con_informed = False, False, False
+
+            if request.data.get('is_video', 'false') == "True":
+                is_video = True
+            if request.data.get('is_offline', 'false') == "True":
+                is_offline = True
+            if request.data.get('con_informed', 'false') == "True":
+                con_informed = True
+
             data = {
+                "is_video": is_video,
+                "is_offline": is_offline,
+                "con_informed": con_informed,
                 "link": request.data.get('link', None),
                 "deadline": request.data.get('deadline', None),
-                "is_video": request.data.get('is_video', False),
                 "skills": json.loads(request.data.get('skills')),
-                "is_offline": request.data.get('is_offline', False),
                 "con_timezone": request.data.get('con_timezone', None),
-                "con_informed": request.data.get('con_informed', False),
                 "additional_details": request.data.get('additional_details', None),
             }
             test = Test.objects.create(
@@ -2626,9 +2636,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             )
 
             # Activity
-            if data['is_video']:
+            if is_video:
                 desc = f"Video test created with deadline {str(test.deadline)}"
-            elif data['is_offline']:
+            elif is_offline:
                 desc = f"Offline test created with deadline {str(test.deadline)}"
             else:
                 desc = f"Test created with deadline {str(test.deadline)}"

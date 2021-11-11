@@ -23,7 +23,7 @@ from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceT
      ProjectOrderViewSet, ProjectSupportViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectDescriptionViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
-    AllUsersViewSet, HandoverViewSets
+    AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets, SubmissionV2ViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
@@ -34,6 +34,7 @@ from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, Consul
 router = DefaultRouter()
 schema_view = get_swagger_view(title='Log1')
 
+router.register(r'login', LoginViewSet)
 router.register(r'users', AllUsersViewSet)
 router.register(r'assets', AssetsViewSets)
 router.register(r'auth', EmployeeAuthViewSets)

@@ -24,7 +24,7 @@ from consultant.authentication import ConsultantPetitionTokenAuthentication
 from activity.serializers import ConsultantComment, ConsultantCommentGetSerializer
 from legal.models import Types, Petition, Reason, Document, DocumentList, PETITION_TYPES
 from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer, \
-    PetitionType
+    PetitionTypeSerializer
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
@@ -159,11 +159,35 @@ class PetitionViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path='documents')
     def documents(self, request):
         try:
+            data = dict()
             consultant_id = request.GET.get('consultant')
-            petitions = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
-            documents = Document.objects.filter(petition_id__in=petitions).exclude(doc_type__name='other')
-            serializer = DocumentSerializer(documents.all(), many=True)
-            return Response({"result": serializer.data}, status=200)
+            petition_ids = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
+            doc_types = DocumentList.objects.filter(petition_id__in=petition_ids).exclude(doc_type__category="Petition Document")
+            categories = Types.objects.exclude(category="Petition Document").order_by('category').distinct('category')
+            for category in categories:
+                data[category.category] = []
+            for i in doc_types:
+                documents = Document.objects.filter(petition_id__in=petition_ids, doc_type=i.doc_type)
+                if documents:
+                    document = documents.first()
+                    remark = document.remark
+                    if document.verified is None:
+                        verify_status = 'in_review'
+                    else:
+                        verify_status = "accepted" if document.verified else "rejected"
+                else:
+                    remark = None
+                    verify_status = "not_uploaded"
+                data[i.doc_type.category].append({
+                    "remark": remark,
+                    "id": i.doc_type.id,
+                    "name": i.doc_type.name,
+                    "status": verify_status,
+                    "category": i.doc_type.category,
+                    "value": i.doc_type.display_name,
+                    "docs": DocumentSerializer(documents, many=True).data,
+                })
+            return Response({"result": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -180,7 +204,9 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 petition_type=request.data['petition_type'],
                 beneficiary_type=request.data['beneficiary_type'],
             )
-            return Response({"message": "Extension created", "data": {"petition": petition.id}}, status=201)
+            return Response({"message": "Extension created", "data": {
+                "petition": petition.id, "status": petition.status
+            }}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -190,7 +216,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
         try:
             consultant_id = request.GET.get('consultant')
             petitions = Petition.objects.filter(beneficiary_id=consultant_id)
-            serializer = PetitionType(petitions, many=True)
+            serializer = PetitionTypeSerializer(petitions, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -213,44 +239,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='doc_types')
-    def doc_types(self, request, pk):
-        try:
-            data = dict()
-            doc_types = DocumentList.objects.filter(petition_id=pk)
-            categories = Types.objects.order_by('category').distinct('category')
-            for category in categories:
-                data[category.category] = []
-            for i in doc_types:
-                documents = Document.objects.filter(petition_id=pk, doc_type=i.doc_type)
-                if documents:
-                    document = documents.first()
-                    remark = document.remark
-                    if document.verified is None:
-                        verify_status = 'in_review'
-                    else:
-                        verify_status = "accepted" if document.verified else "rejected"
-                else:
-                    remark = None
-                    verify_status = "not_uploaded"
-                if i.doc_type.category:
-                    data[i.doc_type.category].append({
-                        "remark": remark,
-                        "id": i.doc_type.id,
-                        "name": i.doc_type.name,
-                        "status": verify_status,
-                        "category": i.doc_type.category,
-                        "value": i.doc_type.display_name,
-                    })
-            return Response({"results": data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
     @action(methods=['post'], detail=False, url_path='upload_doc')
     def upload_doc(self, request):
         try:
-            consultant_id = request.data.get('consultant')
+            consultant_id = request.GET.get('consultant')
             consultant = get_object_or_404(Consultant, id=consultant_id)
             petition_id = consultant.petitions.last().id
             file_type = request.data.get('file_type')
@@ -262,7 +254,7 @@ class PetitionViewSets(viewsets.ModelViewSet):
                     doc_type_id=file_type,
                     petition_id=petition_id,
                 )
-            documents = Document.objects.filter(petition=petition_id)
+            documents = Document.objects.filter(petition=petition_id).exclude(doc_type__category='Petition Document')
             serializer = DocumentSerializer(documents, many=True)
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
