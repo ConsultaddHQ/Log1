@@ -204,6 +204,10 @@ class PetitionViewSets(viewsets.ModelViewSet):
                 petition_type=request.data['petition_type'],
                 beneficiary_type=request.data['beneficiary_type'],
             )
+
+            for i in Types.objects.filter(category="Petition Document"):
+                DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
+
             return Response({"message": "Extension created", "data": {
                 "petition": petition.id, "status": petition.status
             }}, status=201)

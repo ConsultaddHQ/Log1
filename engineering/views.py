@@ -83,26 +83,64 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 )
 
             counts = {
-                "training": {
-                    "display_name": "Training",
-                    "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
-                                             support__statuses__frequency='more_than_2_days').count()
+                "support_status": {
+                    "training": {
+                        "display_name": "Training",
+                        "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
+                                                 support__statuses__frequency='more_than_2_days').count()
+                    },
+                    "active": {
+                        "display_name": "Active",
+                        "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
+                                                 support__statuses__frequency='more_than_2_days').count()
+                    },
+                    "less_active": {
+                        "display_name": "Less Active",
+                        "count": projects.filter(support__statuses__is_current=True,
+                                                 support__statuses__frequency='less_than_3_days').count()
+                    },
+                    "independent": {
+                        "display_name": "Independent",
+                        "count": projects.filter(
+                            support__statuses__is_current=True,
+                            support__statuses__frequency__in=['independent', 'twice_a_month']
+                        ).count()
+                    },
                 },
-                "active": {
-                    "display_name": "Active",
-                    "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
-                                             support__statuses__frequency='more_than_2_days').count()
-                },
-                "less_active": {
-                    "display_name": "Less Active",
-                    "count": projects.filter(support__statuses__is_current=True,
-                                             support__statuses__frequency='less_than_3_days').count()
-                },
-                "independent": {
-                    "display_name": "Independent",
-                    "count": projects.filter(support__statuses__is_current=True,
-                                             support__statuses__frequency__in=['independent', 'twice_a_month']).count()
-                },
+                "project_status": {
+                    "new": {
+                        "display_name": "New",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='new').count(),
+                    },
+                    "received": {
+                        "display_name": "Received",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='received').count(),
+                    },
+                    "on_boarded": {
+                        "display_name": "On Boarded",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='on_boarded').count(),
+                    },
+                    "joined": {
+                        "display_name": "Joined",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='joined').count(),
+                    },
+                    "complete": {
+                        "display_name": "Complete",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='complete').count(),
+                    },
+                    "cancelled": {
+                        "display_name": "Cancelled",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='cancelled').count(),
+                    },
+                    "terminated": {
+                        "display_name": "Terminated",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='terminated').count(),
+                    }
+                }
             }
 
             if filter_json:
@@ -254,9 +292,9 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             tag_and_notify(update, tags, request.user, 'create')
 
             # Activity
-            desc = f"{request.user.employee_name} added update"
+            desc = f"{request.user.employee_name} added project Update-{update.id}"
             create_activity(data['project'], 'projectupdate', request.user, desc, 'created')
-            return Response({"message": "Update is added"}, status=201)
+            return Response({"message": "Project Update is added successfully"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -272,10 +310,10 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             tag_and_notify(update, tags, request.user, 'update')
 
             # Activity
-            desc = f"{request.user.employee_name} edited update"
+            desc = f"{request.user.employee_name} edited project Update-{update.id}"
             create_activity(update.project.id, 'projectupdate', request.user, desc, 'update')
 
-            return Response({"message": "Update is edited"}, status=202)
+            return Response({"message": "Project update is edited successfully"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -284,7 +322,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='add_document')
-    def add_document(self, request, id, pk):
+    def add_document(self, request, project_id, pk):
         try:
             update = get_object_or_404(ProjectUpdate, id=pk)
             file_data = {
@@ -305,7 +343,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='remove_document')
-    def remove_document(self, request, id, pk):
+    def remove_document(self, request, project_id, pk):
         try:
             update = get_object_or_404(ProjectUpdate, id=pk)
             attachment = get_object_or_404(Attachment, id=request.data.get('attachment_id'))
@@ -348,6 +386,7 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
             serializer = self.serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
             # Activity
             desc = f"{request.user.employee_name} added project description"
             create_activity(serializer.data['id'], 'projectdescription', request.user, desc, 'create')

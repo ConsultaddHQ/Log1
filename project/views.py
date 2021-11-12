@@ -29,7 +29,7 @@ from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from utils_app.mailing import send_email_attachment_multiple, send_email
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
-from notification.utils import create_notification, push_notification, push_notification_consultant
+from notification.utils import push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status
@@ -630,6 +630,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
     @action(methods=['get'], detail=False, url_path="mail_to_onboard")
     def mail_to_onboard(self, request):
         try:
+            path = []
             project_id = request.GET.get('project_id', None)
             if project_id:
 
@@ -643,8 +644,6 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 if prev_status.status == 'on_boarded':
                     po_type = 'updated'
 
-                path = []
-
                 for i in project.attachments.filter(
                         attachment_type__in=['work_order_signed', 'work_order_msa_signed', 'msa_signed']):
                     try:
@@ -656,6 +655,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 res, error = 'development server', 'development server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     res, error = self.po_mail(project, path, self.fetch_scrum_masters(request), po_type, request)
+
                 delete_temp_file(path)
                 if not error == 'error':
                     project.submission.consultant_marketing.status = 'close'
@@ -670,9 +670,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                         if created:
                             prev_status.is_current = False
                             prev_status.save()
-                        desc = "Purchase order status is updated to Onboarded and Onboarding mail is sent"
 
                         # Activity
+                        desc = "Purchase order status is updated to Onboarded and Onboarding mail is sent"
                         create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
                     return Response({"message": "On-boarding mail sent", "error": res}, status=200)
                 return Response({"data": str(res)}, status=400)
@@ -783,7 +783,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path="status")
-    def status(self, request, id, pk):
+    def status(self, request, project_id, pk):
         try:
             support = get_object_or_404(ProjectSupport, id=pk)
             status = request.data.get('status')
@@ -803,46 +803,51 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=False, url_path="initiate")
-    def initiate(self, request, pk):
+    def initiate(self, request, project_id):
         try:
-            project = get_object_or_404(Project, id=pk)
+            start = request.data.get('start')
+            project = get_object_or_404(Project, id=project_id)
             support_id = request.data.get('support', None)
             support = get_object_or_404(User, id=support_id)
-            start = request.data.get('start')
 
             project_support = ProjectSupport.objects.create(project=project, support=support, start=start)
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency='active',
             )
-            to = [project.created_by.email]
-            # mail_data = {
-            #     'template': '../templates/support_initiate.html',
-            #     'to': to, 'cc': cc, 'bcc': [],
-            #     'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
-            #     'context': {
-            #         'marketer_name': submission.created_by.employee_name,
-            #         'location': submission.lead.city, 'job_title': submission.lead.job_title,
-            #         'consultant_phone_no': consultant.phone_no, 'start': project_start_date,
-            #         'consultant_name': consultant.name, 'consultant_email': consultant.email,
-            #         'client_name': submission.client, 'support_email': support.email, 'support_name': support.name
-            #     },
-            # }
-            #
-            # res = "Development Server"
-            # if os.environ.get('ENV', 'local') == 'prod':
-            #     res, msg = send_email(mail_data, support.email, request=request)
-            #     if not msg:
-            #         return res, "error"
-            return Response({"message": "Support status is updated"}, status=202)
+            submission = project.submission
+            consultant = project.submission.consultant
+            if os.environ.get('ENV', 'local') == 'prod':
+                to = [project.created_by.email, support.email]
+                cc = ['engineering@consultadd.com']
+            else:
+                to = ['sarang.m@consultadd.com']
+                cc = []
+            mail_data = {
+                'template': '../templates/support_initiate.html',
+                'to': to, 'cc': cc, 'bcc': [],
+                'subject': f"{consultant.name}'s support initiated for  {project.submission.client} by"
+                           f" {support.employee_name}",
+                'context': {
+                    'start': project.start_date, 'support_name': support.employee_name, 'client': submission.client,
+                    'marketer_name': submission.created_by.employee_name, 'support_email': support.email,
+                    'location': submission.lead.city, 'job_title': submission.lead.job_title,
+                    'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                },
+            }
+
+            res, msg = send_email(mail_data, support.email, request=request)
+            if not msg:
+                return Response({"message": "Unable to send mail"}, status=400)
+            return Response({"message": "Support is initiated", "result": res}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=True, url_path="remove")
-    def remove_support(self, request, *args, **kwargs):
+    def remove_support(self, request, project_id, pk):
         try:
             if 'admin' in request.user.roles and 'engineer' in request.user.roles:
-                support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
+                support = get_object_or_404(ProjectSupport, id=pk)
                 support.delete()
                 return Response({"message": "Support is removed"}, status=202)
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
