@@ -1566,9 +1566,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
             title = get_interview_title(interview)
 
             # Activity
-            est = pytz.timezone('US/Eastern')
-            end = interview.end_time.astimezone(est)
-            start = interview.start_time.astimezone(est)
+            # est = pytz.timezone('US/Eastern')
+            # end = interview.end_time.astimezone(est)
+            # start = interview.start_time.astimezone(est)
+            end = interview.end_time
+            start = interview.start_time
             desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: {start.time()} " \
                    f"to {end.date()} :: {end.time()}"
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
