@@ -233,10 +233,9 @@ class LeadViewSets(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            lead = Lead.objects.get(id=kwargs.get('pk'))
-            lead = Lead.objects.filter(id=kwargs.get('pk'))
-            if lead:
-                data = self.get_data(lead)
+            queryset = Lead.objects.filter(id=kwargs.get('pk'))
+            if queryset:
+                data = self.get_data(queryset)
                 return Response({"data": data[0]}, status=200)
             return Response({"data": dict()}, status=200)
         except Exception as error:
@@ -1126,17 +1125,19 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 if 'assignment' in filters:
                     if filters["assignment"] == 'assigned':
-                        queryset = queryset.filter(guest_type='assigned')
+                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
                     if filters["assignment"] == 'unassigned':
-                        queryset = queryset.filter(guest_type='coder')
+                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
 
                 if 'guest_type' in filters:
                     if filters["guest_type"] in ['coding', 'assigned']:
-                        queryset = queryset.filter(guest_type='coder')
+                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
                     if filters["guest_type"] == 'assistance':
-                        queryset = queryset.filter(guest_type='assistance')
+                        queryset = queryset.filter(guest_type='assistance').exclude(status='cancelled')
                     if filters["guest_type"] == 'all':
-                        queryset = queryset.filter(guest_type__in=['coder', 'assistance', 'assigned'])
+                        queryset = queryset.filter(
+                            guest_type__in=['coder', 'assistance', 'assigned']
+                        ).exclude(status='cancelled')
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1180,9 +1181,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             change_to_feedback_due()
 
             submission_id = request.data.get('submission', None)
-            if not submission_id:
-                return Response({"message": 'Missing Submission ID'}, status=400)
-
             submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
             if not submissions:
                 return Response({"message": 'This is not your submission'}, status=400)
@@ -1190,8 +1188,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
             # calculating Interview round
             round_count = 0
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(status='cancelled')
-            if prev_interview and prev_interview.first().status not in ['cancelled', 'next_round']:
-                return Response({"message": "Change status of previous interview first"}, status=400)
+            if prev_interview and prev_interview.first().status == 'next_round':
+                return Response({"message": "Update status of previous interview first"}, status=400)
 
             if prev_interview:
                 round_count = prev_interview.aggregate(Max('round'))['round__max']
@@ -1223,44 +1221,32 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 if interview.round == 1:
                     interview = self.rank_interviews(interview, 'create')
 
-                # Calendar title
-                title = get_interview_title(interview)
-
                 # Calendar attendees and User for sending notification
+                title = get_interview_title(interview)
                 user_list, attendees = get_users_and_attendees(request, interview)
-
-                # Calendar booking start and end time
                 end_time = datetime.strptime(str(interview.end_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
                 start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
                 event = {
-                    "end": end_time,
-                    "summary": title,
-                    "start": start_time,
-                    "user": request.user,
-                    "attendees": attendees,
-                    "lead": submission.lead,
-                    "submission": submission,
-                    "consultant": interview.consultant,
-                    "description": interview.description,
-                    "call_details": interview.call_details,
+                    "end": end_time, "summary": title, "start": start_time,
+                    "submission": submission, "consultant": interview.consultant,
+                    "user": request.user, "attendees": attendees, "lead": submission.lead,
+                    "description": interview.description, "call_details": interview.call_details,
                 }
 
                 # Booking MS calendar
-                booking_res = 'Development Server'
-                if os.environ.get('ENV', 'local') == 'prod':
-                    try:
-                        calendar = Calendar(request=request)
-                        cal_res, msg = calendar.book_ms_calendar(event)
-                        if msg == 'error':
-                            return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
+                try:
+                    calendar = Calendar(request=request)
+                    cal_res, msg = calendar.book_ms_calendar(event)
+                    if msg == 'error':
+                        return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
-                        interview.calendar_id = cal_res['id']
-                        booking_res = 'booked'
-                        interview.save()
-                    except Exception as error:
-                        return Response({"message": "Calendar booking failed", "error": str(error)}, status=400)
+                    interview.calendar_id = cal_res['id']
+                    booking_res = 'booked'
+                    interview.save()
+                except Exception as error:
+                    return Response({"message": "Calendar booking failed", "error": str(error)}, status=400)
 
                 # Teams message for Interview
                 if date.today() == interview.start_time.date():
@@ -1313,7 +1299,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 return Response({"message": "Invalid value of status, Please select status"}, status=400)
 
             if interview_status == 'cancelled':
-                return Response({"message": "Interview is not cancelled."}, status=400)
+                return Response({"message": "Interview can't be cancelled."}, status=400)
 
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
             if not queryset:
@@ -1328,7 +1314,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 if status_change == 'false' and prev_status == 'cancelled':
                     interview.status = 'scheduled'
                     interview.save()
-                    desc = f"Interview round {interview.round} is scheduled again"
 
                 # Setting Submission is_active value
                 submission = interview.submission
@@ -1352,56 +1337,39 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                         "%Y-%m-%dT%H:%M:%S")
                     event = {
-                        "end": end_time,
-                        "summary": title,
-                        "start": start_time,
-                        "user": request.user,
-                        "attendees": attendees,
-                        "lead": submission.lead,
-                        "submission": submission,
-                        "consultant": submission.consultant,
-                        "description": request.data["description"],
-                        "call_details": request.data["call_details"]
+                        "user": request.user, "attendees": attendees,
+                        "lead": submission.lead, "submission": submission,
+                        "start": start_time, "consultant": submission.consultant,
+                        "end": end_time, "description": request.data["description"],
+                        "summary": title, "call_details": request.data["call_details"],
                     }
 
                     # Updating calendar Booking
-                    booking_res = 'Development Server'
-                    if os.environ.get('ENV', 'local') == 'prod':
-                        calendar_id = interview.calendar_id
-                        calendar = Calendar(request=request)
-                        if not calendar_id:
-                            res, msg = calendar.book_ms_calendar(event)
-                            if msg == 'error':
-                                return Response({"message": "Calendar booking failed", "error": res},
-                                                status=400)
+                    calendar_id = interview.calendar_id
+                    calendar = Calendar(request=request)
+                    if not calendar_id:
+                        res, msg = calendar.book_ms_calendar(event)
+                        if msg == 'error':
+                            return Response({"message": "Calendar booking failed", "error": res}, status=400)
+
+                        interview.calendar_id = res['id']
+                        booking_res = 'booked'
+                        interview.save()
+                    else:
+                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        if msg == 'booked':
                             interview.calendar_id = res['id']
-                            booking_res = 'booked'
+                            booking_res = 'updated'
                             interview.save()
-                        else:
-                            try:
-                                res, msg = calendar.update_ms_calendar(calendar_id, event)
-                                booking_res = 'updated'
-                                if msg == 'booked':
-                                    interview.calendar_id = res['id']
-                                    booking_res = 'booked'
-                                    interview.save()
-                                if msg == "error":
-                                    return Response({"message": "Calendar update failed", "error": res},
-                                                    status=400)
-                            except Exception as error:
-                                write_exception(f"Booking update failed: {error}", request)
-                                return Response(
-                                    {"message": "Calendar booking update failed", "error": str(error)}, status=400
-                                )
+                        if msg == "error":
+                            return Response({"message": "Calendar update failed", "error": res}, status=400)
 
                 if interview.guest_type in ['coder', 'assistance'] and (
                         pre_guest_type == 'not_required' or pre_guest_type is None):
-                    title = "Coding request"
-                    coder_request_notification(request.user, interview, title)
+                    coder_request_notification(request.user, interview, "Coding request")
 
                 if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
-                    title = "Coding not required for this Interview"
-                    coder_request_notification(request.user, interview, title)
+                    coder_request_notification(request.user, interview, "Coding not required for this Interview")
                     interview.guest.clear()
 
                 # Activity
@@ -1519,9 +1487,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     submission.status = 'in_offer'
                 submission.save()
 
+                title = get_interview_title(interview)
                 booking_res = 'Interview Status Updated'
                 user_list, _ = get_users_and_attendees(request, interview)
-                title = get_interview_title(interview)
                 desc = f"Round {interview.round} status is changed from {prev_status} to "
                 if interview.status not in ['cancelled']:
                     if interview.status == 'next_round':
@@ -1537,12 +1505,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                         interview_status_emoji = "&#128078;"
                         desc = "Failed"
 
-                    text = f"""*{title} ({interview_status})* <br>"""
-                    text += interview.feedback
-
                     data = {
-                        "text": text,
                         "title": f"""{interview_status_emoji} Interview Feedback """,
+                        "text": f"""*{title} ({interview_status})* <br>""" + interview.feedback,
                     }
                     post_msg_using_webhook(config.interview_feedback_url, data)
 
@@ -1583,7 +1548,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
         try:
             queryset = Interview.objects.filter(id=pk, submission__created_by=request.user)
             if not queryset:
-                return Response({"message": "Interview not found"}, status=404)
+                return Response({"message": "This is not your Interview"}, status=404)
 
             interview = queryset.first()
             prev_guest_type = interview.guest_type
@@ -1596,7 +1561,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.guest.clear()
                 interview.save()
 
-            booking_res = 'error'
             submission = interview.submission
             user_list, attendees = get_users_and_attendees(request, interview)
             title = get_interview_title(interview)
@@ -1615,45 +1579,37 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
                 event = {
-                    "end": end_time,
-                    "summary": title,
-                    "start": start_time,
-                    "user": request.user,
-                    "attendees": attendees,
-                    "lead": submission.lead,
-                    "submission": submission,
-                    "consultant": submission.consultant,
-                    "description": request.data["description"],
-                    "call_details": request.data["call_details"]
+                    "lead": submission.lead, "submission": submission, "consultant": submission.consultant,
+                    "call_details": request.data["call_details"], "user": request.user, "attendees": attendees,
+                    "end": end_time, "description": request.data["description"], "start": start_time, "summary": title,
                 }
 
                 # Updating calendar Booking
-                if os.environ.get('ENV', 'local') == 'prod':
-                    calendar_id = interview.calendar_id
-                    calendar = Calendar(request=request)
-                    if not calendar_id:
-                        try:
-                            cal_res, msg = calendar.book_ms_calendar(event)
-                            if msg == "error":
-                                return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
+                calendar_id = interview.calendar_id
+                calendar = Calendar(request=request)
+                if not calendar_id:
+                    try:
+                        cal_res, msg = calendar.book_ms_calendar(event)
+                        if msg == "error":
+                            return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
-                            interview.calendar_id = cal_res['id']
+                        interview.calendar_id = cal_res['id']
+                        booking_res = 'booked'
+                        interview.save()
+                    except Exception as error:
+                        return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
+                else:
+                    try:
+                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        booking_res = 'updated'
+                        if msg == 'booked':
+                            interview.calendar_id = res['id']
                             booking_res = 'booked'
                             interview.save()
-                        except Exception as error:
-                            return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
-                    else:
-                        try:
-                            res, msg = calendar.update_ms_calendar(calendar_id, event)
-                            booking_res = 'updated'
-                            if msg == 'booked':
-                                interview.calendar_id = res['id']
-                                booking_res = 'booked'
-                                interview.save()
-                            if msg == 'error':
-                                return Response({"message": "Calendar reschedule failed", "error": res}, status=400)
-                        except Exception as error:
-                            return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
+                        if msg == 'error':
+                            return Response({"message": "Calendar reschedule failed", "error": res}, status=400)
+                    except Exception as error:
+                        return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
 
                 # Activity
                 desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: {start.time()} " \
@@ -1662,8 +1618,8 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
                 if date.today() <= interview.start_time.date():
                     data = {
+                        "text": title,
                         "title": "&#9201; Interview Rescheduled",
-                        "text": title
                     }
                     post_msg_using_webhook(config.announcement_url, data)
 
@@ -1696,16 +1652,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                          'screening_type', 'interview_mode')
 
                 notification_data = {
-                    'category': 'info',
-                    'description': title,
-                    'target_id': interview.id,
-                    'parent_id': submission.id,
-                    'sender_user_type': 'user',
-                    'target_type': 'interview',
-                    'parent_type': 'submission',
-                    'title': 'Interview Updated',
-                    'sender_id': request.user.id,
-                    'recipient_user_type': 'user',
+                    'parent_id': submission.id, 'sender_user_type': 'user', 'target_type': 'interview',
+                    'parent_type': 'submission', 'title': 'Interview Updated', 'sender_id': request.user.id,
+                    'category': 'info', 'description': title, 'target_id': interview.id, 'recipient_user_type': 'user',
                 }
                 create_notification(user_list, notification_data)
                 return Response({"data": data[0], "calendar": booking_res, "message": "Interview updated"}, status=202)
@@ -1717,14 +1666,13 @@ class InterviewViewSets(viewsets.ModelViewSet):
     def cancel_interview(self, request, pk):
         try:
             interview = get_object_or_404(Interview, id=pk, submission__created_by=request.user)
-            if os.environ.get('ENV', 'local') == 'prod':
-                try:
-                    if interview.calendar_id:
-                        calendar = Calendar(request=request)
-                        calendar.delete_ms_calendar(interview.calendar_id)
-                except Exception as error:
-                    write_exception(f"Booking cancellation failed: {error}", request)
-                    return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
+            try:
+                if interview.calendar_id:
+                    calendar = Calendar(request=request)
+                    calendar.delete_ms_calendar(interview.calendar_id)
+            except Exception as error:
+                write_exception(f"Booking cancellation failed: {error}", request)
+                return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
 
             interview.feedback = request.data.get('feedback', None)
             interview.status = 'cancelled'
@@ -2775,10 +2723,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # message to channel
             current_time = datetime.strftime(datetime.utcnow(), "%H:%M:%S")
             if "14:30:00" < current_time < "23:30:00":
+                consultant_name = submission.consultant.name
                 assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
                 text = f"Test Assigned to :- {assigned} <br>"
                 data = {
-                    "title": f"&#128203; Test Assigned :: {submission.consultant.name} :: {submission.client} :: {skills} <br>",
+                    "title": f"&#128203; Test Assigned :: {consultant_name} :: {submission.client} :: {skills} <br>",
                     "text": text
                 }
                 post_msg_using_webhook(config.engineering_url, data)

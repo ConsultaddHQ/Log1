@@ -162,7 +162,7 @@ def coder_request_notification(user, interview, title):
             "@type": "MessageCard",
             "themeColor": "#0076D7",
             "@context": "http://schema.org/extensions",
-            "summary": f"Coding expert request for Interview ",
+            "summary": f"Coding assignment",
             "sections": [
                 {
                     "activityTitle": title,

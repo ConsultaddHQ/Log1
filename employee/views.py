@@ -181,6 +181,60 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['post'], detail=False, url_path='bulk_register')
+    def bulk_register(self, request, *args, **kwargs):
+        try:
+            import pandas as pd
+            file = request.FILES.get('file')
+            file_extension = file.name.split(".")[-1]
+            if file_extension == 'csv':
+                df = pd.read_csv(file, encoding="ISO-8859-1", skip_blank_lines=False)
+            elif file_extension == 'xlsx':
+                df = pd.read_excel(file)
+            else:
+                return Response({"message": "File format not supported"}, status=400)
+
+            created, failed, already = 0, 0, 0
+            error = ""
+            for index, row in df.iterrows():
+                if pd.isnull(row["employee_id"]):
+                    break
+                try:
+                    user = User.objects.filter(employee_id__exact=row["employee_id"])
+                    if user:
+                        already += 1
+                    else:
+                        team = Team.objects.get(name=row['team'])
+                        user = User.objects.create_user(
+                            team=team,
+                            email=row["email"],
+                            phone=row['phone'],
+                            gender=row['gender'],
+                            employee_name=row["name"],
+                            username=int(row["employee_id"]),
+                            employee_id=int(row["employee_id"]),
+                        )
+                        user.set_password(row['password'])
+                        user.save()
+                        role = Role.objects.get(name=row['role'])
+                        user.role.add(role)
+                        created += 1
+                except Exception as e:
+                    failed += 1
+                    error += f"{row} \n"
+                    write_exception(f"{row['employee_id']}, {e}", request)
+                    continue
+            data = {
+                "error": error,
+                "Failed": failed,
+                "Created": created,
+                "Already Exist": already,
+            }
+            return Response({"message": "Success", "data": data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['put'], detail=False, url_path='profile')
     def profile(self, request):
         try:
@@ -761,10 +815,9 @@ class LoginViewSet(GenericViewSet, CreateModelMixin):
                 "employee_id": int(request.data.get('employee_id')),
             }
 
+            headers = {"Content-Type": "application/json"}
+
             # Beats login
-            headers = {
-                "Content-Type": "application/json",
-            }
             url = f"{os.environ.get('beats_url')}"
             data['api_key'] = os.environ.get('beats_api_key')
             response = requests.request('post', url=url, headers=headers, data=json.dumps(data))

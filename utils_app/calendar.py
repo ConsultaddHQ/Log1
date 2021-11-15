@@ -104,63 +104,69 @@ class Calendar:
 
     def book_ms_calendar(self, data):
         try:
-            headers = self.get_ms_header()
-            if not headers:
-                return False, "error"
-            event = self.get_ms_body(data)
+            if os.environ.get('ENV', 'local') == 'prod':
+                headers = self.get_ms_header()
+                if not headers:
+                    return False, "error"
+                event = self.get_ms_body(data)
 
-            url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/"
-            response = requests.post(url, headers=headers, data=event)
-            data = json.loads(response.text.encode('utf-8'))
-            if response.status_code == 201:
-                return data, "ok"
-            else:
-                write_info(message=data, function='book_ms_calendar', request=self.request)
-                return str(data), "error"
+                url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/"
+                response = requests.post(url, headers=headers, data=event)
+                data = json.loads(response.text.encode('utf-8'))
+                if response.status_code == 201:
+                    return data, "ok"
+                else:
+                    write_info(message=data, function='book_ms_calendar', request=self.request)
+                    return str(data), "error"
+            return {"id": "Calendar ID"}, "ok"
         except Exception as error:
             write_exception(message=error, request=self.request)
             return str(error), "error"
 
     def update_ms_calendar(self, event_id, data):
         try:
-            headers = self.get_ms_header()
-            if not headers:
-                return False, "error"
+            if os.environ.get('ENV', 'local') == 'prod':
+                headers = self.get_ms_header()
+                if not headers:
+                    return False, "error"
 
-            event = self.get_ms_body(data)
-            url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
-            response = requests.patch(url, headers=headers, data=event)
-            response_data = json.loads(response.text.encode('utf-8'))
-            if response.status_code == 200:
-                return response_data, "updated"
-            if response.status_code == 404:
-                response_data, msg = self.book_ms_calendar(data)
-                if msg == 'ok':
-                    return response_data, "booked"
+                event = self.get_ms_body(data)
+                url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
+                response = requests.patch(url, headers=headers, data=event)
+                response_data = json.loads(response.text.encode('utf-8'))
+                if response.status_code == 200:
+                    return response_data, "updated"
+                if response.status_code == 404:
+                    response_data, msg = self.book_ms_calendar(data)
+                    if msg == 'ok':
+                        return response_data, "booked"
+                    else:
+                        write_info(message=response_data, function='update_ms_calendar', request=self.request)
+                        return str(response_data), "error"
                 else:
                     write_info(message=response_data, function='update_ms_calendar', request=self.request)
                     return str(response_data), "error"
-            else:
-                write_info(message=response_data, function='update_ms_calendar', request=self.request)
-                return str(response_data), "error"
+            return {"id": "Calendar ID"}, "booked"
         except Exception as error:
             write_exception(message=error, request=self.request)
             return str(error), "error"
 
     def delete_ms_calendar(self, event_id):
         try:
-            headers = self.get_ms_header()
-            if not headers:
-                return False, "error"
+            if os.environ.get('ENV', 'local') == 'prod':
+                headers = self.get_ms_header()
+                if not headers:
+                    return False, "error"
 
-            url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
-            response = requests.delete(url, headers=headers)
-            if response.status_code == 204:
-                return True, "ok"
-            else:
-                response_data = json.loads(response.text.encode('utf-8'))
-                write_info(message=response_data, function='delete_ms_calendar', request=self.request)
-                return False, "error"
+                url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
+                response = requests.delete(url, headers=headers)
+                if response.status_code == 204:
+                    return True, "ok"
+                else:
+                    response_data = json.loads(response.text.encode('utf-8'))
+                    write_info(message=response_data, function='delete_ms_calendar', request=self.request)
+                    return False, "error"
+            return True, "ok"
         except Exception as error:
             write_exception(message=error, request=self.request)
             return str(error), "error"

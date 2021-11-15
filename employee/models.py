@@ -42,13 +42,13 @@ class UserManager(BaseUserManager):
         user = self.model(
             team=team,
             email=email,
+            phone=phone,
             gender=gender,
             employee_name=name,
             username=int(employee_id),
             employee_id=int(employee_id),
         )
 
-        user.phone = phone
         user.set_password(password)
         user.is_active = True
         user.save()

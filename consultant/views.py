@@ -53,8 +53,6 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
             consultants = consultants.filter(
                 status__in=['on_bench', 'on_project'], marketing__status='open'
-            ).union(
-                consultants.exclude(status__in=['on_bench', 'on_project'], marketing__status='open')
             )
 
             status_obj = sub_data["status_obj"]
