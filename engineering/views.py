@@ -253,7 +253,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
 
     def list(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('id'))
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
             serializer = ProjectUpdateGetSerializer(project.updates.all(), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -272,7 +272,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def create(self, request, *args, **kwargs):
         try:
             data = request.data.copy()
-            data['project'] = kwargs.get('id')
+            data['project'] = kwargs.get('project_id')
             data['update_by'] = request.user.id
             serializer = self.serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
@@ -369,7 +369,7 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
 
     def list(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('id'))
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
             if hasattr(project, 'description'):
                 serializer = self.serializer_class(project.description)
                 return Response({"data": serializer.data}, status=200)
@@ -381,7 +381,7 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
     def create(self, request, *args, **kwargs):
         try:
             data = request.data.copy()
-            data['project'] = kwargs.get('id')
+            data['project'] = kwargs.get('project_id')
             data['update_by'] = request.user.id
             serializer = self.serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)

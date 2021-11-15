@@ -18,13 +18,12 @@ class AddressLogMiddleware:
         address = request.META['REMOTE_ADDR']
         request_path = str(getattr(request, 'path', ''))
         method = str(getattr(request, 'method', '')).upper()
-        if os.environ.get('ENV', 'local') == 'prod':
-            if str(request.user) == "AnonymousUser":
-                logger.info(f"{method} :: {address} :: {request_path} :: 1")
+        if str(request.user) == "AnonymousUser":
+            logger.info(f"{method} :: {address} :: {request_path} :: 1")
+        else:
+            if hasattr(request.user, "name"):
+                logger.info(f"Consultant :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
+                            f"{request.user.name}")
             else:
-                if hasattr(request.user, "name"):
-                    logger.info(f"Consultant :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
-                                f"{request.user.name}")
-                else:
-                    logger.info(f"Employee :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
-                                f"{request.user.employee_name}")
+                logger.info(f"Employee :: {method} :: {address} :: {request_path} :: {request.user.id} :: "
+                            f"{request.user.employee_name}")
