@@ -38,7 +38,7 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
             return Response({"message": {'success': False, 'message': str(error)}}, status=400)
 
     @action(methods=['get'], detail=False, url_path='users')
-    def users(self, request, *args, **kwargs):
+    def users(self, request):
         try:
             if request.user.is_superuser:
                 users = User.objects.exclude(role__name='consultant')

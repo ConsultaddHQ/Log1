@@ -65,7 +65,6 @@ INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 AUTH_USER_MODEL = 'employee.User'
 
 MIDDLEWARE = [
-    'log1.middleware.AddressLogMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -74,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'log1.middleware.AddressLogMiddleware',
 ]
 
 ROOT_URLCONF = 'log1.urls'
@@ -90,6 +90,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                'staticfiles': 'django.templatetags.static',
+            }
         },
     },
 ]
@@ -115,7 +118,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'}
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
+    )
+}
 
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
@@ -131,6 +140,31 @@ CORS_ALLOW_HEADERS = [
     'accept-encoding',
     'x-requested-with',
 ]
+
+# Swagger
+SWAGGER_SETTINGS = {
+    "exclude_namespaces": [],
+    "api_version": '2.0',
+    "api_path": "/",
+    "enabled_methods": [
+        'get',
+        'post',
+        'put',
+        'delete'
+    ],
+    'SECURITY_DEFINITIONS': {
+        "apiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Token Authentication"
+        }
+    },
+
+    "api_key": '',
+    "is_superuser": False,
+    'USE_SESSION_AUTH': True,
+    "is_authenticated": True,
+}
 
 # Send Grid Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -176,8 +210,6 @@ PUBLIC_MEDIA_LOCATION = 'media'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
 DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 
-MODELS_PATH = os.path.join(BASE_DIR, 'models')
-
 # Password Reset Token Expiry Time
 RESET_TOKEN_EXPIRY_TIME = 1
 
@@ -191,7 +223,7 @@ logging.config.dictConfig({
             'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
         },
         'address_format': {
-            'format': '%(message)s :: %(asctime)s'
+            'format': '%(asctime)s %(levelname)-5s %(message)s'
         },
     },
     'handlers': {
@@ -206,7 +238,7 @@ logging.config.dictConfig({
             'formatter': 'file',
             'maxBytes': 10485760,
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': f"{os.path.join(BASE_DIR, 'logs/debug.log')}",
+            'filename': f"{os.path.join(BASE_DIR, 'logs/error.log')}",
         },
         'access': {
             'level': 'INFO',

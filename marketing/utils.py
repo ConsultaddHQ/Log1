@@ -12,7 +12,7 @@ from log1.utils import write_info, write_exception, post_msg_using_webhook
 
 
 def vendor_account_manager(vendor_company):
-    file = open('fixtures/am_config.json', 'r')
+    file = open('../fixtures/am_config.json', 'r')
     data = json.loads(file.read())
     vendor_company = vendor_company.replace(" ", "").replace(",", "").replace("-", "").replace("_", "").lower()
     for email, vendors in data.items():
@@ -26,19 +26,27 @@ def get_scrum_masters(request):
 
 
 def get_users_and_attendees(request, interview):
-    user_list = [interview.supervisor]
-    attendees = [{'email': interview.supervisor.email}, {'email': request.user.email}]
-    scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
+    try:
+        user_list = [interview.supervisor]
+        attendees = [{'email': interview.supervisor.email}, {'email': interview.submission.created_by.email}]
+        if 'engineer' not in request.user.roles:
+            scrum_masters = User.objects.filter(team=request.user.team, role__name__in=['admin', 'proxy'], is_active=True)
+            for user in scrum_masters:
+                user_list.append(user)
+                attendees.append({"email": user.email})
 
-    for user in interview.guest.all().union(scrum_masters):
-        user_list.append(user)
-        attendees.append({"email": user.email})
+        for user in interview.guest.all():
+            user_list.append(user)
+            attendees.append({"email": user.email})
 
-    email = vendor_account_manager(interview.submission.lead.vendor_company.name)
-    if email:
-        attendees.append({"email": email})
+        email = vendor_account_manager(interview.submission.lead.vendor_company.name)
+        if email:
+            attendees.append({"email": email})
 
-    return user_list, attendees
+        return user_list, attendees
+    except Exception as error:
+        print(error)
+        return None, None
 
 
 def date_filter(queryset, timestamp, field_str):
@@ -154,7 +162,7 @@ def coder_request_notification(user, interview, title):
             "@type": "MessageCard",
             "themeColor": "#0076D7",
             "@context": "http://schema.org/extensions",
-            "summary": f"Coding expert request for Interview ",
+            "summary": f"Coding assignment",
             "sections": [
                 {
                     "activityTitle": title,
@@ -167,6 +175,10 @@ def coder_request_notification(user, interview, title):
                         {
                             "name": f"Technology",
                             "value": f"{interview.tech_stack}"
+                        },
+                        {
+                            "name": f"Supervisor",
+                            "value": f"{interview.supervisor.employee_name}"
                         },
                         {
                             "name": f"Date",
@@ -200,7 +212,7 @@ def coder_assigned_notification(user, interview):
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
-                    "activityTitle": f"Coding expert assignment for Interview",
+                    "activityTitle": f"Coding assignment",
                     "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
                                         f" ***{interview.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
@@ -210,6 +222,10 @@ def coder_assigned_notification(user, interview):
                         {
                             "name": f"Technology",
                             "value": f"{interview.tech_stack}"
+                        },
+                        {
+                            "name": f"Supervisor",
+                            "value": f"{interview.supervisor.employee_name}"
                         },
                         {
                             "name": f"Date",

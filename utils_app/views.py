@@ -13,7 +13,7 @@ from log1.utils import write_exception, ERROR_MSG
 
 
 # Route - /city/
-class CityViewSets(ListModelMixin, GenericViewSet):
+class CityViewSet(ListModelMixin, GenericViewSet):
     queryset = City.objects.all()
     serializer_class = UtilSerializer
     permission_classes = (IsAuthenticated,)
@@ -68,7 +68,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             return Response({"message": ERROR_MSG, "error": error}, status=400)
 
 
-class UtilViewSets(CreateModelMixin, GenericViewSet):
+class TeamsTargetViewSet(CreateModelMixin, GenericViewSet):
     queryset = City.objects.all()
     serializer_class = UtilSerializer
 
@@ -87,8 +87,15 @@ class UtilViewSets(CreateModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+
+class UtilityViewSet(CreateModelMixin, GenericViewSet):
+    queryset = City.objects.all()
+    serializer_class = UtilSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
     @action(methods=['get'], detail=False, url_path='technology')
-    def technology(self, request, *args, **kwargs):
+    def technology(self, request):
         try:
             data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'AWS', 'DevOps', 'BA', 'DA',
                     'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']

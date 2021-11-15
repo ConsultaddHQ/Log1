@@ -1,22 +1,25 @@
 import json
-from datetime import date
 from django.db.models import Q
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
-from project.models import Project
+from engineering.serializers import *
 from marketing.utils import date_filter
+from activity.views import create_activity
+from engineering.utils import tag_and_notify
+from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
-from engineering.serializers import ProjectSupportSerializer, TimesheetSerializer
-from engineering.serializers import EngineeringSerializer, EngineeringDetailSerializer
+from engineering.serializers import TimesheetSerializer, ProjectUpdateSerializer, ProjectDescriptionSerializer
 
 
+# Route - /engineering/
 class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     queryset = Project.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -51,9 +54,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
                 if 'assignment' in filters:
                     if filters['assignment'] == 'assigned':
-                        projects = projects.exclude(support__end=None)
+                        projects = projects.exclude(support=None)
                     if filters['assignment'] == 'unassigned':
-                        projects = projects.filter(support__end=None)
+                        projects = projects.filter(support=None)
 
                 if 'client' in filters:
                     projects = projects.filter(submission__client=filters['client'])
@@ -80,26 +83,64 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 )
 
             counts = {
-                "training": {
-                    "display_name": "Training",
-                    "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
-                                             support__statuses__frequency='more_than_2_days').count()
+                "support_status": {
+                    "training": {
+                        "display_name": "Training",
+                        "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
+                                                 support__statuses__frequency='more_than_2_days').count()
+                    },
+                    "active": {
+                        "display_name": "Active",
+                        "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
+                                                 support__statuses__frequency='more_than_2_days').count()
+                    },
+                    "less_active": {
+                        "display_name": "Less Active",
+                        "count": projects.filter(support__statuses__is_current=True,
+                                                 support__statuses__frequency='less_than_3_days').count()
+                    },
+                    "independent": {
+                        "display_name": "Independent",
+                        "count": projects.filter(
+                            support__statuses__is_current=True,
+                            support__statuses__frequency__in=['independent', 'twice_a_month']
+                        ).count()
+                    },
                 },
-                "active": {
-                    "display_name": "Active",
-                    "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
-                                             support__statuses__frequency='more_than_2_days').count()
-                },
-                "less_active": {
-                    "display_name": "Less Active",
-                    "count": projects.filter(support__statuses__is_current=True,
-                                             support__statuses__frequency='less_than_3_days').count()
-                },
-                "independent": {
-                    "display_name": "Independent",
-                    "count": projects.filter(support__statuses__is_current=True,
-                                             support__statuses__frequency__in=['independent', 'twice_a_month']).count()
-                },
+                "project_status": {
+                    "new": {
+                        "display_name": "New",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='new').count(),
+                    },
+                    "received": {
+                        "display_name": "Received",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='received').count(),
+                    },
+                    "on_boarded": {
+                        "display_name": "On Boarded",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='on_boarded').count(),
+                    },
+                    "joined": {
+                        "display_name": "Joined",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='joined').count(),
+                    },
+                    "complete": {
+                        "display_name": "Complete",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='complete').count(),
+                    },
+                    "cancelled": {
+                        "display_name": "Cancelled",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='cancelled').count(),
+                    },
+                    "terminated": {
+                        "display_name": "Terminated",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='terminated').count(),
+                    }
+                }
             }
 
             if filter_json:
@@ -146,7 +187,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path="filters")
-    def filters(self, request, *args, **kwargs):
+    def filters(self, request):
         try:
             project_status = [
                 {'name': 'new', 'display_name': 'New'},
@@ -172,34 +213,25 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    @action(methods=['get'], detail=True, url_path="support")
-    def support(self, request, *args, **kwargs):
-        try:
-            qs = Project.objects.filter(id=kwargs.get('pk', None))
-            if qs:
-                serializer = ProjectSupportSerializer(qs.first().support.all().order_by('-created'), many=True)
-                return Response({"data": serializer.data}, status=200)
-            return Response({"message": "Project not found"}, status=404)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
-
     @action(methods=['get'], detail=True, url_path="activity")
-    def activity(self, request, *args, **kwargs):
+    def activity(self, request, pk):
         try:
-            activities = Activity.objects.filter(object_id=kwargs.get('pk'), content_type__model='project_support')
+            activities = Activity.objects.filter(
+                object_id=pk,
+                content_type__model__in=['projectsupport', 'projectupdate', 'projectdescription']
+            )
             serializer = ActivitySerializer(activities.order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=True, url_path="timesheets")
-    def timesheets(self, request, *args, **kwargs):
+    @action(methods=['get'], detail=True, url_path="timesheet")
+    def timesheet(self, request, pk):
         try:
             first, last = get_page_limits(request)
             start = request.GET.get('start', None)
             end = request.GET.get('end', date.today())
-            qs = Project.objects.filter(id=kwargs.get('pk', None))
+            qs = Project.objects.filter(id=pk)
             if qs:
                 timesheets = qs.first().timesheets.exclude(status='draft')
                 if start:
@@ -210,3 +242,172 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": "Project not found"}, status=404)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /project/:project_id:/update/
+class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    queryset = ProjectUpdate.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = ProjectUpdateSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            serializer = ProjectUpdateGetSerializer(project.updates.all(), many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            serializer = ProjectUpdateGetSerializer(update)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data.copy()
+            data['project'] = kwargs.get('project_id')
+            data['update_by'] = request.user.id
+            serializer = self.serializer_class(data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            update = ProjectUpdate.objects.get(id=serializer.data['id'])
+            for file in request.FILES.getlist('files'):
+                file_data = {
+                    "file": file,
+                    "object_id": update.id,
+                    "creator": request.user,
+                    "model": "projectupdate",
+                    "type": 'project_update',
+                }
+                create_attachment(file_data)
+            tags = request.data.get('tagged_user', '')
+            tag_and_notify(update, tags, request.user, 'create')
+
+            # Activity
+            desc = f"{request.user.employee_name} added project Update-{update.id}"
+            create_activity(data['project'], 'projectupdate', request.user, desc, 'created')
+            return Response({"message": "Project Update is added successfully"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            serializer = self.serializer_class(update, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            tags = request.data.get('tagged_user', '')
+            tag_and_notify(update, tags, request.user, 'update')
+
+            # Activity
+            desc = f"{request.user.employee_name} edited project Update-{update.id}"
+            create_activity(update.project.id, 'projectupdate', request.user, desc, 'update')
+
+            return Response({"message": "Project update is edited successfully"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)
+
+    @action(methods=['put'], detail=True, url_path='add_document')
+    def add_document(self, request, project_id, pk):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=pk)
+            file_data = {
+                "object_id": update.id,
+                "creator": request.user,
+                "model": "projectupdate",
+                "type": 'project_update',
+                "file": request.FILES.get('file'),
+            }
+            if create_attachment(file_data):
+                # Activity
+                desc = f"{request.user.employee_name} uploaded {file_data['file']} file"
+                create_activity(update.id, 'projectupdate', request.user, desc, 'update')
+                return Response({"message": "Document is uploaded"}, status=202)
+            return Response({"message": "Error in uploading document"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='remove_document')
+    def remove_document(self, request, project_id, pk):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=pk)
+            attachment = get_object_or_404(Attachment, id=request.data.get('attachment_id'))
+            if update.update_by.id == request.user.id or attachment.creator.id == request.user.id:
+                file_name = attachment.attachment_file.name
+                attachment.delete()
+                # Activity
+                desc = f"{request.user.employee_name} removed {file_name} file"
+                create_activity(update.id, 'projectupdate', request.user, desc, 'update')
+                return Response({"message": "Document removed"}, status=202)
+            return Response({"message": "Error in deleting document"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /project/:project_id:/description/
+class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = ProjectDescription.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ProjectDescriptionSerializer
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            if hasattr(project, 'description'):
+                serializer = self.serializer_class(project.description)
+                return Response({"data": serializer.data}, status=200)
+            return Response({"data": []}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data.copy()
+            data['project'] = kwargs.get('project_id')
+            data['update_by'] = request.user.id
+            serializer = self.serializer_class(data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            # Activity
+            desc = f"{request.user.employee_name} added project description"
+            create_activity(serializer.data['id'], 'projectdescription', request.user, desc, 'create')
+            return Response({"message": "Description added"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            description = get_object_or_404(ProjectDescription, id=kwargs.get('pk'))
+            serializer = self.serializer_class(description, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            # Activity
+            desc = f"{request.user.employee_name} updated project description"
+            create_activity(description.id, 'projectdescription', request.user, desc, 'update')
+            return Response({"message": "Description Updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({"detail": "Method PATCH not allowed."}, status=405)

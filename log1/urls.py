@@ -5,32 +5,36 @@ from django.conf import settings
 from django.conf.urls import include
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
+from rest_framework_swagger.views import get_swagger_view
 from rest_framework.documentation import include_docs_urls
 
 from activity.views import CommentViewSet
-from engineering.views import EngineeringViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
-from utils_app.views import CityViewSets, ChoiceViewSet, UtilViewSets
+from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
 from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeSheetV2ViewSets, Test
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
-    ProjectSupportViewSet, ProjectOrderViewSet
+     ProjectOrderViewSet, ProjectSupportViewSet
+from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectDescriptionViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
-    AllUsersViewSet, HandoverViewSets
+    AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets, SubmissionV2ViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     FeedbackViewSet, ConsultantImportViewSet, ConsultantV2ViewSets
 
-router = DefaultRouter()
 
+router = DefaultRouter()
+schema_view = get_swagger_view(title='Log1')
+
+router.register(r'login', LoginViewSet)
 router.register(r'users', AllUsersViewSet)
 router.register(r'assets', AssetsViewSets)
 router.register(r'auth', EmployeeAuthViewSets)
@@ -62,11 +66,13 @@ router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
-router.register(r'project_support', ProjectSupportViewSet)
 router.register(r'project_order', ProjectOrderViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
+router.register(r'project/(?P<project_id>[0-9]+)/updates', ProjectUpdateViewSet)
+router.register(r'project/(?P<project_id>[0-9]+)/support', ProjectSupportViewSet)
+router.register(r'project/(?P<project_id>[0-9]+)/description', ProjectDescriptionViewSet)
 
-router.register(r'city', CityViewSets)
+router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)
 
 router.register(r'cmd', SlashCommandViewSets)
@@ -97,7 +103,8 @@ router.register(r'payroll', PayrollScheduleViewSets)
 router.register(r'timesheet_v2', TimeSheetV2ViewSets)
 
 router.register(r'test', Test)
-router.register(r'util', UtilViewSets)
+router.register(r'utility', UtilityViewSet)
+router.register(r'util', TeamsTargetViewSet)
 
 # Legal App routes
 router.register(r'petition', PetitionViewSets)
@@ -118,6 +125,7 @@ urlpatterns = [
     path('api/admin/', admin.site.urls),
     path('api/v2/', include(router_v2.urls)),
     path('api/explorer/', include('explorer.urls')),
+    path('api/swagger/', schema_view),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

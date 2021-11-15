@@ -40,15 +40,15 @@ class UserManager(BaseUserManager):
             raise ValueError('Users must have an email address')
         email = self.normalize_email(email)
         user = self.model(
-            employee_id=int(employee_id),
-            username=int(employee_id),
-            email=email,
             team=team,
-            employee_name=name,
+            email=email,
+            phone=phone,
             gender=gender,
+            employee_name=name,
+            username=int(employee_id),
+            employee_id=int(employee_id),
         )
 
-        user.phone = phone
         user.set_password(password)
         user.is_active = True
         user.save()
@@ -60,7 +60,7 @@ class UserManager(BaseUserManager):
         """
         user = self.create_user(
             employee_id,
-            "admin@log1.com",
+            "admin@consultadd.com",
             "Admin",
             password=password
         )
@@ -97,8 +97,8 @@ class User(AbstractUser, PermissionsMixin):
     is_superuser = models.BooleanField(default=False)
     role = models.ManyToManyField(Role, related_name='roles')
     employee_id = models.IntegerField(_('Employee ID'), unique=True)
-    employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
+    employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
@@ -131,7 +131,7 @@ class User(AbstractUser, PermissionsMixin):
 
     def send_mail(self, mail_data):
         try:
-            res, msg = send_email(mail_data, "admin@log1.com")
+            res, msg = send_email(mail_data, "admin@consultadd.com")
             if not msg:
                 return res, "error"
             return res, "ok"

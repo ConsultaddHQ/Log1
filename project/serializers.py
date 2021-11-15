@@ -216,17 +216,37 @@ class SupportStatusSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class ProjectSupportSerializer(serializers.ModelSerializer):
-    support = UserSerializer()
-    status = serializers.SerializerMethodField()
-
+class ProjectSupportCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectSupport
         fields = '__all__'
 
+
+class ProjectSupportSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+    support = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSupport
+        exclude = ('project',)
+
+    @staticmethod
+    def get_support(obj):
+        return {
+            'id': obj.support.id,
+            'email': obj.support.email,
+            'name': obj.support.employee_name,
+        }
+
     @staticmethod
     def get_status(obj):
-        return SupportStatusSerializer(obj.statuses.filter(is_current=True).first()).data
+        status = obj.statuses.filter(is_current=True)
+        if status:
+            return {
+                "value": status.first().frequency,
+                "change_date": status.first().change_date,
+            }
+        return None
 
 
 class ProjectSupportDetailSerializer(serializers.ModelSerializer):
@@ -240,8 +260,8 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectSupport
-        fields = ('id', 'created', 'is_primary', 'end', 'start', 'feedback', 'status',
-                  'client', 'consultant', 'technology', 'support', 'joining_date', 'frequency')
+        fields = ('id', 'created', 'end', 'start', 'feedback', 'status', 'client', 'consultant', 'technology',
+                  'support', 'joining_date', 'frequency')
 
     @staticmethod
     def get_status(obj):

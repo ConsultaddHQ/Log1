@@ -2,8 +2,10 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
-from attachment.serializers import AttachmentURLSerializer
-from project.models import Project, ProjectSupport, SupportStatus, TimeSheet
+from attachment.models import Attachment
+from attachment.serializers import AttachmentGetSerializer
+from project.models import Project, SupportStatus, TimeSheet
+from engineering.models import ProjectDescription, ProjectUpdate
 
 
 class POCSerializer(serializers.ModelSerializer):
@@ -90,7 +92,7 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer')
+        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote')
 
     @staticmethod
     def get_marketer(obj):
@@ -141,11 +143,13 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_remote_consultant(obj):
-        return {
-            'id': obj.consultant.id,
-            'name': obj.consultant.name,
-            'email': obj.consultant.email,
-        }
+        if obj.is_remote:
+            return {
+                'id': obj.consultant.id,
+                'name': obj.consultant.name,
+                'email': obj.consultant.email,
+            }
+        return None
 
 
 class SupportSerializer(serializers.ModelSerializer):
@@ -158,19 +162,6 @@ class SupportStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = SupportStatus
         fields = ('id', 'frequency', 'change_date')
-
-
-class ProjectSupportSerializer(serializers.ModelSerializer):
-    support = SupportSerializer()
-    status = serializers.SerializerMethodField()
-
-    class Meta:
-        model = ProjectSupport
-        fields = ('id', 'start', 'end', 'feedback', 'support', 'status')
-
-    @staticmethod
-    def get_status(obj):
-        return SupportStatusSerializer(obj.statuses.filter(is_current=True).first()).data
 
 
 class TimesheetSerializer(serializers.ModelSerializer):
@@ -193,4 +184,51 @@ class TimesheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
+        return AttachmentGetSerializer(obj.attachments.all(), many=True).data
+
+
+class ProjectUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectUpdate
+        fields = '__all__'
+
+
+class ProjectUpdateGetSerializer(serializers.ModelSerializer):
+    update_by = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectUpdate
+        exclude = ('project',)
+
+    @staticmethod
+    def get_update_by(obj):
+        return {
+            "id": obj.update_by.id,
+            "email": obj.update_by.email,
+            "name": obj.update_by.employee_name,
+        }
+
+    @staticmethod
+    def get_tagged_user(obj):
+        data = []
+        if obj.tagged_user.exists():
+            for user in obj.tagged_user.first().tagged_user.all():
+                data.append({
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.employee_name,
+                })
+        return data
+
+    @staticmethod
+    def get_attachments(obj):
+        attachment = Attachment.objects.filter(object_id=obj.id, content_type__model="projectupdate")
+        return AttachmentGetSerializer(attachment, many=True).data
+
+
+class ProjectDescriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectDescription
+        fields = '__all__'
