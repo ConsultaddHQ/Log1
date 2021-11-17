@@ -729,7 +729,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /project/<id>/support/
+# Route - /project/<project_id>/support/
 class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectSupport.objects.all()
     serializer_class = ProjectSupportSerializer
@@ -738,7 +738,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
     def list(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('id'))
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -747,7 +747,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
     def create(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('id'))
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
             support_id = request.data.get('support', None)
             support = get_object_or_404(User, id=support_id)
 

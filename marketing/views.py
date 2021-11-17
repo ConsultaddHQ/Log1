@@ -1205,9 +1205,10 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 interview.save()
 
                 # Activity
-                end = interview.end_time.strftime("%Y-%m-%d %H-%M").split(" ")
-                start = interview.start_time.strftime("%Y-%m-%d %H-%M").split(" ")
-                desc = f"Interview round {interview.round} is scheduled for {start[0]}-{start[1]} to {end[0]}-{end[1]}"
+                end = interview.end_time.strftime("%Y-%m-%d %H-%M")
+                start = interview.start_time.strftime("%Y-%m-%d %H-%M")
+                desc = f"Interview round {interview.round} is scheduled for " \
+                       f"{start.split(' ')[0]}-{start.split(' ')[1]} to {end.split(' ')[0]}-{end.split(' ')[0]}"
                 create_activity(submission_id, 'submission', request.user, desc, 'created')
 
                 # Closing Submission for scheduling Interview
