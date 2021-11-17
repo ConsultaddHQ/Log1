@@ -51,10 +51,6 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
             if sort_by in ['name', 'created']:
                 consultants = consultants.order_by(sort_by)
 
-            consultants = consultants.filter(
-                status__in=['on_bench', 'on_project'], marketing__status='open'
-            )
-
             status_obj = sub_data["status_obj"]
             count = {
                 "total": consultants.count(),

@@ -1073,8 +1073,9 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
             else:
-                consultants = Consultant.objects.filter(marketing__status='open').values('id')
-                queryset = Interview.objects.filter(submission__consultant_marketing__consultant_id__in=consultants)
+                # consultants = Consultant.objects.filter(marketing__status='open').values('id')
+                # queryset = Interview.objects.filter(submission__consultant_marketing__consultant_id__in=consultants)
+                queryset = Interview.objects.all()
 
             if filter_for == 'my':
                 if 'interviewee' in roles:
@@ -1085,40 +1086,40 @@ class InterviewViewSets(viewsets.ModelViewSet):
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=team)
 
-            if 'engineer' in roles:
-                pass
-
-            elif 'admin' in roles or 'proxy' in roles:
-                consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
-                queryset = queryset.filter(
-                    Q(supervisor_id=user_id) |
-                    Q(submission__created_by_id=user_id) |
-                    Q(submission__consultant_marketing__in_pool=True) |
-                    Q(submission__consultant_marketing__consultant__in=consultant_ids) |
-                    Q(submission__consultant_marketing__teams=team, submission__consultant_marketing__in_pool=False)
-                )
-
-            elif 'marketer' in roles:
-                consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
-                if 'recruiter' in roles or 'retention_manager' in roles:
-                    queryset = queryset.filter(
-                        Q(supervisor_id=user_id) |
-                        Q(submission__created_by_id=user_id) |
-                        Q(submission__consultant_marketing__in_pool=True) |
-                        Q(submission__consultant_marketing__marketer__id=user_id) |
-                        Q(submission__consultant_marketing__consultant__in=consultant_ids) |
-                        Q(submission__consultant_marketing__consultant__pocs__poc_id=user_id,
-                          submission__consultant_marketing__status='open')
-                    )
-
-                else:
-                    queryset = queryset.filter(
-                        Q(supervisor_id=user_id) |
-                        Q(submission__created_by_id=user_id) |
-                        Q(submission__consultant_marketing__in_pool=True) |
-                        Q(submission__consultant_marketing__marketer__id=user_id) |
-                        Q(submission__consultant_marketing__consultant__in=consultant_ids)
-                    )
+            # if 'engineer' in roles:
+            #     pass
+            #
+            # elif 'admin' in roles or 'proxy' in roles:
+            #     consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
+            #     queryset = queryset.filter(
+            #         Q(supervisor_id=user_id) |
+            #         Q(submission__created_by_id=user_id) |
+            #         Q(submission__consultant_marketing__in_pool=True) |
+            #         Q(submission__consultant_marketing__consultant__in=consultant_ids) |
+            #         Q(submission__consultant_marketing__teams=team, submission__consultant_marketing__in_pool=False)
+            #     )
+            #
+            # elif 'marketer' in roles:
+            #     consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
+            #     if 'recruiter' in roles or 'retention_manager' in roles:
+            #         queryset = queryset.filter(
+            #             Q(supervisor_id=user_id) |
+            #             Q(submission__created_by_id=user_id) |
+            #             Q(submission__consultant_marketing__in_pool=True) |
+            #             Q(submission__consultant_marketing__marketer__id=user_id) |
+            #             Q(submission__consultant_marketing__consultant__in=consultant_ids) |
+            #             Q(submission__consultant_marketing__consultant__pocs__poc_id=user_id,
+            #               submission__consultant_marketing__status='open')
+            #         )
+            #
+            #     else:
+            #         queryset = queryset.filter(
+            #             Q(supervisor_id=user_id) |
+            #             Q(submission__created_by_id=user_id) |
+            #             Q(submission__consultant_marketing__in_pool=True) |
+            #             Q(submission__consultant_marketing__marketer__id=user_id) |
+            #             Q(submission__consultant_marketing__consultant__in=consultant_ids)
+            #         )
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -1129,15 +1130,11 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     if filters["assignment"] == 'unassigned':
                         queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
 
-                if 'guest_type' in filters:
-                    if filters["guest_type"] in ['coding', 'assigned']:
-                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
-                    if filters["guest_type"] == 'assistance':
-                        queryset = queryset.filter(guest_type='assistance').exclude(status='cancelled')
-                    if filters["guest_type"] == 'all':
-                        queryset = queryset.filter(
-                            guest_type__in=['coder', 'assistance', 'assigned']
-                        ).exclude(status='cancelled')
+                if 'coding_interview' in filters:
+                    if filters["coding_interview"] == 'yes':
+                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                    elif filters["coding_interview"] == 'no':
+                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1158,9 +1155,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     queryset = queryset.filter(
                         submission__consultant_marketing__consultant_id__in=filters["consultant"]
                     )
-
-                created = filters.get('created', None)
-                queryset = date_filter(queryset, created, 'created')
 
                 start_time = filters.get('start_time', None)
                 queryset = date_filter(queryset, start_time, "start_time")
@@ -1188,7 +1182,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
             # calculating Interview round
             round_count = 0
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(status='cancelled')
-            if prev_interview and prev_interview.first().status == 'next_round':
+            if prev_interview and prev_interview.first().status != 'next_round':
                 return Response({"message": "Update status of previous interview first"}, status=400)
 
             if prev_interview:
@@ -1208,7 +1202,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                 end = interview.end_time.strftime("%Y-%m-%d %H-%M")
                 start = interview.start_time.strftime("%Y-%m-%d %H-%M")
                 desc = f"Interview round {interview.round} is scheduled for " \
-                       f"{start.split(' ')[0]}-{start.split(' ')[1]} to {end.split(' ')[0]}-{end.split(' ')[0]}"
+                       f"{start.split(' ')[0]}-{start.split(' ')[1]} to {end.split(' ')[0]}-{end.split(' ')[1]}"
                 create_activity(submission_id, 'submission', request.user, desc, 'created')
 
                 # Closing Submission for scheduling Interview
@@ -1566,9 +1560,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             title = get_interview_title(interview)
 
             # Activity
-            # est = pytz.timezone('US/Eastern')
-            # end = interview.end_time.astimezone(est)
-            # start = interview.start_time.astimezone(est)
             end = interview.end_time
             start = interview.start_time
             desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: {start.time()} " \
