@@ -68,6 +68,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             return Response({"message": ERROR_MSG, "error": error}, status=400)
 
 
+# Route - /util/
 class TeamsTargetViewSet(CreateModelMixin, GenericViewSet):
     queryset = City.objects.all()
     serializer_class = UtilSerializer
@@ -88,6 +89,7 @@ class TeamsTargetViewSet(CreateModelMixin, GenericViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+# Route - /utility/
 class UtilityViewSet(CreateModelMixin, GenericViewSet):
     queryset = City.objects.all()
     serializer_class = UtilSerializer
@@ -97,7 +99,7 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
     @action(methods=['get'], detail=False, url_path='technology')
     def technology(self, request):
         try:
-            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'AWS', 'DevOps', 'BA', 'DA',
+            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
                     'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
             return Response({"data": data}, status=200)
         except Exception as error:

@@ -29,7 +29,6 @@ from legal.serializers import PetitionSerializer, PetitionGetSerializer, Petitio
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
 
-# Api for Legal Team
 # Route - /petition/
 class PetitionViewSets(viewsets.ModelViewSet):
     queryset = Petition.objects.all()

@@ -681,6 +681,41 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=True, url_path='margin')
+    def margin(self, request, pk):
+        try:
+            projects = Project.objects.filter(
+                Q(consultant_id=pk) |
+                Q(submission__consultant_marketing__consultant_id=pk)
+            )
+            project_data = []
+            margin, margin_percentage = 0, 0
+            if projects.count() == 1:
+                project_rate = projects.first().rate
+                rate_revision = ConsultantRateRevision.objects.filter(consultant=pk, end=None)
+                if rate_revision:
+                    consultant_rate = rate_revision.first().rate
+                    margin = project_rate - consultant_rate
+                    margin_percentage = (margin/project_rate)*100
+
+            for project in projects:
+                project_data.append(
+                    {
+                        "rate": project.rate,
+                        "client": project.submission.client,
+                    }
+                )
+            data = {
+                "margin": margin,
+                "projects": project_data,
+                "margin_percentage": margin_percentage,
+                "lock_flag": True if margin_percentage < 21 else False,
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /consultant_bench/
 class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
