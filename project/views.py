@@ -517,7 +517,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
             prev_status_obj = project.statuses.get(is_current=True)
-
+            prev_rate, prev_start_date = project.rate, project.start_date
             all_status, cancellation_status, termination_status = fetch_project_status()
 
             if new_status not in all_status:
@@ -616,7 +616,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     util.send_completion_notification()
 
             # Activity
-            create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+            if prev_rate != project.rate:
+                desc=f"Purchase order rate is updated"
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+            elif prev_start_date != project.start_date:
+                desc = f"Purchase order start_date is updated"
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+            else:
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
@@ -729,7 +736,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /project/<project_id>/support/
+# Route - /project/<id>/support/
 class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectSupport.objects.all()
     serializer_class = ProjectSupportSerializer

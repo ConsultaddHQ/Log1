@@ -1,4 +1,6 @@
+import os
 import json
+
 from django.db.models import Q
 
 from rest_framework.response import Response
@@ -11,7 +13,9 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 
 from engineering.serializers import *
 from marketing.utils import date_filter
+from marketing.models import Interview
 from activity.views import create_activity
+from consultant.models import ConsultantPOC
 from engineering.utils import tag_and_notify
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
@@ -241,6 +245,57 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 return Response({"data": serializer.data, 'total': total}, status=200)
             return Response({"message": "Project not found"}, status=404)
         except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path="summary")
+    def summary(self, request, pk):
+        try:
+            project = get_object_or_404(Project, id=pk)
+            recording_attachment = Attachment.objects.filter(
+                object_id=Interview.objects.get(submission=project.submission).id,
+                attachment_type='recordings'
+            )
+            recording, resume = [], []
+            if recording_attachment:
+                for attachment in recording_attachment:
+                    data = {
+                        "id": attachment.id,
+                        "name": os.path.split(attachment.attachment_file.name)[1]
+                    }
+                    recording.append(data)
+            resume_attachment = Attachment.objects.filter(object_id=project.submission.id, attachment_type='resume')
+            if resume_attachment:
+                for attachment in resume_attachment:
+                    data = {
+                        "id": attachment.id,
+                        "name": os.path.split(attachment.attachment_file.name)[1]
+                    }
+                    resume.append(data)
+            recruiter, retention = project.consultant.recruiter, ConsultantPOC.objects.get(consultant=project.consultant,
+                                                                                           poc_type='relation').poc
+            data = {
+                "jobDescription": project.submission.lead.job_desc,
+                "marketer": {
+                    "name": project.submission.created_by.employee_name,
+                    "email": project.submission.created_by.email,
+                    "id": project.submission.created_by.id
+                },
+                "recruiter": {
+                    "name": recruiter.employee_name,
+                    "email": recruiter.email,
+                    "id": recruiter.id
+                },
+                "retention": {
+                    "name": retention.employee_name,
+                    "email": retention.email,
+                    "id": retention.id
+                },
+                "recordings": recording,
+                "resume": resume
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
