@@ -11,7 +11,7 @@ class Command(BaseCommand):
 
     # A command must define handle()
     def handle(self, *args, **options):
-        job = create_cron_object(name='teams_bot')
+        job = create_cron_object(name='feedback_due_notification')
         try:
             interview_text = f""" <tr>
                             <th style="padding:5px 8px 5px 8px;">#</th>

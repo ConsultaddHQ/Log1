@@ -2,10 +2,10 @@ import os
 import json
 
 from django.db.models import Q
+from django.shortcuts import get_object_or_404
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.shortcuts import get_object_or_404
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
@@ -17,6 +17,7 @@ from marketing.models import Interview
 from activity.views import create_activity
 from consultant.models import ConsultantPOC
 from engineering.utils import tag_and_notify
+from utils_app.aws_utils import get_s3_object
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
@@ -250,48 +251,43 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path="summary")
     def summary(self, request, pk):
         try:
+            resume = []
+            recording = []
             project = get_object_or_404(Project, id=pk)
-            recording_attachment = Attachment.objects.filter(
-                object_id=Interview.objects.get(submission=project.submission).id,
-                attachment_type='recordings'
-            )
-            recording, resume = [], []
-            if recording_attachment:
-                for attachment in recording_attachment:
-                    data = {
-                        "id": attachment.id,
-                        "name": os.path.split(attachment.attachment_file.name)[1]
-                    }
-                    recording.append(data)
+            interviews = Interview.objects.filter(submission__project__id=pk)
+            for interview in interviews:
+                if interview.attachment_link:
+                    recording.append({
+                        "id": interview.id,
+                        "name": interview.attachment_link.split('/')[-1]
+                    })
+
             resume_attachment = Attachment.objects.filter(object_id=project.submission.id, attachment_type='resume')
-            if resume_attachment:
-                for attachment in resume_attachment:
-                    data = {
-                        "id": attachment.id,
-                        "name": os.path.split(attachment.attachment_file.name)[1]
-                    }
-                    resume.append(data)
-            recruiter, retention = project.consultant.recruiter, ConsultantPOC.objects.get(consultant=project.consultant,
-                                                                                           poc_type='relation').poc
+            for attachment in resume_attachment:
+                resume.append({
+                    "id": attachment.id,
+                    "name": os.path.split(attachment.attachment_file.name)[1]
+                })
+            recruiter, retention = project.consultant.recruiter, project.consultant.relation
             data = {
-                "jobDescription": project.submission.lead.job_desc,
-                "marketer": {
-                    "name": project.submission.created_by.employee_name,
-                    "email": project.submission.created_by.email,
-                    "id": project.submission.created_by.id
-                },
+                "resume": resume,
+                "recordings": recording,
+                "job_description": project.submission.lead.job_desc,
                 "recruiter": {
-                    "name": recruiter.employee_name,
+                    "id": recruiter.id,
                     "email": recruiter.email,
-                    "id": recruiter.id
+                    "name": recruiter.employee_name,
                 },
                 "retention": {
-                    "name": retention.employee_name,
+                    "id": retention.id,
                     "email": retention.email,
-                    "id": retention.id
+                    "name": retention.employee_name,
                 },
-                "recordings": recording,
-                "resume": resume
+                "marketer": {
+                    "id": project.submission.created_by.id,
+                    "email": project.submission.created_by.email,
+                    "name": project.submission.created_by.employee_name,
+                },
             }
             return Response({"data": data}, status=200)
         except Exception as error:
