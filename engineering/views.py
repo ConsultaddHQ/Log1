@@ -15,9 +15,7 @@ from engineering.serializers import *
 from marketing.utils import date_filter
 from marketing.models import Interview
 from activity.views import create_activity
-from consultant.models import ConsultantPOC
 from engineering.utils import tag_and_notify
-from utils_app.aws_utils import get_s3_object
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
@@ -251,27 +249,28 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path="summary")
     def summary(self, request, pk):
         try:
-            resume = []
             recording = []
             project = get_object_or_404(Project, id=pk)
             interviews = Interview.objects.filter(submission__project__id=pk)
-            for interview in interviews:
-                if interview.attachment_link:
-                    recording.append({
-                        "id": interview.id,
-                        "name": interview.attachment_link.split('/')[-1]
-                    })
+            if interviews:
+                for interview in interviews:
+                    if interview.attachment_link:
+                        recording.append({
+                            "id": interview.id,
+                            "name": interview.attachment_link.split('/')[-1]
+                        })
 
             resume_attachment = Attachment.objects.filter(object_id=project.submission.id, attachment_type='resume')
-            for attachment in resume_attachment:
-                resume.append({
-                    "id": attachment.id,
-                    "name": os.path.split(attachment.attachment_file.name)[1]
-                })
+            if resume_attachment:
+                resume = {
+                    "id": resume_attachment[0].id,
+                    "name": os.path.split(resume_attachment[0].attachment_file.name)[1]
+                }
+            description = ProjectDescription.objects.filter(project=project)
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
             data = {
-                "resume": resume,
-                "recordings": recording,
+                "resume": resume if resume_attachment else None,
+                "recordings": recording if resume_attachment else None,
                 "job_description": project.submission.lead.job_desc,
                 "recruiter": {
                     "id": recruiter.id,
@@ -288,6 +287,20 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     "email": project.submission.created_by.email,
                     "name": project.submission.created_by.employee_name,
                 },
+                "notes": {
+                    "id": description[0].id if description else None,
+                    "notes": description[0].notes if description else None
+
+                },
+                "remark": {
+                    "id": description[0].id if description else None,
+                    "remark": description[0].remark if description else None
+                },
+                "description":{
+                    "id": description[0].id if description else None,
+                    "description": description[0].description if description else None
+                }
+
             }
             return Response({"data": data}, status=200)
         except Exception as error:
@@ -446,6 +459,32 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+
+    # def create(self, request, *args, **kwargs):
+    #     try:
+    #         data = request.data.copy()
+    #         data['update_by'] = request.user
+    #         project = get_object_or_404(Project, id=kwargs.get('project_id'))
+    #         project_description, created = self.queryset.get_or_create(project=project, update_by=data['update_by'])
+    #         status = 201 if created else 202
+    #
+    #         for key, value in data.items():
+    #             if value == "" or value == "null":
+    #                 value = None
+    #             project_description.__setattr__(key, value)
+    #         project_description.save()
+    #         serializer = ProjectDescriptionSerializer(project_description)
+    #
+    #         # Activity
+    #         desc = f"{request.user.employee_name} added project description"
+    #         activity_type = 'create' if created else 'update'
+    #         create_activity(project_description.id, 'projectdescription', request.user, desc, activity_type)
+    #         return Response({"data": serializer.data}, status=status)
+    #     except Exception as error:
+    #         write_exception(error, request)
+    #         return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
     def update(self, request, *args, **kwargs):
         try:
             description = get_object_or_404(ProjectDescription, id=kwargs.get('pk'))
@@ -462,3 +501,36 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
+
+
+class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = Project.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = ProjectDescriptionSerializer
+
+    @action(methods=['get'], detail=False, url_path='technology')
+    def technology(self, request, *args, **kwargs):
+        data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
+                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
+        return Response({"data": data}, status=200)
+
+    @action(methods=['put'], detail=False, url_path='notes')
+    def notes(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            if hasattr(project, 'description'):
+                for key, value in request.data.items():
+                    if value == "" or value == "null":
+                        value = None
+                    project.description.__setattr__(key, value)
+                project.description.save()
+                serial = ProjectDescriptionSerializer(project.description)
+                return Response({"data": serial.data}, status=202)
+
+            return ProjectDescriptionViewSet.create(self, request, *args, **kwargs)
+            # response = create_project_description(request, kwargs.get('project_id'))
+            # return Response({"data": response}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

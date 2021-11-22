@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from employee.models import User, Tagging
 from notification.utils import create_notification, push_notification
+from .serializers import ProjectDescriptionSerializer
 
 
 def tag_and_notify(update, tags, user, tag_type='create'):
@@ -63,3 +64,14 @@ def tag_and_notify(update, tags, user, tag_type='create'):
         },
     }
     push_notification(tags, message_body)
+
+
+# def create_project_description(data, project_id):
+#     payload = data.data.copy()
+#     payload['project'] = project_id
+#     payload['update_by'] = data.user.id
+#     serial = ProjectDescriptionSerializer(data=payload, partial=True)
+#     serial.is_valid(raise_exception=True)
+#     serial.save()
+#     return serial.data
+#
