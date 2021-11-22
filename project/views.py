@@ -517,7 +517,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
             prev_status_obj = project.statuses.get(is_current=True)
-
+            prev_rate, prev_start_date = project.rate, project.start_date
             all_status, cancellation_status, termination_status = fetch_project_status()
 
             if new_status not in all_status:
@@ -616,7 +616,14 @@ class ProjectViewSets(viewsets.ModelViewSet):
                     util.send_completion_notification()
 
             # Activity
-            create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+            if prev_rate != project.rate:
+                desc=f"Purchase order rate is updated"
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+            elif prev_start_date != project.start_date:
+                desc = f"Purchase order start_date is updated"
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+            else:
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
@@ -738,7 +745,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
     def list(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('id'))
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -747,7 +754,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
     def create(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('id'))
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
             support_id = request.data.get('support', None)
             support = get_object_or_404(User, id=support_id)
 

@@ -12,7 +12,7 @@ from log1.utils import write_info, write_exception, post_msg_using_webhook
 
 
 def vendor_account_manager(vendor_company):
-    file = open('../fixtures/am_config.json', 'r')
+    file = open('fixtures/am_config.json', 'r')
     data = json.loads(file.read())
     vendor_company = vendor_company.replace(" ", "").replace(",", "").replace("-", "").replace("_", "").lower()
     for email, vendors in data.items():
@@ -45,8 +45,8 @@ def get_users_and_attendees(request, interview):
 
         return user_list, attendees
     except Exception as error:
-        print(error)
-        return None, None
+        write_exception(error, request)
+        return [], []
 
 
 def date_filter(queryset, timestamp, field_str):
@@ -55,7 +55,7 @@ def date_filter(queryset, timestamp, field_str):
         lte = timestamp.get('lte', None)
         gte = timestamp.get('gte', None)
         if lte:
-            filters[f"{field_str}__lte"] = lte
+            filters[f"{field_str}__lt"] = lte
         if gte:
             filters[f"{field_str}__gte"] = gte
     return queryset.filter(**filters)

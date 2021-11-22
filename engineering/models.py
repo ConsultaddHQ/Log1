@@ -8,11 +8,6 @@ from employee.models import User, Tagging
 from utils_app.models import TimeStampedModel
 from project.models import Project, ProjectSupport
 
-UPDATE_TYPES = (
-    ('project', 'Project'),
-    ('training', 'Training'),
-)
-
 
 class ProjectDescription(TimeStampedModel):
     notes = models.TextField(_('Notes'), null=True)
@@ -33,6 +28,10 @@ class ProjectDescription(TimeStampedModel):
 
 
 class ProjectUpdate(TimeStampedModel):
+    UPDATE_TYPES = (
+        ('project', 'Project'),
+        ('training', 'Training'),
+    )
     tagged_user = GenericRelation(Tagging)
     attachments = GenericRelation(Attachment)
     end = models.DateField(_("End"), null=True)
