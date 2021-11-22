@@ -1,4 +1,5 @@
-from django.db.models import F
+from django.db.models import F, Q
+from datetime import date, timedelta
 from rest_framework import serializers
 
 from consultant.models import *
@@ -241,10 +242,11 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
     recruiter = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
+    rate_revision = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'skills', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit')
+        fields = ('id', 'name', 'skills', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit', 'rate_revision')
 
     @staticmethod
     def get_rate(obj):
@@ -284,6 +286,28 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
                 "previous_marketing_days": marketing.previous_marketing_days,
             }
         return None
+
+    @staticmethod
+    def get_rate_revision(obj):
+        qs = obj.rates.filter(end=None)
+        if qs:
+            revision_date = qs.first().start
+        else:
+            revision_date = date(2010, 1, 1)
+        projects = Project.objects.filter(
+            (
+                    Q(consultant_id=obj.id) |
+                    Q(submission__consultant_marketing__consultant_id=obj.id)
+            ) & (
+                Q(statuses__status='joined')
+            )
+        )
+        for project in projects:
+            if revision_date < project.start_date:
+                revision_date = project.start_date
+        if date.today() + timedelta(days=170) > revision_date:
+            return True
+        return False
 
 
 class ConsultantBenchSerializer(serializers.ModelSerializer):

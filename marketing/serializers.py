@@ -179,7 +179,7 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
             return False
         return True
 
@@ -248,7 +248,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
             return False
         return True
 
@@ -422,7 +422,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance'] and obj.coding_present is None:
+        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
             return False
         return True
 
