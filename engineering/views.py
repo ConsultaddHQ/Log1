@@ -246,52 +246,6 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=True, url_path="summary")
-    def summary(self, request, pk):
-        try:
-            resume = []
-            recording = []
-            project = get_object_or_404(Project, id=pk)
-            interviews = Interview.objects.filter(submission__project__id=pk)
-            for interview in interviews:
-                if interview.attachment_link:
-                    recording.append({
-                        "id": interview.id,
-                        "name": interview.attachment_link.split('/')[-1]
-                    })
-
-            resume_attachment = Attachment.objects.filter(object_id=project.submission.id, attachment_type='resume')
-            for attachment in resume_attachment:
-                resume.append({
-                    "id": attachment.id,
-                    "name": os.path.split(attachment.attachment_file.name)[1]
-                })
-            recruiter, retention = project.consultant.recruiter, project.consultant.relation
-            data = {
-                "resume": resume,
-                "recordings": recording,
-                "job_description": project.submission.lead.job_desc,
-                "recruiter": {
-                    "id": recruiter.id,
-                    "email": recruiter.email,
-                    "name": recruiter.employee_name,
-                },
-                "retention": {
-                    "id": retention.id,
-                    "email": retention.email,
-                    "name": retention.employee_name,
-                },
-                "marketer": {
-                    "id": project.submission.created_by.id,
-                    "email": project.submission.created_by.email,
-                    "name": project.submission.created_by.employee_name,
-                },
-            }
-            return Response({"data": data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
 
 # Route - /project/:project_id:/update/
 class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
@@ -401,7 +355,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                 attachment.delete()
                 # Activity
                 desc = f"{request.user.employee_name} removed {file_name} file"
-                create_activity(update.id, 'projectupdate', request.user, desc, 'update')
+                create_activity(update.project.id, 'projectupdate', request.user, desc, 'update')
                 return Response({"message": "Document removed"}, status=202)
             return Response({"message": "Error in deleting document"}, status=400)
         except Exception as error:
@@ -409,8 +363,8 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /project/:project_id:/description/
-class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+# Route - /project/:project_id:/summary/
+class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     permission_classes = (IsAuthenticated,)
     queryset = ProjectDescription.objects.all()
     authentication_classes = (TokenAuthentication,)
@@ -418,45 +372,108 @@ class ProjectDescriptionViewSet(GenericViewSet, ListModelMixin, CreateModelMixin
 
     def list(self, request, *args, **kwargs):
         try:
+            resume, description_data, recording = None, None, list()
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
-            if hasattr(project, 'description'):
-                serializer = self.serializer_class(project.description)
-                return Response({"data": serializer.data}, status=200)
-            return Response({"data": []}, status=200)
+            interviews = Interview.objects.filter(submission__project__id=kwargs.get('project_id'))
+            for interview in interviews:
+                if interview.attachment_link:
+                    recording.append({
+                        "id": interview.id,
+                        "name": interview.attachment_link.split('/')[-1]
+                    })
+
+            resume_attachment = Attachment.objects.filter(object_id=project.submission.id, attachment_type='resume')
+            if resume_attachment:
+                resume = {
+                    "id": resume_attachment.first().id,
+                    "name": os.path.split(resume_attachment.first().attachment_file.name)[1]
+                }
+            description_qs = ProjectDescription.objects.filter(project=project)
+            if description_qs:
+                description = description_qs.first()
+                description_data = {
+                    "id": description.id,
+                    "notes": description.notes,
+                    "remark": description.remark,
+                    "description": description.description,
+                }
+            recruiter, retention = project.consultant.recruiter, project.consultant.relation
+            data = {
+                "resume": resume,
+                "recordings": recording,
+                "description": description_data,
+                "job_description": project.submission.lead.job_desc,
+                "recruiter": {
+                    "id": recruiter.id,
+                    "email": recruiter.email,
+                    "name": recruiter.employee_name,
+                },
+                "retention": {
+                    "id": retention.id,
+                    "email": retention.email,
+                    "name": retention.employee_name,
+                },
+                "marketer": {
+                    "id": project.submission.created_by.id,
+                    "email": project.submission.created_by.email,
+                    "name": project.submission.created_by.employee_name,
+                },
+            }
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
-            data = request.data.copy()
-            data['project'] = kwargs.get('project_id')
-            data['update_by'] = request.user.id
-            serializer = self.serializer_class(data=data, partial=True)
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            if hasattr(project, 'description'):
+                serializer = ProjectDescriptionSerializer(project.description, request.data, partial=True)
+            else:
+                data = request.data.copy()
+                data['project'] = project.id
+                data['update_by'] = request.user.id
+                serializer = ProjectDescriptionSerializer(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
             # Activity
-            desc = f"{request.user.employee_name} added project description"
-            create_activity(serializer.data['id'], 'projectdescription', request.user, desc, 'create')
-            return Response({"message": "Description added"}, status=201)
+            if 'notes' in request.data:
+                desc = f"{request.user.employee_name} updated the interview notes"
+            elif 'remark' in request.data:
+                desc = f"{request.user.employee_name} updated the project description"
+            else:
+                desc = f"{request.user.employee_name} updated the project description"
+            create_activity(project.id, 'projectdescription', request.user, desc, 'created')
+
+            return Response({"message":  "Project description created", "data": serializer.data}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def update(self, request, *args, **kwargs):
         try:
-            description = get_object_or_404(ProjectDescription, id=kwargs.get('pk'))
-            serializer = self.serializer_class(description, data=request.data, partial=True)
+            description = ProjectDescription.objects.get(id=kwargs.get('pk'))
+            serializer = ProjectDescriptionSerializer(description, request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
             # Activity
-            desc = f"{request.user.employee_name} updated project description"
-            create_activity(description.id, 'projectdescription', request.user, desc, 'update')
-            return Response({"message": "Description Updated"}, status=202)
+            if 'notes' in request.data:
+                desc = f"{request.user.employee_name} updated the interview notes"
+            elif 'remark' in request.data:
+                desc = f"{request.user.employee_name} updated the project description"
+            else:
+                desc = f"{request.user.employee_name} updated the project description"
+            create_activity(description.project.id, 'projectdescription', request.user, desc, 'update')
+
+            return Response({"message": "Project description updated", "data": serializer.data}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    def partial_update(self, request, *args, **kwargs):
-        return Response({"detail": "Method PATCH not allowed."}, status=405)
+    @action(methods=['get'], detail=False, url_path='technology')
+    def technology(self, request, *args, **kwargs):
+        data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
+                'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
+        return Response({"data": data}, status=200)
