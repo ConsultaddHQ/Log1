@@ -16,8 +16,9 @@ class Command(BaseCommand):
         job = create_cron_object(name='rate_due_notification')
         try:
             data = []
+            counter = 1
             consultants = Consultant.objects.filter(status__in=['on_project'])
-            for count, consultant in enumerate(consultants):
+            for consultant in consultants:
                 try:
                     rate_qs = ConsultantRateRevision.objects.filter(consultant_id=consultant.id, end=None)
                     if rate_qs:
@@ -41,13 +42,14 @@ class Command(BaseCommand):
                             revision_date = project.start_date
                     if date.today() - timedelta(days=170) < revision_date:
                         data.append({
-                            "count": count,
+                            "count": counter,
                             "rate": con_rate,
                             "consultant_id": consultant.id,
                             "consultant_name": consultant.name,
                             "consultant_email": consultant.email,
                             "margin": project_rate - con_rate if project_rate != 0 else None,
                         })
+                        counter += 1
                 except Exception as error:
                     write_exception(message=error)
 
