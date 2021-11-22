@@ -21,7 +21,7 @@ from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, C
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
      ProjectOrderViewSet, ProjectSupportViewSet
-from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectDescriptionViewSet, ProjectSummaryViewSet
+from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
@@ -71,7 +71,6 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'project/(?P<project_id>[0-9]+)/updates', ProjectUpdateViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/support', ProjectSupportViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/summary', ProjectSummaryViewSet)
-router.register(r'project/(?P<project_id>[0-9]+)/description', ProjectDescriptionViewSet)
 
 router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)
