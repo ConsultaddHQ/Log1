@@ -4,7 +4,6 @@ from django.contrib.contenttypes.models import ContentType
 
 from employee.models import User, Tagging
 from notification.utils import create_notification, push_notification
-from .serializers import ProjectDescriptionSerializer
 
 
 def tag_and_notify(update, tags, user, tag_type='create'):
