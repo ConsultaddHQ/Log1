@@ -355,7 +355,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                 attachment.delete()
                 # Activity
                 desc = f"{request.user.employee_name} removed {file_name} file"
-                create_activity(update.id, 'projectupdate', request.user, desc, 'update')
+                create_activity(update.project.id, 'projectupdate', request.user, desc, 'update')
                 return Response({"message": "Document removed"}, status=202)
             return Response({"message": "Error in deleting document"}, status=400)
         except Exception as error:
@@ -363,55 +363,12 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+# Route - /project/:project_id:/summary/
 class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     permission_classes = (IsAuthenticated,)
-    queryset = Project.objects.all()
+    queryset = ProjectDescription.objects.all()
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectDescriptionSerializer
-
-    def create(self, request, *args, **kwargs):
-        try:
-            project = get_object_or_404(Project, id=kwargs.get('project_id'))
-            if hasattr(project, 'description'):
-                serializer = ProjectDescriptionSerializer(project.description, request.data, partial=True)
-            else:
-                data = request.data.copy()
-                data['project'] = project.id
-                data['update_by'] = request.user.id
-                serializer = ProjectDescriptionSerializer(data=data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-
-            # Activity
-            updated_key = "project description"
-            for key in request.data:
-                updated_key = key
-            desc = f"{request.user.employee_name} added the {updated_key}"
-            create_activity(serializer.data['id'], 'projectdescription', request.user, desc, 'created')
-
-            return Response({"message": f"{updated_key} added", "data": serializer.data}, status=201)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def update(self, request, *args, **kwargs):
-        try:
-            description = ProjectDescription.objects.get(id=kwargs.get('pk'))
-            serializer = ProjectDescriptionSerializer(description, request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-
-            # Activity
-            updated_key = str()
-            for key in request.data:
-                updated_key = key
-            desc = f"{request.user.employee_name} updated the {updated_key}"
-            create_activity(description.id, 'projectdescription', request.user, desc, 'update')
-
-            return Response({"message": f"{updated_key} updated", "data": serializer.data}, status=202)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -438,7 +395,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "id": description.id,
                     "notes": description.notes,
                     "remark": description.remark,
-                    "description": description.description
+                    "description": description.description,
                 }
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
             data = {
@@ -467,8 +424,56 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def create(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            if hasattr(project, 'description'):
+                serializer = ProjectDescriptionSerializer(project.description, request.data, partial=True)
+            else:
+                data = request.data.copy()
+                data['project'] = project.id
+                data['update_by'] = request.user.id
+                serializer = ProjectDescriptionSerializer(data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            # Activity
+            if 'notes' in request.data:
+                desc = f"{request.user.employee_name} updated the interview notes"
+            elif 'remark' in request.data:
+                desc = f"{request.user.employee_name} updated the project description"
+            else:
+                desc = f"{request.user.employee_name} updated the project description"
+            create_activity(project.id, 'projectdescription', request.user, desc, 'created')
+
+            return Response({"message":  "Project description created", "data": serializer.data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            description = ProjectDescription.objects.get(id=kwargs.get('pk'))
+            serializer = ProjectDescriptionSerializer(description, request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            # Activity
+            if 'notes' in request.data:
+                desc = f"{request.user.employee_name} updated the interview notes"
+            elif 'remark' in request.data:
+                desc = f"{request.user.employee_name} updated the project description"
+            else:
+                desc = f"{request.user.employee_name} updated the project description"
+            create_activity(description.project.id, 'projectdescription', request.user, desc, 'update')
+
+            return Response({"message": "Project description updated", "data": serializer.data}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['get'], detail=False, url_path='technology')
     def technology(self, request, *args, **kwargs):
         data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
-                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
+                'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
         return Response({"data": data}, status=200)
