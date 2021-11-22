@@ -12,12 +12,10 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from engineering.serializers import *
-from marketing.utils import date_filter
 from marketing.models import Interview
+from marketing.utils import date_filter
 from activity.views import create_activity
-from consultant.models import ConsultantPOC
 from engineering.utils import tag_and_notify
-from utils_app.aws_utils import get_s3_object
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception

@@ -11,6 +11,7 @@ from rest_framework.documentation import include_docs_urls
 from activity.views import CommentViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
+from dashboard.views import MarketingDashboardViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
@@ -25,7 +26,7 @@ from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectD
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets, MarketingDashboardViewSet, TestViewSets, SubmissionV2ViewSets
+    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     FeedbackViewSet, ConsultantImportViewSet, ConsultantV2ViewSets
