@@ -5,7 +5,7 @@ from employee.models import User
 from attachment.models import Attachment
 from attachment.serializers import AttachmentGetSerializer
 from project.models import Project, SupportStatus, TimeSheet
-from engineering.models import ProjectDescription, ProjectUpdate
+from engineering.models import ProjectDescription, ProjectUpdate, TrainingCheckList, TrainingAgenda
 
 
 class POCSerializer(serializers.ModelSerializer):
@@ -15,16 +15,17 @@ class POCSerializer(serializers.ModelSerializer):
 
 
 class EngineeringSerializer(serializers.ModelSerializer):
-    project_status = serializers.SerializerMethodField()
-    support_status = serializers.SerializerMethodField()
+    remark = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
-    remark = serializers.SerializerMethodField()
+    project_status = serializers.SerializerMethodField()
+    support_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status', 'remark')
+        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
+                  'remark')
 
     @staticmethod
     def get_project_status(obj):
@@ -32,6 +33,43 @@ class EngineeringSerializer(serializers.ModelSerializer):
         if status:
             return status.first().get_status_display()
         return None
+
+    @staticmethod
+    def get_support(obj):
+        data = []
+        for support in obj.support.all():
+            data.append({
+                "email": support.support.email,
+                "name": support.support.employee_name,
+            })
+        return data
+
+    @staticmethod
+    def get_remark(obj):
+        if hasattr(obj, 'description'):
+            remark = obj.description.remark
+            return remark
+        return None
+
+    @staticmethod
+    def get_submission(obj):
+        lead = obj.submission.lead
+        return {
+            "location": lead.city,
+            "job_title": lead.job_title,
+            "client": obj.submission.client,
+            "vendor": lead.vendor_company.name,
+        }
+
+    @staticmethod
+    def get_consultant(obj):
+        consultant = obj.submission.consultant_marketing.consultant
+        return {
+            'id': consultant.id,
+            'name': consultant.name,
+            'email': consultant.email,
+            'location': consultant.current_city
+        }
 
     @staticmethod
     def get_support_status(obj):
@@ -53,42 +91,6 @@ class EngineeringSerializer(serializers.ModelSerializer):
                     return "Independent"
                 else:
                     return None
-        return None
-
-    @staticmethod
-    def get_support(obj):
-        data = []
-        for support in obj.support.all():
-            data.append({
-                "email": support.support.email,
-                "name": support.support.employee_name,
-            })
-        return data
-
-    @staticmethod
-    def get_submission(obj):
-        lead = obj.submission.lead
-        return {
-            "location": lead.city,
-            "job_title": lead.job_title,
-            "client": obj.submission.client,
-            "vendor": lead.vendor_company.name,
-        }
-
-    @staticmethod
-    def get_consultant(obj):
-        consultant = obj.submission.consultant_marketing.consultant
-        return {
-            'id': consultant.id,
-            'name': consultant.name,
-            'email': consultant.email,
-        }
-
-    @staticmethod
-    def get_remark(obj):
-        if hasattr(obj, 'description'):
-            remark = obj.description.remark
-            return remark
         return None
 
 
@@ -147,6 +149,7 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
             'retention': retention,
             'name': consultant.name,
             'email': consultant.email,
+            'location': consultant.current_city,
         }
 
     @staticmethod
@@ -202,6 +205,7 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateGetSerializer(serializers.ModelSerializer):
+    blocker = serializers.SerializerMethodField()
     update_by = serializers.SerializerMethodField()
     tagged_user = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
@@ -209,6 +213,10 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectUpdate
         exclude = ('project',)
+
+    @staticmethod
+    def get_blocker(obj):
+        return obj.blocker.replace("<p></p>", "") if obj.blocker else obj.blocker
 
     @staticmethod
     def get_update_by(obj):
@@ -239,4 +247,16 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
 class ProjectDescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectDescription
+        fields = '__all__'
+
+
+class TrainingAgendaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainingAgenda
+        fields = '__all__'
+
+
+class TrainingCheckListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainingCheckList
         fields = '__all__'

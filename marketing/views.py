@@ -1062,19 +1062,30 @@ class InterviewViewSets(viewsets.ModelViewSet):
             user_id = request.user.id
             roles = request.user.roles
             team = request.user.team
+            queryset = Interview.objects.all()
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                queryset = Interview.objects.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                )
-            else:
+                if query.isnumeric():
+                    queryset = queryset.filter(
+                        Q(id=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+            # else:
                 # consultants = Consultant.objects.filter(marketing__status='open').values('id')
                 # queryset = Interview.objects.filter(submission__consultant_marketing__consultant_id__in=consultants)
-                queryset = Interview.objects.all()
+                # queryset = Interview.objects.all()
 
             if filter_for == 'my':
                 if 'interviewee' in roles:
@@ -2153,7 +2164,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 query = query.lstrip().replace(':amp:', '&')
                 if query.isnumeric():
                     queryset = Test.objects.filter(
-                        Q(id__exact=query)
+                        Q(id__exact=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__istartswith=query)
                     )
                 else:
                     queryset = Test.objects.filter(
