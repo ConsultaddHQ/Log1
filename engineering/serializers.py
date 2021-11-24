@@ -23,7 +23,8 @@ class EngineeringSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status')
+        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
+                  'remark')
 
     @staticmethod
     def get_project_status(obj):
@@ -31,6 +32,42 @@ class EngineeringSerializer(serializers.ModelSerializer):
         if status:
             return status.first().get_status_display()
         return None
+
+    @staticmethod
+    def get_support(obj):
+        data = []
+        for support in obj.support.all():
+            data.append({
+                "email": support.support.email,
+                "name": support.support.employee_name,
+            })
+        return data
+
+    @staticmethod
+    def get_remark(obj):
+        if hasattr(obj, 'description'):
+            remark = obj.description.remark
+            return remark
+        return None
+
+    @staticmethod
+    def get_submission(obj):
+        lead = obj.submission.lead
+        return {
+            "location": lead.city,
+            "job_title": lead.job_title,
+            "client": obj.submission.client,
+            "vendor": lead.vendor_company.name,
+        }
+
+    @staticmethod
+    def get_consultant(obj):
+        consultant = obj.submission.consultant_marketing.consultant
+        return {
+            'id': consultant.id,
+            'name': consultant.name,
+            'email': consultant.email,
+        }
 
     @staticmethod
     def get_support_status(obj):
@@ -53,35 +90,6 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 else:
                     return None
         return None
-
-    @staticmethod
-    def get_support(obj):
-        data = []
-        for support in obj.support.all():
-            data.append({
-                "email": support.support.email,
-                "name": support.support.employee_name,
-            })
-        return data
-
-    @staticmethod
-    def get_submission(obj):
-        lead = obj.submission.lead
-        return {
-            "location": lead.city,
-            "job_title": lead.job_title,
-            "client": obj.submission.client,
-            "vendor": lead.vendor_company.name,
-        }
-
-    @staticmethod
-    def get_consultant(obj):
-        consultant = obj.submission.consultant_marketing.consultant
-        return {
-            'id': consultant.id,
-            'name': consultant.name,
-            'email': consultant.email,
-        }
 
 
 class EngineeringDetailSerializer(serializers.ModelSerializer):
