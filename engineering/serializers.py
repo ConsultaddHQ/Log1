@@ -70,6 +70,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
             'email': consultant.email,
         }
 
+    @staticmethod
     def get_support_status(obj):
         if obj.statuses.filter(status__istartswith='terminated').first():
             return 'terminated'
