@@ -396,6 +396,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "notes": description.notes,
                     "remark": description.remark,
                     "description": description.description,
+                    "technology": description.technology
                 }
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
             data = {

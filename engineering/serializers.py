@@ -20,6 +20,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
     support = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
+    remark = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
