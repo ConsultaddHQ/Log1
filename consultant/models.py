@@ -15,82 +15,16 @@ from employee.models import User, Team, Tagging
 from activity.models import Comment, ConsultantComment
 from notification.models import FCMDevice, Notification
 
-CONSULTANT_STATUS_CHOICE = (
-    ('on_bench', 'On Bench'),
-    ('archived', 'Archived'),
-    ('on_project', 'On Project'),
-    ('terminated', 'Terminated')
-)
-
-MARKETING_STATUS_CHOICE = (
-    ('open', 'Open'),
-    ('close', 'Close'),
-)
-
-VISA_CHOICES = (
-    ('j1', 'J-1'),
-    ('tps', 'TPS'),
-    ('h1b', 'H-1B'),
-    ('opt', 'OPT-EAD'),
-    ('cpt', 'CPT-EAD'),
-    ('gc', 'Green Card'),
-    ('l2_ead', 'L2-EAD'),
-    ('asylum', 'Asylum'),
-    ('h4_ead', 'H-4-EAD'),
-    ('gc_ead', 'Green Card-EAD'),
-    ('us_citizen', 'US CITIZEN'),
-    ('opt_ext', 'OPT-EAD Extension'),
-)
-
-EDUCATION_CHOICES = (
-    ('phd', 'PhD'),
-    ('diploma', 'Diploma'),
-    ('masters', 'Masters'),
-    ('bachelors', 'Bachelors'),
-    ('associate', 'Associate'),
-    ('certification', 'Certification'),
-)
-
-GENDER_CHOICE = (
-    ('male', 'Male'),
-    ('female', 'Female'),
-)
-
-FEEDBACK_CHOICES = (
-    ('cfr', 'CFR'),
-    ('training', 'Training'),
-    ('screening', 'Screening'),
-    ('marketing', 'Marketing'),
-    ('engineering', 'Engineering'),
-    ('recruitment', 'Recruitment'),
-    ('re_marketing', 'Re-marketing'),
-)
-
-WORK_TYPE_CHOICE = (
-    ('c2c', 'C2C'),
-    ('full_time', 'Full Time'),
-)
-
-EXIT_STATUS_CHOICE = (
-    ('complete', 'Consultant Exit Complete'),
-    ('cancelled', 'Consultant Exit Cancelled'),
-    ('in_process', 'Consultant Exit in Process'),
-)
-
-LEGAL_STATUS_CHOICE = (
-    ('solved', "Action Solved"),
-    ('in_process', "Action in Process"),
-    ('notice_sent', "Legal Notice Sent"),
-    ('finders_fee', "Taking Finder's Fee"),
-)
-
 EXIT_TYPE_CHOICE = (
     ('fired', 'Employee Fired'),
     ('resigned', 'Employee Resigned'),
     ('absconded', 'Employee Absconded'),
 )
-
 TOKEN_GENERATOR_CLASS = get_token_generator()
+
+
+def clear_expired(expiry_time):
+    ConsultantResetPasswordToken.objects.filter(created_at__lte=expiry_time).delete()
 
 
 class ConsultantManager(BaseUserManager):
@@ -101,6 +35,20 @@ class ConsultantManager(BaseUserManager):
 
 
 class Consultant(AbstractBaseUser, TimeStampedModel):
+    WORK_TYPE_CHOICE = (
+        ('c2c', 'C2C'),
+        ('full_time', 'Full Time'),
+    )
+    GENDER_CHOICE = (
+        ('male', 'Male'),
+        ('female', 'Female'),
+    )
+    CONSULTANT_STATUS_CHOICE = (
+        ('on_bench', 'On Bench'),
+        ('archived', 'Archived'),
+        ('on_project', 'On Project'),
+        ('terminated', 'Terminated')
+    )
     is_w2 = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     first_login = models.BooleanField(default=True)
@@ -144,9 +92,6 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     USERNAME_FIELD = 'email'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -224,10 +169,6 @@ class ConsultantResetPasswordToken(models.Model):
         return f'{self.id}:{self.consultant}-{self.key}'
 
 
-def clear_expired(expiry_time):
-    ConsultantResetPasswordToken.objects.filter(created_at__lte=expiry_time).delete()
-
-
 class ConsultantToken(models.Model):
     fcm_tokens = GenericRelation(FCMDevice)
     key = models.CharField(_("Key"), max_length=40, primary_key=True)
@@ -280,6 +221,20 @@ class ConsultantPetitionToken(models.Model):
 
 
 class WorkAuth(TimeStampedModel):
+    VISA_CHOICES = (
+        ('j1', 'J-1'),
+        ('tps', 'TPS'),
+        ('h1b', 'H-1B'),
+        ('opt', 'OPT-EAD'),
+        ('cpt', 'CPT-EAD'),
+        ('gc', 'Green Card'),
+        ('l2_ead', 'L2-EAD'),
+        ('asylum', 'Asylum'),
+        ('h4_ead', 'H-4-EAD'),
+        ('gc_ead', 'Green Card-EAD'),
+        ('us_citizen', 'US CITIZEN'),
+        ('opt_ext', 'OPT-EAD Extension'),
+    )
     is_current = models.BooleanField(_('Is current Visa'), default=True)
     visa_end = models.DateField(_('Visa End Date'), blank=True, null=True)
     visa_start = models.DateField(_('Visa Start Date'), blank=True, null=True)
@@ -291,9 +246,6 @@ class WorkAuth(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -304,6 +256,14 @@ class WorkAuth(TimeStampedModel):
 
 
 class Education(models.Model):
+    EDUCATION_CHOICES = (
+        ('phd', 'PhD'),
+        ('diploma', 'Diploma'),
+        ('masters', 'Masters'),
+        ('bachelors', 'Bachelors'),
+        ('associate', 'Associate'),
+        ('certification', 'Certification'),
+    )
     title = models.CharField(_('Education Title'), max_length=300)
     remark = models.TextField(_('Additional Details'), null=True, blank=True)
     city = models.CharField(_('City'), max_length=100, blank=True, null=True)
@@ -372,9 +332,6 @@ class ConsultantProfile(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -385,6 +342,10 @@ class ConsultantProfile(TimeStampedModel):
 
 
 class ConsultantMarketing(TimeStampedModel):
+    MARKETING_STATUS_CHOICE = (
+        ('open', 'Open'),
+        ('close', 'Close'),
+    )
     rtg = models.BooleanField(_('Ready to Go'), default=False)
     cycle = models.IntegerField(_('Cycle Number'), default=1)
     in_pool = models.BooleanField(_('In Pool'), default=False)
@@ -421,9 +382,6 @@ class ConsultantMarketing(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -464,9 +422,6 @@ class ConsultantRateRevision(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -492,9 +447,6 @@ class ConsultantPOC(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -512,6 +464,18 @@ class ExitReason(models.Model):
 
 
 class ConsultantExit(TimeStampedModel):
+    EXIT_STATUS_CHOICE = (
+        ('complete', 'Consultant Exit Complete'),
+        ('cancelled', 'Consultant Exit Cancelled'),
+        ('in_process', 'Consultant Exit in Process'),
+    )
+
+    LEGAL_STATUS_CHOICE = (
+        ('solved', "Action Solved"),
+        ('in_process', "Action in Process"),
+        ('notice_sent', "Legal Notice Sent"),
+        ('finders_fee', "Taking Finder's Fee"),
+    )
     tagged_user = GenericRelation(Tagging)
     rehire = models.BooleanField(_('Fit to rehire'), default=False)
     legal_action = models.BooleanField(_('Legal Actions'), default=False)
@@ -553,9 +517,6 @@ class ConsultantExit(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -566,6 +527,15 @@ class ConsultantExit(TimeStampedModel):
 
 
 class Feedback(TimeStampedModel):
+    FEEDBACK_CHOICES = (
+        ('cfr', 'CFR'),
+        ('training', 'Training'),
+        ('screening', 'Screening'),
+        ('marketing', 'Marketing'),
+        ('engineering', 'Engineering'),
+        ('recruitment', 'Recruitment'),
+        ('re_marketing', 'Re-marketing'),
+    )
     tagged_user = GenericRelation(Tagging)
     feedback_text = models.TextField(_('Feedback'))
     feedback_type = models.CharField(
@@ -588,9 +558,6 @@ class Feedback(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

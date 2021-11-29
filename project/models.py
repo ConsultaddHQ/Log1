@@ -3,52 +3,11 @@ from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
 
-from employee.models import User
 from marketing.models import Submission
 from consultant.models import Consultant
 from attachment.models import Attachment
+from employee.models import User, Tagging
 from utils_app.models import TimeStampedModel
-
-PROJECT_STATUS_CHOICES = (
-    ("new", "New"),
-    ("other", "Other"),
-    ("joined", "Joined"),
-    ("signed", "Signed"),
-    ("received", "Received"),
-    ("extended", "Extended"),
-    ("on_boarded", "On Boarded"),
-    ("complete", "Project Completed"),
-
-    # Offer cancelled
-    ("cancelled", "Cancelled"),
-    ("cancelled-dual_offer", "Dual Offer"),
-    ("cancelled-client_cancelled", "Client Cancelled"),
-    ("cancelled-contract_conflicts", "Contract Conflicts"),
-    ("cancelled-candidate_absconded", "Candidate Absconded"),
-    ("cancelled-candidate_denied", "Candidate Denied Joining"),
-    ("cancelled_candidate_denied_jd", "Candidate Denied Joining - JD"),
-    ("cancelled-candidate_denied_rate", "Candidate Denied Joining - Rate"),
-    ("cancelled-candidate_denied_location", "Candidate Denied Joining - Location"),
-
-    # PO terminated
-    ("terminated-fired", "Fired"),
-    ("terminated-resigned", "Resigned"),
-    ("terminated", "Project Terminated"),
-    ("terminated-fired_budget_issue", "Fired - Budget Issue"),
-    ("terminated-resigned_rate_issue", "Resigned - Rate Issue"),
-    ("terminated-fired_security_issue", "Fired - Data Security Issue"),
-    ("terminated-resigned_location_issue", "Resigned - Location Issue"),
-    ("terminated-fired_performance_issue", "Fired - Performance Issue"),
-    ("terminated-resigned_full_time_offer", "Resigned - Full Time Offer"),
-    ("terminated-resigned_technology_issue", "Resigned - Technology Issue"),
-)
-
-TIMESHEET_STATUS = (
-    ('draft', 'Draft'),
-    ('rejected', 'Rejected'),
-    ('approved', 'Approved'),
-    ('submitted', 'Submitted'),
-)
 
 
 class Project(TimeStampedModel):
@@ -103,6 +62,39 @@ class Project(TimeStampedModel):
 
 
 class ProjectStatus(models.Model):
+    PROJECT_STATUS_CHOICES = (
+        ("new", "New"),
+        ("other", "Other"),
+        ("joined", "Joined"),
+        ("signed", "Signed"),
+        ("received", "Received"),
+        ("extended", "Extended"),
+        ("on_boarded", "On Boarded"),
+        ("complete", "Project Completed"),
+
+        # Offer cancelled
+        ("cancelled", "Cancelled"),
+        ("cancelled-dual_offer", "Dual Offer"),
+        ("cancelled-client_cancelled", "Client Cancelled"),
+        ("cancelled-contract_conflicts", "Contract Conflicts"),
+        ("cancelled-candidate_absconded", "Candidate Absconded"),
+        ("cancelled-candidate_denied", "Candidate Denied Joining"),
+        ("cancelled_candidate_denied_jd", "Candidate Denied Joining - JD"),
+        ("cancelled-candidate_denied_rate", "Candidate Denied Joining - Rate"),
+        ("cancelled-candidate_denied_location", "Candidate Denied Joining - Location"),
+
+        # PO terminated
+        ("terminated-fired", "Fired"),
+        ("terminated-resigned", "Resigned"),
+        ("terminated", "Project Terminated"),
+        ("terminated-fired_budget_issue", "Fired - Budget Issue"),
+        ("terminated-resigned_rate_issue", "Resigned - Rate Issue"),
+        ("terminated-fired_security_issue", "Fired - Data Security Issue"),
+        ("terminated-resigned_location_issue", "Resigned - Location Issue"),
+        ("terminated-fired_performance_issue", "Fired - Performance Issue"),
+        ("terminated-resigned_full_time_offer", "Resigned - Full Time Offer"),
+        ("terminated-resigned_technology_issue", "Resigned - Technology Issue"),
+    )
     is_current = models.BooleanField(_('Is Current'), default=True)
     created = models.DateTimeField(_('Created'), default=timezone.now)
     status = models.CharField(
@@ -138,9 +130,7 @@ class ProjectOrder(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -192,6 +182,12 @@ class SupportStatus(models.Model):
 
 
 class TimeSheet(TimeStampedModel):
+    TIMESHEET_STATUS = (
+        ('draft', 'Draft'),
+        ('rejected', 'Rejected'),
+        ('approved', 'Approved'),
+        ('submitted', 'Submitted'),
+    )
     attachments = GenericRelation(Attachment)
     start = models.DateField(_('Start'), null=True, blank=True)
     end = models.DateField(_('End'), null=True, blank=True)
@@ -234,3 +230,30 @@ class PayrollSchedule(models.Model):
 
     def __str__(self):
         return f'{self.processing_date} :: {self.pay_period_start} - {self.pay_period_end} :: {self.pay_date}'
+
+
+class ConsultantFeedback(TimeStampedModel):
+    FEEDBACK_CHOICES = (
+        ('cfr', 'CFR'),
+        ('pre_joining', 'Pre Joining'),
+        ('re_marketing', 'Re-marketing'),
+        ('rate_increment', 'Rate Increment'),
+    )
+    tagged_user = GenericRelation(Tagging)
+    description = models.TextField(_('Feedback'))
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT)
+    consultant = models.ForeignKey(Consultant, on_delete=models.CASCADE)
+    department = models.CharField(_('Feedback Department'), max_length=30)
+    verdict = models.CharField(_('Consultant Verdict'), max_length=30, null=True, blank=True)
+    feedback_type = models.CharField(_('Feedback Type'), max_length=30, choices=FEEDBACK_CHOICES)
+    rating = models.IntegerField(_('Consultant Rating'), help_text=_('Rating 1 being worst and 5 being best'))
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='feedbacks', null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(ConsultantFeedback, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.consultant.name}:{self.feedback_type}'

@@ -15,9 +15,7 @@ class Conversation(TimeStampedModel):
     user2 = models.CharField(_('User2'), max_length=20)
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -39,9 +37,7 @@ class Message(models.Model):
     created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         return super(Message, self).save(*args, **kwargs)

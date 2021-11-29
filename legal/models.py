@@ -95,9 +95,6 @@ class Petition(TimeStampedModel):
         return f'{self.beneficiary.name} :: {self.status}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -123,9 +120,6 @@ class Reason(TimeStampedModel):
         return f'{self.petition.id} :: {self.petition.status} :: {self.reason}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -178,9 +172,6 @@ class Document(TimeStampedModel):
         return f'{self.petition.beneficiary.name} attached {self.doc_type}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
