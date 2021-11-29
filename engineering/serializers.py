@@ -15,12 +15,12 @@ class POCSerializer(serializers.ModelSerializer):
 
 
 class EngineeringSerializer(serializers.ModelSerializer):
-    project_status = serializers.SerializerMethodField()
-    support_status = serializers.SerializerMethodField()
+    remark = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
-    remark = serializers.SerializerMethodField()
+    project_status = serializers.SerializerMethodField()
+    support_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Project

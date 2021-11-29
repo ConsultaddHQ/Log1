@@ -202,9 +202,6 @@ class Asset(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

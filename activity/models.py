@@ -33,9 +33,6 @@ class Activity(models.Model):
         return f'{str(self.content_type.model).title()} {self.get_activity_type_display()} by {self.user.employee_name}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         return super(Activity, self).save(*args, **kwargs)
