@@ -20,10 +20,11 @@ class EngineeringSerializer(serializers.ModelSerializer):
     support = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
+    remark = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status')
+        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status', 'remark')
 
     @staticmethod
     def get_project_status(obj):
@@ -82,6 +83,13 @@ class EngineeringSerializer(serializers.ModelSerializer):
             'name': consultant.name,
             'email': consultant.email,
         }
+
+    @staticmethod
+    def get_remark(obj):
+        if hasattr(obj, 'description'):
+            remark = obj.description.remark
+            return remark
+        return None
 
 
 class EngineeringDetailSerializer(serializers.ModelSerializer):
