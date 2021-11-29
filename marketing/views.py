@@ -2,8 +2,7 @@ import os
 import pytz
 import json
 import difflib
-from datetime import date, datetime, timedelta
-from dateutil.relativedelta import relativedelta
+from datetime import date, datetime
 
 from django.conf import settings
 from django.db import transaction
@@ -1063,19 +1062,30 @@ class InterviewViewSets(viewsets.ModelViewSet):
             user_id = request.user.id
             roles = request.user.roles
             team = request.user.team
+            queryset = Interview.objects.all()
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                queryset = Interview.objects.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                )
-            else:
+                if query.isnumeric():
+                    queryset = queryset.filter(
+                        Q(id=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+            # else:
                 # consultants = Consultant.objects.filter(marketing__status='open').values('id')
                 # queryset = Interview.objects.filter(submission__consultant_marketing__consultant_id__in=consultants)
-                queryset = Interview.objects.all()
+                # queryset = Interview.objects.all()
 
             if filter_for == 'my':
                 if 'interviewee' in roles:
@@ -1989,301 +1999,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
 
-# Route - /dashboard/
-class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
-    queryset = Submission.objects.all()
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
-
-    def list(self, request, *args, **kwargs):
-        team_name = request.GET.get("team", None)
-        filter_for = request.GET.get("filter_for", None)
-        result_count = request.GET.get("result_count", 5)
-        filter_by_time = request.GET.get("filter_by", None)
-
-        try:
-            if filter_for == 'my':
-                sub = Submission.objects.filter(created_by=request.user)
-                interviews = Interview.objects.filter(
-                    Q(supervisor=request.user) |
-                    Q(submission__created_by=request.user)
-                )
-                projects = Project.objects.filter(submission__created_by=request.user)
-
-            elif filter_for == 'team':
-                if not team_name:
-                    team_name = request.user.team.name
-                sub = Submission.objects.filter(created_by__team__name=team_name)
-                interviews = Interview.objects.filter(submission__created_by__team__name=team_name)
-                projects = Project.objects.filter(submission__created_by__team__name=team_name)
-
-            else:
-                sub = Submission.objects.all()
-                projects = Project.objects.all()
-                interviews = Interview.objects.all()
-
-            upcoming_interviews = interviews.filter(
-                status__in=['scheduled', 'rescheduled'], start_time__gte=datetime.today()
-            ).order_by('start_time')[:result_count].annotate(
-                client=F('submission__client'),
-                job_title=F('submission__lead__job_title'),
-                vendor=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client',
-                     'job_title')
-
-            upcoming_joining = projects.filter(
-                statuses__status='on_boarded', statuses__is_current=True
-            ).order_by('-start_date')[:result_count].annotate(
-                client=F('submission__client'),
-                vendor=F('submission__lead__vendor_company__name'),
-                consultant_name=F('consultant__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
-
-            new_offers = projects.filter(
-                statuses__is_current=True,
-                start_date__gte=datetime.today(),
-                statuses__status__in=['new', 'received', 'on_boarded'],
-            ).order_by('-start_date')[:result_count].annotate(
-                client=F('submission__client'),
-                consultant_name=F('consultant__name'),
-                vendor=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
-
-            data = {
-                "new_offers": new_offers,
-                "joining": upcoming_joining,
-                "interviews": upcoming_interviews
-            }
-            if filter_by_time == 'last_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
-                first = last.replace(day=1)
-
-            elif filter_by_time == 'last_6_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
-                first = last + timedelta(days=1) + relativedelta(months=-6)
-
-            else:
-                # this_month
-                first = date.today().replace(day=1)
-                last = date.today()
-
-            total = projects.count()
-            new = projects.filter(statuses__status='new', statuses__is_current=True).count()
-            joined = projects.filter(statuses__status='joined', statuses__is_current=True).count()
-            received = projects.filter(statuses__status='received', statuses__is_current=True).count()
-            on_boarded = projects.filter(statuses__status='on_boarded', statuses__is_current=True).count()
-            extended = projects.filter(statuses__status__istartswith='extended', statuses__is_current=True).count()
-            complete = projects.filter(statuses__status__istartswith='complete', statuses__is_current=True).count()
-            cancelled = projects.filter(statuses__status__istartswith='cancelled', statuses__is_current=True).count()
-            terminated = projects.filter(statuses__status__istartswith='terminate', statuses__is_current=True).count()
-            not_joined = projects.filter(
-                statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
-            ).count()
-
-            count = {
-                'total_offers': total,
-                'offer': projects.filter(created__range=[first, last]).count(),
-                'submission': sub.filter(created__range=[first, last]).count(),
-                'on_project': Consultant.objects.filter(status='on_project').count(),
-                'ba_bench': Consultant.objects.filter(skills__contains='BA', status='on_bench').count(),
-                'dev_bench': Consultant.objects.filter(status='on_bench').exclude(skills__exact='BA').count(),
-                'interview': interviews.filter(
-                    created__range=[first, last], status__in=['offer', 'feedback_due', 'failed']
-                ).count(),
-            }
-
-            offer_count = [
-                {'name': 'new', 'count': new},
-                {'name': 'joined', 'count': joined},
-                {'name': 'received', 'count': received},
-                {'name': 'extended', 'count': extended},
-                {'name': 'complete', 'count': complete},
-                {'name': 'cancelled', 'count': cancelled},
-                {'name': 'terminated', 'count': terminated},
-                {'name': 'on_boarded', 'count': on_boarded},
-                {'name': 'not_joined', 'count': not_joined},
-            ]
-            return Response({'data': data, 'count': count, 'offer_count': offer_count}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": error}, status=400)
-
-    @action(methods=['get'], detail=False, url_path='performance')
-    def marketing_performance(self, request):
-        team_name = request.GET.get("team", None)
-        filter_for = request.GET.get("filter_for", None)
-        filter_by_time = request.GET.get("filter_by", None)
-
-        try:
-            if filter_by_time == 'last_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
-                first = last.replace(day=1)
-
-                prev_last = last + relativedelta(months=-1)
-                prev_first = first + relativedelta(months=-1)
-
-            elif filter_by_time == 'last_6_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
-                first = last + timedelta(days=1) + relativedelta(months=-6)
-
-                prev_last = last + relativedelta(months=-6)
-                prev_first = first + relativedelta(months=-6)
-            else:
-                # this_month
-                last = date.today()
-                prev_first, prev_last = None, None
-                first = date.today().replace(day=1)
-
-            if filter_for == 'my':
-                new_po = Project.objects.filter(
-                    statuses__status='joined',
-                    submission__created_by=request.user,
-                    statuses__created__range=[first, last],
-                ).count()
-
-                offers_count = Project.objects.filter(
-                    submission__created__range=[first, last], submission__created_by=request.user
-                ).count()
-
-                submissions_count = Submission.objects.filter(
-                    created__range=[first, last], created_by=request.user
-                ).count()
-
-                interviews_count = Interview.objects.filter(
-                    submission__created_by=request.user,
-                    submission__created__range=[first, last],
-                    status__in=['offer', 'failed', 'feedback_due'],
-                ).count()
-
-                joining_count = Project.objects.filter(
-                    statuses__status='joined',
-                    submission__created_by=request.user,
-                    submission__created__range=[first, last],
-                ).count()
-
-            elif filter_for == 'team':
-                if not team_name:
-                    team_name = request.user.team.name
-
-                new_po = Project.objects.filter(
-                    statuses__status='joined',
-                    statuses__created__range=[first, last],
-                    submission__created_by__team__name=team_name,
-                ).count()
-
-                offers_count = Project.objects.filter(
-                    submission__created__range=[first, last], submission__created_by__team__name=team_name
-                ).count()
-
-                submissions_count = Submission.objects.filter(
-                    created__range=[first, last], created_by__team__name=team_name
-                ).count()
-
-                interviews_count = Interview.objects.filter(
-                    submission__created__range=[first, last],
-                    submission__created_by__team__name=team_name,
-                    status__in=['offer', 'failed', 'feedback_due'],
-                ).count()
-
-                joining_count = Project.objects.filter(
-                    statuses__status='joined',
-                    submission__created__range=[first, last],
-                    submission__created_by__team__name=team_name
-                ).count()
-
-            else:
-                submissions_count = Submission.objects.filter(created__range=[first, last]).count()
-                offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
-                interviews_count = Interview.objects.filter(
-                    submission__created__range=[first, last], status__in=['offer', 'failed', 'feedback_due']
-                ).count()
-                new_po = Project.objects.filter(
-                    statuses__status='joined', statuses__created__range=[first, last]
-                ).count()
-                joining_count = Project.objects.filter(
-                    statuses__status='joined', submission__created__range=[first, last]
-                ).count()
-
-            percent = None
-            if filter_by_time != 'this_month':
-                prev_po = Project.objects.filter(
-                    statuses__status='joined', created__range=[prev_first, prev_last]
-                ).count()
-
-                if prev_po != 0:
-                    percent = int(((new_po - prev_po) / prev_po) * 100)
-
-            conversions = {
-                "interview": 0,
-                "joining": 0,
-                "offers": 0,
-                "count": {
-                    "offer_count": offers_count,
-                    "joining_count": joining_count,
-                    "interview_count": interviews_count,
-                    "submission_count": submissions_count,
-                }
-            }
-            if submissions_count != 0:
-                conversions['interview'] = round((interviews_count / submissions_count) * 100, 2)
-                conversions['joining'] = round((joining_count / submissions_count) * 100, 2)
-                conversions['offers'] = round((offers_count / submissions_count) * 100, 2)
-
-            result = {
-                "joined_count": new_po,
-                "joined_percent": percent,
-                "conversions": conversions
-            }
-            return Response({"data": result}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": error}, status=400)
-
-    @action(methods=['get'], detail=False, url_path='history')
-    def dashboard_history(self, request):
-        team_name = request.GET.get("team", None)
-        filter_for = request.GET.get("filter_for", "")
-        filter_by_time = request.GET.get("filter_by", "")
-
-        try:
-            if filter_for == 'my':
-                projects = Project.objects.filter(submission__created_by=request.user)
-            elif filter_for == 'team':
-                if not team_name:
-                    team_name = request.user.team.name
-                projects = Project.objects.filter(submission__created_by__team__name=team_name)
-            else:
-                projects = Project.objects.all()
-
-            result = []
-            diff = 0
-            if filter_by_time == 'last_12_month':
-                diff = 12
-
-            elif filter_by_time == 'last_6_month':
-                diff = 6
-
-            last = date.today().replace(day=1) - timedelta(days=1) + relativedelta(months=-(diff - 1))
-            first = last.replace(day=1)
-            for i in range(diff):
-                projects_count = projects.filter(created__range=[first, last]).count()
-                data = {
-                    "month": first.strftime('%b'),
-                    "po": projects_count
-                }
-                result.append(data)
-                first = first + relativedelta(months=1)
-                last = last.replace(day=1) + relativedelta(months=2) - timedelta(days=1)
-            return Response({"data": result}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": error}, status=400)
-
-
 # Route - /test/
 class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
     queryset = Test.objects.all()
@@ -2449,7 +2164,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 query = query.lstrip().replace(':amp:', '&')
                 if query.isnumeric():
                     queryset = Test.objects.filter(
-                        Q(id__exact=query)
+                        Q(id__exact=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__istartswith=query)
                     )
                 else:
                     queryset = Test.objects.filter(

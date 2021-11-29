@@ -12,8 +12,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from engineering.serializers import *
-from marketing.utils import date_filter
 from marketing.models import Interview
+from marketing.utils import date_filter
 from activity.views import create_activity
 from engineering.utils import tag_and_notify
 from attachment.models import Attachment, create_attachment

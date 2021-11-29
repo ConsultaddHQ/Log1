@@ -2,11 +2,11 @@ import csv
 import json
 from operator import or_
 from functools import reduce
+from datetime import datetime
 from django.db import transaction
-from datetime import date, datetime
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.db.models import Subquery, OuterRef, Q
+from django.db.models import Subquery, OuterRef
 
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -48,9 +48,6 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 write_info(message=consultants, function='ConsultantV2ViewSets_list', request=request)
                 return Response({"message": ERROR_MSG, "error": consultants}, status=400)
 
-            if sort_by in ['name', 'created']:
-                consultants = consultants.order_by(sort_by)
-
             status_obj = sub_data["status_obj"]
             count = {
                 "total": consultants.count(),
@@ -61,6 +58,9 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 "terminated": status_obj['terminated'].count(),
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
+
+            if sort_by in ['name', 'created']:
+                consultants = consultants.order_by(sort_by)
 
             serializer = ConsultantV2ListSerializer(consultants[first:last], many=True)
             return Response({"count": count, "data": serializer.data}, status=200)
@@ -696,7 +696,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 if rate_revision:
                     consultant_rate = rate_revision.first().rate
                     margin = project_rate - consultant_rate
-                    margin_percentage = (margin/project_rate)*100
+                    margin_percentage = (margin / project_rate) * 100
 
             for project in projects:
                 project_data.append(

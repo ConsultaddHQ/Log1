@@ -24,35 +24,14 @@ class EngineeringSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status', 'remark')
+        fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
+                  'remark')
 
     @staticmethod
     def get_project_status(obj):
         status = obj.statuses.filter(is_current=True)
         if status:
             return status.first().get_status_display()
-        return None
-
-    @staticmethod
-    def get_support_status(obj):
-        if obj.statuses.filter(status__istartswith='terminated').first():
-            return 'terminated'
-
-        support_qs = obj.support.filter(end=None)
-        if support_qs:
-            qs = support_qs.first().statuses.filter(is_current=True)
-            if qs:
-                support_status = qs.first()
-                if obj.start_date > date.today():
-                    return "Training"
-                elif support_status.frequency == 'more_than_2_days':
-                    return "Active"
-                elif support_status.frequency == 'less_than_3_days':
-                    return "Less Active"
-                elif support_status.frequency in ('twice_a_month', 'independent'):
-                    return "Independent"
-                else:
-                    return None
         return None
 
     @staticmethod
@@ -64,6 +43,13 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 "name": support.support.employee_name,
             })
         return data
+
+    @staticmethod
+    def get_remark(obj):
+        if hasattr(obj, 'description'):
+            remark = obj.description.remark
+            return remark
+        return None
 
     @staticmethod
     def get_submission(obj):
@@ -84,11 +70,25 @@ class EngineeringSerializer(serializers.ModelSerializer):
             'email': consultant.email,
         }
 
-    @staticmethod
-    def get_remark(obj):
-        if hasattr(obj, 'description'):
-            remark = obj.description.remark
-            return remark
+    def get_support_status(obj):
+        if obj.statuses.filter(status__istartswith='terminated').first():
+            return 'terminated'
+
+        support_qs = obj.support.filter(end=None)
+        if support_qs:
+            qs = support_qs.first().statuses.filter(is_current=True)
+            if qs:
+                support_status = qs.first()
+                if obj.start_date > date.today():
+                    return "Training"
+                elif support_status.frequency == 'more_than_2_days':
+                    return "Active"
+                elif support_status.frequency == 'less_than_3_days':
+                    return "Less Active"
+                elif support_status.frequency in ('twice_a_month', 'independent'):
+                    return "Independent"
+                else:
+                    return None
         return None
 
 
