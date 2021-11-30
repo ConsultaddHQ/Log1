@@ -10,29 +10,6 @@ from employee.models import User
 from log1.utils import write_exception
 from utils_app.models import TimeStampedModel
 
-ATTACHMENT_TYPE = (
-    ('ssn', 'SSN'),
-    ('other', 'Other'),
-    ('resume', 'Resume'),
-    ('visa', 'Visa Docs'),
-    ('test', 'Test Docs'),
-    ('msa', 'MSA/Agreement'),
-    ('misc', 'Miscellaneous'),
-    ('timesheet', 'Timesheet'),
-    ('work_order', 'Work Order'),
-    ('academic', 'Academic Docs'),
-    ('photo_id', 'Miscellaneous'),
-    ('results', 'Assessment Results'),
-    ('project_update', 'Project Update'),
-    ('msa_signed', 'MSA/Agreement Signed'),
-    ('recordings', 'Interview Recordings'),
-    ('test_submit', "Test Submission Docs"),
-    ('test_feedback', "Test Feedback Docs"),
-    ('work_order_signed', 'Work Order Signed'),
-    ('work_order_msa', 'Work Order and MSA/Agreement'),
-    ('work_order_msa_signed', 'Work Order and MSA/Agreement Signed'),
-)
-
 
 def attachment_upload(instance, filename):
     if instance.content_object:
@@ -69,8 +46,28 @@ class AttachmentManager(models.Manager):
 
 
 class Attachment(TimeStampedModel):
-    objects = AttachmentManager()
-
+    ATTACHMENT_TYPE = (
+        ('ssn', 'SSN'),
+        ('other', 'Other'),
+        ('resume', 'Resume'),
+        ('visa', 'Visa Docs'),
+        ('test', 'Test Docs'),
+        ('msa', 'MSA/Agreement'),
+        ('misc', 'Miscellaneous'),
+        ('timesheet', 'Timesheet'),
+        ('work_order', 'Work Order'),
+        ('academic', 'Academic Docs'),
+        ('photo_id', 'Miscellaneous'),
+        ('results', 'Assessment Results'),
+        ('project_update', 'Project Update'),
+        ('msa_signed', 'MSA/Agreement Signed'),
+        ('recordings', 'Interview Recordings'),
+        ('test_submit', "Test Submission Docs"),
+        ('test_feedback', "Test Feedback Docs"),
+        ('work_order_signed', 'Work Order Signed'),
+        ('work_order_msa', 'Work Order and MSA/Agreement'),
+        ('work_order_msa_signed', 'Work Order and MSA/Agreement Signed'),
+    )
     object_id = models.PositiveIntegerField()
     is_active = models.BooleanField(_('Is active'), default=True)
     attachment_file = models.FileField(_('attachment'), upload_to=attachment_upload)
@@ -85,6 +82,8 @@ class Attachment(TimeStampedModel):
     )
     content_object = GenericForeignKey('content_type', 'object_id')
 
+    objects = AttachmentManager()
+
     class Meta:
         ordering = ['-created']
         verbose_name = _("attachment")
@@ -97,9 +96,6 @@ class Attachment(TimeStampedModel):
         return f'{self.creator.employee_name} attached {self.attachment_file.name}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

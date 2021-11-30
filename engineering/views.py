@@ -396,6 +396,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "notes": description.notes,
                     "remark": description.remark,
                     "description": description.description,
+                    "technology": description.technology
                 }
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
             data = {
@@ -407,12 +408,12 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "id": recruiter.id,
                     "email": recruiter.email,
                     "name": recruiter.employee_name,
-                },
+                } if recruiter else None,
                 "retention": {
                     "id": retention.id,
                     "email": retention.email,
                     "name": retention.employee_name,
-                },
+                } if retention else None,
                 "marketer": {
                     "id": project.submission.created_by.id,
                     "email": project.submission.created_by.email,
