@@ -19,7 +19,7 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelM
 from api_key.models import APIKey
 from consultant.serializers import *
 from employee.models import tag_users
-from project.models import ProjectStatus
+from project.models import ProjectStatus, ConsultantFeedback
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
@@ -1776,3 +1776,177 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
         except Exception as error:
             write_exception(message=error)
             return Response({"message": str(error)}, status=400)
+
+
+class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    queryset = ConsultantFeedback.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = FeedbackSerializer
+
+    def create(self, request, *args, **kwargs):
+        try:
+            feedback = ConsultantFeedback.objects.create(
+                created_by=request.user,
+                rating=request.data.get('rating'),
+                consultant_id=kwargs.get('id'),
+                feedback_type=request.data.get('feedback_type'),
+                department=request.data.get('department', None),
+                description=request.data.get('description'),
+                project_id=request.data.get('project_id'),
+            )
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                tag_data = {
+                    "model": "consultant_feedback",
+                    "object_id": feedback.id,
+                    "tags": tags
+                }
+                tag_users(tag_data)
+
+            employee_name = request.user.employee_name
+            consultant = feedback.consultant
+            title = f"{employee_name} tagged you in a {consultant.name}'s feedback"
+            notification_data = {
+                'title': title,
+                'category': 'info',
+                'description': title,
+                'target_id': feedback.id,
+                'sender_user_type': 'user',
+                'target_type': 'consultant_feedback',
+                'parent_id': consultant.id,
+                'parent_type': 'consultant',
+                'sender_id': request.user.id,
+                'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+            message_body = {
+                "body": title,
+                "title": title,
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'consultant',
+                    'sub_target': 'feedback',
+                    'target_id': consultant.id,
+                    'sub_target_id': feedback.id,
+                    'timestamp': str(datetime.now()),
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
+
+            # Push Notification
+            feedback_type = feedback.get_feedback_type_display()
+            poc_title = f"{feedback_type} feedback added for {consultant.name} by {employee_name}"
+            send_notification_for_user(consultant, request.user, poc_title, 'feedback', feedback.id)
+            # Activity
+            desc = f"{employee_name} added {feedback_type} feedback"
+            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
+            serializer = self.serializer_class(feedback)
+            return Response({"data": serializer.data, "message": "Consultant's feedback added"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def list(self, request, *args, **kwargs):
+        query = request.GET.get('query')
+        feedback_qs = self.queryset
+        first, last = get_page_limits(request)
+        if request.GET.get("feedback_type"):
+            feedback_qs = feedback_qs.filter(feedback_type=request.GET.get("feedback_type"))
+        if request.GET.get('project'):
+            feedback_qs = feedback_qs.filter(project__consultant__name__istartswith=request.GET.get('project'))
+        if query:
+            query = query.lstrip().replace(':amp:', '&')
+            feedback_qs = self.queryset.filter(consultant__name__istartswith=query)
+        serial = self.serializer_class(feedback_qs[first:last], many=True)
+        return Response({"data": serial.data}, status=200)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            feedback = get_object_or_404(ConsultantFeedback, id=kwargs.get('pk'))
+            if feedback.created_by != request.user:
+                return Response({"message": "can't be updated"}, status=400)
+            serializer = self.serializer_class(feedback, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            user_list = []
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                user_tag = feedback.tagged_user.all().first()
+                if not user_tag:
+                    tag_data = {"tags": tags, "model": "consultant_feedback", "object_id": feedback.id}
+                    tag_users(tag_data)
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                    user_tag.tagged_user.add(user)
+
+            employee_name = request.user.employee_name
+            consultant = feedback.consultant
+            title = f"{employee_name} tagged you in a {consultant.name}'s feedback"
+            notification_data = {
+                'title': title,
+                'category': 'info',
+                'description': title,
+                'target_id': feedback.id,
+                'target_type': 'consultantfeedback',
+                'sender_user_type': 'user',
+                'parent_id': consultant.id,
+                'parent_type': 'consultant',
+                'sender_id': request.user.id,
+                'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+
+            # Push Notification
+
+            message_body = {
+                "body": title,
+                "title": title,
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'consultant',
+                    'sub_target': 'consultantfeedback',
+                    'target_id': consultant.id,
+                    'sub_target_id': feedback.id,
+                    'timestamp': str(datetime.now()),
+                },
+            }
+            object_ids = [user.id for user in user_list]
+            push_notification(object_ids, message_body)
+
+            # Push Notification
+            title = f"{serializer.data['feedback_type']} feedback updated for {consultant.name} by {employee_name}"
+            send_notification_for_user(consultant, request.user, title, 'consultantfeedback', feedback.id)
+            # Activity
+            desc = f"{employee_name} updated {feedback.get_feedback_type_display()} feedback"
+            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
+            return Response({"data": serializer.data, "message": "Consultant's feedback updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='feedback_types')
+    def feedback_types(self, request, *args, **kwargs):
+        data = ['CFR', 'Pre joining', 'Engineering', 'Remarketing', 'Rate Increment']
+        return Response({"data": data}, status=200)
+
+    @action(methods=['get'], detail=False, url_path='department')
+    def department(self, request, *args, **kwargs):
+        data = ['Engineering', 'Marketing', 'Legal', 'Recruitment', 'Relations', 'Finance']
+        return Response({"data": data}, status=200)
