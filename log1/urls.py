@@ -55,7 +55,7 @@ router.register(r'beats_consultant', ConsultantImportViewSet)
 router.register(r'consultant_bench', ConsultantBenchViewSets)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
-router.register(r'consultant/(?P<id>[0-9]+)/feedback', ConsultantFeedbackViewSet)
+router.register(r'consultant/(?P<consultant_id>[0-9]+)/feedback', ConsultantFeedbackViewSet)
 
 router.register(r'test', TestViewSets)
 router.register(r'lead', LeadViewSets)
