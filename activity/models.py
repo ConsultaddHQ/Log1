@@ -63,9 +63,6 @@ class Comment(models.Model):
     created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
 
     def save(self, *args, **kwargs):
-        """
-            On save, update timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         return super(Comment, self).save(*args, **kwargs)
@@ -94,9 +91,6 @@ class ConsultantComment(models.Model):
     created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
 
     def save(self, *args, **kwargs):
-        """
-            On save, update timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         return super(ConsultantComment, self).save(*args, **kwargs)

@@ -14,17 +14,6 @@ from utils_app.mailing import send_email
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
 
-GENDER_CHOICE = (
-    ('male', 'Male'),
-    ('female', 'Female')
-)
-
-ASSET_TYPES = (
-    ('email', 'Email'),
-    ('social', 'Social'),
-    ('number', 'Number'),
-    ('job_board', 'Job Board')
-)
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
@@ -90,6 +79,10 @@ class User(AbstractUser, PermissionsMixin):
     """
     Custom employee realization based on Django AbstractUser and PermissionMixin.
     """
+    GENDER_CHOICE = (
+        ('male', 'Male'),
+        ('female', 'Female')
+    )
     email = models.EmailField(_('Email'))
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -179,6 +172,12 @@ def clear_expired(expiry_time):
 
 
 class Asset(TimeStampedModel):
+    ASSET_TYPES = (
+        ('email', 'Email'),
+        ('social', 'Social'),
+        ('number', 'Number'),
+        ('job_board', 'Job Board')
+    )
     username = models.CharField(_('Username'), max_length=50)
     provider = models.CharField(_('Provider'), max_length=30)
     password = models.CharField(_('Password'), max_length=50)

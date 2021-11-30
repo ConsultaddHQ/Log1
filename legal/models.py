@@ -41,7 +41,7 @@ PETITION_STATUSES = (
 
 
 def attachment_upload(instance, filename):
-    """Stores the attachment in a "per module/appname/primary key" folder"""
+    """Stores the attachment in a "per module/app_name/primary key" folder"""
     if instance.petition:
         return f'attachments/visa_petition/{instance.petition.pk}/{filename}'
     return None
