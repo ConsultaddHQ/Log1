@@ -1779,7 +1779,7 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
 
 
 # Route - /consultant/:consultant_id:/feedback
-class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
+class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, ListModelMixin):
     serializer_class = FeedbackSerializer
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantFeedback.objects.all()
@@ -1789,14 +1789,13 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
         try:
             query = request.GET.get('query')
             first, last = get_page_limits(request)
-
             if request.GET.get('project'):
                 self.queryset = self.queryset.filter(project=request.GET.get('project'))
             if request.GET.get("feedback_type"):
                 self.queryset = self.queryset.filter(feedback_type=request.GET.get("feedback_type"))
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                self.queryset = self.queryset.filter(consultant__name__icontains=query)
+                self.queryset = self.queryset.filter(created_by__employee_name__icontains=query)
             serializer = self.serializer_class(self.queryset[first:last], many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -1892,7 +1891,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
 
             tags = request.data.get('tagged_user', [])
             user_tag = feedback.tagged_user.all().first()
-            user_tag.tagged_user.clear()
+            if user_tag:
+                user_tag.tagged_user.clear()
             if len(tags) > 0:
                 if not user_tag:
                     tag_data = {
@@ -1964,3 +1964,45 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def department(self, request, *args, **kwargs):
         data = ['Engineering', 'Marketing', 'Legal', 'Recruitment', 'Relations', 'Finance']
         return Response({"data": data}, status=200)
+
+    @action(methods=['get'], detail=False, url_path='project')
+    def project(self, request, *args, **kwargs):
+        projects = Consultant.objects.get(id=kwargs.get('consultant_id')).get_project()
+        data = []
+        for project in projects:
+            project_dict = {
+                'id': project.id,
+                'vendorName': project.employer,
+                'clientName': project.submission.client,
+            }
+            data.append(project_dict)
+        return Response({"data": data}, status=200)
+
+    @action(methods=['post'], detail=False, url_path='request_feedback')
+    def request_feedback(self, request, *args, **kwargs):
+        departments = request.data.get("department", [])
+        consultant = ConsultantMarketing.objects.get(id=kwargs.get('consultant_id'))
+        obj = {
+            'Engineering': 'engineering@consultadd.com',
+            'Finance': 'finance@consultadd.com',
+            'Legal': 'legal@consultadd.com',
+            'Recruitment': 'recruitment@consultadd.com',
+            'Relations': 'relations@consultadd.com',
+        }
+        to = list()
+        for department in departments:
+            if department == 'Marketing':
+                to.append(consultant.primary_marketer.email)
+            elif department in obj.keys():
+                to.append(obj[department])
+        mail_data = {
+            "cc": [], "bcc": [], "to": to if os.environ.get('ENV') == 'prod' else ['shreyas.k@consultadd.com'],
+            'template': '../templates/request_feedback.html',
+            'subject': "Test mail Requesting consultant's feedback",
+            'context': {
+                'consultant_name': consultant.consultant.name,
+                'sender_name': request.user.employee_name
+            },
+        }
+        send_email(mail_data, request.user.email)
+        return Response({"message": "mail sent"}, status=200)

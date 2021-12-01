@@ -56,7 +56,7 @@ class Project(TimeStampedModel):
 
     def __str__(self):
         if self.consultant:
-            return f'{self.id}: {self.consultant.name}'
+            return f'{self.id}: {self.consultant.name} : {self.employer}'
         return f'{self.id}'
 
     @property
