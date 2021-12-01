@@ -19,7 +19,6 @@ from engineering.utils import tag_and_notify
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
-from engineering.serializers import TimesheetSerializer, ProjectUpdateSerializer, ProjectDescriptionSerializer
 
 
 # Route - /engineering/
@@ -478,3 +477,20 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
         data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
         return Response({"data": data}, status=200)
+
+
+# Route - /project/:project_id:/training/
+class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = TrainingAgenda.objects.all()
+    serializer_class = TrainingAgendaSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            agendas = TrainingAgenda.objects.filter(project_id=kwargs.get('project_id'))
+            serializer = self.serializer_class(agendas, many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
