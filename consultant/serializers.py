@@ -5,6 +5,7 @@ from rest_framework import serializers
 from consultant.models import *
 from project.models import Project
 from marketing.models import Interview
+from project.models import ConsultantFeedback
 from employee.serializers import TeamSerializer, UserSerializer, TaggedUserSerializer
 
 
@@ -450,6 +451,34 @@ class ConsultantFeedbackSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_created_by(obj):
         return obj.created_by.employee_name
+
+    @staticmethod
+    def get_tagged_user(obj):
+        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
+
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConsultantFeedback
+        fields = ['id', 'created', 'description', 'feedback_type', 'rating', 'tagged_user', 'consultant', 'project',
+                  'created_by', 'tagged_user']
+
+    @staticmethod
+    def get_created_by(obj):
+        return obj.created_by.employee_name
+
+    @staticmethod
+    def get_consultant(obj):
+        return obj.consultant.name
+
+    @staticmethod
+    def get_project(obj):
+        return obj.project.consultant.name
 
     @staticmethod
     def get_tagged_user(obj):

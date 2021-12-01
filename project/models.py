@@ -9,6 +9,13 @@ from attachment.models import Attachment
 from employee.models import User, Tagging
 from utils_app.models import TimeStampedModel
 
+FEEDBACK_CHOICES = (
+    ('cfr', 'CFR'),
+    ('pre_joining', 'Pre Joining'),
+    ('re_marketing', 'Re-marketing'),
+    ('rate_increment', 'Rate Increment'),
+)
+
 
 class Project(TimeStampedModel):
     attachments = GenericRelation(Attachment)
@@ -130,7 +137,6 @@ class ProjectOrder(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
