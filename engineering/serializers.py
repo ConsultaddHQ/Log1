@@ -5,7 +5,7 @@ from employee.models import User
 from attachment.models import Attachment
 from attachment.serializers import AttachmentGetSerializer
 from project.models import Project, SupportStatus, TimeSheet
-from engineering.models import ProjectDescription, ProjectUpdate
+from engineering.models import ProjectDescription, ProjectUpdate, TrainingCheckList, TrainingAgenda
 
 
 class POCSerializer(serializers.ModelSerializer):
@@ -240,4 +240,16 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
 class ProjectDescriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectDescription
+        fields = '__all__'
+
+
+class TrainingAgendaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainingAgenda
+        fields = '__all__'
+
+
+class TrainingCheckListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainingCheckList
         fields = '__all__'

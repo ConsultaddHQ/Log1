@@ -22,14 +22,15 @@ from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, C
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
      ProjectOrderViewSet, ProjectSupportViewSet
-from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet
+from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
+    TrainingCheckListViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
-    FeedbackViewSet, ConsultantImportViewSet, ConsultantV2ViewSets
+    FeedbackViewSet, ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
 
 
 router = DefaultRouter()
@@ -55,6 +56,7 @@ router.register(r'beats_consultant', ConsultantImportViewSet)
 router.register(r'consultant_bench', ConsultantBenchViewSets)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
+router.register(r'consultant/(?P<consultant_id>[0-9]+)/feedback', ConsultantFeedbackViewSet)
 
 router.register(r'test', TestViewSets)
 router.register(r'lead', LeadViewSets)
@@ -72,6 +74,8 @@ router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'project/(?P<project_id>[0-9]+)/updates', ProjectUpdateViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/support', ProjectSupportViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/summary', ProjectSummaryViewSet)
+router.register(r'project/(?P<project_id>[0-9]+)/training', TrainingAgendaViewSet)
+router.register(r'project/(?P<project_id>[0-9]+)/checklist', TrainingCheckListViewSet)
 
 router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)

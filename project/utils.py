@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
@@ -7,6 +8,7 @@ from employee.models import User
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
+from engineering.models import TrainingCheckList
 from utils_app.calendar import get_profile_picture
 from consultant.utils import send_notification_for_user
 from log1.utils import post_msg_using_webhook, password_generator, write_exception
@@ -480,3 +482,18 @@ def send_support_mail(project, support, request):
     except Exception as error:
         write_exception(message=error, request=request)
         return error, "error"
+
+
+def create_checklist(project_id, request):
+    try:
+        file = open('data/checklist.json', 'r')
+        data = json.loads(file.read())
+        file.close()
+        for index, checklist in enumerate(data['checklist']):
+            TrainingCheckList.objects.create(
+                task=checklist,
+                position=index + 1,
+                project_id=project_id
+            )
+    except Exception as error:
+        write_exception(error, request)
