@@ -59,10 +59,11 @@ class TrainingCheckList(TimeStampedModel):
         ('incomplete', 'Incomplete'),
         ('not_applicable', 'Not Applicable'),
     )
+    position = models.IntegerField(_('Position'), null=True)
     task = models.TextField(_('Task'), blank=True, null=True)
     remark = models.TextField(_('Remark'), blank=True, null=True)
-    status = models.CharField(_('Status'), max_length=20, choices=STATUS, null=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='check_list')
+    status = models.CharField(_('Status'), max_length=20, choices=STATUS, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -71,7 +72,7 @@ class TrainingCheckList(TimeStampedModel):
         return super(TrainingCheckList, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.project.id
+        return str(self.project.id)
 
 
 class TrainingAgenda(TimeStampedModel):
@@ -80,6 +81,7 @@ class TrainingAgenda(TimeStampedModel):
         ('incomplete', 'Incomplete'),
         ('not_applicable', 'Not Applicable'),
     )
+    position = models.IntegerField(_('Position'), null=True)
     remark = models.TextField(_('Remark'), blank=True, null=True)
     duration = models.CharField(_('Duration'), max_length=30, null=True)
     description = models.TextField(_('Description'), blank=True, null=True)
@@ -87,6 +89,7 @@ class TrainingAgenda(TimeStampedModel):
     status = models.CharField(_('Status'), max_length=30, null=True, blank=True)
     assignment_submitted = models.BooleanField(_('Assignment Submitted'), null=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='agenda')
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agendas')
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -95,4 +98,4 @@ class TrainingAgenda(TimeStampedModel):
         return super(TrainingAgenda, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.project.id
+        return str(self.project.id)

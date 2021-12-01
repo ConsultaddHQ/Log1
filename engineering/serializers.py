@@ -247,3 +247,9 @@ class TrainingAgendaSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainingAgenda
         fields = '__all__'
+
+
+class TrainingCheckListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainingCheckList
+        fields = '__all__'
