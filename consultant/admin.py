@@ -131,3 +131,11 @@ class ConsultantExitAdmin(ExportActionModelAdmin):
 class ExitReasonAdmin(ExportActionModelAdmin):
     search_fields = ('name',)
     list_display = ('id', 'name')
+
+
+@admin.register(MSAccount)
+class MSAccountAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
+    list_filter = ('licence_assigned',)
+    search_fields = ('email', 'consultant__email', 'user_id', 'member_id')
+    list_display = ('id', 'email', 'consultant', 'licence_assigned', 'user_id', 'member_id')
