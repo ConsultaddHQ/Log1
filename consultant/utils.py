@@ -760,7 +760,32 @@ def pre_joining_feedback_notification(feedback):
                 }
             ]
         }
-        post_msg_using_webhook(config.pre_joining_call_feedback, data)
+        post_msg_using_webhook(config.pre_joining_call_feedback_url, data)
+        return "ok"
+    except Exception as error:
+        write_info(message=error, function='coder_request_notification')
+        return str(error)
+
+
+def engineering_feedback_notification(feedback):
+    try:
+        project = feedback.project
+        description = feedback.description
+        data = {
+            "@type": "MessageCard",
+            "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
+            "summary": f"***Issue feedback added***",
+            "sections": [
+                {
+                    "activityTitle": f"***{project.consultant.name}*** :: ***{project.submission.lead.job_title}*** :: ***{project.submission.client}***",
+                    "activitySubtitle": f"***{'Issue feedback added'}***",
+                    "activityText": description,
+                    "markdown": True
+                }
+            ]
+        }
+        post_msg_using_webhook(config.engineering_url, data)
         return "ok"
     except Exception as error:
         write_info(message=error, function='coder_request_notification')
