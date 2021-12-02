@@ -27,7 +27,7 @@ from project.models import ProjectStatus, ConsultantFeedback, FEEDBACK_CHOICES
 from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
     terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter, \
-    candidate_filter, pre_joining_feedback_notification
+    candidate_filter, pre_joining_feedback_notification, engineering_feedback_notification
 
 
 # Route - /v2/consultant/
@@ -1849,6 +1849,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             create_notification(user_list, notification_data)
             if feedback.feedback_type == 'pre_joining':
                 pre_joining_feedback_notification(feedback)
+            elif feedback.feedback_type == 'issue':
+                engineering_feedback_notification(feedback)
             # Push Notification
             message_body = {
                 "body": title,
