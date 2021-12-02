@@ -1,5 +1,6 @@
 import csv
 import json
+import os
 from operator import or_
 from functools import reduce
 from datetime import datetime
@@ -1833,7 +1834,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 user_list.append(consultant.relation)
             employee_name = request.user.employee_name
             feedback_type = feedback.get_feedback_type_display()
-            title = f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback"
+            title = f"{feedback_type} feedback added for {consultant.name} by {employee_name} from {feedback.department}.{os.linesep}"\
+                    f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback"
             notification_data = {
                 'title': title,
                 'category': 'info',
@@ -1974,20 +1976,12 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
 
     @action(methods=['get'], detail=False, url_path='project')
     def project(self, request, *args, **kwargs):
-        projects = Consultant.objects.get(id=kwargs.get('consultant_id')).get_project()
-        data = []
-        for project in projects:
-            project_dict = {
-                'id': project.id,
-                'vendorName': project.employer,
-                'clientName': project.submission.client,
-            }
-            data.append(project_dict)
-        return Response({"data": data}, status=200)
+        projects = Consultant.objects.get(id=kwargs.get('consultant_id')).get_project().values('id', 'employer', 'submission__client')
+        return Response({"data": projects}, status=200)
 
     @action(methods=['post'], detail=False, url_path='request_feedback')
     def request_feedback(self, request, *args, **kwargs):
-        departments = request.data.get("department", ['Marketing'])
+        departments = request.data.get("department", [])
         project = Project.objects.filter(consultant=kwargs.get('consultant_id'), statuses__status__in=['new', 'joined', 'extended', 'complete']).order_by('-modified').first()
         if project is None:
             project = Project.objects.filter(consultant=kwargs.get('consultant_id'), statuses__status__icontains="terminate").order_by('-modified').first()
@@ -2006,7 +2000,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             elif department in obj.keys():
                 to.append(obj[department])
         mail_data = {
-            "cc": [], "bcc": [], "to": to if os.environ.get('ENV') == 'prod' else ['test_mail@consultadd.com'],
+            "cc": [], "bcc": [], "to": to,
             'template': '../templates/request_feedback.html',
             'subject': "Test mail Requesting consultant's feedback",
             'context': {
@@ -2016,5 +2010,6 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 'feedback_type': request.data['feedback_type']
             },
         }
-        send_email(mail_data, request.user.email)
+        if os.environ.get('ENV', 'local') == 'prod':
+            send_email(mail_data, request.user.email)
         return Response({"message": "mail sent"}, status=201)
