@@ -741,3 +741,27 @@ def candidate_filter(request):
     except Exception as error:
         write_exception(error, request)
         return str(error), "error"
+
+
+def pre_joining_feedback_notification(feedback):
+    try:
+        project = feedback.project
+        description = feedback.description
+        data = {
+            "@type": "MessageCard",
+            "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
+            "summary": f"Pre-Joining feedback added",
+            "sections": [
+                {
+                    "activityTitle": f"{project.consultant.name} :: {project.submission.lead.job_title} :: {project.submission.client}",
+                    "activityText": description,
+                    "markdown": True
+                }
+            ]
+        }
+        post_msg_using_webhook(config.pre_joining_call_feedback, data)
+        return "ok"
+    except Exception as error:
+        write_info(message=error, function='coder_request_notification')
+        return str(error)

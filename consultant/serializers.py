@@ -465,8 +465,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantFeedback
-        fields = ['id', 'created', 'description', 'feedback_type', 'rating', 'project', 'consultant',
-                  'created_by', 'tagged_user']
+        fields = "__all__"
 
     @staticmethod
     def get_created_by(obj):
@@ -476,6 +475,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
     def get_project(obj):
         if obj.project:
             data = {
+                'id': obj.project.id,
                 'vendorName': obj.project.employer,
                 'clientName': obj.project.submission.client,
             }
