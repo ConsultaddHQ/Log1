@@ -32,7 +32,7 @@ from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_li
 from notification.utils import push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status
+    fetch_project_status, create_checklist
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
@@ -497,6 +497,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
                 sub.status = 'project'
                 sub.save()
+
+                # Creating Project training Checklist
+                create_checklist(project.id, request)
 
                 # Activity
                 desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
