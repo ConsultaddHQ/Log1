@@ -14,6 +14,7 @@ FEEDBACK_CHOICES = (
     ('pre_joining', 'Pre Joining'),
     ('re_marketing', 'Re-marketing'),
     ('rate_increment', 'Rate Increment'),
+    ('engineering', 'Engineering')
 )
 
 
