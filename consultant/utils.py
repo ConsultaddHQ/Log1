@@ -743,19 +743,18 @@ def candidate_filter(request):
         return str(error), "error"
 
 
-def pre_joining_feedback_notification(feedback):
+def pre_joining_feedback_notification(feedback, request):
     try:
         project = feedback.project
-        description = feedback.description
         data = {
             "@type": "MessageCard",
             "themeColor": "#0076D7",
             "@context": "http://schema.org/extensions",
-            "summary": f"Pre-Joining feedback added",
+            "summary": f"Pre-Joining-Call feedback",
             "sections": [
                 {
                     "activityTitle": f"{project.consultant.name} :: {project.submission.lead.job_title} :: {project.submission.client}",
-                    "activityText": description,
+                    "activityText": feedback.description,
                     "markdown": True
                 }
             ]
@@ -763,24 +762,24 @@ def pre_joining_feedback_notification(feedback):
         post_msg_using_webhook(config.pre_joining_call_feedback_url, data)
         return "ok"
     except Exception as error:
-        write_info(message=error, function='coder_request_notification')
+        write_exception(message=error, request=request)
         return str(error)
 
 
-def engineering_feedback_notification(feedback):
+def engineering_feedback_notification(feedback, request):
     try:
         project = feedback.project
-        description = feedback.description
         data = {
             "@type": "MessageCard",
             "themeColor": "#0076D7",
             "@context": "http://schema.org/extensions",
-            "summary": f"***Issue feedback added***",
+            "summary": f"***Support Issue feedback***",
             "sections": [
                 {
-                    "activityTitle": f"***{project.consultant.name}*** :: ***{project.submission.lead.job_title}*** :: ***{project.submission.client}***",
-                    "activitySubtitle": f"***{'Issue feedback added'}***",
-                    "activityText": description,
+                    "activityTitle": f"***{project.consultant.name}*** :: ***{project.submission.lead.job_title}*** "
+                                     f":: ***{project.submission.client}***",
+                    "activitySubtitle": f"***Issue feedback added***",
+                    "activityText": feedback.description,
                     "markdown": True
                 }
             ]
@@ -788,5 +787,46 @@ def engineering_feedback_notification(feedback):
         post_msg_using_webhook(config.engineering_url, data)
         return "ok"
     except Exception as error:
-        write_info(message=error, function='coder_request_notification')
+        write_exception(message=error, request=request)
+        return str(error)
+
+
+def create_and_send_notification(consultant, feedback, title, user_list, request):
+    try:
+        notification_data = {
+            'title': title,
+            'category': 'info',
+            'description': title,
+            'target_id': feedback.id,
+            'sender_user_type': 'user',
+            'parent_id': consultant.id,
+            'parent_type': 'consultant',
+            'sender_id': request.user.id,
+            'recipient_user_type': 'user',
+            'target_type': 'consultantfeedback',
+        }
+        create_notification(user_list, notification_data)
+
+        # Push Notification
+        message_body = {
+            "body": title,
+            "title": title,
+            "category": "alert",
+            "show_in_foreground": True,
+            "click_action": "https://app.log1.com",
+            "data": {
+                'is_read': False,
+                'is_deleted': False,
+                'target': 'consultant',
+                'target_id': consultant.id,
+                'sub_target_id': feedback.id,
+                'timestamp': str(datetime.now()),
+                'sub_target': 'consultantfeedback',
+            },
+        }
+        object_ids = [user.id for user in user_list]
+        push_notification(object_ids, message_body)
+        return False
+    except Exception as error:
+        write_exception(message=error, request=request)
         return str(error)
