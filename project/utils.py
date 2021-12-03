@@ -439,7 +439,7 @@ class ProjectUtil:
 
 def fetch_scrum_masters(user):
     scrum_masters = list(User.objects.filter(
-        team=user.team, role__name__in=['admin', 'proxy'], is_active=True
+        team=user.team, role__name__in=['admin', 'proxy'], account_login=True
     ).values_list('email', flat=True))
     return scrum_masters
 
