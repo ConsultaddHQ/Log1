@@ -8,7 +8,7 @@ from log1.utils import write_exception, write_info
 class MicrosoftAccount:
     def __init__(self):
         self.headers = self.get_ms_header()
-        self.team = "76e64f25-b1cd-4250-9047-14a0dcee0915"
+        self.team = os.environ.get('consultadd_us_team_id')
 
     def get_ms_header(self):
         try:
@@ -71,8 +71,7 @@ class MicrosoftAccount:
             response = requests.patch(url, headers=self.headers, data=json.dumps(data))
             data = json.loads(response.text.encode('utf-8'))
             if response.status_code == 201:
-                self.user_id = data['id']
-                return self.user_id, "ok"
+                return data['id'], "ok"
             else:
                 write_info(message=data, function='create_account')
                 return str(data), "error"
@@ -87,7 +86,7 @@ class MicrosoftAccount:
                 "addLicenses": [
                     {
                         "disabledPlans": [],
-                        "skuId": "710779e8-3d4a-4c88-adb9-386c958d1fdf"
+                        "skuId": os.environ.get('licence_id')
                     }
                 ],
             }
@@ -106,11 +105,11 @@ class MicrosoftAccount:
     def remove_licence(self, user_id):
         try:
             data = {
-                "removeLicenses": ["710779e8-3d4a-4c88-adb9-386c958d1fdf"],
+                "removeLicenses": [os.environ.get('licence_id')],
                 "addLicenses": [
                     {
                         "disabledPlans": [],
-                        "skuId": "710779e8-3d4a-4c88-adb9-386c958d1fdf"
+                        "skuId": os.environ.get('licence_id')
                     }
                 ],
             }
