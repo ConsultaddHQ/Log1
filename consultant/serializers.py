@@ -459,27 +459,36 @@ class ConsultantFeedbackSerializer(serializers.ModelSerializer):
 
 class FeedbackSerializer(serializers.ModelSerializer):
     created_by = serializers.SerializerMethodField()
-    consultant = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
     tagged_user = serializers.SerializerMethodField()
 
     class Meta:
         model = ConsultantFeedback
-        fields = ['id', 'created', 'description', 'feedback_type', 'rating', 'tagged_user', 'consultant', 'project',
-                  'created_by', 'tagged_user']
-
-    @staticmethod
-    def get_created_by(obj):
-        return obj.created_by.employee_name
+        fields = "__all__"
 
     @staticmethod
     def get_consultant(obj):
         return obj.consultant.name
 
     @staticmethod
+    def get_created_by(obj):
+        return obj.created_by.employee_name
+
+    @staticmethod
     def get_project(obj):
-        return obj.project.consultant.name
+        if obj.project:
+            data = {
+                'id': obj.project.id,
+                'client_name': obj.project.submission.client,
+                'vendor_name': obj.project.submission.vendor.name,
+            }
+            return data
+        return None
 
     @staticmethod
     def get_tagged_user(obj):
-        return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
+        if obj.tagged_user:
+            return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
+        return None
+

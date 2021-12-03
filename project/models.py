@@ -11,7 +11,10 @@ from utils_app.models import TimeStampedModel
 
 FEEDBACK_CHOICES = (
     ('cfr', 'CFR'),
+    ('issue', 'Issue'),
+    ('2_week', '2 Week'),
     ('pre_joining', 'Pre Joining'),
+    ('independent', 'Independent'),
     ('re_marketing', 'Re-marketing'),
     ('rate_increment', 'Rate Increment'),
 )
@@ -239,15 +242,6 @@ class PayrollSchedule(models.Model):
 
 
 class ConsultantFeedback(TimeStampedModel):
-    FEEDBACK_CHOICES = (
-        ('cfr', 'CFR'),
-        ('issue', 'Issue'),
-        ('2_week', '2 Week'),
-        ('pre_joining', 'Pre Joining'),
-        ('independent', 'Independent'),
-        ('re_marketing', 'Re-marketing'),
-        ('rate_increment', 'Rate Increment'),
-    )
     tagged_user = GenericRelation(Tagging)
     description = models.TextField(_('Feedback'))
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
