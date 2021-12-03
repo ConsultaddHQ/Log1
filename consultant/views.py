@@ -1789,18 +1789,18 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query')
-            feedback_type = json.loads(request.GET.get('feedback_type'))
+            feedback_type = json.loads(request.GET.get('feedback_type', '{"type":[]}'))
             first, last = get_page_limits(request)
-            consultant_feedback = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
+            consultant_feedbacks = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
             if request.GET.get('project'):
-                consultant_feedback = consultant_feedback.filter(project=request.GET.get('project'))
+                consultant_feedbacks = consultant_feedbacks.filter(project=request.GET.get('project'))
             if feedback_type['type']:
-                consultant_feedback = consultant_feedback.filter(feedback_type__in=feedback_type['type'])
+                consultant_feedbacks = consultant_feedbacks.filter(feedback_type__in=feedback_type['type'])
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                consultant_feedback = consultant_feedback.filter(created_by__employee_name__icontains=query)
-            serializer = self.serializer_class(consultant_feedback[first:last], many=True)
-            return Response({"count": len(consultant_feedback), "data": serializer.data}, status=200)
+                consultant_feedbacks = consultant_feedbacks.filter(created_by__employee_name__icontains=query)
+            serializer = self.serializer_class(consultant_feedbacks[first:last], many=True)
+            return Response({"count": len(consultant_feedbacks), "data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1816,6 +1816,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 description=request.data.get('description'),
                 feedback_type=request.data.get('feedback_type'),
                 department=request.data.get('department', None),
+                verdict=request.data.get('verdict', None)
             )
             tags = request.data.get('tagged_user', [])
             consultant = feedback.consultant
@@ -1979,12 +1980,13 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     @action(methods=['get'], detail=False, url_path='project')
     def project(self, request, *args, **kwargs):
         projects = Consultant.objects.get(id=kwargs.get('consultant_id')).get_project().values(
-            'id', 'employer', 'submission__client')
+            'id', 'submission__client', 'submission__lead__vendor_company__name')
         return Response({"data": projects}, status=200)
 
     @action(methods=['post'], detail=False, url_path='request_feedback')
     def request_feedback(self, request, *args, **kwargs):
         departments = request.data.get("department", [])
+        consultant = Consultant.objects.get(id=kwargs.get('consultant_id'))
         projects = Project.objects.filter(
             consultant=kwargs.get('consultant_id'), statuses__status__in=['new', 'joined', 'extended', 'complete']
         ).order_by('-modified')
@@ -1992,8 +1994,6 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             projects = Project.objects.filter(
                 consultant=kwargs.get('consultant_id'), statuses__status__icontains="terminate"
             ).order_by('-modified')
-        if projects:
-            project = projects.first()
         obj = {
             'Legal': 'legal@consultadd.com',
             'Finance': 'finance@consultadd.com',
@@ -2002,18 +2002,18 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             'Recruitment': 'recruitment@consultadd.com',
         }
         to = list()
-        for department in departments:
-            if department == 'Marketing':
-                to.append(project.submission.created_by.email)
-                to.extend(fetch_scrum_masters(project.submission.created_by))
-            elif department in obj.keys():
-                to.append(obj[department])
+        if projects:
+            if 'Marketing' in departments:
+                to.append(projects.first().submission.created_by.email)
+                to.extend(fetch_scrum_masters(projects.first().submission.created_by))
+                departments.remove('Marketing')
+            to = [obj[department] for department in departments]
         mail_data = {
             "cc": [], "bcc": [], "to": to,
             'template': '../templates/request_feedback.html',
             'subject': "Test mail Requesting consultant's feedback",
             'context': {
-                'consultant_name': project.consultant.name,
+                'consultant_name': consultant.name,
                 'sender_name': request.user.employee_name,
                 'link': f'https://app.log1.com/#/consultant/bench/{kwargs.get("consultant_id")}?key=feedback',
                 'feedback_type': request.data['feedback_type']
