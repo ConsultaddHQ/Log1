@@ -11,10 +11,12 @@ from utils_app.models import TimeStampedModel
 
 FEEDBACK_CHOICES = (
     ('cfr', 'CFR'),
+    ('issue', 'Issue'),
+    ('2_week', '2 Week'),
     ('pre_joining', 'Pre Joining'),
+    ('independent', 'Independent'),
     ('re_marketing', 'Re-marketing'),
     ('rate_increment', 'Rate Increment'),
-    ('engineering', 'Engineering')
 )
 
 
@@ -57,7 +59,7 @@ class Project(TimeStampedModel):
 
     def __str__(self):
         if self.consultant:
-            return f'{self.id}: {self.consultant.name} : {self.employer}'
+            return f'{self.id}: {self.consultant.name}'
         return f'{self.id}'
 
     @property

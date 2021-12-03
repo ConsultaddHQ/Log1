@@ -1,6 +1,5 @@
 import csv
 import json
-import os
 from operator import or_
 from functools import reduce
 from datetime import datetime
@@ -1979,21 +1978,28 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
 
     @action(methods=['get'], detail=False, url_path='project')
     def project(self, request, *args, **kwargs):
-        projects = Consultant.objects.get(id=kwargs.get('consultant_id')).get_project().values('id', 'employer', 'submission__client')
+        projects = Consultant.objects.get(id=kwargs.get('consultant_id')).get_project().values(
+            'id', 'employer', 'submission__client')
         return Response({"data": projects}, status=200)
 
     @action(methods=['post'], detail=False, url_path='request_feedback')
     def request_feedback(self, request, *args, **kwargs):
         departments = request.data.get("department", [])
-        project = Project.objects.filter(consultant=kwargs.get('consultant_id'), statuses__status__in=['new', 'joined', 'extended', 'complete']).order_by('-modified').first()
-        if project is None:
-            project = Project.objects.filter(consultant=kwargs.get('consultant_id'), statuses__status__icontains="terminate").order_by('-modified').first()
+        projects = Project.objects.filter(
+            consultant=kwargs.get('consultant_id'), statuses__status__in=['new', 'joined', 'extended', 'complete']
+        ).order_by('-modified')
+        if projects is None:
+            projects = Project.objects.filter(
+                consultant=kwargs.get('consultant_id'), statuses__status__icontains="terminate"
+            ).order_by('-modified')
+        if projects:
+            project = projects.first()
         obj = {
-            'Engineering': 'engineering@consultadd.com',
-            'Finance': 'finance@consultadd.com',
             'Legal': 'legal@consultadd.com',
-            'Recruitment': 'recruitment@consultadd.com',
+            'Finance': 'finance@consultadd.com',
             'Relations': 'relations@consultadd.com',
+            'Engineering': 'engineering@consultadd.com',
+            'Recruitment': 'recruitment@consultadd.com',
         }
         to = list()
         for department in departments:
