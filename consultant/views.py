@@ -1,11 +1,6 @@
 import csv
-import json
-from operator import or_
-from functools import reduce
-from datetime import datetime
 from django.db import transaction
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef
 
 from rest_framework import viewsets
@@ -16,17 +11,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
 
+from consultant.utils import *
 from api_key.models import APIKey
 from consultant.serializers import *
 from employee.models import tag_users
+from project.utils import fetch_scrum_masters
+from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
 from project.models import ProjectStatus, ConsultantFeedback, FEEDBACK_CHOICES
 from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
-    terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter, \
-    candidate_filter
 
 
 # Route - /v2/consultant/
@@ -414,7 +409,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             activities = Activity.objects.filter(
                 object_id=pk, content_type__model='consultant'
-            ).order_by('created')
+            ).order_by('-created')
             serializer = ActivitySerializer(activities, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -1495,6 +1490,12 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit, request)
 
+            if con_exit.status == 'complete':
+                qs = MSAccount.objects.filter(consultant=con_exit.consultant)
+                if qs:
+                    account = MicrosoftAccount()
+                    account.remove_member(qs.first().member_id)
+
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
             create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
@@ -1779,7 +1780,7 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
 
 
 # Route - /consultant/:consultant_id:/feedback
-class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
+class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, ListModelMixin):
     serializer_class = FeedbackSerializer
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantFeedback.objects.all()
@@ -1788,17 +1789,18 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query')
+            feedback_type = json.loads(request.GET.get('feedback_type', []))
             first, last = get_page_limits(request)
-
+            queryset = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
             if request.GET.get('project'):
-                self.queryset = self.queryset.filter(project=request.GET.get('project'))
-            if request.GET.get("feedback_type"):
-                self.queryset = self.queryset.filter(feedback_type=request.GET.get("feedback_type"))
+                queryset = queryset.filter(project_id=request.GET.get('project'))
+            if feedback_type:
+                queryset = queryset.filter(feedback_type__in=feedback_type)
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                self.queryset = self.queryset.filter(consultant__name__icontains=query)
-            serializer = self.serializer_class(self.queryset[first:last], many=True)
-            return Response({"data": serializer.data}, status=200)
+                queryset = queryset.filter(created_by__employee_name__icontains=query)
+            serializer = self.serializer_class(queryset[first:last], many=True)
+            return Response({"count": len(queryset), "data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1810,11 +1812,23 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 created_by=request.user,
                 project_id=request.data.get('project'),
                 rating=request.data.get('rating', None),
+                verdict=request.data.get('verdict', None),
                 consultant_id=kwargs.get('consultant_id'),
                 description=request.data.get('description'),
                 feedback_type=request.data.get('feedback_type'),
                 department=request.data.get('department', None),
             )
+
+            if feedback.feedback_type == 'pre_joining':
+                pre_joining_feedback_notification(feedback, request)
+            elif feedback.feedback_type == 'issue':
+                engineering_feedback_notification(feedback, request)
+
+            consultant = feedback.consultant
+            employee_name = request.user.employee_name
+            feedback_type = feedback.get_feedback_type_display()
+
+            # Tagging notification
             tags = request.data.get('tagged_user', [])
             if len(tags) > 0:
                 for tag in tags:
@@ -1827,51 +1841,22 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 }
                 tag_users(tag_data)
 
-            consultant = feedback.consultant
-            employee_name = request.user.employee_name
-            feedback_type = feedback.get_feedback_type_display()
-            title = f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback"
-            notification_data = {
-                'title': title,
-                'category': 'info',
-                'description': title,
-                'target_id': feedback.id,
-                'sender_user_type': 'user',
-                'parent_id': consultant.id,
-                'parent_type': 'consultant',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'target_type': 'consultantfeedback',
-            }
-            create_notification(user_list, notification_data)
+            title = f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback."
+            create_and_send_notification(consultant, feedback, title, user_list, request)
 
-            # Push Notification
-            message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'consultant',
-                    'target_id': consultant.id,
-                    'sub_target_id': feedback.id,
-                    'timestamp': str(datetime.now()),
-                    'sub_target': 'consultantfeedback',
-                },
-            }
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
+            # POC Notification
+            user_list = []
+            pocs = consultant.pocs.all()
+            for user in pocs:
+                user_list.append(user.poc)
+
+            title = f"{feedback_type} feedback added for {consultant.name} by {employee_name} from " \
+                    f"{feedback.department}."
+            create_and_send_notification(consultant, feedback, title, user_list, request)
 
             # Activity
             desc = f"{employee_name} added {feedback_type} feedback"
             create_activity(consultant.id, 'consultant', request.user, desc, 'created')
-
-            # Push Notification
-            poc_title = f"{feedback_type} feedback added for {consultant.name} by {employee_name}"
-            send_notification_for_user(consultant, request.user, poc_title, 'feedback', feedback.id)
 
             serializer = self.serializer_class(feedback)
             return Response({"data": serializer.data, "message": "Feedback added"}, status=201)
@@ -1890,9 +1875,15 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
+            consultant = feedback.consultant
+            employee_name = request.user.employee_name
+            feedback_type = feedback.get_feedback_type_display()
+
+            # Tagging notification
             tags = request.data.get('tagged_user', [])
             user_tag = feedback.tagged_user.all().first()
-            user_tag.tagged_user.clear()
+            if user_tag:
+                user_tag.tagged_user.clear()
             if len(tags) > 0:
                 if not user_tag:
                     tag_data = {
@@ -1906,51 +1897,22 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                     user_list.append(user)
                     user_tag.tagged_user.add(user)
 
-            consultant = feedback.consultant
-            employee_name = request.user.employee_name
-            feedback_type = feedback.get_feedback_type_display()
             title = f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback"
-            notification_data = {
-                'title': title,
-                'category': 'info',
-                'description': title,
-                'target_id': feedback.id,
-                'sender_user_type': 'user',
-                'parent_id': consultant.id,
-                'parent_type': 'consultant',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'target_type': 'consultantfeedback',
-            }
-            create_notification(user_list, notification_data)
+            create_and_send_notification(consultant, feedback, title, user_list, request)
 
             # Push Notification
-            message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'consultant',
-                    'target_id': consultant.id,
-                    'sub_target_id': feedback.id,
-                    'timestamp': str(datetime.now()),
-                    'sub_target': 'consultantfeedback',
-                },
-            }
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
+            user_list = []
+            pocs = consultant.pocs.all()
+            for user in pocs:
+                user_list.append(user.poc)
+
+            title = f"{feedback_type} feedback updated for {consultant.name} by {employee_name}"
+            create_and_send_notification(consultant, feedback, title, user_list, request)
 
             # Activity
             desc = f"{employee_name} updated {feedback.get_feedback_type_display()} feedback"
             create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
 
-            # Push Notification
-            title = f"{feedback_type} feedback updated for {consultant.name} by {employee_name}"
-            send_notification_for_user(consultant, request.user, title, 'consultantfeedback', feedback.id)
             return Response({"data": serializer.data, "message": "Feedback updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -1964,3 +1926,60 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def department(self, request, *args, **kwargs):
         data = ['Engineering', 'Marketing', 'Legal', 'Recruitment', 'Relations', 'Finance']
         return Response({"data": data}, status=200)
+
+    @action(methods=['get'], detail=False, url_path='project')
+    def project(self, request, consultant_id):
+        try:
+            projects = Consultant.objects.get(id=consultant_id).get_project().annotate(
+                client=F('submission__client'),
+                vendor=F('submission__lead__vendor_company__name'),
+            ).values('id', 'client', 'vendor')
+            return Response({"data": projects}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='request_feedback')
+    def request_feedback(self, request, consultant_id):
+        try:
+            departments = request.data.get("department", [])
+            consultant = Consultant.objects.get(id=consultant_id)
+            projects = Project.objects.filter(
+                consultant=consultant_id, statuses__status__in=['new', 'joined', 'extended', 'complete']
+            ).order_by('-modified')
+            if projects is None:
+                projects = Project.objects.filter(
+                    consultant=consultant_id, statuses__status__icontains="terminate"
+                ).order_by('-modified')
+            obj = {
+                'Legal': 'legal@consultadd.com',
+                'Finance': 'finance@consultadd.com',
+                'Relations': 'relations@consultadd.com',
+                'Engineering': 'engineering@consultadd.com',
+                'Recruitment': 'recruitment@consultadd.com',
+            }
+
+            to = list()
+            if projects:
+                if 'Marketing' in departments:
+                    to.append(projects.first().submission.created_by.email)
+                    to.extend(fetch_scrum_masters(projects.first().submission.created_by))
+                    departments.remove('Marketing')
+            to = [obj[department] for department in departments] + to
+            mail_data = {
+                "to": to, "cc": [], "bcc": [],
+                'template': '../templates/request_feedback.html',
+                'subject': "Test mail Requesting consultant's feedback",
+                'context': {
+                    'consultant_name': consultant.name,
+                    'sender_name': request.user.employee_name,
+                    'feedback_type': request.data['feedback_type'],
+                    'link': f'https://app.log1.com/#/consultant/bench/{consultant_id}?key=feedback',
+                },
+            }
+            if os.environ.get('ENV', 'local') == 'prod':
+                send_email(mail_data, request.user.email)
+            return Response({"message": "mail sent"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
