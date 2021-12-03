@@ -1790,17 +1790,18 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query')
+            feedback_type = json.loads(request.GET.get('feedback_type'))
             first, last = get_page_limits(request)
             consultant_feedback = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
             if request.GET.get('project'):
                 consultant_feedback = consultant_feedback.filter(project=request.GET.get('project'))
-            if request.GET.get("feedback_type"):
-                consultant_feedback = consultant_feedback.filter(feedback_type__in=request.GET.get("feedback_type"))
+            if feedback_type['type']:
+                consultant_feedback = consultant_feedback.filter(feedback_type__in=feedback_type['type'])
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 consultant_feedback = consultant_feedback.filter(created_by__employee_name__icontains=query)
             serializer = self.serializer_class(consultant_feedback[first:last], many=True)
-            return Response({"data": serializer.data}, status=200)
+            return Response({"count": len(consultant_feedback), "data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
