@@ -1,11 +1,6 @@
 import csv
-import json
-from operator import or_
-from functools import reduce
-from datetime import datetime
 from django.db import transaction
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
 from django.db.models import Subquery, OuterRef
 
 from rest_framework import viewsets
@@ -1795,7 +1790,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query')
-            feedback_type = request.GET.get('feedback_type', [])
+            feedback_type = json.loads(request.GET.get('feedback_type', []))
             first, last = get_page_limits(request)
             queryset = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
             if request.GET.get('project'):
