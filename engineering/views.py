@@ -605,8 +605,7 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
             checklist.save()
 
             # Activity
-            desc = f"{request.user.employee_name} changed status of checklist {checklist.position} to" \
-                   f" {checklist.status.title()}"
+            desc = f"{request.user.employee_name} updated checklist {checklist.position}"
             create_activity(kwargs.get('project_id'), 'trainingchecklist', request.user, desc, 'updated')
             return Response({"message": "Checklist updated"}, status=202)
         except Exception as error:

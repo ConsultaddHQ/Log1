@@ -565,3 +565,17 @@ class Feedback(TimeStampedModel):
 
     def __str__(self):
         return f'{self.id}:{self.consultant.name}:{self.feedback_type}'
+
+
+class MSAccount(models.Model):
+    email = models.EmailField(_('Microsoft Email'), blank=True, null=True)
+    user_id = models.CharField(_('User ID'), max_length=300, blank=True, null=True)
+    licence_assigned = models.BooleanField(_('Licence Assigned?'), default=False, null=True)
+    member_id = models.CharField(_('Team member id'), max_length=300, blank=True, null=True)
+    consultant = models.ForeignKey(Consultant, on_delete=models.CASCADE, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        return super(MSAccount, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.consultant.name}-{self.email}'

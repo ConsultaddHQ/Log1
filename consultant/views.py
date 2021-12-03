@@ -413,7 +413,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             activities = Activity.objects.filter(
                 object_id=pk, content_type__model='consultant'
-            ).order_by('created')
+            ).order_by('-created')
             serializer = ActivitySerializer(activities, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -1493,6 +1493,12 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit, request)
+
+            if con_exit.status == 'complete':
+                qs = MSAccount.objects.filter(consultant=con_exit.consultant)
+                if qs:
+                    account = MicrosoftAccount()
+                    account.remove_member(qs.first().member_id)
 
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
