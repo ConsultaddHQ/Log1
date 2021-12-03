@@ -468,6 +468,10 @@ class FeedbackSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
     @staticmethod
+    def get_consultant(obj):
+        return obj.consultant.name
+
+    @staticmethod
     def get_created_by(obj):
         return obj.created_by.employee_name
 
@@ -476,8 +480,8 @@ class FeedbackSerializer(serializers.ModelSerializer):
         if obj.project:
             data = {
                 'id': obj.project.id,
-                'vendorName': obj.project.employer,
-                'clientName': obj.project.submission.client,
+                'client_name': obj.project.submission.client,
+                'vendor_name': obj.project.submission.vendor.name,
             }
             return data
         return None
@@ -488,6 +492,3 @@ class FeedbackSerializer(serializers.ModelSerializer):
             return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
         return None
 
-    @staticmethod
-    def get_consultant(obj):
-        return obj.consultant.name
