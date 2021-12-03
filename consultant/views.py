@@ -1818,7 +1818,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 department=request.data.get('department', None),
             )
             tags = request.data.get('tagged_user', [])
-            if len(tags) > 0:
+            consultant = feedback.consultant
+            if len(tags) > 0 and feedback.feedback_type == 'issue':
                 for tag in tags:
                     user = get_object_or_404(User, id=tag)
                     user_list.append(user)
@@ -1828,16 +1829,17 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                     "model": "consultantfeedback",
                 }
                 tag_users(tag_data)
-            consultant = feedback.consultant
-            user_list.append(consultant.recruiter)
-            if consultant.relation:
-                user_list.append(consultant.relation)
+            else:
+                if consultant.recruiter:
+                    user_list.append(consultant.recruiter)
+                if consultant.relation:
+                    user_list.append(consultant.relation)
             employee_name = request.user.employee_name
             feedback_type = feedback.get_feedback_type_display()
-            title = f"{feedback_type} feedback added for {consultant.name} by {employee_name} from {feedback.department}.{os.linesep}"\
-                    f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback"
+            title_r = f"{feedback_type} feedback added for {consultant.name} by {employee_name} from {feedback.department}."
+            title = f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback."
             notification_data = {
-                'title': title,
+                'title': title if feedback_type == 'issue' else title_r,
                 'category': 'info',
                 'description': title,
                 'target_id': feedback.id,
