@@ -10,13 +10,11 @@ from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
 
-from rest_framework import viewsets
 from rest_framework.mixins import *
-from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
 from marketing.serializers import *
@@ -139,7 +137,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
 
 # Route - /lead/
-class LeadViewSets(viewsets.ModelViewSet):
+class LeadViewSets(ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
     permission_classes = (IsAuthenticated,)
@@ -965,7 +963,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 
 # Route - /interview/
-class InterviewViewSets(viewsets.ModelViewSet):
+class InterviewViewSets(ModelViewSet):
     queryset = Interview.objects.all()
     serializer_class = InterviewSerializer
     permission_classes = (IsAuthenticated,)

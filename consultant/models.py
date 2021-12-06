@@ -578,4 +578,4 @@ class MSAccount(models.Model):
         return super(MSAccount, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.consultant.name}-{self.email}'
+        return f'{self.consultant}-{self.email}'

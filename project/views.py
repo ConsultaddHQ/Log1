@@ -8,13 +8,12 @@ from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from constance import config
 from marketing.utils import date_filter
@@ -38,7 +37,7 @@ from project.serializers import ProjectSerializer, ProjectGetSerializer, Project
 
 
 # Route - /project/
-class ProjectViewSets(viewsets.ModelViewSet):
+class ProjectViewSets(ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = (IsAuthenticated,)
@@ -620,7 +619,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             # Activity
             if prev_rate != project.rate:
-                desc=f"Purchase order rate is updated"
+                desc = f"Purchase order rate is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             elif prev_start_date != project.start_date:
                 desc = f"Purchase order start_date is updated"
@@ -960,7 +959,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
 
 
 # Route - /eng_project/
-class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
+class EngineeringProjectsViewSets(GenericViewSet, ListModelMixin):
     authentication_classes = ()
     permission_classes = (HasAPIKey,)
     queryset = Project.objects.all()
