@@ -2,52 +2,26 @@ import os
 import json
 import requests
 
+from utils_app.calendar import get_ms_header
 from log1.utils import write_exception, write_info
 
 
 class MicrosoftAccount:
     def __init__(self):
-        self.headers = self.get_ms_header()
+        self.headers = get_ms_header()
         self.team = os.environ.get('consultadd_us_team_id')
-
-    def get_ms_header(self):
-        try:
-            tenant_id = os.environ.get('tenant_id')
-            client_id = os.environ.get('client_id')
-            client_secret = os.environ.get('client_secret')
-            scope = 'https%3A//graph.microsoft.com/.default'
-
-            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-            url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-            payload = f'client_id={client_id}&client_secret={client_secret}&scope={scope}&grant_type=client_credentials'
-
-            response = requests.request("POST", url, headers=headers, data=payload)
-            data = json.loads(response.text.encode('utf8'))
-
-            access_token = None
-            if response.status_code == 200:
-                access_token = data["access_token"]
-
-            headers = {
-                "Authorization": "bearer " + access_token,
-                "Content-Type": "application/json"
-            }
-            return headers
-        except Exception as error:
-            write_exception(message=error)
-            return None
 
     def create_account(self, data):
         try:
             payload = {
                 "accountEnabled": True,
                 "displayName": data['name'],
-                "mailNickname": data['name'],
+                "mailNickname": data['name'].split()[0],
                 "userPrincipalName": data['email'],
                 "usageLocation": "IN",
                 "passwordProfile": {
                     "forceChangePasswordNextSignIn": True,
-                    "password": "consultadd@123"
+                    "password": data['password']
                 }
             }
             url = f"https://graph.microsoft.com/v1.0/Users"
@@ -130,7 +104,7 @@ class MicrosoftAccount:
             data = {
                 "roles": ['member'],
                 "@odata.type": "#microsoft.graph.aadUserConversationMember",
-                "user@odata.bind": f"https://graph.microsoft.com/v1.0/users({user_id})"
+                "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{user_id}')"
             }
             url = f"https://graph.microsoft.com/v1.0/teams/{self.team}/members"
             response = requests.post(url, headers=self.headers, data=json.dumps(data))

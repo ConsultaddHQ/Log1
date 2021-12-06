@@ -5,12 +5,11 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 
 from utils_app.mailing import send_email
@@ -30,7 +29,7 @@ TOKEN_GENERATOR_CLASS = get_token_generator()
 
 
 # Route - /petition/
-class PetitionViewSets(viewsets.ModelViewSet):
+class PetitionViewSets(ModelViewSet):
     queryset = Petition.objects.all()
     serializer_class = PetitionSerializer
     permission_classes = (IsAuthenticated,)

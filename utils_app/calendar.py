@@ -5,37 +5,38 @@ import requests
 from log1.utils import write_exception, write_info
 
 
+def get_ms_header(request=None):
+    try:
+        tenant_id = os.environ.get('tenant_id')
+        client_id = os.environ.get('client_id')
+        client_secret = os.environ.get('client_secret')
+        scope = 'https%3A//graph.microsoft.com/.default'
+
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+        payload = f'client_id={client_id}&client_secret={client_secret}&scope={scope}&grant_type=client_credentials'
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+        data = json.loads(response.text.encode('utf8'))
+
+        access_token = None
+        if response.status_code == 200:
+            access_token = data["access_token"]
+
+        headers = {
+            "Authorization": "bearer " + access_token,
+            "Content-Type": "application/json"
+        }
+        return headers
+    except Exception as error:
+        write_exception(message=error, request=request)
+        return None
+
+
 class Calendar:
     def __init__(self, request=None):
         self.request = request
-        self.headers = self.get_ms_header()
-
-    def get_ms_header(self):
-        try:
-            tenant_id = os.environ.get('tenant_id')
-            client_id = os.environ.get('client_id')
-            client_secret = os.environ.get('client_secret')
-            scope = 'https%3A//graph.microsoft.com/.default'
-
-            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-            url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-            payload = f'client_id={client_id}&client_secret={client_secret}&scope={scope}&grant_type=client_credentials'
-
-            response = requests.request("POST", url, headers=headers, data=payload)
-            data = json.loads(response.text.encode('utf8'))
-
-            access_token = None
-            if response.status_code == 200:
-                access_token = data["access_token"]
-
-            headers = {
-                "Authorization": "bearer " + access_token,
-                "Content-Type": "application/json"
-            }
-            return headers
-        except Exception as error:
-            write_exception(message=error, request=self.request)
-            return None
+        self.headers = get_ms_header(request)
 
     @staticmethod
     def calendar_ms_description(data):
@@ -105,13 +106,12 @@ class Calendar:
     def book_ms_calendar(self, data):
         try:
             if os.environ.get('ENV', 'local') == 'prod':
-                headers = self.get_ms_header()
-                if not headers:
+                if not self.headers:
                     return False, "error"
                 event = self.get_ms_body(data)
 
                 url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/"
-                response = requests.post(url, headers=headers, data=event)
+                response = requests.post(url, headers=self.headers, data=event)
                 data = json.loads(response.text.encode('utf-8'))
                 if response.status_code == 201:
                     return data, "ok"
@@ -126,13 +126,12 @@ class Calendar:
     def update_ms_calendar(self, event_id, data):
         try:
             if os.environ.get('ENV', 'local') == 'prod':
-                headers = self.get_ms_header()
-                if not headers:
+                if not self.headers:
                     return False, "error"
 
                 event = self.get_ms_body(data)
                 url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
-                response = requests.patch(url, headers=headers, data=event)
+                response = requests.patch(url, headers=self.headers, data=event)
                 response_data = json.loads(response.text.encode('utf-8'))
                 if response.status_code == 200:
                     return response_data, "updated"
@@ -154,12 +153,11 @@ class Calendar:
     def delete_ms_calendar(self, event_id):
         try:
             if os.environ.get('ENV', 'local') == 'prod':
-                headers = self.get_ms_header()
-                if not headers:
+                if not self.headers:
                     return False, "error"
 
                 url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
-                response = requests.delete(url, headers=headers)
+                response = requests.delete(url, headers=self.headers)
                 if response.status_code == 204:
                     return True, "ok"
                 else:

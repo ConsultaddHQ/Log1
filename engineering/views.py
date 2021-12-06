@@ -4,13 +4,11 @@ import json
 from django.db.models import Q, Max
 from django.shortcuts import get_object_or_404
 
-from rest_framework.response import Response
+from rest_framework.mixins import *
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, \
-    DestroyModelMixin
 
 from engineering.serializers import *
 from marketing.models import Interview
@@ -529,6 +527,7 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             TrainingAgenda.objects.create(
                 created_by=request.user,
                 position=old_position + 1,
+                remark=request.data.get('remark'),
                 project_id=kwargs.get('project_id'),
                 duration=request.data.get('duration'),
                 description=request.data.get('description'),

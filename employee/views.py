@@ -12,15 +12,13 @@ from django.db.models import Q, F, Value, CharField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework.response import Response
+from rest_framework.mixins import *
 from rest_framework.decorators import action
-from rest_framework import exceptions, viewsets
+from rest_framework import exceptions
 from rest_framework.authtoken.models import Token
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, \
-    DestroyModelMixin
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from api_key.models import APIKey
 from consultant.models import Consultant
@@ -471,7 +469,7 @@ class ResetPasswordViewSets(GenericViewSet):
 
 
 # Route - /assets/
-class AssetsViewSets(viewsets.ModelViewSet):
+class AssetsViewSets(ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
     permission_classes = (IsAuthenticated,)

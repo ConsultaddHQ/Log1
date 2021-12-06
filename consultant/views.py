@@ -3,13 +3,12 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.db.models import Subquery, OuterRef
 
-from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from consultant.utils import *
 from api_key.models import APIKey
@@ -25,7 +24,7 @@ from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_A
 
 
 # Route - /v2/consultant/
-class ConsultantV2ViewSets(viewsets.ModelViewSet):
+class ConsultantV2ViewSets(ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
@@ -110,7 +109,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
 
 # Route - /consultant/
-class ConsultantViewSets(viewsets.ModelViewSet):
+class ConsultantViewSets(ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
@@ -1131,7 +1130,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
 
 # Route - /consultant_profile/
-class ConsultantProfileViewSets(viewsets.ModelViewSet):
+class ConsultantProfileViewSets(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantProfile.objects.all()
     serializer_class = ConsultantProfileSerializer
