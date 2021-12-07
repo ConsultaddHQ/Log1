@@ -759,7 +759,7 @@ def pre_joining_feedback_notification(feedback, request):
                 }
             ]
         }
-        post_msg_using_webhook(config.pre_joining_call_feedback_url, data)
+        post_msg_using_webhook(config.pre_joining_feedback_url, data)
         return "ok"
     except Exception as error:
         write_exception(message=error, request=request)

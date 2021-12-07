@@ -1,59 +1,77 @@
+import json
+from datetime import date
 from rest_framework.test import APITestCase, APIClient
 
-from employee.models import User
+from employee.models import User, Team, Role
 from project.models import Project
-from .models import Consultant, ConsultantMarketing
-from marketing.models import Submission, Lead, VendorCompany
+from marketing.models import Submission, Lead, VendorCompany, VendorContact
+from consultant.models import Consultant, ConsultantMarketing
 
 
 class ConsultantFeedbackViewSetTest(APITestCase):
 
     def setUp(self):
+        team = Team.objects.create(name="Consultadd")
+        role = Role.objects.create(name="marketer")
         self.user = User.objects.create(
+            team=team,
             employee_id=1000,
-            employee_name="Consultadd",
             password='consultadd',
             email='admin@log1.com',
+            employee_name='Admin Demo',
         )
+        self.user.role.add(role)
 
         self.consultant = Consultant.objects.create(
+            gender='male',
+            skills='Python',
+            status='on_bench',
             email='test@log1.com',
             name='consultant name',
+            current_city='New York',
         )
 
-        self.vendor_company = VendorCompany.objects.create(name='vendor_name')
-
-        self.lead = Lead.objects.create(
-            vendor_company=self.vendor_company
+        vendor_company = VendorCompany.objects.create(name='vendor_name')
+        vendor_contact = VendorContact.objects.create(
+            name='vendor_name',
+            number='1234567890',
+            company=vendor_company,
+            email='vendor.name@email.com',
         )
 
-        self.consultant_marketing = ConsultantMarketing.objects.create(
+        lead = Lead.objects.create(
+            status='sub',
+            owner=self.user,
+            city='Remote, US',
+            primary_skill='Python',
+            job_desc='Job Description',
+            job_title='Python Developer',
+            vendor_company=vendor_company,
+        )
+
+        consultant_marketing = ConsultantMarketing.objects.create(
+            status='open',
+            start=date.today(),
             primary_marketer=self.user,
-            consultant=self.consultant
-        )
-        self.submission = Submission.objects.create(
-            client='apple',
-            lead=self.lead,
-            created_by=self.user,
-            consultant_marketing=self.consultant_marketing
-        )
-
-        self.project = Project.objects.create(
-            submission=self.submission,
             consultant=self.consultant,
-
+            preferred_location='East Coast',
         )
+        consultant_marketing.teams.add(team)
+        consultant_marketing.marketer.add(self.user)
+
+        self.submission = Submission.objects.create(
+            rate=50,
+            lead=lead,
+            client='apple',
+            is_complete=True,
+            employer='Consultadd',
+            created_by=self.user,
+            vendor_contact=vendor_contact,
+            consultant_marketing=consultant_marketing
+        )
+
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
-
-        self.payload = {
-            "description": "feedback added",
-            "project":self.project,
-            "rating": 4,
-            "department":None,
-            "feedback_type":"pre_joining",
-            "tagged_user":[],
-        }
 
     def test_get_consultant_feedback_list(self):
         route = f"/api/consultant/{self.consultant.id}/feedback/?query=&project=&feedback_type=[]"
@@ -70,9 +88,12 @@ class ConsultantFeedbackViewSetTest(APITestCase):
         route = f"/api/consultant/{self.consultant.id}/feedback/feedback_types/"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['data'], (('cfr', 'CFR'), ('issue', 'Issue'),
-                         ('2_week', '2 Week'), ('pre_joining', 'Pre Joining'), ('independent', 'Independent'),
-                         ('re_marketing', 'Re-marketing'), ('rate_increment', 'Rate Increment')))
+        self.assertEqual(
+            res.data['data'], (
+                ('cfr', 'CFR'), ('issue', 'Issue'),
+                ('2_week', '2 Week'), ('pre_joining', 'Pre Joining'), ('independent', 'Independent'),
+                ('re_marketing', 'Re-marketing'), ('rate_increment', 'Rate Increment'))
+        )
 
     def test_get_consultant_project(self):
         route = f"/api/consultant/{self.consultant.id}/feedback/project/"
@@ -82,8 +103,24 @@ class ConsultantFeedbackViewSetTest(APITestCase):
         self.assertEqual(res.data['data'].first()['client'], 'apple')
 
     def test_create_consultant_feedback(self):
+        project = Project.objects.create(
+            is_msg_sent=True,
+            city='Remote, US',
+            employer='Consultadd',
+            start_date=date.today(),
+            submission=self.submission,
+            consultant=self.consultant,
+        )
+        payload = {
+            "rating": 4,
+            "tagged_user": [],
+            "department": "Marketing",
+            "project": project.id,
+            "feedback_type": "pre_joining",
+            "description": "Consultant Feedback",
+        }
         route = f"/api/consultant/{self.consultant.id}/feedback/"
-        res = self.client.post(route, data=self.payload)
+        res = self.client.post(route, data=payload)
         self.assertEqual(res.status_code, 201)
 
     def test_request_feedback_mail(self):
@@ -92,5 +129,5 @@ class ConsultantFeedbackViewSetTest(APITestCase):
             'department': ['Marketing'],
             'feedback_type': 're_marketing'
         }
-        res = self.client.post(route, data=payload)
+        res = self.client.post(route, data=json.dumps(payload), content_type='application/json')
         self.assertEqual(res.status_code, 201)

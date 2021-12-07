@@ -1918,12 +1918,11 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             }
 
             to = list()
-            if projects:
-                if 'Marketing' in departments:
-                    to.append(projects.first().submission.created_by.email)
-                    to.extend(fetch_scrum_masters(projects.first().submission.created_by))
-                    departments.remove('Marketing')
-            to = [obj[department] for department in departments] + to
+            if projects and 'Marketing' in departments:
+                to.append(projects.first().submission.created_by.email)
+                to.extend(fetch_scrum_masters(projects.first().submission.created_by))
+
+            to = [obj[department] for department in departments if 'Marketing' != department] + to
             mail_data = {
                 "to": to, "cc": [], "bcc": [],
                 'template': '../templates/request_feedback.html',
