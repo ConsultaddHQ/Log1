@@ -6,10 +6,8 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
-    help = "this command is to move Interview to failed after 30 days if status is feedback_due"
+    help = "This command is to move Interview to failed after 30 days if status is feedback_due"
 
-    # A command must define handle()
     def handle(self, *args, **options):
         job = create_cron_object('make_consultant_open')
         try:

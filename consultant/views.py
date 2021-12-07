@@ -1717,39 +1717,6 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
-# API for Petition Web App
-# Route - /consultant_petition/
-class ConsultantPetitionAuthViewSet(GenericViewSet):
-    permission_classes = ()
-    authentication_classes = ()
-    queryset = Consultant.objects.all()
-    serializer_class = ConsultantPetitionLoginSerializer
-
-    @action(methods=['post'], detail=False, url_path='login')
-    def login(self, request):
-        """
-            Normal Login
-            :param request, email, password
-        """
-        try:
-            email = request.data.get('email').lower()
-            if email:
-                consultant = get_object_or_404(Consultant, email=email)
-            else:
-                return Response({"error": "Email is Empty"}, status=400)
-            consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
-            if consultant:
-                consultant = consultant.first()
-                if not consultant.p_is_active:
-                    return Response({"error": "User account is not Active"}, status=400)
-                serializer = self.serializer_class(consultant)
-                return Response({"result": serializer.data}, status=202)
-            return Response({"error": "Incorrect Email Id OR Password"}, status=400)
-        except Exception as error:
-            write_exception(message=error)
-            return Response({"error": str(error)}, status=400)
-
-
 # Route - /beats_consultant/
 class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
     queryset = Consultant.objects.all()
@@ -1825,7 +1792,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 engineering_feedback_notification(feedback, request)
 
             consultant = feedback.consultant
-            employee_name = request.user.employee_name
+            emp_name = request.user.employee_name
             feedback_type = feedback.get_feedback_type_display()
 
             # Tagging notification
@@ -1841,21 +1808,17 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 }
                 tag_users(tag_data)
 
-            title = f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback."
+            title = f"{emp_name} tagged you in a {consultant.name}'s {feedback_type} feedback."
             create_and_send_notification(consultant, feedback, title, user_list, request)
 
             # POC Notification
-            user_list = []
             pocs = consultant.pocs.all()
-            for user in pocs:
-                user_list.append(user.poc)
-
-            title = f"{feedback_type} feedback added for {consultant.name} by {employee_name} from " \
-                    f"{feedback.department}."
+            user_list = [user.poc for user in pocs]
+            title = f"{feedback_type} feedback added for {consultant.name} by {emp_name} from {feedback.department}."
             create_and_send_notification(consultant, feedback, title, user_list, request)
 
             # Activity
-            desc = f"{employee_name} added {feedback_type} feedback"
+            desc = f"{emp_name} added {feedback_type} feedback"
             create_activity(consultant.id, 'consultant', request.user, desc, 'created')
 
             serializer = self.serializer_class(feedback)
@@ -1901,11 +1864,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             create_and_send_notification(consultant, feedback, title, user_list, request)
 
             # Push Notification
-            user_list = []
             pocs = consultant.pocs.all()
-            for user in pocs:
-                user_list.append(user.poc)
-
+            user_list = [user.poc for user in pocs]
             title = f"{feedback_type} feedback updated for {consultant.name} by {employee_name}"
             create_and_send_notification(consultant, feedback, title, user_list, request)
 
@@ -1931,8 +1891,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def project(self, request, consultant_id):
         try:
             projects = Consultant.objects.get(id=consultant_id).get_project().annotate(
-                client=F('submission__client'),
                 vendor=F('submission__lead__vendor_company__name'),
+                client=F('submission__client'),
             ).values('id', 'client', 'vendor')
             return Response({"data": projects}, status=200)
         except Exception as error:
@@ -1983,3 +1943,36 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# API for Petition Web App
+# Route - /consultant_petition/
+class ConsultantPetitionAuthViewSet(GenericViewSet):
+    permission_classes = ()
+    authentication_classes = ()
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantPetitionLoginSerializer
+
+    @action(methods=['post'], detail=False, url_path='login')
+    def login(self, request):
+        """
+            Normal Login
+            :param request, email, password
+        """
+        try:
+            email = request.data.get('email').lower()
+            if email:
+                consultant = get_object_or_404(Consultant, email=email)
+            else:
+                return Response({"error": "Email is Empty"}, status=400)
+            consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
+            if consultant:
+                consultant = consultant.first()
+                if not consultant.p_is_active:
+                    return Response({"error": "User account is not Active"}, status=400)
+                serializer = self.serializer_class(consultant)
+                return Response({"result": serializer.data}, status=202)
+            return Response({"error": "Incorrect Email Id OR Password"}, status=400)
+        except Exception as error:
+            write_exception(message=error)
+            return Response({"error": str(error)}, status=400)

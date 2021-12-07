@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
@@ -8,8 +8,7 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help Daily
-    help = "this command is for posting your payload to MatterMost app"
+    help = "This command is for posting Project joining"
 
     def handle(self, *args, **options):
         job = create_cron_object(name='joining_announcement')

@@ -462,6 +462,7 @@ class FeedbackSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     tagged_user = serializers.SerializerMethodField()
+    department = serializers.CharField(allow_null=True, allow_blank=True)
 
     class Meta:
         model = ConsultantFeedback
