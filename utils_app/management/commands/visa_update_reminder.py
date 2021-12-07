@@ -8,10 +8,8 @@ from utils_app.mailing import send_email, send_email_without_template
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
     help = "This command is to send mail for Visa expiry reminder"
 
-    # A command must define handle()
     def handle(self, *args, **options):
         job = create_cron_object(name='visa_update_reminder')
         try:

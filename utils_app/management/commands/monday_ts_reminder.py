@@ -10,10 +10,8 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
-    help = "this command is for posting your payload to MatterMost app"
+    help = "This command is for sending Timesheet reminders on Timesheet APP"
 
-    # A command must define handle()
     def handle(self, *args, **options):
         job = create_cron_object(name='monday_ts_reminder')
         try:

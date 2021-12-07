@@ -46,7 +46,6 @@ def upload_files(docs, service, doc_type, consultant, creator, content_type):
 
 
 class Command(BaseCommand):
-    # A command must define handle()
     def handle(self, *args, **options):
 
         creds = None

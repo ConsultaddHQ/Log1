@@ -16,6 +16,8 @@ class MicrosoftAccount:
             payload = {
                 "accountEnabled": True,
                 "displayName": data['name'],
+                "surname": data['last_name'],
+                "givenName": data['first_name'],
                 "mailNickname": data['name'].split()[0],
                 "userPrincipalName": data['email'],
                 "usageLocation": "IN",

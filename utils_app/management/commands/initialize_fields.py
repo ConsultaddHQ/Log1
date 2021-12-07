@@ -4,10 +4,8 @@ from utils_app.models import ObjectGroup, Field
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
-    help = "this command is for initialising Field and ObjectGroup model data"
+    help = "This command is for initialising Field and ObjectGroup model data"
 
-    # A command must define handle()
     def handle(self, *args, **options):
         file = open("fields_fixture.json", "r")
         data = json.loads(file.read())

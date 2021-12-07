@@ -8,10 +8,8 @@ from log1.utils import post_msg_using_webhook
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
-    help = "this command is for posting your payload to MatterMost app"
+    help = "This command is for posting CronJobs status"
 
-    # A command must define handle()
     def handle(self, *args, **options):
         try:
             to_zone = tz.gettz('Asia/Kolkata')
