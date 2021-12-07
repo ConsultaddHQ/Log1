@@ -1755,8 +1755,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query')
-            feedback_type = json.loads(request.GET.get('feedback_type', []))
             first, last = get_page_limits(request)
+            feedback_type = json.loads(request.GET.get('feedback_type', []))
             queryset = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
             if request.GET.get('project'):
                 queryset = queryset.filter(project_id=request.GET.get('project'))
@@ -1954,10 +1954,6 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
-        """
-            Normal Login
-            :param request, email, password
-        """
         try:
             email = request.data.get('email').lower()
             if email:

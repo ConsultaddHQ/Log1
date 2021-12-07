@@ -12,7 +12,7 @@ class Command(BaseCommand):
         feedbacks = Feedback.objects.all()
         content_type = ContentType.objects.get(model='consultantfeedback')
         for obj in feedbacks:
-            department = obj.created_by.team.name.title()
+            department = obj.created_by.team.dept
             feedback = ConsultantFeedback.objects.create(
                 rating=obj.rating,
                 department=department,
@@ -21,8 +21,8 @@ class Command(BaseCommand):
                 description=obj.feedback_text,
                 feedback_type=obj.feedback_type,
             )
-            tag_obj = obj.tagged_user
-            if tag_obj:
+            tag_objs = obj.tagged_user.all()
+            if tag_objs:
                 tag = Tagging.objects.create(
                     content_type=content_type,
                     object_id=feedback.id,
