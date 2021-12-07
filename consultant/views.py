@@ -1784,7 +1784,6 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 feedback_type=request.data.get('feedback_type'),
                 department=request.data.get('department', None),
             )
-
             if feedback.feedback_type == 'pre_joining':
                 pre_joining_feedback_notification(feedback, request)
             elif feedback.feedback_type == 'issue':
@@ -1906,7 +1905,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             projects = Project.objects.filter(
                 consultant=consultant_id, statuses__status__in=['new', 'joined', 'extended', 'complete']
             ).order_by('-modified')
-            if projects is None:
+            if not projects:
                 projects = Project.objects.filter(
                     consultant=consultant_id, statuses__status__icontains="terminate"
                 ).order_by('-modified')
