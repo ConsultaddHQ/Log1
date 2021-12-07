@@ -37,10 +37,8 @@ def mail_to_scrum(yesterday, this_week, scrum_masters, team_name, path, offers):
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
     help = "this command is for Scrum Meeting report (Marketer's weekly Interviews)"
 
-    # A command must define handle()
     def handle(self, *args, **options):
         job = create_cron_object(name='scrum_report')
         try:

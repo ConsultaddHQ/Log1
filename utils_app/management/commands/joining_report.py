@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date
 from django.core.management import BaseCommand
 
 from constance import config
@@ -8,8 +8,7 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
-    help = "this command is for posting your payload to MatterMost app"
+    help = "This command is for posting Project joining Status"
 
     def handle(self, *args, **options):
         job = create_cron_object(name='joining_report')
@@ -51,26 +50,26 @@ class Command(BaseCommand):
             data = {
                 "title": "Projects joining status &#128221;",
                 "text": f"""<table border='2' style='border-collapse:collapse'>
-                                <tr>
-                                    <th style="padding:5px 8px 5px 8px;">Project Status</th>
-                                    <th style="padding:5px 8px 5px 8px;">Count</th>
-                                </tr>
-                                <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Joined Last Month</td>
-                                    <td style="text-align: center;padding:5px 8px 5px 8px;">{joined_last_month}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Joined This Month</td>
-                                    <td style="text-align: center;padding:5px 8px 5px 8px;">{joined_this_month_t}/{joined_this_month}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Expected Joining this Month</td>
-                                    <td style="text-align: center;padding:5px 8px 5px 8px;">{expected_joining}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Joining Status Not Updated in Log1</td>
-                                    <td style="text-align: center;padding:5px 8px 5px 8px;">{offers_not_joined}</td>
-                                </tr>
+            <tr>
+                <th style="padding:5px 8px 5px 8px;">Project Status</th>
+                <th style="padding:5px 8px 5px 8px;">Count</th>
+            </tr>
+            <tr>
+                <td style="padding:5px 8px 5px 8px;">Joined Last Month</td>
+                <td style="text-align: center;padding:5px 8px 5px 8px;">{joined_last_month}</td>
+            </tr>
+            <tr>
+                <td style="padding:5px 8px 5px 8px;">Joined This Month</td>
+                <td style="text-align: center;padding:5px 8px 5px 8px;">{joined_this_month_t}/{joined_this_month}</td>
+            </tr>
+            <tr>
+                <td style="padding:5px 8px 5px 8px;">Expected Joining this Month</td>
+                <td style="text-align: center;padding:5px 8px 5px 8px;">{expected_joining}</td>
+            </tr>
+            <tr>
+                <td style="padding:5px 8px 5px 8px;">Joining Status Not Updated in Log1</td>
+                <td style="text-align: center;padding:5px 8px 5px 8px;">{offers_not_joined}</td>
+            </tr>
                             </table>"""
             }
             res, msg = post_msg_using_webhook(config.joined_url, data)

@@ -12,6 +12,8 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
+    help = "This command is for sending Consultant rate due notification mail"
+
     def handle(self, *args, **options):
         job = create_cron_object(name='rate_due_notification')
         try:

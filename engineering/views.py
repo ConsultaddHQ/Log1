@@ -1,16 +1,13 @@
 import os
 import json
-
 from django.db.models import Q, Max
 from django.shortcuts import get_object_or_404
 
-from rest_framework.response import Response
+from rest_framework.mixins import *
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, \
-    DestroyModelMixin
 
 from engineering.serializers import *
 from marketing.models import Interview
@@ -313,6 +310,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                     "type": 'project_update',
                 }
                 create_attachment(file_data)
+
             tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'create')
 
@@ -347,9 +345,9 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='add_document')
-    def add_document(self, request, project_id, pk):
+    def add_document(self, request, *args, **kwargs):
         try:
-            update = get_object_or_404(ProjectUpdate, id=pk)
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
             file_data = {
                 "object_id": update.id,
                 "creator": request.user,
@@ -368,9 +366,9 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='remove_document')
-    def remove_document(self, request, project_id, pk):
+    def remove_document(self, request, *args, **kwargs):
         try:
-            update = get_object_or_404(ProjectUpdate, id=pk)
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
             attachment = get_object_or_404(Attachment, id=request.data.get('attachment_id'))
             if update.update_by.id == request.user.id or attachment.creator.id == request.user.id:
                 file_name = attachment.attachment_file.name
@@ -470,7 +468,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 desc = f"{request.user.employee_name} updated the project description"
             create_activity(project.id, 'projectdescription', request.user, desc, 'created')
 
-            return Response({"message":  "Project description created", "data": serializer.data}, status=201)
+            return Response({"message": "Project description created", "data": serializer.data}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -529,6 +527,7 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             TrainingAgenda.objects.create(
                 created_by=request.user,
                 position=old_position + 1,
+                remark=request.data.get('remark'),
                 project_id=kwargs.get('project_id'),
                 duration=request.data.get('duration'),
                 description=request.data.get('description'),
@@ -536,7 +535,7 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             )
 
             # Activity
-            desc = f"{request.user.employee_name} added training agenda {old_position+ 1}"
+            desc = f"{request.user.employee_name} added training agenda {old_position + 1}"
             create_activity(kwargs.get('project_id'), 'trainingagenda', request.user, desc, 'created')
 
             return Response({"message": "Agenda added"}, status=201)
@@ -602,6 +601,7 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
         try:
             checklist = get_object_or_404(TrainingCheckList, id=kwargs.get('pk'))
             checklist.status = request.data.get('status')
+            checklist.remark = request.data.get('remark', None)
             checklist.save()
 
             # Activity

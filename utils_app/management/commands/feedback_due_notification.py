@@ -8,6 +8,7 @@ from utils_app.utils import create_cron_error, create_cron_object, write_excepti
 
 
 class Command(BaseCommand):
+    help = "This command is for posting Feedback Due status of Interview, test and coder feedback due"
 
     def handle(self, *args, **options):
         job = create_cron_object(name='feedback_due_notification')

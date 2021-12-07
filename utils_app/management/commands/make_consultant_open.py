@@ -9,10 +9,8 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
     help = "this command is to move Consultant in pool"
 
-    # A command must define handle()
     def handle(self, *args, **options):
         job = create_cron_object(name='make_consultant_open')
         try:

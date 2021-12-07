@@ -23,7 +23,6 @@ from consultant.authentication import consultant_authenticate, ConsultantTokenAu
 from consultant.models import Consultant, ConsultantToken, ConsultantResetPasswordToken, FCMDevice
 
 
-# API for Mobile App
 # Route - /consultant_auth/
 class ConsultantAuthViewSet(GenericViewSet):
     permission_classes = ()
@@ -124,7 +123,6 @@ class ConsultantAuthViewSet(GenericViewSet):
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
-# API for Mobile App
 # Route - /consultant_app/
 class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
@@ -181,7 +179,6 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             return Response({"error": str(error)}, status=400)
 
 
-# API for Mobile App
 # Route - /consultant_password/
 class ConsultantResetPasswordViewSet(GenericViewSet):
     permission_classes = ()

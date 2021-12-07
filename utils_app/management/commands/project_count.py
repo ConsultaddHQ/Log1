@@ -8,10 +8,7 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
-    help = "this command is for posting your payload to MatterMost app"
-
-    # A command must define handle()
+    help = "This command is for posting Project Count on channel"
 
     def handle(self, *args, **options):
         job = create_cron_object(name='project_count')
