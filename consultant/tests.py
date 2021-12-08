@@ -1,5 +1,6 @@
 import datetime
 import json
+import random
 from datetime import date
 from rest_framework.test import APITestCase, APIClient
 
@@ -7,7 +8,7 @@ from .factoryboy import ConsultantFactory, ConsultantMarketingFactory
 from employee.models import User, Team, Role
 from project.models import Project, ProjectStatus
 from marketing.models import Submission, Lead, VendorCompany, VendorContact
-from consultant.models import Consultant, ConsultantMarketing
+from consultant.models import Consultant, ConsultantMarketing, PayrollEmployer
 
 
 class ConsultantFeedbackViewSetTest(APITestCase):
@@ -184,15 +185,17 @@ class ConsultantTest(APITestCase):
             email='admin@log1.com',
             employee_name='Admin Demo',
         )
-        for role in ['admin', 'marketer', 'recruiter']:
+        user.is_superuser = True
+        for role in ['superadmin', 'admin', 'marketer', 'recruiter']:
             user.role.add(Role.objects.create(name=role))
-
         for i in range(0, 5):
             consultant = ConsultantFactory()
             if i%2 == 0:
                 consultant_marketing = ConsultantMarketingFactory(consultant=consultant, in_pool=False, status='open')
                 consultant_marketing.teams.add(team)
                 consultant_marketing.marketer.add(user)
+                consultant.status = random.choice(['on_bench', 'archived'])
+        self.consultant = Consultant.objects.all()
 
         self.client = APIClient(user)
         self.client.force_authenticate(user=user)
@@ -201,17 +204,19 @@ class ConsultantTest(APITestCase):
         route_list = f"/api/consultant/"
         res = self.client.get(route_list)
         self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data['data']), 3)
 
-        route_list_with_query = f"/api/consultant/?query={ConsultantFactory().name}"
+        route_list_with_query = f"/api/consultant/?query={self.consultant.first().name}"
         res_query = self.client.get(route_list_with_query)
+        self.assertEqual(res_query.data['data'][0]['name'], self.consultant.first().name)
         self.assertEqual(res_query.status_code, 200)
 
     def test_retrieve_consultant(self):
-        route = f"/api/consultant/{ConsultantFactory(name='john').id}/"
+        route = f"/api/consultant/{self.consultant.first().id}/"
         res = self.client.get(route)
-        self.assertEqual(res.data['data']['name'], 'john')
+        self.assertEqual(res.data['data']['name'], self.consultant.first().name)
 
-        route_with_submission = f"/api/consultant/{ConsultantFactory(name='John').id}/?submission={True}"
+        route_with_submission = f"/api/consultant/{self.consultant.first().id}/?submission={True}"
         res_submsission = self.client.get(route_with_submission)
         self.assertEqual(res_submsission.status_code, 200)
 
@@ -220,9 +225,9 @@ class ConsultantTest(APITestCase):
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
 
-        search_route = f"/api/consultant/search/?query={res.data['data'].first()['name']}"
+        search_route = f"/api/consultant/search/?query={self.consultant.first().name}"
         search_res = self.client.get(search_route)
-        self.assertEqual(search_res.data['data'].first()['name'], res.data['data'].first()['name'])
+        self.assertEqual(search_res.data['data'].first()['name'], self.consultant.first().name)
 
     def test_create_and_update_eductaion(self):
         payload = {
@@ -263,3 +268,65 @@ class ConsultantTest(APITestCase):
             put_res = self.client.put(put_route, data=json.dumps(payload), content_type="application/json")
             self.assertEqual(put_res.status_code, 202)
             self.assertEqual(put_res.data['data']['city'], 'West Coast')
+
+    def test_activities(self):
+        route = f"/api/consultant/{self.consultant.first().id}/activities/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+
+    def test_set_password(self):
+        payload = {
+            "consultant_id": self.consultant.first().id,
+            "new_password": "test"
+        }
+        route = f"/api/consultant/set_password/"
+        res = self.client.post(route, data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['message'], 'Password Changed Successfully')
+
+    def test_marketing(self):
+        route = f"/api/consultant/{self.consultant.first().id}/marketing/"
+        res = self.client.get(route)
+        route_interview = f"/api/consultant/{self.consultant.first().id}/marketing/?marketing_stage='interview'"
+        self.assertEqual(res.status_code, 200)
+
+    def test_payroll_employer(self):
+        payload = {
+            'name': 'test_name',
+        }
+
+        create_route = f"/api/consultant/{self.consultant.first().id}/payroll_employer/"
+        create_res = self.client.post(create_route, data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(create_res.status_code, 201)
+        self.assertEqual(create_res.data['message'], "Employer added")
+
+        payload['name'] = "name"
+        update_route = f"/api/consultant/{create_res.data['data']['id']}/payroll_employer/"
+        update_res = self.client.put(update_route, data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(update_res.status_code, 202)
+        self.assertEqual(update_res.data['message'], "Employer updated")
+
+        route = f"/api/consultant/{self.consultant.first().id}/payroll_employer/"
+        get_res = self.client.get(route)
+        self.assertEqual(get_res.status_code, 200)
+
+    def test_rate_revision(self):
+        payload = {
+            "rate": 60,
+            "name": "test_employer",
+            "feedback": "test_feedback",
+            "start": "2021-12-12",
+            "consultant": self.consultant.first().id
+        }
+        route = f"/api/consultant/{self.consultant.first().id}/rate_revision/"
+        post_res = self.client.post(route, data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(post_res.status_code, 201)
+
+        payload['end'] = None
+        post_res = self.client.post(route, data=json.dumps(payload), content_type="application/json")
+        self.assertEqual(post_res.status_code, 201)
+
+        get_route = f"/api/consultant/{self.consultant.first().id}/rate_revision/"
+        get_res = self.client.get(get_route)
+        self.assertEqual(len(get_res.data['data']), 2)
+        self.assertEqual(get_res.status_code, 200)

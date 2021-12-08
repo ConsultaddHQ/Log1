@@ -1,9 +1,10 @@
-import factory
-from factory import fuzzy
 import random
-from faker import Faker
-from factory.django import DjangoModelFactory
+import factory
 from .models import *
+from faker import Faker
+from factory import fuzzy
+from marketing.models import Submission, Lead
+from factory.django import DjangoModelFactory
 
 fake = Faker()
 
@@ -13,7 +14,6 @@ class ConsultantFactory(DjangoModelFactory):
     class Meta:
         model = Consultant
 
-    id = fuzzy.FuzzyInteger(1111, 9999)
     email = fuzzy.FuzzyText(fake.email())
     name = fuzzy.FuzzyText(fake.name())
     gender = random.choice(['male', 'female'])
@@ -41,3 +41,32 @@ class ConsultantMarketingFactory(DjangoModelFactory):
     preferred_location = fuzzy.FuzzyText(fake.city())
     status = random.choice(['open', 'close'])
     consultant = factory.SubFactory(ConsultantFactory)
+
+
+class LeadFactory(DjangoModelFactory):
+
+    class Meta:
+        model = Lead
+
+    job_desc = fuzzy.FuzzyText(fake.sentence())
+    city = fuzzy.FuzzyText(fake.city)
+    job_title = random.choice(['SDE', 'ASE', 'Full-stack'])
+    primary_skill = random.choice(["true", "false"])
+
+
+class SubmissionFactory(DjangoModelFactory):
+
+    class Meta:
+        model = Submission
+
+    employer = fuzzy.FuzzyText(fake.name())
+    rate = fuzzy.FuzzyInteger(45, 120)
+    is_active = random.choice(['True', 'False'])
+    is_complete = random.choice(['True', 'False'])
+    email = fuzzy.FuzzyText(fake.email())
+    client = fuzzy.FuzzyText(length=5)
+    phone = fuzzy.FuzzyInteger(6666666666, 9999999999)
+    status = random.choice(["in_offer", "draft", 'sub', 'project', 'interview'])
+    current_city = fuzzy.FuzzyText(fake.city())
+    education = random.choice(['phd', 'm.tech', 'b.tech'])
+    consultant_marketing = factory.SubFactory(ConsultantMarketingFactory)
