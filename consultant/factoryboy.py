@@ -19,7 +19,7 @@ class ConsultantFactory(DjangoModelFactory):
     gender = random.choice(['male', 'female'])
     skills = random.choice(['Python', 'Java', 'React', 'JS', 'Ruby'])
     current_city = fuzzy.FuzzyText(fake.city())
-    status = random.choice(['on_bench', 'archived', 'on_project', 'terminated'])
+    status = random.choice(['on_bench', 'archived', 'on_project'])
     work_type = random.choice(['c2c', 'full_time'])
     is_active = random.choice(['True', 'False'])
     first_login = random.choice(['True', 'False'])
@@ -35,38 +35,9 @@ class ConsultantMarketingFactory(DjangoModelFactory):
         model = ConsultantMarketing
 
     rtg = random.choice(['True', 'False'])
-    cycle = random.choice([1,2,3,])
+    cycle = random.choice([1,2,3])
     in_pool = random.choice(['True', 'False'])
     previous_marketing_days = random.choice([0,1,2])
     preferred_location = fuzzy.FuzzyText(fake.city())
     status = random.choice(['open', 'close'])
     consultant = factory.SubFactory(ConsultantFactory)
-
-
-class LeadFactory(DjangoModelFactory):
-
-    class Meta:
-        model = Lead
-
-    job_desc = fuzzy.FuzzyText(fake.sentence())
-    city = fuzzy.FuzzyText(fake.city)
-    job_title = random.choice(['SDE', 'ASE', 'Full-stack'])
-    primary_skill = random.choice(["true", "false"])
-
-
-class SubmissionFactory(DjangoModelFactory):
-
-    class Meta:
-        model = Submission
-
-    employer = fuzzy.FuzzyText(fake.name())
-    rate = fuzzy.FuzzyInteger(45, 120)
-    is_active = random.choice(['True', 'False'])
-    is_complete = random.choice(['True', 'False'])
-    email = fuzzy.FuzzyText(fake.email())
-    client = fuzzy.FuzzyText(length=5)
-    phone = fuzzy.FuzzyInteger(6666666666, 9999999999)
-    status = random.choice(["in_offer", "draft", 'sub', 'project', 'interview'])
-    current_city = fuzzy.FuzzyText(fake.city())
-    education = random.choice(['phd', 'm.tech', 'b.tech'])
-    consultant_marketing = factory.SubFactory(ConsultantMarketingFactory)
