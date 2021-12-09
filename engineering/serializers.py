@@ -68,6 +68,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
             'id': consultant.id,
             'name': consultant.name,
             'email': consultant.email,
+            'location': consultant.current_city
         }
 
     @staticmethod
@@ -148,6 +149,7 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
             'retention': retention,
             'name': consultant.name,
             'email': consultant.email,
+            'location': consultant.current_city,
         }
 
     @staticmethod
