@@ -1,141 +1,44 @@
 import json
-import random
-from datetime import date
 from rest_framework.test import APITestCase, APIClient
 
-from .factoryboy import ConsultantFactory, ConsultantMarketingFactory
+from employee.models import Role
+from consultant.models import Consultant
 from activity.views import create_activity
-from employee.models import User, Team, Role
-from project.models import Project, ProjectStatus, SupportStatus, ProjectSupport, ConsultantFeedback
-from marketing.models import Submission, Lead, VendorCompany, VendorContact
-from consultant.models import Consultant, ConsultantMarketing, PayrollEmployer
-
-
-class Setup:
-    def __init__(self):
-        self.project_ids = []
-        role = Role.objects.create(name="marketer")
-        self.team = Team.objects.create(name="Consultadd")
-        self.user = User.objects.create(
-            team=self.team,
-            employee_id=1000,
-            password='consultadd',
-            email='admin@log1.com',
-            employee_name='Admin Demo',
-        )
-        self.user.role.add(role)
-
-    def create_project(self, marketing, status, count):
-        vendor_company = VendorCompany.objects.create(name=f'vendor_company_name{count}')
-        vendor_contact = VendorContact.objects.create(
-            number='1234567890',
-            company=vendor_company,
-            name=f'vendor_name{count}',
-            email=f'vendor.name{count}@email.com',
-        )
-
-        lead = Lead.objects.create(
-            status='sub',
-            owner=self.user,
-            city='New York, US',
-            primary_skill='Python',
-            job_title='Python Developer',
-            vendor_company=vendor_company,
-            job_desc=f'Job Description{count}',
-        )
-
-        submission = Submission.objects.create(
-            rate=50,
-            lead=lead,
-            is_complete=True,
-            created_by=self.user,
-            employer='Consultadd',
-            client=f'client{count}',
-            vendor_contact=vendor_contact,
-            consultant_marketing=marketing,
-        )
-        project = Project.objects.create(
-            is_msg_sent=True,
-            city='New York, US',
-            employer='Consultadd',
-            submission=submission,
-            start_date=date.today(),
-            consultant=marketing.consultant,
-        )
-
-        ProjectStatus.objects.create(
-            status=status,
-            project=project,
-            is_current=True,
-        )
-        if count % 5 != 0:
-            project_support = ProjectSupport.objects.create(
-                project=project,
-                support=self.user,
-                start=date.today(),
-            )
-
-            SupportStatus.objects.create(
-                is_current=True,
-                support=project_support,
-                change_date=date.today(),
-                frequency='more_than_2_days',
-            )
-            ConsultantFeedback.objects.create(
-                project_id=project.id,
-                description=f"test description {count}",
-                created_by=self.user,
-                consultant_id=marketing.consultant.id,
-                department=random.choice(['Engineering', 'Legal', 'Marketing']),
-                feedback_type="cfr",
-                rating=random.choice([3, 4, 5]),
-            )
-            desc = f"Admin Demo added himself as support person"
-            create_activity(project.id, 'projectsupport', self.user, desc, 'created')
-
-        return project
+from consultant.factories import Setup
 
 
 class ConsultantFeedbackViewSetTest(APITestCase):
 
     def setUp(self):
-
         self.setup = Setup()
-        self.consultant = ConsultantFactory()
-        consultant_marketing = ConsultantMarketingFactory(consultant=self.consultant, in_pool=False, status='open')
-        consultant_marketing.teams.add(self.setup.team)
-        consultant_marketing.marketer.add(self.setup.user)
+        consultant_marketing = self.setup.create_consultant()
         self.project = self.setup.create_project(consultant_marketing, 'new', 1)
+
+        self.consultant = Consultant.objects.all()
         self.client = APIClient()
         self.client.force_authenticate(user=self.setup.user)
 
     def test_get_consultant_feedback_list(self):
-        route = f"/api/consultant/{self.consultant.id}/feedback/?query=admin&project={self.project.id}&feedback_type=[%22cfr%22]"
+        route = f"/api/consultant/{self.consultant.first().id}/feedback/" \
+                f"?query=admin&project={self.project.id}&feedback_type=[%22cfr%22]"
         res = self.client.get(route)
         self.assertEqual(res.data['data'][0]['project']['id'], self.project.id)
         self.assertEqual(res.data['data'][0]['feedback_type'], 'cfr')
         self.assertEqual(res.status_code, 200)
 
     def test_get_consultant_feedback_department(self):
-        route = f"/api/consultant/{self.consultant.id}/feedback/department/"
+        route = f"/api/consultant/{self.consultant.first().id}/feedback/department/"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['data'], ['Engineering', 'Marketing', 'Legal', 'Recruitment', 'Relations', 'Finance'])
 
     def test_get_consultant_feedback_types(self):
-        route = f"/api/consultant/{self.consultant.id}/feedback/feedback_types/"
+        route = f"/api/consultant/{self.consultant.first().id}/feedback/feedback_types/"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(
-            res.data['data'],
-                (('cfr', 'CFR'), ('green_card', 'Green Card'), ('independent', 'Independent'),
-                 ('pre_joining', 'Pre Joining'), ('2_week', '2 Week of Joining'),
-                 ('re_marketing', 'Re-marketing'), ('rate_increment', 'Rate Increment'),
-                 ('engineering_issue', 'Engineering Issue'))
-        )
 
     def test_get_consultant_project(self):
-        route = f"/api/consultant/{self.consultant.id}/feedback/project/"
+        route = f"/api/consultant/{self.consultant.first().id}/feedback/project/"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['data'].first()['vendor'], 'vendor_company_name1')
@@ -150,7 +53,7 @@ class ConsultantFeedbackViewSetTest(APITestCase):
             "description": "Consultant Feedback",
             "tagged_user": [self.setup.user.id]
         }
-        create_route = f"/api/consultant/{self.consultant.id}/feedback/"
+        create_route = f"/api/consultant/{self.consultant.first().id}/feedback/"
         res = self.client.post(create_route, data=payload)
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data['message'], 'Feedback added')
@@ -160,13 +63,13 @@ class ConsultantFeedbackViewSetTest(APITestCase):
         self.assertEqual(res.data['data']['department'], 'engineering')
         self.assertEqual(res.status_code, 201)
 
-        route_update = f"/api/consultant/{self.consultant.id}/feedback/{res.data['data']['id']}/"
+        route_update = f"/api/consultant/{self.consultant.first().id}/feedback/{res.data['data']['id']}/"
         payload['description'] = 'update consultant feedback'
         update_res = self.client.put(route_update, data=payload)
         self.assertEqual(update_res.status_code, 202)
 
     def test_request_feedback_mail(self):
-        route = f"/api/consultant/{self.consultant.id}/feedback/request_feedback/"
+        route = f"/api/consultant/{self.consultant.first().id}/feedback/request_feedback/"
         payload = {
             'department': ['Marketing', 'Engineering'],
             'feedback_type': 're_marketing'
@@ -179,7 +82,8 @@ class ConsultantV2VTest(APITestCase):
 
     def setUp(self):
         self.setup = Setup()
-        for i in range(0,5): ConsultantFactory()
+        for i in range(0, 5):
+            self.setup.create_consultant()
         self.client = APIClient()
         self.client.force_authenticate(user=self.setup.user)
 
@@ -205,12 +109,8 @@ class ConsultantTest(APITestCase):
         for role in ['admin', 'marketer', 'recruiter']:
             self.setup.user.role.add(Role.objects.create(name=role))
         for i in range(0, 5):
-            consultant = ConsultantFactory()
-            if i % 2 == 0:
-                consultant_marketing = ConsultantMarketingFactory(consultant=consultant, in_pool=False, status='open')
-                consultant_marketing.teams.add(self.setup.team)
-                consultant_marketing.marketer.add(self.setup.user)
-                self.setup.create_project(consultant_marketing, 'new', 1)
+            consultant_marketing = self.setup.create_consultant()
+            self.setup.create_project(consultant_marketing, 'new', 1)
         self.consultant = Consultant.objects.all()
 
         self.client = APIClient(self.setup.user)
@@ -220,7 +120,7 @@ class ConsultantTest(APITestCase):
         route_list = f"/api/consultant/"
         res = self.client.get(route_list)
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(len(res.data['data']), 3)
+        self.assertEqual(len(res.data['data']), 5)
 
         route_list_with_query = f"/api/consultant/?query={self.consultant.first().name}"
         res_query = self.client.get(route_list_with_query)
@@ -233,8 +133,8 @@ class ConsultantTest(APITestCase):
         self.assertEqual(res.data['data']['name'], self.consultant.first().name)
 
         route_with_submission = f"/api/consultant/{self.consultant.first().id}/?submission={True}"
-        res_submsission = self.client.get(route_with_submission)
-        self.assertEqual(res_submsission.status_code, 200)
+        res_submission = self.client.get(route_with_submission)
+        self.assertEqual(res_submission.status_code, 200)
 
     def test_search_consultant(self):
         route = f"/api/consultant/search/"
@@ -246,7 +146,7 @@ class ConsultantTest(APITestCase):
         search_res = self.client.get(search_route)
         self.assertEqual(search_res.data['data'].first()['name'], self.consultant.first().name)
 
-    def test_create_and_update_eductaion(self):
+    def test_create_and_update_education(self):
         payload = {
             "city": "East Coast",
             "major": 'major',
@@ -255,7 +155,7 @@ class ConsultantTest(APITestCase):
             "edu_type": "phd",
             "end_date": "2021-12-15",
         }
-        post_route = f"/api/consultant/{ConsultantFactory().id}/education/"
+        post_route = f"/api/consultant/{self.consultant.first().id}/education/"
         post_res = self.client.post(post_route, data=json.dumps(payload), content_type="application/json")
         self.assertEqual(post_res.status_code, 201)
 
@@ -276,7 +176,7 @@ class ConsultantTest(APITestCase):
             "start_date": "2020-12-15"
         }
 
-        post_route = f"/api/consultant/{ConsultantFactory().id}/experience/"
+        post_route = f"/api/consultant/{self.consultant.first().id}/experience/"
         post_res = self.client.post(post_route, data=json.dumps(payload), content_type="application/json")
         self.assertEqual(post_res.status_code, 201)
         payload['city'] = 'West Coast'
