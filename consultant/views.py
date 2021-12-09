@@ -1784,8 +1784,9 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 feedback_type=request.data.get('feedback_type'),
                 department=request.data.get('department', None),
             )
-
-            if feedback.feedback_type == 'pre_joining':
+            if feedback.feedback_type in ['issue', '2 weeks', 'independent']:
+                feedback.department = 'Engineering'
+            elif feedback.feedback_type == 'pre_joining':
                 pre_joining_feedback_notification(feedback, request)
             elif feedback.feedback_type == 'issue':
                 engineering_feedback_notification(feedback, request)
@@ -1906,7 +1907,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             projects = Project.objects.filter(
                 consultant=consultant_id, statuses__status__in=['new', 'joined', 'extended', 'complete']
             ).order_by('-modified')
-            if projects is None:
+            if not projects:
                 projects = Project.objects.filter(
                     consultant=consultant_id, statuses__status__icontains="terminate"
                 ).order_by('-modified')
@@ -1919,12 +1920,11 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             }
 
             to = list()
-            if projects:
-                if 'Marketing' in departments:
-                    to.append(projects.first().submission.created_by.email)
-                    to.extend(fetch_scrum_masters(projects.first().submission.created_by))
-                    departments.remove('Marketing')
-            to = [obj[department] for department in departments] + to
+            if projects and 'Marketing' in departments:
+                to.append(projects.first().submission.created_by.email)
+                to.extend(fetch_scrum_masters(projects.first().submission.created_by))
+
+            to = [obj[department] for department in departments if 'Marketing' != department] + to
             mail_data = {
                 "to": to, "cc": [], "bcc": [],
                 'template': '../templates/request_feedback.html',

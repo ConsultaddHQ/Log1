@@ -59,7 +59,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         projects = projects.filter(support=None)
 
                 if 'client' in filters:
-                    projects = projects.filter(submission__client=filters['client'])
+                    projects = projects.filter(submission__client__iexact=filters['client'])
 
                 if 'support' in filters:
                     projects = projects.filter(support__support_id=filters['support'])
@@ -189,24 +189,22 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path="filters")
     def filters(self, request):
         try:
-            project_status = [
-                {'name': 'new', 'display_name': 'New'},
-                {'name': 'received', 'display_name': 'Received'},
-                {'name': 'on_boarded', 'display_name': 'On Boarded'},
-                {'name': 'joined', 'display_name': 'Joined'},
-                {'name': 'complete', 'display_name': 'Complete'},
-                {'name': 'cancelled', 'display_name': 'Cancelled'},
-                {'name': 'terminated', 'display_name': 'Terminated'},
-            ]
-            support_status = [
-                {'name': 'training', 'display_name': 'Training'},
-                {'name': 'active', 'display_name': 'Active'},
-                {'name': 'less_active', 'display_name': 'Less Active'},
-                {'name': 'independent', 'display_name': 'Independent'},
-            ]
             data = {
-                "project_status": project_status,
-                "support_status": support_status,
+                "project_status": [
+                    {'name': 'new', 'display_name': 'New'},
+                    {'name': 'received', 'display_name': 'Received'},
+                    {'name': 'on_boarded', 'display_name': 'On Boarded'},
+                    {'name': 'joined', 'display_name': 'Joined'},
+                    {'name': 'complete', 'display_name': 'Complete'},
+                    {'name': 'cancelled', 'display_name': 'Cancelled'},
+                    {'name': 'terminated', 'display_name': 'Terminated'},
+                ],
+                "support_status": [
+                    {'name': 'training', 'display_name': 'Training'},
+                    {'name': 'active', 'display_name': 'Active'},
+                    {'name': 'less_active', 'display_name': 'Less Active'},
+                    {'name': 'independent', 'display_name': 'Independent'},
+                ],
             }
             return Response({"data": data}, status=200)
         except Exception as error:
