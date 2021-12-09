@@ -87,6 +87,7 @@ class TrainingAgenda(TimeStampedModel):
     description = models.TextField(_('Description'), blank=True, null=True)
     assignment_given = models.BooleanField(_('Assignment Given'), null=True)
     status = models.CharField(_('Status'), max_length=30, null=True, blank=True)
+    completion_date = models.DateField(_("Completion date"), null=True, blank=True)
     assignment_submitted = models.BooleanField(_('Assignment Submitted'), null=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='agenda')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agendas')

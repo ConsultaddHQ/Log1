@@ -11,12 +11,13 @@ from utils_app.models import TimeStampedModel
 
 FEEDBACK_CHOICES = (
     ('cfr', 'CFR'),
-    ('issue', 'Issue'),
-    ('2_week', '2 Week'),
-    ('pre_joining', 'Pre Joining'),
+    ('green_card', 'Green Card'),
     ('independent', 'Independent'),
+    ('pre_joining', 'Pre Joining'),
+    ('2_week', '2 Week of Joining'),
     ('re_marketing', 'Re-marketing'),
     ('rate_increment', 'Rate Increment'),
+    ('engineering_issue', 'Engineering Issue'),
 )
 
 
