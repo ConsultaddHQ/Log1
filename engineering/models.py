@@ -10,10 +10,12 @@ from project.models import Project, ProjectSupport
 
 
 class ProjectDescription(TimeStampedModel):
+    attachments = GenericRelation(Attachment)
     notes = models.TextField(_('Notes'), null=True)
     remark = models.TextField(_('Remark'), null=True)
     description = models.TextField(_('Description'), null=True)
     update_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    resource = models.TextField(_('Resource'), blank=True, null=True)
     technology = models.CharField(_('Technology'), max_length=500, null=True)
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='description')
     consultant_preferred_time = models.CharField(_('Preferred Time'), max_length=30, null=True, blank=True)
@@ -87,6 +89,7 @@ class TrainingAgenda(TimeStampedModel):
     description = models.TextField(_('Description'), blank=True, null=True)
     assignment_given = models.BooleanField(_('Assignment Given'), null=True)
     status = models.CharField(_('Status'), max_length=30, null=True, blank=True)
+    completion_date = models.DateField(_("Completion date"), null=True, blank=True)
     assignment_submitted = models.BooleanField(_('Assignment Submitted'), null=True)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='agenda')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='agendas')

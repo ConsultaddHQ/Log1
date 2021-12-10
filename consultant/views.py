@@ -3,12 +3,12 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.db.models import Subquery, OuterRef
 
+from rest_framework.mixins import *
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from consultant.utils import *
 from api_key.models import APIKey
@@ -21,6 +21,55 @@ from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
 from project.models import ProjectStatus, ConsultantFeedback, FEEDBACK_CHOICES
 from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+
+
+# Route - /v2/consultant/<consultant_id>/microsoft/
+class MicroSoftViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
+    queryset = MSAccount.objects.all()
+    serializer_class = MSAccountSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
+            ms = MicrosoftAccount()
+            if hasattr(consultant, 'msaccount'):
+                account = consultant.msaccount
+                licence = ms.assign_licence(account.user_id)
+                if licence == 'ok':
+                    account.licence_assigned = True
+                    member_id, msg = ms.assign_team(account.user_id)
+                    if msg == 'ok':
+                        account.member_id = member_id
+                account.save()
+            else:
+                account = MSAccount.objects.create(
+                    consultant=consultant,
+                    email=f"{consultant.name[0]}.{consultant.name[0]}@consultadd.com"
+                )
+                name = consultant.name.split()
+                data = {
+                    "first_name": name[0],
+                    "name": consultant.name,
+                    "email": consultant.email,
+                    "password": f"consultadd@1{consultant.id}23",
+                    "last_name": name[1] if len(name) > 1 else "",
+                }
+                user_id, msg = ms.create_account(data)
+                if msg == 'ok':
+                    account.user_id = user_id
+                    licence = ms.assign_licence(user_id)
+                    if licence == 'ok':
+                        account.licence_assigned = True
+                        member_id, msg = ms.assign_team(user_id)
+                        if msg == 'ok':
+                            account.member_id = member_id
+                account.save()
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /v2/consultant/
@@ -1755,8 +1804,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query')
-            feedback_type = json.loads(request.GET.get('feedback_type', []))
             first, last = get_page_limits(request)
+            feedback_type = json.loads(request.GET.get('feedback_type', '[]'))
             queryset = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
             if request.GET.get('project'):
                 queryset = queryset.filter(project_id=request.GET.get('project'))
@@ -1784,11 +1833,13 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 feedback_type=request.data.get('feedback_type'),
                 department=request.data.get('department', None),
             )
+            if feedback.feedback_type in ['engineering_issue', '2_week', 'independent']:
+                setattr(feedback, 'department', 'engineering')
+                feedback.save()
+                if feedback.feedback_type == 'issue': engineering_feedback_notification(feedback, request)
 
-            if feedback.feedback_type == 'pre_joining':
+            elif feedback.feedback_type == 'pre_joining':
                 pre_joining_feedback_notification(feedback, request)
-            elif feedback.feedback_type == 'issue':
-                engineering_feedback_notification(feedback, request)
 
             consultant = feedback.consultant
             emp_name = request.user.employee_name
@@ -1906,7 +1957,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             projects = Project.objects.filter(
                 consultant=consultant_id, statuses__status__in=['new', 'joined', 'extended', 'complete']
             ).order_by('-modified')
-            if projects is None:
+            if not projects:
                 projects = Project.objects.filter(
                     consultant=consultant_id, statuses__status__icontains="terminate"
                 ).order_by('-modified')
@@ -1919,12 +1970,11 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             }
 
             to = list()
-            if projects:
-                if 'Marketing' in departments:
-                    to.append(projects.first().submission.created_by.email)
-                    to.extend(fetch_scrum_masters(projects.first().submission.created_by))
-                    departments.remove('Marketing')
-            to = [obj[department] for department in departments] + to
+            if projects and 'Marketing' in departments:
+                to.append(projects.first().submission.created_by.email)
+                to.extend(fetch_scrum_masters(projects.first().submission.created_by))
+
+            to = [obj[department] for department in departments if 'Marketing' != department] + to
             mail_data = {
                 "to": to, "cc": [], "bcc": [],
                 'template': '../templates/request_feedback.html',
@@ -1954,10 +2004,6 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
-        """
-            Normal Login
-            :param request, email, password
-        """
         try:
             email = request.data.get('email').lower()
             if email:

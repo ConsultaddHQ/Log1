@@ -68,6 +68,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
             'id': consultant.id,
             'name': consultant.name,
             'email': consultant.email,
+            'location': consultant.current_city
         }
 
     @staticmethod
@@ -148,6 +149,7 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
             'retention': retention,
             'name': consultant.name,
             'email': consultant.email,
+            'location': consultant.current_city,
         }
 
     @staticmethod
@@ -203,6 +205,7 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProjectUpdateGetSerializer(serializers.ModelSerializer):
+    blocker = serializers.SerializerMethodField()
     update_by = serializers.SerializerMethodField()
     tagged_user = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
@@ -210,6 +213,10 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectUpdate
         exclude = ('project',)
+
+    @staticmethod
+    def get_blocker(obj):
+        return obj.blocker.replace("<p></p>", "") if obj.blocker else obj.blocker
 
     @staticmethod
     def get_update_by(obj):

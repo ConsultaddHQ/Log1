@@ -572,7 +572,7 @@ class MSAccount(models.Model):
     user_id = models.CharField(_('User ID'), max_length=300, blank=True, null=True)
     licence_assigned = models.BooleanField(_('Licence Assigned?'), default=False, null=True)
     member_id = models.CharField(_('Team member id'), max_length=300, blank=True, null=True)
-    consultant = models.ForeignKey(Consultant, on_delete=models.CASCADE, blank=True, null=True)
+    consultant = models.OneToOneField(Consultant, on_delete=models.CASCADE, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         return super(MSAccount, self).save(*args, **kwargs)

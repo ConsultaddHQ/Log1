@@ -1,7 +1,9 @@
 import os
 import json
+
 from django.db.models import Q, Max
 from django.shortcuts import get_object_or_404
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -59,7 +61,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         projects = projects.filter(support=None)
 
                 if 'client' in filters:
-                    projects = projects.filter(submission__client=filters['client'])
+                    projects = projects.filter(submission__client__iexact=filters['client'])
 
                 if 'support' in filters:
                     projects = projects.filter(support__support_id=filters['support'])
@@ -189,24 +191,22 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path="filters")
     def filters(self, request):
         try:
-            project_status = [
-                {'name': 'new', 'display_name': 'New'},
-                {'name': 'received', 'display_name': 'Received'},
-                {'name': 'on_boarded', 'display_name': 'On Boarded'},
-                {'name': 'joined', 'display_name': 'Joined'},
-                {'name': 'complete', 'display_name': 'Complete'},
-                {'name': 'cancelled', 'display_name': 'Cancelled'},
-                {'name': 'terminated', 'display_name': 'Terminated'},
-            ]
-            support_status = [
-                {'name': 'training', 'display_name': 'Training'},
-                {'name': 'active', 'display_name': 'Active'},
-                {'name': 'less_active', 'display_name': 'Less Active'},
-                {'name': 'independent', 'display_name': 'Independent'},
-            ]
             data = {
-                "project_status": project_status,
-                "support_status": support_status,
+                "project_status": [
+                    {'name': 'new', 'display_name': 'New'},
+                    {'name': 'received', 'display_name': 'Received'},
+                    {'name': 'on_boarded', 'display_name': 'On Boarded'},
+                    {'name': 'joined', 'display_name': 'Joined'},
+                    {'name': 'complete', 'display_name': 'Complete'},
+                    {'name': 'cancelled', 'display_name': 'Cancelled'},
+                    {'name': 'terminated', 'display_name': 'Terminated'},
+                ],
+                "support_status": [
+                    {'name': 'training', 'display_name': 'Training'},
+                    {'name': 'active', 'display_name': 'Active'},
+                    {'name': 'less_active', 'display_name': 'Less Active'},
+                    {'name': 'independent', 'display_name': 'Independent'},
+                ],
             }
             return Response({"data": data}, status=200)
         except Exception as error:
@@ -499,6 +499,54 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
         data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
         return Response({"data": data}, status=200)
+
+    @action(methods=['get', 'put'], detail=False, url_path='resource')
+    def resource(self, request, project_id):
+        try:
+            project = get_object_or_404(Project, id=project_id)
+            if request.method == 'PUT':
+                description, _ = ProjectDescription.objects.get_or_create(project=project)
+                description.resource = request.data.get('resource')
+                description.save()
+
+                # Activity
+                desc = f"{request.user.employee_name} updated project resource"
+                create_activity(description.project.id, 'projectdescription', request.user, desc, 'update')
+
+                return Response({"message": "Project description updated"}, status=202)
+            else:
+                if hasattr(project, 'description'):
+                    description = get_object_or_404(ProjectDescription, project=project)
+                    return Response({"data": {'id': description.id, "resource": description.resource}}, status=200)
+                return Response({"message": "Project Resource not found"}, status=404)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get', 'put'], detail=False, url_path='document')
+    def document(self, request, project_id):
+        try:
+            project = get_object_or_404(Project, id=project_id)
+            if request.method == 'PUT':
+                description, _ = ProjectDescription.objects.get_or_create(project=project)
+                if request.FILES.get('file', None):
+                    content_type = ContentType.objects.get(model='projectdescription')
+                    Attachment.objects.create(
+                        creator=request.user,
+                        object_id=description.id,
+                        content_type=content_type,
+                        attachment_type='project_resource',
+                        attachment_file=request.FILES.get('file'),
+                    )
+                    return Response({"message": "Resource Uploaded"}, status=201)
+                return Response({"message": "File not found"}, status=400)
+            else:
+                description = get_object_or_404(ProjectDescription, project_id=project.id)
+                serializer = AttachmentGetSerializer(description.attachments.all(), many=True)
+                return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /project/:project_id:/training/

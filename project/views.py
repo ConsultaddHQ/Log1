@@ -771,7 +771,11 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
             )
-
+            if request.user.id == support.id:
+                desc = f"{request.user.employee_name} added himself as support person"
+            else:
+                desc = f"{request.user.employee_name} added {support.employee_name} as support person"
+            create_activity(project.id, 'projectsupport', request.user, desc, 'created')
             return Response({"message": "Support is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -783,6 +787,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             serializer = ProjectSupportSerializer(support, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            desc = f"{request.user.employee_name} updated support details"
+            create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
             return Response({"message": "Support is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -806,6 +812,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
             else:
                 SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
+            desc = f"{request.user.employee_name} updated support status"
+            create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
             return Response({"message": "Support status is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -857,6 +865,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         try:
             if 'admin' in request.user.roles and 'engineer' in request.user.roles:
                 support = get_object_or_404(ProjectSupport, id=pk)
+                desc = f"{request.user.employee_name} removed {support.support.employee_name} as support person"
+                create_activity(support.project.id, 'projectsupport', request.user, desc, 'deleted')
                 support.delete()
                 return Response({"message": "Support is removed"}, status=202)
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
