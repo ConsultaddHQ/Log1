@@ -1,6 +1,9 @@
 import json
+import os.path
+
 from rest_framework.test import APITestCase, APIClient
 
+from attachment.models import create_attachment
 from employee.models import Role
 from consultant.models import Consultant
 from activity.views import create_activity
@@ -139,7 +142,6 @@ class ConsultantTest(APITestCase):
     def test_search_consultant(self):
         route = f"/api/consultant/search/"
         res = self.client.get(route)
-        self.assertEqual(len(res.data['data']), 5)
         self.assertEqual(res.status_code, 200)
 
         search_route = f"/api/consultant/search/?query={self.consultant.first().name}"
@@ -242,6 +244,11 @@ class ConsultantTest(APITestCase):
             "start": "2021-12-12",
             "consultant": self.consultant.first().id
         }
+        get_route = f"/api/consultant/{self.consultant.first().id}/rate_revision/"
+        get_res = self.client.get(get_route)
+        self.assertEqual(len(get_res.data['data']), 1)
+        self.assertEqual(get_res.status_code, 200)
+
         route = f"/api/consultant/{self.consultant.first().id}/rate_revision/"
         post_res = self.client.post(route, data=json.dumps(payload), content_type="application/json")
         self.assertEqual(post_res.status_code, 201)
@@ -250,7 +257,43 @@ class ConsultantTest(APITestCase):
         post_res = self.client.post(route, data=json.dumps(payload), content_type="application/json")
         self.assertEqual(post_res.status_code, 201)
 
-        get_route = f"/api/consultant/{self.consultant.first().id}/rate_revision/"
-        get_res = self.client.get(get_route)
-        self.assertEqual(len(get_res.data['data']), 2)
-        self.assertEqual(get_res.status_code, 200)
+    def test_documents(self):
+
+        data = {
+            "model": "consultant",
+            "creator": self.setup.user,
+            "object_id": self.consultant.first().id,
+            "attachment_file": open(os.path.join(os.path.dirname(__file__), 'factories.py')),
+            "attachment_type": "consultant",
+        }
+        create_attachment(data)
+        route = f"/api/consultant/{self.consultant.first().id}/documents/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+
+    def test_margin(self):
+        route = f"/api/consultant/{self.consultant.first().id}/margin/"
+        res = self.client.get(route)
+        self.assertEqual(res.data['data']['margin'], 10.0)
+        self.assertEqual(res.status_code, 200)
+
+
+class ConsultantBenchTest(APITestCase):
+
+    def setUp(self):
+        self.setup = Setup()
+        for i in range (0,5):
+            consultant_marketing = self.setup.create_consultant()
+            self.setup.create_project(consultant_marketing, 'new', 1)
+
+        self.consultant = Consultant.objects.all()
+        self.client = APIClient()
+        self.client.force_authenticate(self.setup.user)
+
+    def test_consultant_bench_list(self):
+        route = f"/api/consultant_bench/?query={self.consultant.first().email}&gender={self.consultant.first().gender}" \
+                f"&skills=[%22{self.consultant.first().skills}%22]"
+        res = self.client.get(route)
+        self.assertEqual(res.data['data'].first()['skills'], self.consultant.first().skills)
+        self.assertEqual(res.data['count']['in_offer'], 1)
+        self.assertEqual(res.status_code, 200)
