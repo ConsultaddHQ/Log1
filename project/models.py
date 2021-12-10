@@ -247,10 +247,10 @@ class ConsultantFeedback(TimeStampedModel):
     description = models.TextField(_('Feedback'))
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     consultant = models.ForeignKey(Consultant, on_delete=models.CASCADE)
+    rating = models.IntegerField(_('Consultant Rating'), null=True, blank=True)
     verdict = models.CharField(_('Consultant Verdict'), max_length=30, null=True, blank=True)
     department = models.CharField(_('Feedback Department'), max_length=30, null=True, blank=True)
     feedback_type = models.CharField(_('Feedback Type'), max_length=30, choices=FEEDBACK_CHOICES)
-    rating = models.IntegerField(_('Consultant Rating'), help_text=_('Rating 1 being worst and 5 being best'))
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='feedbacks', null=True, blank=True)
 
     def save(self, *args, **kwargs):

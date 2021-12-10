@@ -500,19 +500,25 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
         return Response({"data": data}, status=200)
 
-    @action(methods=['put'], detail=False, url_path='resource')
+    @action(methods=['get', 'put'], detail=False, url_path='resource')
     def resource(self, request, project_id):
         try:
             project = get_object_or_404(Project, id=project_id)
-            description, _ = ProjectDescription.objects.get_or_create(project=project)
-            description.resource = request.data.get('resource')
-            description.save()
+            if request.method == 'PUT':
+                description, _ = ProjectDescription.objects.get_or_create(project=project)
+                description.resource = request.data.get('resource')
+                description.save()
 
-            # Activity
-            desc = f"{request.user.employee_name} updated project resource"
-            create_activity(description.project.id, 'projectdescription', request.user, desc, 'update')
+                # Activity
+                desc = f"{request.user.employee_name} updated project resource"
+                create_activity(description.project.id, 'projectdescription', request.user, desc, 'update')
 
-            return Response({"message": "Project description updated"}, status=202)
+                return Response({"message": "Project description updated"}, status=202)
+            else:
+                if hasattr(project, 'description'):
+                    description = get_object_or_404(ProjectDescription, project=project)
+                    return Response({"data": {'id': description.id, "resource": description.resource}}, status=200)
+                return Response({"message": "Project Resource not found"}, status=404)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -522,7 +528,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
         try:
             project = get_object_or_404(Project, id=project_id)
             if request.method == 'PUT':
-                description = ProjectDescription.objects.get_or_create(project=project)
+                description, _ = ProjectDescription.objects.get_or_create(project=project)
                 if request.FILES.get('file', None):
                     content_type = ContentType.objects.get(model='projectdescription')
                     Attachment.objects.create(

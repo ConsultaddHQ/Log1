@@ -216,7 +216,7 @@ class ProjectUpdateGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_blocker(obj):
-        return obj.blocker.replace("<p></p>", "")
+        return obj.blocker.replace("<p></p>", "") if obj.blocker else obj.blocker
 
     @staticmethod
     def get_update_by(obj):
