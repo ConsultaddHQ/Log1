@@ -18,8 +18,8 @@ class MicrosoftAccount:
                 "displayName": data['name'],
                 "surname": data['last_name'],
                 "givenName": data['first_name'],
-                "mailNickname": data['name'].split()[0],
                 "userPrincipalName": data['email'],
+                "mailNickname": data['name'].split()[0],
                 "usageLocation": "IN",
                 "passwordProfile": {
                     "forceChangePasswordNextSignIn": True,
@@ -127,7 +127,7 @@ class MicrosoftAccount:
 
             url = f"https://graph.microsoft.com/v1.0/teams/{self.team}/members/{member_id}"
             response = requests.delete(url, headers=self.headers)
-            data = json.loads(response.text.encode('utf-8'))
+            data = response.text
             if response.status_code == 200:
                 return "ok"
             else:

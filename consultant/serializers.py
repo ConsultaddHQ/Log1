@@ -493,3 +493,9 @@ class FeedbackSerializer(serializers.ModelSerializer):
             return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
         return None
 
+
+# Consultant Login
+class MSAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MSAccount
+        fields = '__all__'

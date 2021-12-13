@@ -64,6 +64,7 @@ class Attachment(TimeStampedModel):
         ('recordings', 'Interview Recordings'),
         ('test_submit', "Test Submission Docs"),
         ('test_feedback', "Test Feedback Docs"),
+        ('project_resource', "Project Resource"),
         ('work_order_signed', 'Work Order Signed'),
         ('work_order_msa', 'Work Order and MSA/Agreement'),
         ('work_order_msa_signed', 'Work Order and MSA/Agreement Signed'),
