@@ -277,6 +277,40 @@ class ConsultantTest(APITestCase):
         self.assertEqual(res.data['data']['margin'], 10.0)
         self.assertEqual(res.status_code, 200)
 
+    def test_create_consultant(self):
+        data = {
+            'ssn': 123564789866,
+            'name': 'Robert Jr.',
+            'email': 'rober@gmail.com',
+            'is_w2': False,
+            "skills": 'Java',
+            'gender': 'Male',
+            'phone_no': 99887766556,
+            'current_city': 'West Coast',
+            'date_of_birth': "1988-02-02",
+            "visa_end": "2024-09-09",
+            "visa_start": "2020-01-01",
+            "visa_type": "h1b",
+            'recruiter': self.setup.user.id,
+            'retention': self.setup.user.id,
+            'payroll_employer': 'consultadd',
+            'employer_start_date': "2020-01-01",
+        }
+        route = f"/api/consultant/"
+        res = self.client.post(route, data=data)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.status_code, 201)
+
+    def test_update_consultant(self):
+        data = {
+            "skills": 'Python',
+        }
+        route = f"/api/consultant/{self.consultant.first().id}/"
+        res = self.client.put(route, data=data)
+        self.assertEqual(res.data['data']['skills'], 'Python')
+        self.assertEqual(res.data['message'], "Consultant Updated")
+        self.assertEqual(res.status_code, 202)
+
 
 class ConsultantBenchTest(APITestCase):
 
@@ -301,4 +335,29 @@ class ConsultantBenchTest(APITestCase):
         res = self.client.get(route)
         self.assertEqual(res.data['data'].first()['skills'], self.consultant.first().skills)
         self.assertEqual(res.data['count']['in_offer'], 1)
+        self.assertEqual(res.status_code, 200)
+
+
+class ConsultantMarketingTest(APITestCase):
+
+    def setUp(self):
+        self.setup = Setup()
+        for i in range(0, 5):
+            consultant_marketing = self.setup.create_consultant()
+            self.setup.create_project(consultant_marketing, 'new', 1)
+
+        self.consultant = Consultant.objects.all()
+        self.client = APIClient()
+        self.client.force_authenticate(self.setup.user)
+
+    def test_list_consultant_marketing(self):
+        route = f"/api/consultant_marketing/?consultant={self.consultant.first().id}"
+        res = self.client.get(route)
+        self.assertEqual(len(res.data['data']), 1)
+        self.assertEqual(res.status_code, 200)
+
+    def test_stop_consultant_marketing(self):
+        route = f"/api/consultant_marketing/id/stop_marketing/"
+        res = self.client.get(route)
+        self.assertEqual(len(res.data['data']), 1)
         self.assertEqual(res.status_code, 200)

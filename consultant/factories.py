@@ -1,6 +1,6 @@
 import random
 from faker import Faker
-from datetime import date, time
+from datetime import date
 
 from consultant.models import *
 from activity.views import create_activity
@@ -62,9 +62,26 @@ class Setup:
         )
         ConsultantPOC.objects.create(
             start=date.today(),
-            poc_type=random.choice(['Recruiter', 'Retention']),
+            poc_type='Retention',
             poc=self.user,
             consultant=consultant,
+        )
+        ConsultantPOC.objects.create(
+            start=date.today(),
+            poc_type='Recruiter',
+            poc=self.user,
+            consultant=consultant,
+        )
+        ConsultantProfile.objects.create(
+            title='Original',
+            visa_end="2020-09-07",
+            visa_start="2017-09-07",
+            education="phd",
+            date_of_birth="1998-09-09",
+            visa_type='h1b',
+            current_city='West Iowa',
+            profile_owner=self.user,
+            consultant=consultant
         )
         WorkAuth.objects.create(
             is_current=True,
