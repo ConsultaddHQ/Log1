@@ -1836,7 +1836,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             if feedback.feedback_type in ['engineering_issue', '2_week', 'independent']:
                 setattr(feedback, 'department', 'engineering')
                 feedback.save()
-                if feedback.feedback_type == 'issue': engineering_feedback_notification(feedback, request)
+                if feedback.feedback_type == 'issue':
+                    engineering_feedback_notification(feedback, request)
 
             elif feedback.feedback_type == 'pre_joining':
                 pre_joining_feedback_notification(feedback, request)

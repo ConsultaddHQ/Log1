@@ -415,8 +415,9 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "id": description.id,
                     "notes": description.notes,
                     "remark": description.remark,
-                    "description": description.description,
+                    "resource": description.resource,
                     "technology": description.technology,
+                    "description": description.description,
                     "consultant_preferred_time": description.consultant_preferred_time
                 }
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
@@ -523,7 +524,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get', 'put'], detail=False, url_path='document')
+    @action(methods=['get', 'put', 'delete'], detail=False, url_path='document')
     def document(self, request, project_id):
         try:
             project = get_object_or_404(Project, id=project_id)
@@ -540,6 +541,14 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     )
                     return Response({"message": "Resource Uploaded"}, status=201)
                 return Response({"message": "File not found"}, status=400)
+            elif request.method == 'DELETE':
+                attachment_id = request.GET.get('attachment_id')
+                attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
+                desc = f"{attachment.filename} deleted from resources section by {request.user.employee_name}"
+                create_activity(project_id, 'projectdescription', request.user, desc, 'deleted')
+                attachment.attachment_file.delete(save=False)
+                attachment.delete()
+                return Response({"message": "Attachment deleted"}, status=204)
             else:
                 description = get_object_or_404(ProjectDescription, project_id=project.id)
                 serializer = AttachmentGetSerializer(description.attachments.all(), many=True)
