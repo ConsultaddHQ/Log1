@@ -749,16 +749,13 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             if gender:
                 consultants = consultants.filter(gender=gender)
-
             if days:
                 day_filter = marketing_days_filter(days)
                 consultants = consultants.filter(**day_filter)
-
             if type(skills) is not list:
                 skills = json.loads(skills)
             if type(visa) is not list:
                 visa = json.loads(visa)
-
             if len(skills) > 0:
                 consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in skills]))
 

@@ -66,6 +66,13 @@ class Setup:
             poc=self.user,
             consultant=consultant,
         )
+        WorkAuth.objects.create(
+            is_current=True,
+            visa_end="2022-12-12",
+            visa_start="2018-11-11",
+            visa_type=random.choice(['h1b', 'gc']),
+            consultant=consultant,
+        )
         return consultant_marketing[0]
 
     def create_project(self, marketing, status, count):

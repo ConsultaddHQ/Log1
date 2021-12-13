@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase, APIClient
 
 from attachment.models import create_attachment
 from employee.models import Role
-from consultant.models import Consultant
+from consultant.models import Consultant, ConsultantMarketing
 from activity.views import create_activity
 from consultant.factories import Setup
 
@@ -291,6 +291,11 @@ class ConsultantBenchTest(APITestCase):
         self.client.force_authenticate(self.setup.user)
 
     def test_consultant_bench_list(self):
+        route = f"/api/consultant_bench/?team=boto3&visa=[%22gc%22, %22h1b%22]&days=2 weeks"
+        res = self.client.get(route)
+        self.assertEqual(res.data['count']['total'], 5)
+        self.assertEqual(res.status_code, 200)
+
         route = f"/api/consultant_bench/?query={self.consultant.first().email}&gender={self.consultant.first().gender}" \
                 f"&skills=[%22{self.consultant.first().skills}%22]"
         res = self.client.get(route)
