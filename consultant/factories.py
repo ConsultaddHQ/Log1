@@ -50,9 +50,9 @@ class Setup:
             preferred_location=fake.city(),
             status='open',
             consultant=consultant,
-        ),
-        consultant_marketing[0].teams.add(self.team)
-        consultant_marketing[0].marketer.add(self.user)
+        )
+        consultant_marketing.teams.add(self.team)
+        consultant_marketing.marketer.add(self.user)
         ConsultantRateRevision.objects.create(
             rate=45.0,
             previous_rate=40.50,
@@ -90,7 +90,7 @@ class Setup:
             visa_type=random.choice(['h1b', 'gc']),
             consultant=consultant,
         )
-        return consultant_marketing[0]
+        return consultant_marketing
 
     def create_project(self, marketing, status, count):
 
