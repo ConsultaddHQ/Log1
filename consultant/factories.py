@@ -5,7 +5,7 @@ from datetime import date
 from consultant.models import *
 from activity.views import create_activity
 from employee.models import Role
-from marketing.models import Submission, VendorContact, VendorCompany, Lead
+from marketing.models import Submission, VendorContact, VendorCompany, Lead, Interview
 from project.models import ConsultantFeedback, SupportStatus, ProjectSupport, ProjectStatus, Project
 
 fake = Faker()
@@ -15,7 +15,7 @@ class Setup:
     def __init__(self):
         self.project_ids = []
         role = Role.objects.create(name="marketer")
-        self.team = Team.objects.create(name="Consultadd")
+        self.team = Team.objects.create(name="boto3")
         self.user = User.objects.create(
             team=self.team,
             employee_id=1000,
@@ -50,11 +50,47 @@ class Setup:
             preferred_location=fake.city(),
             status='open',
             consultant=consultant,
-        ),
-        consultant_marketing[0].teams.add(self.team)
-        consultant_marketing[0].marketer.add(self.user)
-
-        return consultant_marketing[0]
+        )
+        consultant_marketing.teams.add(self.team)
+        consultant_marketing.marketer.add(self.user)
+        ConsultantRateRevision.objects.create(
+            rate=45.0,
+            previous_rate=40.50,
+            start=date.today(),
+            feedback=fake.text(),
+            consultant=consultant,
+        )
+        ConsultantPOC.objects.create(
+            start=date.today(),
+            poc_type='Retention',
+            poc=self.user,
+            consultant=consultant,
+        )
+        ConsultantPOC.objects.create(
+            start=date.today(),
+            poc_type='Recruiter',
+            poc=self.user,
+            consultant=consultant,
+        )
+        ConsultantProfile.objects.create(
+            title='Original',
+            visa_end="2020-09-07",
+            visa_start="2017-09-07",
+            education="phd",
+            date_of_birth="1998-09-09",
+            visa_type='h1b',
+            current_city='West Iowa',
+            profile_owner=self.user,
+            consultant=consultant
+        )
+        WorkAuth.objects.create(
+            is_current=True,
+            visa_end="2022-12-12",
+            visa_start="2018-11-11",
+            visa_type=random.choice(['h1b', 'gc']),
+            consultant=consultant,
+        )
+        return consultant_marketing
 
     def create_project(self, marketing, status, count):
 
@@ -90,6 +126,7 @@ class Setup:
         )
         project = Project.objects.create(
             is_msg_sent=True,
+            rate=55,
             city='New York, US',
             employer='Consultadd',
             submission=submission,
@@ -123,6 +160,21 @@ class Setup:
                 feedback_type="cfr",
                 rating=random.choice([3, 4, 5]),
             )
+            Interview.objects.create(
+                round= 0,
+                feedback= fake.text(),
+                guest_remark= fake.text(),
+                coding_present= random.choice([True, False]),
+                description= fake.text(),
+                call_details= fake.text(),
+                tech_stack= fake.text(),
+                interview_mode=random.choice(['skype', 'webex', 'dial_in', 'hangouts', 'video_call', 'voice_call']),
+                screening_type=random.choice(['ip_screening', 'vendor_screening', 'interview']),
+                status= random.choice(['offer', 'scheduled', 'next_round']),
+                supervisor=self.user,
+                submission=submission,
+            )
+
             desc = f"Admin Demo added himself as support person"
             create_activity(project.id, 'projectsupport', self.user, desc, 'created')
 
