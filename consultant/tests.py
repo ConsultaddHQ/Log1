@@ -346,18 +346,27 @@ class ConsultantMarketingTest(APITestCase):
             consultant_marketing = self.setup.create_consultant()
             self.setup.create_project(consultant_marketing, 'new', 1)
 
-        self.consultant = Consultant.objects.all()
+        self.marketing = ConsultantMarketing.objects.all()
         self.client = APIClient()
         self.client.force_authenticate(self.setup.user)
 
     def test_list_consultant_marketing(self):
-        route = f"/api/consultant_marketing/?consultant={self.consultant.first().id}"
+        route = f"/api/consultant_marketing/?consultant={self.marketing.first().consultant.id}"
         res = self.client.get(route)
         self.assertEqual(len(res.data['data']), 1)
         self.assertEqual(res.status_code, 200)
 
     def test_stop_consultant_marketing(self):
-        route = f"/api/consultant_marketing/id/stop_marketing/"
-        res = self.client.get(route)
-        self.assertEqual(len(res.data['data']), 1)
-        self.assertEqual(res.status_code, 200)
+        data = {"end": "2020-09-09"}
+        route = f"/api/consultant_marketing/{self.marketing.first().id}/stop_marketing/"
+        res = self.client.put(route, data=data)
+        self.assertEqual(res.data['message'], 'Marketing cycle stopped')
+        self.assertEqual(res.status_code, 202)
+
+    def test_create_consultant_marketing(self):
+        data = {
+            "consultant": self.marketing.first().consultant.id
+        }
+        route = f"/api/consultant_marketing/"
+        res = self.client.post(route, data=data)
+        self.assertEqual()

@@ -904,6 +904,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
     def create(self, request, *args, **kwargs):
         try:
+            breakpoint()
             qs = Consultant.objects.filter(id=request.data['consultant'])
             if not qs:
                 return Response({"message": "Consultant not found"}, status=404)

@@ -523,7 +523,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get', 'put'], detail=False, url_path='document')
+    @action(methods=['get', 'put', 'delete'], detail=False, url_path='document')
     def document(self, request, project_id):
         try:
             project = get_object_or_404(Project, id=project_id)
@@ -540,6 +540,12 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     )
                     return Response({"message": "Resource Uploaded"}, status=201)
                 return Response({"message": "File not found"}, status=400)
+            elif request.method == 'DELETE':
+                attachment = Attachment.objects.get(id=request.GET.get('document_id'), attachment_type='project_resource')
+                if attachment:
+                    attachment.delete()
+                    return Response({"message": "Document deleted"}, status=200)
+                return Response({"message": "Document not found"}, status=400)
             else:
                 description = get_object_or_404(ProjectDescription, project_id=project.id)
                 serializer = AttachmentGetSerializer(description.attachments.all(), many=True)
