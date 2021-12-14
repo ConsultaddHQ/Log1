@@ -72,6 +72,26 @@ class MicroSoftViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
+            ms = MicrosoftAccount()
+            if hasattr(consultant, 'msaccount'):
+                account = consultant.msaccount
+                msg = ms.remove_member(account.member_id)
+                if msg == 'ok':
+                    msg = ms.remove_licence(account.user_id)
+                    if msg == 'ok':
+                        account.licence_assigned = False
+                        ms.disable_account(account.user_id)
+                        account.save()
+                return Response({"message": "Microsoft account removed"}, status=400)
+            else:
+                return Response({"message": "Microsoft account not found"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /v2/consultant/
 class ConsultantV2ViewSets(ModelViewSet):
@@ -1536,12 +1556,6 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit, request)
 
-            if con_exit.status == 'complete':
-                qs = MSAccount.objects.filter(consultant=con_exit.consultant)
-                if qs:
-                    account = MicrosoftAccount()
-                    account.remove_member(qs.first().member_id)
-
             # Activity
             desc = f"{request.user.employee_name} updated exit process"
             create_activity(con_exit.consultant.id, 'consultant', request.user, desc, 'updated')
@@ -1834,7 +1848,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             if feedback.feedback_type in ['engineering_issue', '2_week', 'independent']:
                 setattr(feedback, 'department', 'engineering')
                 feedback.save()
-                if feedback.feedback_type == 'issue': engineering_feedback_notification(feedback, request)
+                if feedback.feedback_type == 'issue':
+                    engineering_feedback_notification(feedback, request)
 
             elif feedback.feedback_type == 'pre_joining':
                 pre_joining_feedback_notification(feedback, request)
