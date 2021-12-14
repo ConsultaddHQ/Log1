@@ -14,7 +14,6 @@ fake = Faker()
 class Setup:
     def __init__(self):
         self.project_ids = []
-        role = Role.objects.create(name="marketer")
         self.team = Team.objects.create(name="boto3")
         self.user = User.objects.create(
             team=self.team,
@@ -23,7 +22,8 @@ class Setup:
             email='admin@log1.com',
             employee_name='Admin Demo',
         )
-        self.user.role.add(role)
+        self.user.role.add(Role.objects.create(name="marketer"))
+        self.user.role.add(Role.objects.create(name="superadmin"))
 
     def create_consultant(self):
         consultant = Consultant.objects.create(
@@ -47,6 +47,7 @@ class Setup:
             cycle=1,
             in_pool=random.choice([True, False]),
             previous_marketing_days=random.choice([0, 1, 2]),
+            primary_marketer=self.user,
             preferred_location=fake.city(),
             status='open',
             consultant=consultant,
