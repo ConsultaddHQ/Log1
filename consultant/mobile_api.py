@@ -119,7 +119,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             except Exception as error:
                 write_exception(error, request)
                 return Response({"error": str(error)}, status=400)
-        write_exception(message=email, request=request)
+        write_info(message=email, function='ConsultantAuthViewSet_login', request=request)
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 

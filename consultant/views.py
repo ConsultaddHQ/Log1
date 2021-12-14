@@ -15,6 +15,7 @@ from api_key.models import APIKey
 from consultant.serializers import *
 from employee.models import tag_users
 from project.utils import fetch_scrum_masters
+
 from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
@@ -67,6 +68,26 @@ class MicroSoftViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                             account.member_id = member_id
                 account.save()
 
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
+            ms = MicrosoftAccount()
+            if hasattr(consultant, 'msaccount'):
+                account = consultant.msaccount
+                msg = ms.remove_member(account.member_id)
+                if msg == 'ok':
+                    msg = ms.remove_licence(account.user_id)
+                    if msg == 'ok':
+                        account.licence_assigned = False
+                        ms.disable_account(account.user_id)
+                        account.save()
+                return Response({"message": "Microsoft account removed"}, status=400)
+            else:
+                return Response({"message": "Microsoft account not found"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -797,16 +818,13 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             if gender:
                 consultants = consultants.filter(gender=gender)
-
             if days:
                 day_filter = marketing_days_filter(days)
                 consultants = consultants.filter(**day_filter)
-
             if type(skills) is not list:
                 skills = json.loads(skills)
             if type(visa) is not list:
                 visa = json.loads(visa)
-
             if len(skills) > 0:
                 consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in skills]))
 
@@ -1537,12 +1555,6 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             if request.data.get('last_date', None) and request.data.get('last_date', None) <= str(date.today()):
                 terminate_consultant(con_exit, request)
-
-            if con_exit.status == 'complete':
-                qs = MSAccount.objects.filter(consultant=con_exit.consultant)
-                if qs:
-                    account = MicrosoftAccount()
-                    account.remove_member(qs.first().member_id)
 
             # Activity
             desc = f"{request.user.employee_name} updated exit process"

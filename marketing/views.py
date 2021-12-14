@@ -1080,10 +1080,6 @@ class InterviewViewSets(ModelViewSet):
                         Q(submission__consultant_marketing__consultant__email__iexact=query) |
                         Q(submission__consultant_marketing__consultant__name__istartswith=query)
                     )
-            # else:
-                # consultants = Consultant.objects.filter(marketing__status='open').values('id')
-                # queryset = Interview.objects.filter(submission__consultant_marketing__consultant_id__in=consultants)
-                # queryset = Interview.objects.all()
 
             if filter_for == 'my':
                 if 'interviewee' in roles:
@@ -1093,41 +1089,6 @@ class InterviewViewSets(ModelViewSet):
 
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=team)
-
-            # if 'engineer' in roles:
-            #     pass
-            #
-            # elif 'admin' in roles or 'proxy' in roles:
-            #     consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
-            #     queryset = queryset.filter(
-            #         Q(supervisor_id=user_id) |
-            #         Q(submission__created_by_id=user_id) |
-            #         Q(submission__consultant_marketing__in_pool=True) |
-            #         Q(submission__consultant_marketing__consultant__in=consultant_ids) |
-            #         Q(submission__consultant_marketing__teams=team, submission__consultant_marketing__in_pool=False)
-            #     )
-            #
-            # elif 'marketer' in roles:
-            #     consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
-            #     if 'recruiter' in roles or 'retention_manager' in roles:
-            #         queryset = queryset.filter(
-            #             Q(supervisor_id=user_id) |
-            #             Q(submission__created_by_id=user_id) |
-            #             Q(submission__consultant_marketing__in_pool=True) |
-            #             Q(submission__consultant_marketing__marketer__id=user_id) |
-            #             Q(submission__consultant_marketing__consultant__in=consultant_ids) |
-            #             Q(submission__consultant_marketing__consultant__pocs__poc_id=user_id,
-            #               submission__consultant_marketing__status='open')
-            #         )
-            #
-            #     else:
-            #         queryset = queryset.filter(
-            #             Q(supervisor_id=user_id) |
-            #             Q(submission__created_by_id=user_id) |
-            #             Q(submission__consultant_marketing__in_pool=True) |
-            #             Q(submission__consultant_marketing__marketer__id=user_id) |
-            #             Q(submission__consultant_marketing__consultant__in=consultant_ids)
-            #         )
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -1148,7 +1109,7 @@ class InterviewViewSets(ModelViewSet):
                     filter_by_status = filters["status"]
 
                 if 'ctb' in filters and len(filters["ctb"]) > 0:
-                    queryset = queryset.filter(supervisor_id__in=filters["ctb"])
+                    queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
 
                 if 'client' in filters and len(filters["client"]) > 0:
                     queryset = queryset.filter(submission__client__in=filters["client"])
