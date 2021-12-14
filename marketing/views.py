@@ -10,13 +10,11 @@ from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
 
-from rest_framework import viewsets
 from rest_framework.mixins import *
-from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
 from marketing.serializers import *
@@ -139,7 +137,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
 
 # Route - /lead/
-class LeadViewSets(viewsets.ModelViewSet):
+class LeadViewSets(ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
     permission_classes = (IsAuthenticated,)
@@ -965,7 +963,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 
 # Route - /interview/
-class InterviewViewSets(viewsets.ModelViewSet):
+class InterviewViewSets(ModelViewSet):
     queryset = Interview.objects.all()
     serializer_class = InterviewSerializer
     permission_classes = (IsAuthenticated,)
@@ -1062,19 +1060,26 @@ class InterviewViewSets(viewsets.ModelViewSet):
             user_id = request.user.id
             roles = request.user.roles
             team = request.user.team
+            queryset = Interview.objects.all()
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                queryset = Interview.objects.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                )
-            else:
-                # consultants = Consultant.objects.filter(marketing__status='open').values('id')
-                # queryset = Interview.objects.filter(submission__consultant_marketing__consultant_id__in=consultants)
-                queryset = Interview.objects.all()
+                if query.isnumeric():
+                    queryset = queryset.filter(
+                        Q(id=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
 
             if filter_for == 'my':
                 if 'interviewee' in roles:
@@ -1084,41 +1089,6 @@ class InterviewViewSets(viewsets.ModelViewSet):
 
             elif filter_for == 'team':
                 queryset = queryset.filter(submission__created_by__team=team)
-
-            # if 'engineer' in roles:
-            #     pass
-            #
-            # elif 'admin' in roles or 'proxy' in roles:
-            #     consultant_ids = Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)
-            #     queryset = queryset.filter(
-            #         Q(supervisor_id=user_id) |
-            #         Q(submission__created_by_id=user_id) |
-            #         Q(submission__consultant_marketing__in_pool=True) |
-            #         Q(submission__consultant_marketing__consultant__in=consultant_ids) |
-            #         Q(submission__consultant_marketing__teams=team, submission__consultant_marketing__in_pool=False)
-            #     )
-            #
-            # elif 'marketer' in roles:
-            #     consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id'))
-            #     if 'recruiter' in roles or 'retention_manager' in roles:
-            #         queryset = queryset.filter(
-            #             Q(supervisor_id=user_id) |
-            #             Q(submission__created_by_id=user_id) |
-            #             Q(submission__consultant_marketing__in_pool=True) |
-            #             Q(submission__consultant_marketing__marketer__id=user_id) |
-            #             Q(submission__consultant_marketing__consultant__in=consultant_ids) |
-            #             Q(submission__consultant_marketing__consultant__pocs__poc_id=user_id,
-            #               submission__consultant_marketing__status='open')
-            #         )
-            #
-            #     else:
-            #         queryset = queryset.filter(
-            #             Q(supervisor_id=user_id) |
-            #             Q(submission__created_by_id=user_id) |
-            #             Q(submission__consultant_marketing__in_pool=True) |
-            #             Q(submission__consultant_marketing__marketer__id=user_id) |
-            #             Q(submission__consultant_marketing__consultant__in=consultant_ids)
-            #         )
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -1139,7 +1109,7 @@ class InterviewViewSets(viewsets.ModelViewSet):
                     filter_by_status = filters["status"]
 
                 if 'ctb' in filters and len(filters["ctb"]) > 0:
-                    queryset = queryset.filter(supervisor_id__in=filters["ctb"])
+                    queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
 
                 if 'client' in filters and len(filters["client"]) > 0:
                     queryset = queryset.filter(submission__client__in=filters["client"])
@@ -2153,7 +2123,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 query = query.lstrip().replace(':amp:', '&')
                 if query.isnumeric():
                     queryset = Test.objects.filter(
-                        Q(id__exact=query)
+                        Q(id__exact=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__istartswith=query)
                     )
                 else:
                     queryset = Test.objects.filter(

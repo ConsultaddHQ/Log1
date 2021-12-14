@@ -8,13 +8,12 @@ from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from constance import config
 from marketing.utils import date_filter
@@ -32,13 +31,13 @@ from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_li
 from notification.utils import push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status
+    fetch_project_status, create_checklist
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
 
 # Route - /project/
-class ProjectViewSets(viewsets.ModelViewSet):
+class ProjectViewSets(ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = (IsAuthenticated,)
@@ -498,6 +497,9 @@ class ProjectViewSets(viewsets.ModelViewSet):
                 sub.status = 'project'
                 sub.save()
 
+                # Creating Project training Checklist
+                create_checklist(project.id, request)
+
                 # Activity
                 desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
                 create_activity(sub.id, 'submission', request.user, desc, 'created')
@@ -617,7 +619,7 @@ class ProjectViewSets(viewsets.ModelViewSet):
 
             # Activity
             if prev_rate != project.rate:
-                desc=f"Purchase order rate is updated"
+                desc = f"Purchase order rate is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             elif prev_start_date != project.start_date:
                 desc = f"Purchase order start_date is updated"
@@ -769,7 +771,11 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
             )
-
+            if request.user.id == support.id:
+                desc = f"{request.user.employee_name} added himself as support person"
+            else:
+                desc = f"{request.user.employee_name} added {support.employee_name} as support person"
+            create_activity(project.id, 'projectsupport', request.user, desc, 'created')
             return Response({"message": "Support is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -781,6 +787,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             serializer = ProjectSupportSerializer(support, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            desc = f"{request.user.employee_name} updated support details"
+            create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
             return Response({"message": "Support is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -804,6 +812,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
             else:
                 SupportStatus.objects.create(is_current=True, support=support, change_date=start, frequency=status)
+            desc = f"{request.user.employee_name} updated support status"
+            create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
             return Response({"message": "Support status is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -855,6 +865,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         try:
             if 'admin' in request.user.roles and 'engineer' in request.user.roles:
                 support = get_object_or_404(ProjectSupport, id=pk)
+                desc = f"{request.user.employee_name} removed {support.support.employee_name} as support person"
+                create_activity(support.project.id, 'projectsupport', request.user, desc, 'deleted')
                 support.delete()
                 return Response({"message": "Support is removed"}, status=202)
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
@@ -957,7 +969,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
 
 
 # Route - /eng_project/
-class EngineeringProjectsViewSets(viewsets.GenericViewSet, ListModelMixin):
+class EngineeringProjectsViewSets(GenericViewSet, ListModelMixin):
     authentication_classes = ()
     permission_classes = (HasAPIKey,)
     queryset = Project.objects.all()

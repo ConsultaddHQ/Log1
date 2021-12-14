@@ -1,11 +1,11 @@
 from django.core.management import BaseCommand
 
-from project.models import Project
 from marketing.models import Submission
 from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
+    help = "This command is for checking if submission is incomplete and updating database"
 
     def handle(self, *args, **options):
         job = create_cron_object(name='complete_submissions')

@@ -1,15 +1,15 @@
 import os
 import json
 
-from django.db.models import Q
+from django.db.models import Q, Max
 from django.shortcuts import get_object_or_404
+from django.contrib.contenttypes.models import ContentType
 
-from rest_framework.response import Response
+from rest_framework.mixins import *
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from engineering.serializers import *
 from marketing.models import Interview
@@ -18,8 +18,7 @@ from activity.views import create_activity
 from engineering.utils import tag_and_notify
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
-from log1.utils import ERROR_MSG, get_page_limits, write_exception
-from engineering.serializers import TimesheetSerializer, ProjectUpdateSerializer, ProjectDescriptionSerializer
+from log1.utils import ERROR_MSG, DONT_HAVE_ACCESS, get_page_limits, write_exception
 
 
 # Route - /engineering/
@@ -62,7 +61,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         projects = projects.filter(support=None)
 
                 if 'client' in filters:
-                    projects = projects.filter(submission__client=filters['client'])
+                    projects = projects.filter(submission__client__iexact=filters['client'])
 
                 if 'support' in filters:
                     projects = projects.filter(support__support_id=filters['support'])
@@ -192,24 +191,22 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path="filters")
     def filters(self, request):
         try:
-            project_status = [
-                {'name': 'new', 'display_name': 'New'},
-                {'name': 'received', 'display_name': 'Received'},
-                {'name': 'on_boarded', 'display_name': 'On Boarded'},
-                {'name': 'joined', 'display_name': 'Joined'},
-                {'name': 'complete', 'display_name': 'Complete'},
-                {'name': 'cancelled', 'display_name': 'Cancelled'},
-                {'name': 'terminated', 'display_name': 'Terminated'},
-            ]
-            support_status = [
-                {'name': 'training', 'display_name': 'Training'},
-                {'name': 'active', 'display_name': 'Active'},
-                {'name': 'less_active', 'display_name': 'Less Active'},
-                {'name': 'independent', 'display_name': 'Independent'},
-            ]
             data = {
-                "project_status": project_status,
-                "support_status": support_status,
+                "project_status": [
+                    {'name': 'new', 'display_name': 'New'},
+                    {'name': 'received', 'display_name': 'Received'},
+                    {'name': 'on_boarded', 'display_name': 'On Boarded'},
+                    {'name': 'joined', 'display_name': 'Joined'},
+                    {'name': 'complete', 'display_name': 'Complete'},
+                    {'name': 'cancelled', 'display_name': 'Cancelled'},
+                    {'name': 'terminated', 'display_name': 'Terminated'},
+                ],
+                "support_status": [
+                    {'name': 'training', 'display_name': 'Training'},
+                    {'name': 'active', 'display_name': 'Active'},
+                    {'name': 'less_active', 'display_name': 'Less Active'},
+                    {'name': 'independent', 'display_name': 'Independent'},
+                ],
             }
             return Response({"data": data}, status=200)
         except Exception as error:
@@ -226,6 +223,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             serializer = ActivitySerializer(activities.order_by('-created'), many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path="timesheet")
@@ -244,6 +242,27 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 return Response({"data": serializer.data, 'total': total}, status=200)
             return Response({"message": "Project not found"}, status=404)
         except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='guidelines')
+    def guidelines(self, request):
+        try:
+            file = open('data/first_day_guideline.txt', 'r')
+            first_day = file.read()
+            file.close()
+
+            file = open('data/project_guidelines.txt', 'r')
+            project = file.read()
+            file.close()
+
+            data = {
+                "first_day": first_day,
+                "guideline": project
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -291,6 +310,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
                     "type": 'project_update',
                 }
                 create_attachment(file_data)
+
             tags = request.data.get('tagged_user', '')
             tag_and_notify(update, tags, request.user, 'create')
 
@@ -325,9 +345,9 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
     @action(methods=['put'], detail=True, url_path='add_document')
-    def add_document(self, request, project_id, pk):
+    def add_document(self, request, *args, **kwargs):
         try:
-            update = get_object_or_404(ProjectUpdate, id=pk)
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
             file_data = {
                 "object_id": update.id,
                 "creator": request.user,
@@ -346,9 +366,9 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='remove_document')
-    def remove_document(self, request, project_id, pk):
+    def remove_document(self, request, *args, **kwargs):
         try:
-            update = get_object_or_404(ProjectUpdate, id=pk)
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
             attachment = get_object_or_404(Attachment, id=request.data.get('attachment_id'))
             if update.update_by.id == request.user.id or attachment.creator.id == request.user.id:
                 file_name = attachment.attachment_file.name
@@ -395,7 +415,10 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "id": description.id,
                     "notes": description.notes,
                     "remark": description.remark,
+                    "resource": description.resource,
+                    "technology": description.technology,
                     "description": description.description,
+                    "consultant_preferred_time": description.consultant_preferred_time
                 }
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
             data = {
@@ -407,12 +430,12 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "id": recruiter.id,
                     "email": recruiter.email,
                     "name": recruiter.employee_name,
-                },
+                } if recruiter else None,
                 "retention": {
                     "id": retention.id,
                     "email": retention.email,
                     "name": retention.employee_name,
-                },
+                } if retention else None,
                 "marketer": {
                     "id": project.submission.created_by.id,
                     "email": project.submission.created_by.email,
@@ -446,7 +469,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                 desc = f"{request.user.employee_name} updated the project description"
             create_activity(project.id, 'projectdescription', request.user, desc, 'created')
 
-            return Response({"message":  "Project description created", "data": serializer.data}, status=201)
+            return Response({"message": "Project description created", "data": serializer.data}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -477,3 +500,171 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
         data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
         return Response({"data": data}, status=200)
+
+    @action(methods=['get', 'put'], detail=False, url_path='resource')
+    def resource(self, request, project_id):
+        try:
+            project = get_object_or_404(Project, id=project_id)
+            if request.method == 'PUT':
+                description, _ = ProjectDescription.objects.get_or_create(project=project)
+                description.resource = request.data.get('resource')
+                description.save()
+
+                # Activity
+                desc = f"{request.user.employee_name} updated project resource"
+                create_activity(description.project.id, 'projectdescription', request.user, desc, 'update')
+
+                return Response({"message": "Project description updated"}, status=202)
+            else:
+                if hasattr(project, 'description'):
+                    description = get_object_or_404(ProjectDescription, project=project)
+                    return Response({"data": {'id': description.id, "resource": description.resource}}, status=200)
+                return Response({"message": "Project Resource not found"}, status=404)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get', 'put', 'delete'], detail=False, url_path='document')
+    def document(self, request, project_id):
+        try:
+            project = get_object_or_404(Project, id=project_id)
+            if request.method == 'PUT':
+                description, _ = ProjectDescription.objects.get_or_create(project=project)
+                if request.FILES.get('file', None):
+                    content_type = ContentType.objects.get(model='projectdescription')
+                    Attachment.objects.create(
+                        creator=request.user,
+                        object_id=description.id,
+                        content_type=content_type,
+                        attachment_type='project_resource',
+                        attachment_file=request.FILES.get('file'),
+                    )
+                    return Response({"message": "Resource Uploaded"}, status=201)
+                return Response({"message": "File not found"}, status=400)
+            elif request.method == 'DELETE':
+                attachment_id = request.GET.get('attachment_id')
+                attachment = get_object_or_404(Attachment, id=attachment_id, creator=request.user)
+                desc = f"{attachment.filename} deleted from resources section by {request.user.employee_name}"
+                create_activity(project_id, 'projectdescription', request.user, desc, 'deleted')
+                attachment.attachment_file.delete(save=False)
+                attachment.delete()
+                return Response({"message": "Attachment deleted"}, status=204)
+            else:
+                description = get_object_or_404(ProjectDescription, project_id=project.id)
+                serializer = AttachmentGetSerializer(description.attachments.all(), many=True)
+                return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /project/:project_id:/training/
+class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin, DestroyModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = TrainingAgenda.objects.all()
+    serializer_class = TrainingAgendaSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            agendas = TrainingAgenda.objects.filter(project_id=kwargs.get('project_id'))
+            serializer = self.serializer_class(agendas, many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            old_position = 0
+            qs = TrainingAgenda.objects.filter(project_id=kwargs.get('project_id'))
+            if qs:
+                old_position = qs.aggregate(Max('position'))['position__max']
+
+            TrainingAgenda.objects.create(
+                created_by=request.user,
+                position=old_position + 1,
+                remark=request.data.get('remark'),
+                project_id=kwargs.get('project_id'),
+                duration=request.data.get('duration'),
+                description=request.data.get('description'),
+                assignment_given=request.data.get('assignment_given'),
+            )
+
+            # Activity
+            desc = f"{request.user.employee_name} added training agenda {old_position + 1}"
+            create_activity(kwargs.get('project_id'), 'trainingagenda', request.user, desc, 'created')
+
+            return Response({"message": "Agenda added"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            qs = TrainingAgenda.objects.filter(id=kwargs.get('pk'), created_by=request.user)
+            if not qs:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+            agenda = qs.first()
+            serializer = self.serializer_class(agenda, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            # Activity
+            desc = f"{request.user.employee_name} updated training agenda {agenda.position}"
+            create_activity(kwargs.get('project_id'), 'trainingagenda', request.user, desc, 'updated')
+
+            return Response({"message": "Agenda updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            qs = TrainingAgenda.objects.filter(id=kwargs.get('pk'), created_by=request.user)
+            if not qs:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            position = qs.first().position
+            qs.delete()
+
+            # Activity
+            desc = f"{request.user.employee_name} deleted training agenda {position}"
+            create_activity(kwargs.get('project_id'), 'trainingagenda', request.user, desc, 'deleted')
+
+            return Response({"message": "Agenda Deleted"}, status=204)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /project/:project_id:/checklist/
+class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = TrainingCheckList.objects.all()
+    serializer_class = TrainingCheckListSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            checklist = TrainingCheckList.objects.filter(project_id=kwargs.get('project_id')).order_by('position')
+            serializer = self.serializer_class(checklist, many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            checklist = get_object_or_404(TrainingCheckList, id=kwargs.get('pk'))
+            checklist.status = request.data.get('status')
+            checklist.remark = request.data.get('remark', None)
+            checklist.save()
+
+            # Activity
+            desc = f"{request.user.employee_name} updated checklist {checklist.position}"
+            create_activity(kwargs.get('project_id'), 'trainingchecklist', request.user, desc, 'updated')
+            return Response({"message": "Checklist updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

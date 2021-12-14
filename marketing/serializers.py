@@ -232,6 +232,10 @@ class InterviewListSerializer(serializers.ModelSerializer):
         }
 
     @staticmethod
+    def get_consultant_name(obj):
+        return obj.consultant.name
+
+    @staticmethod
     def get_supervisor_name(obj):
         return obj.supervisor.employee_name
 
@@ -241,10 +245,6 @@ class InterviewListSerializer(serializers.ModelSerializer):
         for guest in obj.guest.all():
             data.append({'id': guest.id, 'name': guest.employee_name, 'email': guest.email})
         return data
-
-    @staticmethod
-    def get_consultant_name(obj):
-        return obj.consultant.name
 
     @staticmethod
     def get_allow_status_change(obj):

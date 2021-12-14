@@ -5,6 +5,7 @@ from rest_framework import serializers
 from consultant.models import *
 from project.models import Project
 from marketing.models import Interview
+from project.models import ConsultantFeedback
 from employee.serializers import TeamSerializer, UserSerializer, TaggedUserSerializer
 
 
@@ -239,6 +240,7 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
 
 class ConsultantV2ListSerializer(serializers.ModelSerializer):
     rate = serializers.ReadOnlyField()
+    status = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
@@ -246,7 +248,8 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'skills', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit', 'rate_revision')
+        fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit',
+                  'rate_revision')
 
     @staticmethod
     def get_rate(obj):
@@ -254,6 +257,10 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
         if qs:
             return qs.first().rate
         return None
+
+    @staticmethod
+    def get_status(obj):
+        return obj.get_status_display()
 
     @staticmethod
     def get_recruiter(obj):
@@ -305,7 +312,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
         for project in projects:
             if revision_date < project.start_date:
                 revision_date = project.start_date
-        if date.today() + timedelta(days=170) > revision_date:
+        if date.today() + timedelta(days=170) <= revision_date:
             return True
         return False
 
@@ -448,3 +455,47 @@ class ConsultantFeedbackSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_tagged_user(obj):
         return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
+
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    created_by = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    tagged_user = serializers.SerializerMethodField()
+    department = serializers.CharField(allow_null=True, allow_blank=True)
+
+    class Meta:
+        model = ConsultantFeedback
+        fields = "__all__"
+
+    @staticmethod
+    def get_consultant(obj):
+        return obj.consultant.name
+
+    @staticmethod
+    def get_created_by(obj):
+        return obj.created_by.employee_name
+
+    @staticmethod
+    def get_project(obj):
+        if obj.project:
+            data = {
+                'id': obj.project.id,
+                'client_name': obj.project.submission.client,
+                'vendor_name': obj.project.submission.vendor.name,
+            }
+            return data
+        return None
+
+    @staticmethod
+    def get_tagged_user(obj):
+        if obj.tagged_user:
+            return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
+        return None
+
+
+# Consultant Login
+class MSAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MSAccount
+        fields = '__all__'

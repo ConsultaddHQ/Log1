@@ -7,6 +7,8 @@ from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
+    help = "This command is for sending Test status count report on channel"
+
     def handle(self, *args, **options):
         job = create_cron_object(name='test_update')
         try:

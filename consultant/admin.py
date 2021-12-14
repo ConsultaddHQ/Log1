@@ -94,8 +94,8 @@ class ConsultantRateRevisionAdmin(ExportActionModelAdmin):
 @admin.register(PayrollEmployer)
 class PayrollEmployerAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'consultant__name', 'consultant__email')
     list_display = ('id', 'consultant', 'name', 'start')
+    search_fields = ('id', 'consultant__name', 'consultant__email')
 
 
 @admin.register(ConsultantPOC)
@@ -108,8 +108,8 @@ class ConsultantPOCAdmin(ExportActionModelAdmin):
 @admin.register(Feedback)
 class FeedbackAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'consultant__name', 'consultant__email', 'feedback_type', 'rating', 'created')
     list_display = ('id', 'consultant', 'feedback_type', 'rating', 'created')
+    search_fields = ('id', 'consultant__name', 'consultant__email', 'feedback_type', 'rating', 'created')
 
 
 @admin.register(ConsultantExit)
@@ -131,3 +131,11 @@ class ConsultantExitAdmin(ExportActionModelAdmin):
 class ExitReasonAdmin(ExportActionModelAdmin):
     search_fields = ('name',)
     list_display = ('id', 'name')
+
+
+@admin.register(MSAccount)
+class MSAccountAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
+    list_filter = ('licence_assigned',)
+    search_fields = ('email', 'consultant__email', 'user_id', 'member_id')
+    list_display = ('id', 'email', 'consultant', 'licence_assigned', 'user_id', 'member_id')

@@ -109,9 +109,7 @@ class VendorContact(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -154,9 +152,7 @@ class Lead(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -215,9 +211,7 @@ class Submission(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -255,9 +249,7 @@ class VendorLayer(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -304,9 +296,7 @@ class Test(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -360,9 +350,7 @@ class Interview(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
+
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

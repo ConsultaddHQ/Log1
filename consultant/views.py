@@ -1,36 +1,100 @@
 import csv
-import json
-from operator import or_
-from functools import reduce
 from django.db import transaction
-from datetime import date, datetime
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
-from django.db.models import Subquery, OuterRef, Q
+from django.db.models import Subquery, OuterRef
 
-from rest_framework import viewsets
+from rest_framework.mixins import *
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+from consultant.utils import *
 from api_key.models import APIKey
 from consultant.serializers import *
 from employee.models import tag_users
-from project.models import ProjectStatus
+from project.utils import fetch_scrum_masters
+
+from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
 from notification.utils import create_notification, push_notification
+from project.models import ProjectStatus, ConsultantFeedback, FEEDBACK_CHOICES
 from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from consultant.utils import close_marketing, start_marketing, send_exit_process_mail, send_exit_interview_detail, \
-    terminate_consultant, create_consultant, create_activity, send_notification_for_user, marketing_days_filter, \
-    candidate_filter
+
+
+# Route - /v2/consultant/<consultant_id>/microsoft/
+class MicroSoftViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
+    queryset = MSAccount.objects.all()
+    serializer_class = MSAccountSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
+            ms = MicrosoftAccount()
+            if hasattr(consultant, 'msaccount'):
+                account = consultant.msaccount
+                licence = ms.assign_licence(account.user_id)
+                if licence == 'ok':
+                    account.licence_assigned = True
+                    member_id, msg = ms.assign_team(account.user_id)
+                    if msg == 'ok':
+                        account.member_id = member_id
+                account.save()
+            else:
+                account = MSAccount.objects.create(
+                    consultant=consultant,
+                    email=f"{consultant.name[0]}.{consultant.name[0]}@consultadd.com"
+                )
+                name = consultant.name.split()
+                data = {
+                    "first_name": name[0],
+                    "name": consultant.name,
+                    "email": consultant.email,
+                    "password": f"consultadd@1{consultant.id}23",
+                    "last_name": name[1] if len(name) > 1 else "",
+                }
+                user_id, msg = ms.create_account(data)
+                if msg == 'ok':
+                    account.user_id = user_id
+                    licence = ms.assign_licence(user_id)
+                    if licence == 'ok':
+                        account.licence_assigned = True
+                        member_id, msg = ms.assign_team(user_id)
+                        if msg == 'ok':
+                            account.member_id = member_id
+                account.save()
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
+            ms = MicrosoftAccount()
+            if hasattr(consultant, 'msaccount'):
+                account = consultant.msaccount
+                msg = ms.remove_member(account.member_id)
+                if msg == 'ok':
+                    msg = ms.remove_licence(account.user_id)
+                    if msg == 'ok':
+                        account.licence_assigned = False
+                        ms.disable_account(account.user_id)
+                        account.save()
+                return Response({"message": "Microsoft account removed"}, status=400)
+            else:
+                return Response({"message": "Microsoft account not found"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /v2/consultant/
-class ConsultantV2ViewSets(viewsets.ModelViewSet):
+class ConsultantV2ViewSets(ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
@@ -48,9 +112,6 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 write_info(message=consultants, function='ConsultantV2ViewSets_list', request=request)
                 return Response({"message": ERROR_MSG, "error": consultants}, status=400)
 
-            if sort_by in ['name', 'created']:
-                consultants = consultants.order_by(sort_by)
-
             status_obj = sub_data["status_obj"]
             count = {
                 "total": consultants.count(),
@@ -61,6 +122,9 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
                 "terminated": status_obj['terminated'].count(),
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
+
+            if sort_by in ['name', 'created']:
+                consultants = consultants.order_by(sort_by)
 
             serializer = ConsultantV2ListSerializer(consultants[first:last], many=True)
             return Response({"count": count, "data": serializer.data}, status=200)
@@ -115,7 +179,7 @@ class ConsultantV2ViewSets(viewsets.ModelViewSet):
 
 
 # Route - /consultant/
-class ConsultantViewSets(viewsets.ModelViewSet):
+class ConsultantViewSets(ModelViewSet):
     queryset = Consultant.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = ConsultantBenchSerializer
@@ -414,7 +478,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
         try:
             activities = Activity.objects.filter(
                 object_id=pk, content_type__model='consultant'
-            ).order_by('created')
+            ).order_by('-created')
             serializer = ActivitySerializer(activities, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -696,7 +760,7 @@ class ConsultantViewSets(viewsets.ModelViewSet):
                 if rate_revision:
                     consultant_rate = rate_revision.first().rate
                     margin = project_rate - consultant_rate
-                    margin_percentage = (margin/project_rate)*100
+                    margin_percentage = (margin / project_rate) * 100
 
             for project in projects:
                 project_data.append(
@@ -754,16 +818,13 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
 
             if gender:
                 consultants = consultants.filter(gender=gender)
-
             if days:
                 day_filter = marketing_days_filter(days)
                 consultants = consultants.filter(**day_filter)
-
             if type(skills) is not list:
                 skills = json.loads(skills)
             if type(visa) is not list:
                 visa = json.loads(visa)
-
             if len(skills) > 0:
                 consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in skills]))
 
@@ -1136,7 +1197,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
 
 # Route - /consultant_profile/
-class ConsultantProfileViewSets(viewsets.ModelViewSet):
+class ConsultantProfileViewSets(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = ConsultantProfile.objects.all()
     serializer_class = ConsultantProfileSerializer
@@ -1716,39 +1777,6 @@ class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, Retrie
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
-# API for Petition Web App
-# Route - /consultant_petition/
-class ConsultantPetitionAuthViewSet(GenericViewSet):
-    permission_classes = ()
-    authentication_classes = ()
-    queryset = Consultant.objects.all()
-    serializer_class = ConsultantPetitionLoginSerializer
-
-    @action(methods=['post'], detail=False, url_path='login')
-    def login(self, request):
-        """
-            Normal Login
-            :param request, email, password
-        """
-        try:
-            email = request.data.get('email').lower()
-            if email:
-                consultant = get_object_or_404(Consultant, email=email)
-            else:
-                return Response({"error": "Email is Empty"}, status=400)
-            consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
-            if consultant:
-                consultant = consultant.first()
-                if not consultant.p_is_active:
-                    return Response({"error": "User account is not Active"}, status=400)
-                serializer = self.serializer_class(consultant)
-                return Response({"result": serializer.data}, status=202)
-            return Response({"error": "Incorrect Email Id OR Password"}, status=400)
-        except Exception as error:
-            write_exception(message=error)
-            return Response({"error": str(error)}, status=400)
-
-
 # Route - /beats_consultant/
 class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
     queryset = Consultant.objects.all()
@@ -1776,3 +1804,233 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
         except Exception as error:
             write_exception(message=error)
             return Response({"message": str(error)}, status=400)
+
+
+# Route - /consultant/:consultant_id:/feedback
+class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, ListModelMixin):
+    serializer_class = FeedbackSerializer
+    permission_classes = (IsAuthenticated,)
+    queryset = ConsultantFeedback.objects.all()
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            query = request.GET.get('query')
+            first, last = get_page_limits(request)
+            feedback_type = json.loads(request.GET.get('feedback_type', '[]'))
+            queryset = self.queryset.filter(consultant_id=kwargs.get('consultant_id'))
+            if request.GET.get('project'):
+                queryset = queryset.filter(project_id=request.GET.get('project'))
+            if feedback_type:
+                queryset = queryset.filter(feedback_type__in=feedback_type)
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                queryset = queryset.filter(created_by__employee_name__icontains=query)
+            serializer = self.serializer_class(queryset[first:last], many=True)
+            return Response({"count": len(queryset), "data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            user_list = []
+            feedback = ConsultantFeedback.objects.create(
+                created_by=request.user,
+                project_id=request.data.get('project'),
+                rating=request.data.get('rating', None),
+                verdict=request.data.get('verdict', None),
+                consultant_id=kwargs.get('consultant_id'),
+                description=request.data.get('description'),
+                feedback_type=request.data.get('feedback_type'),
+                department=request.data.get('department', None),
+            )
+            if feedback.feedback_type in ['engineering_issue', '2_week', 'independent']:
+                setattr(feedback, 'department', 'engineering')
+                feedback.save()
+                if feedback.feedback_type == 'issue':
+                    engineering_feedback_notification(feedback, request)
+
+            elif feedback.feedback_type == 'pre_joining':
+                pre_joining_feedback_notification(feedback, request)
+
+            consultant = feedback.consultant
+            emp_name = request.user.employee_name
+            feedback_type = feedback.get_feedback_type_display()
+
+            # Tagging notification
+            tags = request.data.get('tagged_user', [])
+            if len(tags) > 0:
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                tag_data = {
+                    "tags": tags,
+                    "object_id": feedback.id,
+                    "model": "consultantfeedback",
+                }
+                tag_users(tag_data)
+
+            title = f"{emp_name} tagged you in a {consultant.name}'s {feedback_type} feedback."
+            create_and_send_notification(consultant, feedback, title, user_list, request)
+
+            # POC Notification
+            pocs = consultant.pocs.all()
+            user_list = [user.poc for user in pocs]
+            title = f"{feedback_type} feedback added for {consultant.name} by {emp_name} from {feedback.department}."
+            create_and_send_notification(consultant, feedback, title, user_list, request)
+
+            # Activity
+            desc = f"{emp_name} added {feedback_type} feedback"
+            create_activity(consultant.id, 'consultant', request.user, desc, 'created')
+
+            serializer = self.serializer_class(feedback)
+            return Response({"data": serializer.data, "message": "Feedback added"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            user_list = []
+            feedback = get_object_or_404(ConsultantFeedback, id=kwargs.get('pk'))
+            if feedback.created_by != request.user:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            serializer = self.serializer_class(feedback, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            consultant = feedback.consultant
+            employee_name = request.user.employee_name
+            feedback_type = feedback.get_feedback_type_display()
+
+            # Tagging notification
+            tags = request.data.get('tagged_user', [])
+            user_tag = feedback.tagged_user.all().first()
+            if user_tag:
+                user_tag.tagged_user.clear()
+            if len(tags) > 0:
+                if not user_tag:
+                    tag_data = {
+                        "tags": tags,
+                        "object_id": feedback.id,
+                        "model": "consultantfeedback",
+                    }
+                    tag_users(tag_data)
+                for tag in tags:
+                    user = get_object_or_404(User, id=tag)
+                    user_list.append(user)
+                    user_tag.tagged_user.add(user)
+
+            title = f"{employee_name} tagged you in a {consultant.name}'s {feedback_type} feedback"
+            create_and_send_notification(consultant, feedback, title, user_list, request)
+
+            # Push Notification
+            pocs = consultant.pocs.all()
+            user_list = [user.poc for user in pocs]
+            title = f"{feedback_type} feedback updated for {consultant.name} by {employee_name}"
+            create_and_send_notification(consultant, feedback, title, user_list, request)
+
+            # Activity
+            desc = f"{employee_name} updated {feedback.get_feedback_type_display()} feedback"
+            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
+
+            return Response({"data": serializer.data, "message": "Feedback updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='feedback_types')
+    def feedback_types(self, request, *args, **kwargs):
+        return Response({"data": FEEDBACK_CHOICES}, status=200)
+
+    @action(methods=['get'], detail=False, url_path='department')
+    def department(self, request, *args, **kwargs):
+        data = ['Engineering', 'Marketing', 'Legal', 'Recruitment', 'Relations', 'Finance']
+        return Response({"data": data}, status=200)
+
+    @action(methods=['get'], detail=False, url_path='project')
+    def project(self, request, consultant_id):
+        try:
+            projects = Consultant.objects.get(id=consultant_id).get_project().annotate(
+                vendor=F('submission__lead__vendor_company__name'),
+                client=F('submission__client'),
+            ).values('id', 'client', 'vendor')
+            return Response({"data": projects}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='request_feedback')
+    def request_feedback(self, request, consultant_id):
+        try:
+            departments = request.data.get("department", [])
+            consultant = Consultant.objects.get(id=consultant_id)
+            projects = Project.objects.filter(
+                consultant=consultant_id, statuses__status__in=['new', 'joined', 'extended', 'complete']
+            ).order_by('-modified')
+            if not projects:
+                projects = Project.objects.filter(
+                    consultant=consultant_id, statuses__status__icontains="terminate"
+                ).order_by('-modified')
+            obj = {
+                'Legal': 'legal@consultadd.com',
+                'Finance': 'finance@consultadd.com',
+                'Relations': 'relations@consultadd.com',
+                'Engineering': 'engineering@consultadd.com',
+                'Recruitment': 'recruitment@consultadd.com',
+            }
+
+            to = list()
+            if projects and 'Marketing' in departments:
+                to.append(projects.first().submission.created_by.email)
+                to.extend(fetch_scrum_masters(projects.first().submission.created_by))
+
+            to = [obj[department] for department in departments if 'Marketing' != department] + to
+            mail_data = {
+                "to": to, "cc": [], "bcc": [],
+                'template': '../templates/request_feedback.html',
+                'subject': "Test mail Requesting consultant's feedback",
+                'context': {
+                    'consultant_name': consultant.name,
+                    'sender_name': request.user.employee_name,
+                    'feedback_type': request.data['feedback_type'],
+                    'link': f'https://app.log1.com/#/consultant/bench/{consultant_id}?key=feedback',
+                },
+            }
+            if os.environ.get('ENV', 'local') == 'prod':
+                send_email(mail_data, request.user.email)
+            return Response({"message": "mail sent"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# API for Petition Web App
+# Route - /consultant_petition/
+class ConsultantPetitionAuthViewSet(GenericViewSet):
+    permission_classes = ()
+    authentication_classes = ()
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantPetitionLoginSerializer
+
+    @action(methods=['post'], detail=False, url_path='login')
+    def login(self, request):
+        try:
+            email = request.data.get('email').lower()
+            if email:
+                consultant = get_object_or_404(Consultant, email=email)
+            else:
+                return Response({"error": "Email is Empty"}, status=400)
+            consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())
+            if consultant:
+                consultant = consultant.first()
+                if not consultant.p_is_active:
+                    return Response({"error": "User account is not Active"}, status=400)
+                serializer = self.serializer_class(consultant)
+                return Response({"result": serializer.data}, status=202)
+            return Response({"error": "Incorrect Email Id OR Password"}, status=400)
+        except Exception as error:
+            write_exception(message=error)
+            return Response({"error": str(error)}, status=400)
