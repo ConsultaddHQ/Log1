@@ -1,10 +1,11 @@
 import json
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 from rest_framework.test import APITestCase, APIClient
 
 from employee.models import Role
 from consultant.factories import Setup
-from consultant.models import Consultant, ConsultantMarketing, ConsultantProfile, ConsultantPOC, WorkAuth
+from consultant.models import Consultant, ConsultantMarketing, ConsultantProfile, ConsultantPOC, WorkAuth, \
+    ConsultantExit, ExitReason
 from activity.views import create_activity
 
 
@@ -89,7 +90,7 @@ class ConsultantV2VTest(APITestCase):
         self.client.force_authenticate(user=self.setup.user)
 
     def test_ConsultantV2_list(self):
-        route = f"/api/v2/consultant/"
+        route = f"/api/v2/consultant/?sort_by=name"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['count']['total'], 5)
@@ -559,11 +560,58 @@ class ConsultantExitTest(APITestCase):
         self.marketing = self.setup.create_consultant()
         self.marketing.consultant.status = 'terminated'
         self.marketing.consultant.save()
+        self.con_exit = ConsultantExit.objects.all()
         self.client = APIClient()
         self.client.force_authenticate(self.setup.user)
 
-    def test_list_consultant_work_auth(self):
+    def test_list_consultant_con_exit(self):
         route = f"/api/consultant_exit/?query={self.marketing.consultant.name}"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['count']['total'], 1)
+
+    def test_create_consultant_con_exit(self):
+        ExitReason.objects.create(id =1, name="test exit reason")
+        data = {
+            "type": "in_process",
+            "consultant": self.marketing.consultant.id,
+            "rehire": True,
+            "last_date": "2020-09-09",
+            "resign_date": "2020-09-08",
+            "exit_details": "text details",
+            "notice_period": 1,
+            "cancel_reason": "test cancel reason",
+            "status": "complete",
+            "legal_status": "in_process",
+            "reasons": ['1']
+        }
+        route = f"/api/consultant_exit/"
+        res = self.client.post(route, data)
+        self.assertEqual(res.status_code, 201)
+        self.assertNotEqual(res.data['data'], {})
+
+    def test_update_consultant_con_exit(self):
+        data = {
+            "exit_details": "test text here",
+            "last_date": "2019-09-09"
+        }
+        route = f"/api/consultant_exit/{self.con_exit.first().id}/"
+        res = self.client.put(route, data)
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['data']['exit_details'], 'test text here')
+
+    def test_cancel_termination_(self):
+        route = f"/api/consultant_exit/{self.con_exit.last().id}/cancel/"
+        res = self.client.put(route, data={"cancel_reason": "test cancel exit"})
+        self.assertEqual(res.data['message'],'Exit process cancelled')
+        self.assertEqual(res.status_code, 202)
+
+        route = f"/api/consultant_exit/{self.con_exit.last().id}/cancel/"
+        res = self.client.put(route)
+        self.assertEqual(res.data['message'], 'Exit process can not be cancelled ')
+
+    def test_termination_reason(self):
+        ExitReason.objects.create(name="test exit reason")
+        res = self.client.get(f"/api/consultant_exit/reason/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'].first()['name'], 'test exit reason')

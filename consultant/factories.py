@@ -63,13 +63,13 @@ class Setup:
         )
         ConsultantPOC.objects.create(
             start=date.today(),
-            poc_type='Retention',
+            poc_type='retention',
             poc=self.user,
             consultant=consultant,
         )
         ConsultantPOC.objects.create(
             start=date.today(),
-            poc_type='Recruiter',
+            poc_type='recruiter',
             poc=self.user,
             consultant=consultant,
         )
@@ -91,10 +91,33 @@ class Setup:
             visa_type=random.choice(['h1b', 'gc']),
             consultant=consultant,
         )
+        ConsultantExit.objects.create(
+            rehire=True,
+            legal_action=False,
+            last_date="2022-09-09",
+            resign_date="2020-03-09",
+            notice_period=6,
+            cancel_reason="test text",
+            status="in_process",
+            type="resigned",
+            consultant=consultant,
+            created_by=self.user
+        )
+        ConsultantExit.objects.create(
+            rehire=True,
+            legal_action=False,
+            last_date="2012-09-09",
+            resign_date="2020-03-09",
+            notice_period=6,
+            cancel_reason="test text",
+            status="in_process",
+            type="resigned",
+            consultant=consultant,
+            created_by=self.user
+        )
         return consultant_marketing
 
     def create_project(self, marketing, status, count):
-
         vendor_company = VendorCompany.objects.create(
             name=f'vendor_company_name{count}'
         )
