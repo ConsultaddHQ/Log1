@@ -1,10 +1,11 @@
 import json
-from datetime import date
+from datetime import timedelta, date
 from rest_framework.test import APITestCase, APIClient
 
 from employee.models import Role
 from consultant.factories import Setup
-from consultant.models import Consultant
+from consultant.models import Consultant, ConsultantMarketing, ConsultantProfile, ConsultantPOC, WorkAuth, \
+    ConsultantExit, ExitReason
 from activity.views import create_activity
 
 
@@ -89,7 +90,7 @@ class ConsultantV2VTest(APITestCase):
         self.client.force_authenticate(user=self.setup.user)
 
     def test_ConsultantV2_list(self):
-        route = f"/api/v2/consultant/"
+        route = f"/api/v2/consultant/?sort_by=name"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['count']['total'], 5)
@@ -327,21 +328,290 @@ class ConsultantMarketingTest(APITestCase):
         self.setup = Setup()
         self.marketing = self.setup.create_consultant()
         for i in range(0, 5):
-            consultant_marketing = self.setup.create_consultant()
-            self.setup.create_project(consultant_marketing, 'new', 1)
-
-        self.consultant = Consultant.objects.all()
+            self.setup.create_project(self.marketing, 'new', 1)
         self.client = APIClient()
         self.client.force_authenticate(self.setup.user)
 
     def test_list_consultant_marketing(self):
-        route = f"/api/consultant_marketing/?consultant={self.consultant.first().id}"
+        route = f"/api/consultant_marketing/?consultant={self.marketing.consultant.id}"
         res = self.client.get(route)
         self.assertEqual(len(res.data['data']), 1)
         self.assertEqual(res.status_code, 200)
 
     def test_stop_consultant_marketing(self):
-        data = {"end": date.today()}
+        data = {"end": "2020-09-09"}
         route = f"/api/consultant_marketing/{self.marketing.id}/stop_marketing/"
         res = self.client.put(route, data=data)
+        self.assertEqual(res.data['message'], 'Marketing cycle stopped')
         self.assertEqual(res.status_code, 202)
+
+    def test_create_consultant_marketing(self):
+        data = {
+            "consultant": self.marketing.consultant.id,
+            "in_pool": False,
+            "end": "2020-09-09",
+            "start": "2018-09-09",
+            "preferred_location": "WEST COAST",
+            "teams": [self.setup.team.name],
+            "marketers": [self.setup.user.id],
+            "primary_marketer": self.setup.user.id,
+        }
+        self.marketing.status = 'close'
+        self.marketing.save()
+        route = f"/api/consultant_marketing/"
+        res = self.client.post(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['message'], 'Marketing started')
+
+        data['reset_days'] = False
+        self.marketing.consultant.status = 'terminated'
+        self.marketing.consultant.save()
+        route = f"/api/consultant_marketing/"
+        res = self.client.post(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['message'], 'Marketing started')
+
+        self.marketing.start = date.today() + timedelta(days=3)
+        self.marketing.save()
+        route = f"/api/consultant_marketing/"
+        res = self.client.post(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.data['message'], f'Marketing will start on {str(self.marketing.start)}')
+
+        self.marketing.status = 'open'
+        self.marketing.save()
+        route = f"/api/consultant_marketing/"
+        res = self.client.post(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.data['message'], f'Marketing is already started')
+
+    def test_update_consultant_marketing(self):
+        route = f"/api/consultant_marketing/{self.marketing.id}/"
+        res = self.client.put(route, data={"preferred_location": "East Coast"})
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], f'Marketing cycle updated')
+        self.assertEqual(res.data['data']['preferred_location'], 'East Coast')
+
+    def test_remarketing(self):
+        route = f"/api/consultant_marketing/remarketing/?consultant={self.marketing.consultant.id}"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data['data']), 1)
+
+    def test_previous_marketing(self):
+        route = f"/api/consultant_marketing/previous_marketing/?consultant={self.marketing.consultant.id}"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data['data']), 15)
+
+        route = f"/api/consultant_marketing/previous_marketing/?consultant=78"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'], [])
+
+    def test_marketer_assignment(self):
+        data = {
+            "marketers": [self.setup.user.id]
+        }
+        route = f"/api/consultant_marketing/{self.marketing.id}/marketer_assignment/"
+        res = self.client.put(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], 'marketers assigned')
+
+    def test_team_assignment(self):
+        data = {
+            "teams": [self.setup.team.id]
+        }
+        route = f"/api/consultant_marketing/{self.marketing.id}/team_assignment/"
+        res = self.client.put(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], 'Team added')
+
+    def test_remove_marketer(self):
+        data = {
+            "marketers": [self.setup.user.id]
+        }
+        route = f"/api/consultant_marketing/{self.marketing.id}/remove_marketer/"
+        res = self.client.put(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], "Marketers removed")
+
+    def test_remove_team(self):
+        data = {
+            "teams": [self.setup.team.id]
+        }
+        route = f"/api/consultant_marketing/{self.marketing.id}/remove_team/"
+        res = self.client.put(route, data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], "Team removed")
+
+
+class ConsultantProfileTest(APITestCase):
+
+    def setUp(self):
+        self.setup = Setup()
+        self.marketing = self.setup.create_consultant()
+        self.client = APIClient()
+        self.client.force_authenticate(self.setup.user)
+
+    def test_retrieve_consultant_profile(self):
+        consultant_profile = ConsultantProfile.objects.all()
+        route = f"/api/consultant_profile/{consultant_profile.first().id}/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data']['id'], consultant_profile.first().id)
+
+    def test_list_consultant_profile(self):
+        route = f"/api/consultant_profile/?con_id={self.marketing.consultant.id}"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data['data']), 1)
+
+    def test_create_consultant_profile(self):
+        data = {
+            "title": "test",
+            "education": "phd",
+            "visa_type": 'h1b',
+            "dob": "1980-09-09",
+            "links": "this.link.",
+            "visa_end": "2025-09-09",
+            "visa_start": "2025-09-09",
+            "current_city": "West Iowa",
+            "linkedin": "likedin_profile",
+            "consultant": self.marketing.consultant.id,
+        }
+        route = f"/api/consultant_profile/"
+        res = self.client.post(route, data=data)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['message'], 'Profile created')
+        self.assertNotEqual(res.data['data'], {})
+
+    def test_update_consultant_profile(self):
+        consultant_profile = ConsultantProfile.objects.all()
+        route = f"/api/consultant_profile/{consultant_profile.first().id}/"
+        res = self.client.put(route, data={"current_city": "West Iowa"})
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], 'Profile updated')
+        self.assertEqual(res.data['data']['id'], consultant_profile.first().id)
+
+
+class ConsultantPOCTest(APITestCase):
+
+    def setUp(self):
+        self.setup = Setup()
+        self.marketing = self.setup.create_consultant()
+        self.client = APIClient()
+        self.client.force_authenticate(self.setup.user)
+
+    def test_create_poc(self):
+        data = {
+            'poc_type': 'Recruiter',
+            'consultant': self.marketing.consultant.id,
+            'poc': self.setup.user.id,
+        }
+        route = f"/api/consultant_poc/"
+        res = self.client.post(route, data=data)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['message'], "POC added")
+
+    def test_update_poc(self):
+        consultant_poc = ConsultantPOC.objects.all()
+        route = f"/api/consultant_poc/{consultant_poc.first().id}/"
+        res = self.client.put(route, data={"poc_type": "Retention"})
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['data']['poc_type'], "Retention")
+        self.assertEqual(res.data['message'], "POC updated")
+
+
+class WorkAuthTest(APITestCase):
+
+    def setUp(self):
+        self.setup = Setup()
+        self.marketing = self.setup.create_consultant()
+        self.client = APIClient()
+        self.client.force_authenticate(self.setup.user)
+
+    def test_create_consultant_work_auth(self):
+        data = {
+            'visa_end': '2028-09-09',
+            'visa_start': '2020-09-09',
+            'visa_type': 'h1b',
+            'consultant': self.marketing.consultant.id
+        }
+        route = f"/api/consultant_work_auth/"
+        res = self.client.post(route, data=data)
+        self.assertNotEqual(res.data, {})
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['message'], "Work Auth added")
+
+    def test_update_consultant_work_auth(self):
+        work_auth = WorkAuth.objects.all()
+        route = f"/api/consultant_work_auth/{work_auth.first().id}/"
+        res = self.client.put(route, data={'visa_end': '2028-09-09'})
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], "Work Auth added")
+        self.assertEqual(res.data['data']['visa_end'], '2028-09-09')
+
+
+class ConsultantExitTest(APITestCase):
+
+    def setUp(self):
+        self.setup = Setup()
+        self.marketing = self.setup.create_consultant()
+        self.marketing.consultant.status = 'terminated'
+        self.marketing.consultant.save()
+        self.con_exit = ConsultantExit.objects.all()
+        self.client = APIClient()
+        self.client.force_authenticate(self.setup.user)
+
+    def test_list_consultant_con_exit(self):
+        route = f"/api/consultant_exit/?query={self.marketing.consultant.name}"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['count']['total'], 1)
+
+    def test_create_consultant_con_exit(self):
+        ExitReason.objects.create(id =1, name="test exit reason")
+        data = {
+            "type": "in_process",
+            "consultant": self.marketing.consultant.id,
+            "rehire": True,
+            "last_date": "2020-09-09",
+            "resign_date": "2020-09-08",
+            "exit_details": "text details",
+            "notice_period": 1,
+            "cancel_reason": "test cancel reason",
+            "status": "complete",
+            "legal_status": "in_process",
+            "reasons": ['1']
+        }
+        route = f"/api/consultant_exit/"
+        res = self.client.post(route, data)
+        self.assertEqual(res.status_code, 201)
+        self.assertNotEqual(res.data['data'], {})
+
+    def test_update_consultant_con_exit(self):
+        data = {
+            "exit_details": "test text here",
+            "last_date": "2019-09-09"
+        }
+        route = f"/api/consultant_exit/{self.con_exit.first().id}/"
+        res = self.client.put(route, data)
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['data']['exit_details'], 'test text here')
+
+    def test_cancel_termination_(self):
+        route = f"/api/consultant_exit/{self.con_exit.last().id}/cancel/"
+        res = self.client.put(route, data={"cancel_reason": "test cancel exit"})
+        self.assertEqual(res.data['message'],'Exit process cancelled')
+        self.assertEqual(res.status_code, 202)
+
+        route = f"/api/consultant_exit/{self.con_exit.last().id}/cancel/"
+        res = self.client.put(route)
+        self.assertEqual(res.data['message'], 'Exit process can not be cancelled ')
+
+    def test_termination_reason(self):
+        ExitReason.objects.create(name="test exit reason")
+        res = self.client.get(f"/api/consultant_exit/reason/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'].first()['name'], 'test exit reason')

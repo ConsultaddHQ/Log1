@@ -14,7 +14,6 @@ fake = Faker()
 class Setup:
     def __init__(self):
         self.project_ids = []
-        role = Role.objects.create(name="marketer")
         self.team = Team.objects.create(name="boto3")
         self.user = User.objects.create(
             team=self.team,
@@ -23,7 +22,8 @@ class Setup:
             email='admin@log1.com',
             employee_name='Admin Demo',
         )
-        self.user.role.add(role)
+        self.user.role.add(Role.objects.create(name="marketer"))
+        self.user.role.add(Role.objects.create(name="superadmin"))
 
     def create_consultant(self):
         consultant = Consultant.objects.create(
@@ -47,6 +47,7 @@ class Setup:
             cycle=1,
             in_pool=random.choice([True, False]),
             previous_marketing_days=random.choice([0, 1, 2]),
+            primary_marketer=self.user,
             preferred_location=fake.city(),
             status='open',
             consultant=consultant,
@@ -62,13 +63,13 @@ class Setup:
         )
         ConsultantPOC.objects.create(
             start=date.today(),
-            poc_type='Retention',
+            poc_type='retention',
             poc=self.user,
             consultant=consultant,
         )
         ConsultantPOC.objects.create(
             start=date.today(),
-            poc_type='Recruiter',
+            poc_type='recruiter',
             poc=self.user,
             consultant=consultant,
         )
@@ -90,10 +91,33 @@ class Setup:
             visa_type=random.choice(['h1b', 'gc']),
             consultant=consultant,
         )
+        ConsultantExit.objects.create(
+            rehire=True,
+            legal_action=False,
+            last_date="2022-09-09",
+            resign_date="2020-03-09",
+            notice_period=6,
+            cancel_reason="test text",
+            status="in_process",
+            type="resigned",
+            consultant=consultant,
+            created_by=self.user
+        )
+        ConsultantExit.objects.create(
+            rehire=True,
+            legal_action=False,
+            last_date="2012-09-09",
+            resign_date="2020-03-09",
+            notice_period=6,
+            cancel_reason="test text",
+            status="in_process",
+            type="resigned",
+            consultant=consultant,
+            created_by=self.user
+        )
         return consultant_marketing
 
     def create_project(self, marketing, status, count):
-
         vendor_company = VendorCompany.objects.create(
             name=f'vendor_company_name{count}'
         )
