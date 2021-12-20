@@ -1,13 +1,11 @@
 from datetime import date, timedelta
 from rest_framework.test import APITestCase, APIClient
 
-from activity.models import Activity
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from consultant.models import Consultant, ConsultantMarketing
 from marketing.models import Submission, Lead, VendorCompany, VendorContact
 from project.models import Project, ProjectStatus, ProjectSupport, SupportStatus, TimeSheet
-from engineering.models import ProjectUpdate
 
 
 class Setup:
@@ -137,14 +135,6 @@ class EngineeringViewSetTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['data'][0]['submission']['vendor'], 'vendor_company_name2')
 
-        route = "/api/engineering/?page=1&page_size=10&filter_json={%22assignment%22:%22assigned%22}&filter_for=all"
-        res = self.client.get(route)
-        self.assertEqual(len(res.data['data']), 4)
-
-        route = "/api/engineering/?filter_json={%22client%22:%22client2%22,%22assignment%22:%22assigned%22}"
-        res = self.client.get(route)
-        self.assertEqual(res.data['data'][0]['submission']['client'], 'client2')
-
         route = "/api/engineering/?filter_json={%22project_status%22:%22new%22}"
         res = self.client.get(route)
         self.assertEqual(len(res.data['data']), 5)
@@ -165,15 +155,23 @@ class EngineeringViewSetTest(APITestCase):
         res = self.client.get(route)
         self.assertEqual(res.data['data'][0]['support_status'], 'Active')
 
+        route = "/api/engineering/?filter_json={%22client%22:%22client2%22,%22assignment%22:%22assigned%22}"
+        res = self.client.get(route)
+        self.assertEqual(res.data['data'][0]['submission']['client'], 'client2')
+
+        route = "/api/engineering/?page=1&page_size=10&filter_json={%22assignment%22:%22assigned%22}&filter_for=all"
+        res = self.client.get(route)
+        self.assertEqual(len(res.data['data']), 4)
+
     def test_retrieve_engineering_project(self):
+        route = f"/api/engineering/1/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 404)
+
         route = f"/api/engineering/{self.setup.project_ids[0]}/"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['data']['id'], self.setup.project_ids[0])
-
-        route = f"/api/engineering/1/"
-        res = self.client.get(route)
-        self.assertEqual(res.status_code, 404)
 
     def test_engineering_filters(self):
         route = f"/api/engineering/filters/"

@@ -14,9 +14,9 @@ class ProjectDescription(TimeStampedModel):
     notes = models.TextField(_('Notes'), null=True)
     remark = models.TextField(_('Remark'), null=True)
     description = models.TextField(_('Description'), null=True)
-    update_by = models.ForeignKey(User, on_delete=models.CASCADE)
     resource = models.TextField(_('Resource'), blank=True, null=True)
     technology = models.CharField(_('Technology'), max_length=500, null=True)
+    update_by = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='description')
     consultant_preferred_time = models.CharField(_('Preferred Time'), max_length=30, null=True, blank=True)
 

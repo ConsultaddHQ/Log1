@@ -185,101 +185,6 @@ class ConsultantViewSets(ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @staticmethod
-    def get_submission_data(queryset, filter_by_status, first, last):
-        try:
-            data_counts = {
-                'total': queryset.count(),
-                'sub': queryset.filter(status='sub').count(),
-                'project': queryset.filter(status='project').count(),
-                'interview': queryset.filter(status='interview').count()
-            }
-
-            if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
-
-            data = queryset[first:last].annotate(
-                city=F('lead__city'),
-                company_name=F('lead__vendor_company__name'),
-                marketer_name=F('created_by__employee_name'),
-                consultant_name=F('consultant_marketing__consultant__name'),
-            ).values('id', 'rate', 'consultant_name', 'company_name', 'marketer_name', 'city', 'project', 'client')
-
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, "error"
-
-    @staticmethod
-    def get_interview_data(queryset, filter_by_status, first, last):
-        try:
-            # Interview counts by status
-            queryset = queryset.order_by('-modified').distinct('modified')
-
-            data_counts = {
-                'total': queryset.count(),
-                'offer': queryset.filter(status='offer').count(),
-                'failed': queryset.filter(status='failed').count(),
-                'scheduled': queryset.filter(status='scheduled').count(),
-                'cancelled': queryset.filter(status='cancelled').count(),
-                'rescheduled': queryset.filter(status='rescheduled').count(),
-                'feedback_due': queryset.filter(status='feedback_due').count(),
-            }
-
-            if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
-
-            data = queryset[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                ctb=F('supervisor__employee_name'),
-                job_title=F('submission__lead__job_title'),
-                marketer_name=F('submission__created_by__employee_name'),
-                company_name=F('submission__lead__vendor_company__name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'submission_id', 'status',
-                     'ctb', 'marketer_name', 'consultant_name', 'client', 'company_name', 'project', 'job_title',
-                     'modified', 'created')
-
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
-
-    @staticmethod
-    def get_project_data(queryset, filter_by_status):
-        try:
-            # count of project by status
-            data_counts = {
-                'total': queryset.count(),
-                'new': queryset.filter(statuses__status='new', statuses__is_current=True).count(),
-                'joined': queryset.filter(statuses__status='joined', statuses__is_current=True).count(),
-                'received': queryset.filter(statuses__status='received', statuses__is_current=True).count(),
-                'on_boarded': queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
-                'not_joined': queryset.filter(statuses__status='not_joined', statuses__is_current=True).count(),
-            }
-
-            queryset = queryset.order_by('-start_date')
-            if filter_by_status:
-                queryset = queryset.filter(statuses__status=filter_by_status, statuses__is_current=True)
-
-            project_status = ProjectStatus.objects.filter(
-                project=OuterRef("pk"), is_current=True)
-
-            data = queryset.annotate(
-                client=F('submission__client'),
-                consultant_name=F('consultant__name'),
-                job_title=F('submission__lead__job_title'),
-                status=Subquery(project_status.values('status')[:1]),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
-                     'status', 'employer', 'start_date', 'end_date', 'job_title')
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
-
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -614,35 +519,6 @@ class ConsultantViewSets(ModelViewSet):
             except Exception as error:
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['get'], detail=True, url_path='marketing')
-    def marketing(self, request, pk):
-        first, last = get_page_limits(request)
-        marketing_stage = request.GET.get('stage')
-        filter_by_status = request.GET.get("filter_by_status", None)
-
-        try:
-            if marketing_stage == 'interview':
-                interviews = Interview.objects.filter(
-                    submission__consultant_marketing__end=None,
-                    submission__consultant_marketing__status='open',
-                    submission__consultant_marketing__consultant_id=pk,
-                )
-                data, counts = self.get_interview_data(interviews, filter_by_status, first, last)
-                if counts == "error":
-                    return Response({"error": str(data)}, status=400)
-            else:
-                projects = Project.objects.filter(
-                    Q(consultant_id=pk) |
-                    Q(submission__consultant_marketing__consultant_id=pk)
-                )
-                data, counts = self.get_project_data(projects, filter_by_status)
-                if counts == "error":
-                    return Response({"error": str(data)}, status=400)
-            return Response({"data": data, "total": counts}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, pk):

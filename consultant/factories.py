@@ -14,7 +14,6 @@ fake = Faker()
 class Setup:
     def __init__(self):
         self.project_ids = []
-        role = Role.objects.create(name="marketer")
         self.team = Team.objects.create(name="boto3")
         self.user = User.objects.create(
             team=self.team,
@@ -23,80 +22,107 @@ class Setup:
             email='admin@log1.com',
             employee_name='Admin Demo',
         )
-        self.user.role.add(role)
+        self.user.role.add(Role.objects.create(name="marketer"))
+        self.user.role.add(Role.objects.create(name="superadmin"))
 
     def create_consultant(self):
         consultant = Consultant.objects.create(
-            email=fake.email(),
             name=fake.name(),
-            gender=random.choice(['male', 'female']),
-            skills=random.choice(['Python', 'Java', 'React', 'JS', 'Ruby']),
-            current_city=fake.city(),
             status='on_bench',
-            work_type=random.choice(['c2c', 'full_time']),
+            email=fake.email(),
+            phone_no=+19767546789,
+            current_city=fake.city(),
             is_active=random.choice([True, False]),
             first_login=random.choice([True, False]),
             remote_only=random.choice([True, False]),
-            phone_no=+19767546789,
             p_is_active=random.choice([True, False]),
+            gender=random.choice(['male', 'female']),
             visa_petition=random.choice([True, False]),
+            work_type=random.choice(['c2c', 'full_time']),
+            skills=random.choice(['Python', 'Java', 'React', 'JS', 'Ruby']),
         )
+        consultant.visa_petition = True
+        consultant.p_is_active = True
+        consultant.pin = 123456789
+        consultant.save()
 
         consultant_marketing = ConsultantMarketing.objects.create(
-            rtg=random.choice([True, False]),
             cycle=1,
-            in_pool=random.choice([True, False]),
-            previous_marketing_days=random.choice([0, 1, 2]),
-            preferred_location=fake.city(),
             status='open',
             consultant=consultant,
+            primary_marketer=self.user,
+            preferred_location=fake.city(),
+            rtg=random.choice([True, False]),
+            in_pool=random.choice([True, False]),
+            previous_marketing_days=random.choice([0, 1, 2]),
         )
         consultant_marketing.teams.add(self.team)
         consultant_marketing.marketer.add(self.user)
         ConsultantRateRevision.objects.create(
             rate=45.0,
-            previous_rate=40.50,
             start=date.today(),
+            previous_rate=40.50,
             feedback=fake.text(),
             consultant=consultant,
         )
         ConsultantPOC.objects.create(
-            start=date.today(),
-            poc_type='Retention',
             poc=self.user,
+            start=date.today(),
+            poc_type='retention',
             consultant=consultant,
         )
         ConsultantPOC.objects.create(
-            start=date.today(),
-            poc_type='Recruiter',
             poc=self.user,
+            start=date.today(),
+            poc_type='recruiter',
             consultant=consultant,
         )
         ConsultantProfile.objects.create(
+            education="phd",
+            visa_type='h1b',
             title='Original',
             visa_end="2020-09-07",
+            consultant=consultant,
             visa_start="2017-09-07",
-            education="phd",
-            date_of_birth="1998-09-09",
-            visa_type='h1b',
-            current_city='West Iowa',
             profile_owner=self.user,
-            consultant=consultant
+            current_city='West Iowa',
+            date_of_birth="1998-09-09",
         )
         WorkAuth.objects.create(
             is_current=True,
+            consultant=consultant,
             visa_end="2022-12-12",
             visa_start="2018-11-11",
             visa_type=random.choice(['h1b', 'gc']),
+        )
+        ConsultantExit.objects.create(
+            rehire=True,
+            notice_period=6,
+            type="resigned",
+            legal_action=False,
+            status="in_process",
+            created_by=self.user,
             consultant=consultant,
+            last_date="2022-09-09",
+            resign_date="2020-03-09",
+            cancel_reason="test text",
+        )
+        ConsultantExit.objects.create(
+            rehire=True,
+            notice_period=6,
+            type="resigned",
+            legal_action=False,
+            status="in_process",
+            created_by=self.user,
+            consultant=consultant,
+            last_date="2012-09-09",
+            resign_date="2020-03-09",
+            cancel_reason="test text",
         )
         return consultant_marketing
 
     def create_project(self, marketing, status, count):
-
-        vendor_company = VendorCompany.objects.create(
-            name=f'vendor_company_name{count}'
-        )
+        vendor_company = VendorCompany.objects.create(name=f'vendor_company_name{count}')
         vendor_contact = VendorContact.objects.create(
             number='1234567890',
             company=vendor_company,
@@ -125,8 +151,8 @@ class Setup:
             consultant_marketing=marketing,
         )
         project = Project.objects.create(
-            is_msg_sent=True,
             rate=55,
+            is_msg_sent=True,
             city='New York, US',
             employer='Consultadd',
             submission=submission,
@@ -152,27 +178,27 @@ class Setup:
                 frequency='more_than_2_days',
             )
             ConsultantFeedback.objects.create(
-                project_id=project.id,
-                description=f"test description {count}",
-                created_by=self.user,
-                consultant_id=marketing.consultant.id,
-                department=random.choice(['Engineering', 'Legal', 'Marketing']),
                 feedback_type="cfr",
+                created_by=self.user,
+                project_id=project.id,
                 rating=random.choice([3, 4, 5]),
+                consultant_id=marketing.consultant.id,
+                description=f"test description {count}",
+                department=random.choice(['Engineering', 'Legal', 'Marketing']),
             )
             Interview.objects.create(
-                round= 0,
-                feedback= fake.text(),
-                guest_remark= fake.text(),
-                coding_present= random.choice([True, False]),
-                description= fake.text(),
-                call_details= fake.text(),
-                tech_stack= fake.text(),
-                interview_mode=random.choice(['skype', 'webex', 'dial_in', 'hangouts', 'video_call', 'voice_call']),
-                screening_type=random.choice(['ip_screening', 'vendor_screening', 'interview']),
-                status= random.choice(['offer', 'scheduled', 'next_round']),
+                round=0,
+                feedback=fake.text(),
                 supervisor=self.user,
                 submission=submission,
+                tech_stack=fake.text(),
+                description=fake.text(),
+                guest_remark=fake.text(),
+                call_details=fake.text(),
+                coding_present=random.choice([True, False]),
+                status=random.choice(['offer', 'scheduled', 'next_round']),
+                screening_type=random.choice(['ip_screening', 'vendor_screening', 'interview']),
+                interview_mode=random.choice(['skype', 'webex', 'dial_in', 'hangouts', 'video_call', 'voice_call']),
             )
 
             desc = f"Admin Demo added himself as support person"
