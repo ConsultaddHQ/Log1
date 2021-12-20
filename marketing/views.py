@@ -2265,7 +2265,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             create_activity(submission.id, 'submission', request.user, desc, 'created')
 
             # upload attachments
-            for file in request.FILES.getlist('file'):
+            for file in request.FILES.getlist('files'):
                 file_data = {
                     "file": file,
                     "type": 'test',

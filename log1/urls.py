@@ -30,7 +30,7 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
     InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
-    FeedbackViewSet, ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
+    ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
 
 
 router = DefaultRouter()
@@ -47,7 +47,6 @@ router.register(r'password', ResetPasswordViewSets)
 router.register(r'attachment', AttachmentView)
 router.register(r'get_attachment', AttachmentGetView)
 
-router.register(r'feedback', FeedbackViewSet)
 router.register(r'consultant', ConsultantViewSets)
 router.register(r'consultant_poc', ConsultantPOCViewSets)
 router.register(r'consultant_work_auth', WorkAuthViewSets)
