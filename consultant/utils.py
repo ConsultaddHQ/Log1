@@ -193,9 +193,12 @@ def terminate_consultant(terminate, request):
         for user in scrum_masters:
             user_list.append(user)
 
-        last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b. %d, %Y")
-        title = f"""{consultant.name} got terminated on {last_date}"""
+        if isinstance(terminate.last_date, str):
+            last_date = datetime.strptime(terminate.last_date, "%Y-%m-%d").strftime("%b %d, %Y")
+        else:
+            last_date = terminate.last_date.strftime("%b %d, %Y")
 
+        title = f"{consultant.name} got terminated on {last_date}"
         notification_data = {
             'title': title,
             'category': 'info',
