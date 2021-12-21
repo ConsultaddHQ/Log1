@@ -624,7 +624,15 @@ class ConsultantViewSets(ModelViewSet):
     @action(methods=['get'], detail=True, url_path='margin')
     def margin(self, request, pk):
         try:
-            projects = Project.objects.filter(
+            projects = Project.objects.filter(statuses__status='joined', statuses__is_current=True)
+            qs = Project.objects.filter(
+                Q(statuses__status__in=['joined', 'complete'], statuses__is_current=True) |
+                Q(statuses__status__istartswith='terminated', statuses__is_current=True)
+            ).filter(
+                Q(consultant_id=pk) |
+                Q(submission__consultant_marketing__consultant_id=pk)
+            ).order_by('-start_date')
+            projects = projects.filter(
                 Q(consultant_id=pk) |
                 Q(submission__consultant_marketing__consultant_id=pk)
             )
@@ -638,10 +646,12 @@ class ConsultantViewSets(ModelViewSet):
                     margin = project_rate - consultant_rate
                     margin_percentage = (margin / project_rate) * 100
 
-            for project in projects:
+            for project in qs:
                 project_data.append(
                     {
+                        "id": project.id,
                         "rate": project.rate,
+                        "status": project.status,
                         "client": project.submission.client,
                     }
                 )
