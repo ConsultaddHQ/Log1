@@ -185,101 +185,6 @@ class ConsultantViewSets(ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @staticmethod
-    def get_submission_data(queryset, filter_by_status, first, last):
-        try:
-            data_counts = {
-                'total': queryset.count(),
-                'sub': queryset.filter(status='sub').count(),
-                'project': queryset.filter(status='project').count(),
-                'interview': queryset.filter(status='interview').count()
-            }
-
-            if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
-
-            data = queryset[first:last].annotate(
-                city=F('lead__city'),
-                company_name=F('lead__vendor_company__name'),
-                marketer_name=F('created_by__employee_name'),
-                consultant_name=F('consultant_marketing__consultant__name'),
-            ).values('id', 'rate', 'consultant_name', 'company_name', 'marketer_name', 'city', 'project', 'client')
-
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, "error"
-
-    @staticmethod
-    def get_interview_data(queryset, filter_by_status, first, last):
-        try:
-            # Interview counts by status
-            queryset = queryset.order_by('-modified').distinct('modified')
-
-            data_counts = {
-                'total': queryset.count(),
-                'offer': queryset.filter(status='offer').count(),
-                'failed': queryset.filter(status='failed').count(),
-                'scheduled': queryset.filter(status='scheduled').count(),
-                'cancelled': queryset.filter(status='cancelled').count(),
-                'rescheduled': queryset.filter(status='rescheduled').count(),
-                'feedback_due': queryset.filter(status='feedback_due').count(),
-            }
-
-            if filter_by_status:
-                queryset = queryset.filter(status=filter_by_status)
-
-            data = queryset[first:last].annotate(
-                client=F('submission__client'),
-                project=F('submission__project'),
-                ctb=F('supervisor__employee_name'),
-                job_title=F('submission__lead__job_title'),
-                marketer_name=F('submission__created_by__employee_name'),
-                company_name=F('submission__lead__vendor_company__name'),
-                consultant_name=F('submission__consultant_marketing__consultant__name'),
-            ).values('id', 'round', 'status', 'start_time', 'end_time', 'interview_mode', 'submission_id', 'status',
-                     'ctb', 'marketer_name', 'consultant_name', 'client', 'company_name', 'project', 'job_title',
-                     'modified', 'created')
-
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
-
-    @staticmethod
-    def get_project_data(queryset, filter_by_status):
-        try:
-            # count of project by status
-            data_counts = {
-                'total': queryset.count(),
-                'new': queryset.filter(statuses__status='new', statuses__is_current=True).count(),
-                'joined': queryset.filter(statuses__status='joined', statuses__is_current=True).count(),
-                'received': queryset.filter(statuses__status='received', statuses__is_current=True).count(),
-                'on_boarded': queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
-                'not_joined': queryset.filter(statuses__status='not_joined', statuses__is_current=True).count(),
-            }
-
-            queryset = queryset.order_by('-start_date')
-            if filter_by_status:
-                queryset = queryset.filter(statuses__status=filter_by_status, statuses__is_current=True)
-
-            project_status = ProjectStatus.objects.filter(
-                project=OuterRef("pk"), is_current=True)
-
-            data = queryset.annotate(
-                client=F('submission__client'),
-                consultant_name=F('consultant__name'),
-                job_title=F('submission__lead__job_title'),
-                status=Subquery(project_status.values('status')[:1]),
-                company_name=F('submission__lead__vendor_company__name'),
-                marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
-                     'status', 'employer', 'start_date', 'end_date', 'job_title')
-            return data, data_counts
-        except Exception as error:
-            write_exception(message=error)
-            return error, 'error'
-
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -615,35 +520,6 @@ class ConsultantViewSets(ModelViewSet):
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='marketing')
-    def marketing(self, request, pk):
-        first, last = get_page_limits(request)
-        marketing_stage = request.GET.get('stage')
-        filter_by_status = request.GET.get("filter_by_status", None)
-
-        try:
-            if marketing_stage == 'interview':
-                interviews = Interview.objects.filter(
-                    submission__consultant_marketing__end=None,
-                    submission__consultant_marketing__status='open',
-                    submission__consultant_marketing__consultant_id=pk,
-                )
-                data, counts = self.get_interview_data(interviews, filter_by_status, first, last)
-                if counts == "error":
-                    return Response({"error": str(data)}, status=400)
-            else:
-                projects = Project.objects.filter(
-                    Q(consultant_id=pk) |
-                    Q(submission__consultant_marketing__consultant_id=pk)
-                )
-                data, counts = self.get_project_data(projects, filter_by_status)
-                if counts == "error":
-                    return Response({"error": str(data)}, status=400)
-            return Response({"data": data, "total": counts}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, pk):
         try:
@@ -748,7 +624,15 @@ class ConsultantViewSets(ModelViewSet):
     @action(methods=['get'], detail=True, url_path='margin')
     def margin(self, request, pk):
         try:
-            projects = Project.objects.filter(
+            projects = Project.objects.filter(statuses__status='joined', statuses__is_current=True)
+            qs = Project.objects.filter(
+                Q(statuses__status__in=['joined', 'complete'], statuses__is_current=True) |
+                Q(statuses__status__istartswith='terminated', statuses__is_current=True)
+            ).filter(
+                Q(consultant_id=pk) |
+                Q(submission__consultant_marketing__consultant_id=pk)
+            ).order_by('-start_date')
+            projects = projects.filter(
                 Q(consultant_id=pk) |
                 Q(submission__consultant_marketing__consultant_id=pk)
             )
@@ -762,10 +646,12 @@ class ConsultantViewSets(ModelViewSet):
                     margin = project_rate - consultant_rate
                     margin_percentage = (margin / project_rate) * 100
 
-            for project in projects:
+            for project in qs:
                 project_data.append(
                     {
+                        "id": project.id,
                         "rate": project.rate,
+                        "status": project.status,
                         "client": project.submission.client,
                     }
                 )
@@ -1612,169 +1498,6 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-
-# Route - /feedback/
-class FeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
-    queryset = Feedback.objects.all()
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
-    serializer_class = ConsultantFeedbackSerializer
-
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            feedback_type = request.GET.get('type', None)
-            feedback = Feedback.objects.filter(consultant_id=kwargs.get('pk')).order_by('-created')
-            if feedback_type:
-                feedback = feedback.filter(feedback_type=feedback_type)
-            serializer = self.serializer_class(feedback, many=True)
-            return Response({"data": serializer.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def create(self, request, *args, **kwargs):
-        try:
-            feedback = Feedback.objects.create(
-                created_by=request.user,
-                rating=request.data.get('rating'),
-                consultant_id=request.data.get('consultant'),
-                feedback_type=request.data.get('feedback_type'),
-                feedback_text=request.data.get('feedback_text'),
-            )
-            user_list = []
-            tags = request.data.get('tagged_user', [])
-            if len(tags) > 0:
-                for tag in tags:
-                    user = get_object_or_404(User, id=tag)
-                    user_list.append(user)
-                tag_data = {
-                    "model": "feedback",
-                    "object_id": feedback.id,
-                    "tags": tags
-                }
-                tag_users(tag_data)
-            employee_name = request.user.employee_name
-            consultant = feedback.consultant
-            title = f"{employee_name} tagged you in a {consultant.name}'s feedback"
-            notification_data = {
-                'title': title,
-                'category': 'info',
-                'description': title,
-                'target_id': feedback.id,
-                'sender_user_type': 'user',
-                'target_type': 'feedback',
-                'parent_id': consultant.id,
-                'parent_type': 'consultant',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-            }
-            create_notification(user_list, notification_data)
-
-            # Push Notification
-            message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'consultant',
-                    'sub_target': 'feedback',
-                    'target_id': consultant.id,
-                    'sub_target_id': feedback.id,
-                    'timestamp': str(datetime.now()),
-                },
-            }
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
-
-            # Push Notification
-            feedback_type = feedback.get_feedback_type_display()
-            poc_title = f"{feedback_type} feedback added for {consultant.name} by {employee_name}"
-            send_notification_for_user(consultant, request.user, poc_title, 'feedback', feedback.id)
-
-            # Activity
-            desc = f"{employee_name} added {feedback_type} feedback"
-            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            serializer = self.serializer_class(feedback)
-            return Response({"data": serializer.data, "message": "Feedback added"}, status=201)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def update(self, request, *args, **kwargs):
-        try:
-            feedback = get_object_or_404(Feedback, id=kwargs.get('pk'))
-            serializer = self.serializer_class(feedback, data=request.data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            user_list = []
-            tags = request.data.get('tagged_user', [])
-            if len(tags) > 0:
-                user_tag = feedback.tagged_user.all().first()
-                if not user_tag:
-                    tag_data = {"tags": tags, "model": "feedback", "object_id": feedback.id}
-                    tag_users(tag_data)
-                for tag in tags:
-                    user = get_object_or_404(User, id=tag)
-                    user_list.append(user)
-                    user_tag.tagged_user.add(user)
-
-            employee_name = request.user.employee_name
-            consultant = feedback.consultant
-            title = f"{employee_name} tagged you in a {consultant.name}'s feedback"
-            notification_data = {
-                'title': title,
-                'category': 'info',
-                'description': title,
-                'target_id': feedback.id,
-                'target_type': 'feedback',
-                'sender_user_type': 'user',
-                'parent_id': consultant.id,
-                'parent_type': 'consultant',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-            }
-            create_notification(user_list, notification_data)
-
-            # Push Notification
-
-            message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'consultant',
-                    'sub_target': 'feedback',
-                    'target_id': consultant.id,
-                    'sub_target_id': feedback.id,
-                    'timestamp': str(datetime.now()),
-                },
-            }
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
-
-            # Push Notification
-            title = f"{serializer.data['feedback_type']} feedback updated for {consultant.name} by {employee_name}"
-            send_notification_for_user(consultant, request.user, title, 'feedback', feedback.id)
-
-            # Activity
-            desc = f"{employee_name} updated {feedback.get_feedback_type_display()} feedback"
-            create_activity(consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"data": serializer.data, "message": "Feedback updated"}, status=202)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def partial_update(self, request, *args, **kwargs):
-        return Response({"detail": "Method PATCH not allowed."}, status=405)
 
 
 # Route - /beats_consultant/

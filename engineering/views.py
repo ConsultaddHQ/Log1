@@ -42,6 +42,21 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             if filter_json:
                 filters = json.loads(filter_json)
 
+                start_date = filters.get('start_date', None)
+                projects = date_filter(projects, start_date, 'start_date')
+
+                if 'support' in filters:
+                    projects = projects.filter(support__support_id=filters['support'])
+
+                if 'client' in filters:
+                    projects = projects.filter(submission__client__iexact=filters['client'])
+
+                if 'assignment' in filters:
+                    if filters['assignment'] == 'assigned':
+                        projects = projects.exclude(support=None)
+                    if filters['assignment'] == 'unassigned':
+                        projects = projects.filter(support=None)
+
                 if 'project_status' in filters:
                     if filters['project_status'] in ['terminated', 'cancelled']:
                         projects = Project.objects.filter(
@@ -54,25 +69,8 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             statuses__status__istartswith=filters['project_status'],
                         )
 
-                if 'assignment' in filters:
-                    if filters['assignment'] == 'assigned':
-                        projects = projects.exclude(support=None)
-                    if filters['assignment'] == 'unassigned':
-                        projects = projects.filter(support=None)
-
-                if 'client' in filters:
-                    projects = projects.filter(submission__client__iexact=filters['client'])
-
-                if 'support' in filters:
-                    projects = projects.filter(support__support_id=filters['support'])
-
-                start_date = filters.get('start_date', None)
-                projects = date_filter(projects, start_date, 'start_date')
-
             if filter_for == 'my':
-                projects = projects.filter(
-                    support__support=request.user,
-                )
+                projects = projects.filter(support__support=request.user)
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -83,6 +81,8 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
+
+            projects = projects.order_by('id').distinct('id')
 
             counts = {
                 "support_status": {
@@ -109,40 +109,6 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         ).count()
                     },
                 },
-                "project_status": {
-                    "new": {
-                        "display_name": "New",
-                        "count": projects.filter(statuses__is_current=True, statuses__status='new').count(),
-                    },
-                    "received": {
-                        "display_name": "Received",
-                        "count": projects.filter(statuses__is_current=True, statuses__status='received').count(),
-                    },
-                    "on_boarded": {
-                        "display_name": "On Boarded",
-                        "count": projects.filter(statuses__is_current=True, statuses__status='on_boarded').count(),
-                    },
-                    "joined": {
-                        "display_name": "Joined",
-                        "count": projects.filter(statuses__is_current=True, statuses__status='joined').count(),
-                    },
-                    "complete": {
-                        "display_name": "Complete",
-                        "count": projects.filter(statuses__is_current=True, statuses__status='complete').count(),
-                    },
-                    "cancelled": {
-                        "display_name": "Cancelled",
-                        "count": projects.filter(
-                            statuses__is_current=True,
-                            statuses__status__istartswith='cancelled').count(),
-                    },
-                    "terminated": {
-                        "display_name": "Terminated",
-                        "count": projects.filter(
-                            statuses__is_current=True,
-                            statuses__status__istartswith='terminated').count(),
-                    }
-                }
             }
 
             if filter_json:

@@ -27,7 +27,6 @@ def set_consultant_password(consultant):
         write_exception(message=error)
 
 
-# Creating consultant object from user for remote
 def create_remote_consultant(request):
     try:
         remote_consultant_id = request.data.get('remote_consultant_id', None)
@@ -461,9 +460,9 @@ def send_support_mail(project, support, request):
         project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
         mail_data = {
-            'template': '../templates/support.html',
             'to': to, 'cc': cc, 'bcc': [],
-            'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
+            'template': '../templates/support.html',
+            'subject': f"Initiate support for {consultant.name} :: {submission.client} :: {support.employee_name}",
             'context': {
                 'marketer_name': submission.created_by.employee_name,
                 'location': submission.lead.city, 'job_title': submission.lead.job_title,

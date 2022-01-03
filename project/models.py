@@ -71,6 +71,13 @@ class Project(TimeStampedModel):
     def created_by(self):
         return self.submission.created_by
 
+    @property
+    def status(self):
+        statuses = self.statuses.filter(is_current=True)
+        if statuses:
+            return statuses.first().get_status_display()
+        return None
+
 
 class ProjectStatus(models.Model):
     PROJECT_STATUS_CHOICES = (
