@@ -15,6 +15,7 @@ class Setup:
         role = Role.objects.create(name="marketer")
         self.team = Team.objects.create(name="Consultadd")
         self.user = User.objects.create(
+            username=1000,
             team=self.team,
             employee_id=1000,
             password='consultadd',
