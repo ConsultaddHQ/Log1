@@ -1,9 +1,11 @@
+from unittest.mock import MagicMock
 from datetime import date, timedelta
 from rest_framework.test import APITestCase, APIClient
 
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from consultant.models import Consultant, ConsultantMarketing
+from engineering.models import ProjectUpdate
 from marketing.models import Submission, Lead, VendorCompany, VendorContact
 from project.models import Project, ProjectStatus, ProjectSupport, SupportStatus, TimeSheet
 
@@ -15,6 +17,7 @@ class Setup:
         role = Role.objects.create(name="marketer")
         self.team = Team.objects.create(name="Consultadd")
         self.user = User.objects.create(
+            username=1000,
             team=self.team,
             employee_id=1000,
             password='consultadd',
@@ -120,6 +123,16 @@ class Setup:
                 project = self.create_project(consultant_marketing, 'terminated', i)
             self.project_ids.append(project.id)
 
+    def project_update(self, project_id):
+        project = Project.objects.get(id=project_id)
+        return ProjectUpdate.objects.create(
+            update_by=self.user,
+            update="test update",
+            blocker="test blocker",
+            project=project,
+            start="2021-09-09"
+        )
+
 
 class EngineeringViewSetTest(APITestCase):
     def setUp(self):
@@ -213,11 +226,45 @@ class ProjectUpdateViewSetTest(APITestCase):
     def setUp(self):
         self.setup = Setup()
         self.setup.projects_setup(2)
-
+        self.project_update = self.setup.project_update(self.setup.project_ids[0])
         self.client = APIClient()
         self.client.force_authenticate(user=self.setup.user)
 
     def test_list(self):
-        route = f"/api/project/{self.setup.project_ids[0]}/update/"
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/"
         res = self.client.get(route)
-        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.status_code, 200)
+        self.assertNotEqual(len(res.data['data']), [])
+
+    def test_retrieve_update(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/{self.project_update.id}/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data']['id'], self.project_update.id)
+
+    def test_create(self):
+        payload = {
+            "blocker": "test_blocker",
+            "update": "test_update",
+            "type": 'project'
+        }
+        # mock_data = MagicMock(data=payload, FILES=['files'])
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/"
+        res = self.client.post(route, data=payload)
+        self.assertEqual(res.status_code, 201)
+        self.assertNotEqual(len(res.data['message']), 'Project Update is added successfully')
+
+    def test_update(self):
+        payload = {
+            "blocker": "test_blockers",
+        }
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/{self.project_update.id}/"
+        res = self.client.put(route, data=payload)
+        self.assertEqual(res.status_code, 202)
+        self.assertNotEqual(len(res.data['message']), 'Project update is edited successfully')
+
+    def test_add_document(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/{self.project_update.id}/add_document/"
+        res = self.client.put(route, data={'file': 'file'})
+        self.assertEqual(res.status_code, 202)
+        self.assertNotEqual(len(res.data['message']), "Document is uploaded")
