@@ -43,7 +43,7 @@ class ConsultantTest(APITestCase):
 
         for i in range(0, 5):
             consultant_marketing = self.setup.create_consultant()
-            self.setup.create_project(consultant_marketing, 'new', 1)
+            self.setup.create_project(consultant_marketing, 'joined', 1)
 
         self.consultant = Consultant.objects.all()
 
