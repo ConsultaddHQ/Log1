@@ -310,8 +310,9 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
             )
         )
         for project in projects:
-            if revision_date < project.start_date:
-                revision_date = project.start_date
+            if project.start_date:
+                if revision_date < project.start_date:
+                    revision_date = project.start_date
         if date.today() + timedelta(days=170) <= revision_date:
             return True
         return False

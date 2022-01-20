@@ -185,6 +185,40 @@ class ConsultantViewSets(ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
+    @staticmethod
+    def get_project_data(queryset, filter_by_status):
+        try:
+            # count of project by status
+            data_counts = {
+                'total': queryset.count(),
+                'new': queryset.filter(statuses__status='new', statuses__is_current=True).count(),
+                'joined': queryset.filter(statuses__status='joined', statuses__is_current=True).count(),
+                'received': queryset.filter(statuses__status='received', statuses__is_current=True).count(),
+                'on_boarded': queryset.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
+                'not_joined': queryset.filter(statuses__status='not_joined', statuses__is_current=True).count(),
+            }
+
+            queryset = queryset.order_by('-start_date')
+            if filter_by_status:
+                queryset = queryset.filter(statuses__status=filter_by_status, statuses__is_current=True)
+
+            project_status = ProjectStatus.objects.filter(
+                project=OuterRef("pk"), is_current=True)
+
+            data = queryset.annotate(
+                client=F('submission__client'),
+                consultant_name=F('consultant__name'),
+                job_title=F('submission__lead__job_title'),
+                status=Subquery(project_status.values('status')[:1]),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+            ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
+                     'status', 'employer', 'start_date', 'end_date', 'job_title')
+            return data, data_counts
+        except Exception as error:
+            write_exception(message=error)
+            return error, 'error'
+
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -519,6 +553,22 @@ class ConsultantViewSets(ModelViewSet):
             except Exception as error:
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='marketing')
+    def marketing(self, request, pk):
+        try:
+            filter_by_status = request.GET.get("filter_by_status", None)
+            projects = Project.objects.filter(
+                Q(consultant_id=pk) |
+                Q(submission__consultant_marketing__consultant_id=pk)
+            )
+            data, counts = self.get_project_data(projects, filter_by_status)
+            if counts == "error":
+                return Response({"error": str(data)}, status=400)
+            return Response({"data": data, "total": counts}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, pk):

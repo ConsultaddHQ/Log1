@@ -57,18 +57,6 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     if filters['assignment'] == 'unassigned':
                         projects = projects.filter(support=None)
 
-                if 'project_status' in filters:
-                    if filters['project_status'] in ['terminated', 'cancelled']:
-                        projects = Project.objects.filter(
-                            statuses__is_current=True,
-                            statuses__status__istartswith=filters['project_status'],
-                        )
-                    else:
-                        projects = projects.filter(
-                            statuses__is_current=True,
-                            statuses__status__istartswith=filters['project_status'],
-                        )
-
             if filter_for == 'my':
                 projects = projects.filter(support__support=request.user)
 
@@ -158,21 +146,12 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def filters(self, request):
         try:
             data = {
-                "project_status": [
-                    {'name': 'new', 'display_name': 'New'},
-                    {'name': 'received', 'display_name': 'Received'},
-                    {'name': 'on_boarded', 'display_name': 'On Boarded'},
-                    {'name': 'joined', 'display_name': 'Joined'},
-                    {'name': 'complete', 'display_name': 'Complete'},
-                    {'name': 'cancelled', 'display_name': 'Cancelled'},
-                    {'name': 'terminated', 'display_name': 'Terminated'},
-                ],
                 "support_status": [
                     {'name': 'training', 'display_name': 'Training'},
                     {'name': 'active', 'display_name': 'Active'},
                     {'name': 'less_active', 'display_name': 'Less Active'},
                     {'name': 'independent', 'display_name': 'Independent'},
-                ],
+                ]
             }
             return Response({"data": data}, status=200)
         except Exception as error:
