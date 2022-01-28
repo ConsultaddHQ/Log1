@@ -3,9 +3,10 @@ from datetime import date, timedelta
 from rest_framework.test import APITestCase, APIClient
 
 from activity.views import create_activity
+from attachment.models import Attachment
 from employee.models import User, Team, Role
 from consultant.models import Consultant, ConsultantMarketing
-from engineering.models import ProjectUpdate
+from engineering.models import ProjectUpdate, ProjectDescription, TrainingAgenda, TrainingCheckList
 from marketing.models import Submission, Lead, VendorCompany, VendorContact
 from project.models import Project, ProjectStatus, ProjectSupport, SupportStatus, TimeSheet
 
@@ -133,6 +134,48 @@ class Setup:
             start="2021-09-09"
         )
 
+    def project_description(self, project_id):
+        project = Project.objects.get(id=project_id)
+        project_description = ProjectDescription.objects.create(
+            notes="test notes",
+            remark="test remark",
+            description="test description",
+            resource="test resource",
+            technology="Java",
+            update_by=self.user,
+            project=project,
+            consultant_preferred_time="11:00 am EST"
+        )
+        return project_description
+
+    def training_agenda(self, project_id):
+        project = Project.objects.get(id=project_id)
+        training = TrainingAgenda.objects.create(
+            position=2,
+            project=project,
+            status="complete",
+            duration="2 weeks",
+            remark="test remark",
+            created_by=self.user,
+            assignment_given=True,
+            assignment_submitted=True,
+            completion_date="2022-01-02",
+            description="test description",
+        )
+        return training
+
+    @staticmethod
+    def training_check_list(project_id):
+        project = Project.objects.get(id=project_id)
+        checklist = TrainingCheckList.objects.create(
+            position=2,
+            project=project,
+            status="complete",
+            remark="test remark",
+            task="training task test content"
+        )
+        return checklist
+
 
 class EngineeringViewSetTest(APITestCase):
     def setUp(self):
@@ -167,6 +210,18 @@ class EngineeringViewSetTest(APITestCase):
         route = "/api/engineering/?query=&page=1&page_size=10&filter_json={%22support_status%22:%22active%22}"
         res = self.client.get(route)
         self.assertEqual(res.data['data'][0]['support_status'], 'Active')
+
+        route = "/api/engineering/?query=&page=1&page_size=10&filter_json={%22support_status%22:%22training%22}"
+        res = self.client.get(route)
+        self.assertEqual(res.data['data'], [])
+
+        route = "/api/engineering/?query=&page=1&page_size=10&filter_json={%22support_status%22:%22less_active%22}"
+        res = self.client.get(route)
+        self.assertEqual(res.data['data'], [])
+
+        route = "/api/engineering/?query=&page=1&page_size=10&filter_json={%22support_status%22:%22independent%22}"
+        res = self.client.get(route)
+        self.assertEqual(res.data['data'], [])
 
         route = "/api/engineering/?filter_json={%22client%22:%22client2%22,%22assignment%22:%22assigned%22}"
         res = self.client.get(route)
@@ -268,3 +323,139 @@ class ProjectUpdateViewSetTest(APITestCase):
         res = self.client.put(route, data={'file': 'file'})
         self.assertEqual(res.status_code, 202)
         self.assertNotEqual(len(res.data['message']), "Document is uploaded")
+
+        attachment = Attachment.objects.all()
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/{self.project_update.id}/remove_document/"
+        res = self.client.put(route, data={'attachment_id': attachment.first().id})
+        self.assertEqual(res.status_code, 202)
+        self.assertNotEqual(len(res.data['message']), "Document removed")
+
+
+class ProjectSummaryViewSetTest(APITestCase):
+    def setUp(self):
+        self.setup = Setup()
+        self.setup.projects_setup(2)
+        self.project_summary = self.setup.project_description(self.setup.project_ids[0])
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.setup.user)
+
+    def test_list(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/"
+        res = self.client.get(route)
+        self.assertNotEqual(res.data['data'], {})
+        self.assertEqual(res.status_code, 200)
+
+    def test_create(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/"
+        res = self.client.post(route, data={"notes":"test notes"})
+        self.assertNotEqual(res.data['data'], {})
+        self.assertEqual(res.status_code, 201)
+
+        description = ProjectDescription.objects.get(id=res.data['data']['id'])
+        description.delete()
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/"
+        res = self.client.post(route)
+        self.assertNotEqual(res.data['data'], {})
+        self.assertEqual(res.status_code, 201)
+
+        description = ProjectDescription.objects.get(id=res.data['data']['id'])
+        description.delete()
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/"
+        res = self.client.post(route, data={"remark": "test remark"})
+        self.assertNotEqual(res.data['data'], {})
+        self.assertEqual(res.status_code, 201)
+
+    def test_update(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/{self.project_summary.id}/"
+        res = self.client.put(route, data={"notes":"test notes"})
+        self.assertEqual(res.data['message'], "Project description updated")
+        self.assertEqual(res.status_code, 202)
+
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/{self.project_summary.id}/"
+        res = self.client.put(route, data={"remark" : "test remark"})
+        self.assertEqual(res.data['message'], "Project description updated")
+        self.assertEqual(res.status_code, 202)
+
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/{self.project_summary.id}/"
+        res = self.client.put(route)
+        self.assertEqual(res.data['message'], "Project description updated")
+        self.assertEqual(res.status_code, 202)
+
+    def test_technology(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/technology/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('Python', res.data['data'])
+
+    def test_resource(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/resource/"
+        res = self.client.put(route, data={"resource": "resource content"})
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], "Project description updated")
+
+        route = f"/api/project/{self.setup.project_ids[0]}/summary/resource/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data']['resource'], "resource content")
+
+
+class TrainingAgendaTest(APITestCase):
+    def setUp(self):
+        self.setup = Setup()
+        self.setup.projects_setup(2)
+        self.training = self.setup.training_agenda(self.setup.project_ids[0])
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.setup.user)
+
+    def test_list(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/training/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertNotEqual(res.data['data'], [])
+
+    def test_create(self):
+        data = {
+            "duration": "2 weeks",
+            "assignment_given": True,
+            "remark": "test remark content",
+            "description": "test description",
+        }
+        route = f"/api/project/{self.setup.project_ids[0]}/training/"
+        res = self.client.post(route, data)
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['message'], "Agenda added")
+
+    def test_update(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/training/{self.training.id}/"
+        res = self.client.put(route, data={"remark": "remark content",})
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], "Agenda updated")
+
+    def test_destroy(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/training/{self.training.id}/"
+        res = self.client.delete(route)
+        self.assertEqual(res.status_code, 204)
+        self.assertEqual(res.data['message'], "Agenda Deleted")
+
+
+class TrainingCheckListTest(APITestCase):
+    def setUp(self):
+        self.setup = Setup()
+        self.setup.projects_setup(2)
+        self.checklist = self.setup.training_check_list(self.setup.project_ids[0])
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.setup.user)
+
+    def test_list(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/checklist/"
+        res = self.client.get(route)
+        self.assertEqual(res.status_code, 200)
+        self.assertNotEqual(res.data['data'], [])
+
+    def test_update(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/checklist/{self.checklist.id}/"
+        res = self.client.put(route, data={"remark": "remark content",})
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.data['message'], "Checklist updated")
