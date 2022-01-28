@@ -97,6 +97,40 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         ).count()
                     },
                 },
+                "project_status": {
+                    "new": {
+                        "display_name": "New",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='new').count(),
+                    },
+                    "received": {
+                        "display_name": "Received",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='received').count(),
+                    },
+                    "on_boarded": {
+                        "display_name": "On Boarded",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='on_boarded').count(),
+                    },
+                    "joined": {
+                        "display_name": "Joined",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='joined').count(),
+                    },
+                    "complete": {
+                        "display_name": "Complete",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='complete').count(),
+                    },
+                    "cancelled": {
+                        "display_name": "Cancelled",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='cancelled').count(),
+                    },
+                    "terminated": {
+                        "display_name": "Terminated",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='terminated').count(),
+                    }
+                }
             }
 
             if filter_json:

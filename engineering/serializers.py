@@ -20,13 +20,14 @@ class EngineeringSerializer(serializers.ModelSerializer):
     support = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
-    project_status = serializers.SerializerMethodField()
     support_status = serializers.SerializerMethodField()
+    project_status = serializers.SerializerMethodField()
+    assignment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
-                  'remark')
+                  'remark', 'assignment_status')
 
     @staticmethod
     def get_project_status(obj):
@@ -38,9 +39,6 @@ class EngineeringSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support(obj):
         data = []
-        if obj.created.date() < datetime.date(2021, 10, 1):
-            return "Old Projects"
-
         for support in obj.support.filter(end=None):
             data.append({
                 "email": support.support.email,
@@ -92,7 +90,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
             qs = support_qs.first().statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date >= date.today():
+                if obj.start_date and obj.start_date >= date.today():
                     return "Training"
                 elif support_status.frequency == 'more_than_2_days':
                     return "Active"
@@ -104,7 +102,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
             qs = support.latest('start').statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date >= date.today():
+                if obj.start_date and obj.start_date >= date.today():
                     return "Training"
                 elif support_status.frequency == 'more_than_2_days':
                     return "Active"
@@ -113,6 +111,15 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 elif support_status.frequency in ('twice_a_month', 'independent'):
                     return "Independent"
         return None
+
+    @staticmethod
+    def get_assignment_status(obj):
+        if obj.created.date() < datetime.date(2021, 10, 1):
+            return "Old Project"
+        if obj.support.all():
+            return "Assigned"
+        else:
+            return "Unassigned"
 
 
 class EngineeringDetailSerializer(serializers.ModelSerializer):
