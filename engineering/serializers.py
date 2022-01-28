@@ -1,3 +1,4 @@
+import datetime
 from datetime import date
 from rest_framework import serializers
 
@@ -37,11 +38,20 @@ class EngineeringSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support(obj):
         data = []
-        for support in obj.support.all():
+        if obj.created.date() < datetime.date(2021, 10, 1):
+            return "Old Projects"
+
+        for support in obj.support.filter(end=None):
             data.append({
                 "email": support.support.email,
                 "name": support.support.employee_name,
             })
+        if len(data) < 1:
+            for support in obj.support.all():
+                data.append({
+                    "email": support.support.email,
+                    "name": support.support.employee_name,
+                })
         return data
 
     @staticmethod
@@ -77,11 +87,12 @@ class EngineeringSerializer(serializers.ModelSerializer):
             return 'terminated'
 
         support_qs = obj.support.filter(end=None)
+        support = obj.support.all()
         if support_qs:
             qs = support_qs.first().statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date > date.today():
+                if obj.start_date >= date.today():
                     return "Training"
                 elif support_status.frequency == 'more_than_2_days':
                     return "Active"
@@ -89,8 +100,18 @@ class EngineeringSerializer(serializers.ModelSerializer):
                     return "Less Active"
                 elif support_status.frequency in ('twice_a_month', 'independent'):
                     return "Independent"
-                else:
-                    return None
+        elif support:
+            qs = support.latest('start').statuses.filter(is_current=True)
+            if qs:
+                support_status = qs.first()
+                if obj.start_date >= date.today():
+                    return "Training"
+                elif support_status.frequency == 'more_than_2_days':
+                    return "Active"
+                elif support_status.frequency == 'less_than_3_days':
+                    return "Less Active"
+                elif support_status.frequency in ('twice_a_month', 'independent'):
+                    return "Independent"
         return None
 
 

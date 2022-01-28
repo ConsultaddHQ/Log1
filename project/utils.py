@@ -27,7 +27,6 @@ def set_consultant_password(consultant):
         write_exception(message=error)
 
 
-# Creating consultant object from user for remote
 def create_remote_consultant(request):
     try:
         remote_consultant_id = request.data.get('remote_consultant_id', None)
@@ -174,11 +173,11 @@ class ProjectUtil:
             if self.project.is_remote or self.project.submission.lead.is_w2:
                 activity_title = f"***{self.project.consultant.name.strip()}*** joined ***Remote*** project at " \
                                  f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title}***"
+                                 f"***{self.project.submission.lead.job_title.strip()}***"
             else:
                 activity_title = f"***{self.consultant.name.strip()}*** joined project at " \
                                  f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title}***"
+                                 f"***{self.project.submission.lead.job_title.strip()}***"
 
             profile_path = get_profile_picture(self.user)
             data = {
@@ -319,7 +318,7 @@ class ProjectUtil:
             months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
             activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title}***, terminated from " \
+                                 f"***{self.project.submission.lead.job_title.strip()}***, terminated from " \
                                  f"***{self.project.submission.client}*** with the end date of ***{self.project_end}***"
             profile_path = get_profile_picture(self.user)
             data = {
@@ -369,8 +368,8 @@ class ProjectUtil:
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
 
             activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title}***, cancelled at " \
-                                 f"***{self.project.submission.client}***"
+                                 f"***{self.project.submission.lead.job_title.strip()}***, cancelled at " \
+                                 f"***{self.project.submission.client.strip()}***"
             profile_path = get_profile_picture(self.user)
             data = {
                 "@type": "MessageCard",
@@ -461,9 +460,9 @@ def send_support_mail(project, support, request):
         project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
 
         mail_data = {
-            'template': '../templates/support.html',
             'to': to, 'cc': cc, 'bcc': [],
-            'subject': f"{consultant.name}'s Support Initiated for  {submission.client} {support.employee_name}",
+            'template': '../templates/support.html',
+            'subject': f"Initiate support for {consultant.name} :: {submission.client} :: {support.employee_name}",
             'context': {
                 'marketer_name': submission.created_by.employee_name,
                 'location': submission.lead.city, 'job_title': submission.lead.job_title,
