@@ -42,6 +42,7 @@ class ProjectUpdate(TimeStampedModel):
     update_by = models.ForeignKey(User, on_delete=models.CASCADE)
     update = models.TextField(_("̈Update"), null=True, blank=True)
     blocker = models.TextField(_("Blocker"), null=True, blank=True)
+    blocker_resolved = models.BooleanField(_('Blocker Resolved'), null=True, default=None)
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='updates')
     type = models.CharField(_('Update Type'), choices=UPDATE_TYPES, max_length=20, null=True)
 

@@ -57,18 +57,6 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     if filters['assignment'] == 'unassigned':
                         projects = projects.filter(support=None)
 
-                if 'project_status' in filters:
-                    if filters['project_status'] in ['terminated', 'cancelled']:
-                        projects = Project.objects.filter(
-                            statuses__is_current=True,
-                            statuses__status__istartswith=filters['project_status'],
-                        )
-                    else:
-                        projects = projects.filter(
-                            statuses__is_current=True,
-                            statuses__status__istartswith=filters['project_status'],
-                        )
-
             if filter_for == 'my':
                 projects = projects.filter(support__support=request.user)
 
@@ -109,6 +97,40 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         ).count()
                     },
                 },
+                "project_status": {
+                    "new": {
+                        "display_name": "New",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='new').count(),
+                    },
+                    "received": {
+                        "display_name": "Received",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='received').count(),
+                    },
+                    "on_boarded": {
+                        "display_name": "On Boarded",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='on_boarded').count(),
+                    },
+                    "joined": {
+                        "display_name": "Joined",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='joined').count(),
+                    },
+                    "complete": {
+                        "display_name": "Complete",
+                        "count": projects.filter(statuses__is_current=True, statuses__status='complete').count(),
+                    },
+                    "cancelled": {
+                        "display_name": "Cancelled",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='cancelled').count(),
+                    },
+                    "terminated": {
+                        "display_name": "Terminated",
+                        "count": projects.filter(
+                            statuses__is_current=True,
+                            statuses__status__istartswith='terminated').count(),
+                    }
+                }
             }
 
             if filter_json:
@@ -172,7 +194,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     {'name': 'active', 'display_name': 'Active'},
                     {'name': 'less_active', 'display_name': 'Less Active'},
                     {'name': 'independent', 'display_name': 'Independent'},
-                ],
+                ]
             }
             return Response({"data": data}, status=200)
         except Exception as error:
@@ -260,8 +282,8 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def create(self, request, *args, **kwargs):
         try:
             data = request.data.copy()
-            data['project'] = kwargs.get('project_id')
             data['update_by'] = request.user.id
+            data['project'] = kwargs.get('project_id')
             serializer = self.serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -309,6 +331,22 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
+
+    @action(methods=['put'], detail=True, url_path='blocker')
+    def blocker(self, request, *args, **kwargs):
+        try:
+            update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            update.blocker_resolved = request.data.get('blocker_resolved', None)
+            update.save()
+
+            # Activity
+            if update.blocker_resolved:
+                desc = f"{request.user.employee_name} edited Project Update-{update.id} and marked blocker resolved."
+                create_activity(update.id, 'projectupdate', request.user, desc, 'update')
+            return Response({"message": "Project update edited successfully"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['put'], detail=True, url_path='add_document')
     def add_document(self, request, *args, **kwargs):

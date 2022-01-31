@@ -6,7 +6,7 @@ from engineering.models import ProjectDescription, ProjectUpdate, TrainingAgenda
 @admin.register(ProjectUpdate)
 class ProjectUpdateAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_display = ('id', 'update', 'blocker', 'project', 'type', 'start', 'end')
+    list_display = ('id', 'update', 'blocker', 'blocker_resolved', 'project', 'type', 'start', 'end')
 
 
 @admin.register(ProjectDescription)

@@ -791,6 +791,7 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
 
 # Route - /login/
 class LoginViewSet(GenericViewSet, CreateModelMixin):
+    serializer_class = UserSerializer
     queryset = User.objects.all()
 
     def create(self, request, *args, **kwargs):
