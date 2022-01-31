@@ -19,7 +19,6 @@ from project.utils import fetch_scrum_masters
 from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
-from notification.utils import create_notification, push_notification
 from project.models import ProjectStatus, ConsultantFeedback, FEEDBACK_CHOICES
 from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 

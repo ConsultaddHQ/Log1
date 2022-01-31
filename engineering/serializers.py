@@ -30,6 +30,13 @@ class EngineeringSerializer(serializers.ModelSerializer):
                   'remark', 'assignment_status')
 
     @staticmethod
+    def get_remark(obj):
+        if hasattr(obj, 'description'):
+            remark = obj.description.remark
+            return remark
+        return None
+
+    @staticmethod
     def get_project_status(obj):
         status = obj.statuses.filter(is_current=True)
         if status:
@@ -37,27 +44,13 @@ class EngineeringSerializer(serializers.ModelSerializer):
         return None
 
     @staticmethod
-    def get_support(obj):
-        data = []
-        for support in obj.support.filter(end=None):
-            data.append({
-                "email": support.support.email,
-                "name": support.support.employee_name,
-            })
-        if len(data) < 1:
-            for support in obj.support.all():
-                data.append({
-                    "email": support.support.email,
-                    "name": support.support.employee_name,
-                })
-        return data
-
-    @staticmethod
-    def get_remark(obj):
-        if hasattr(obj, 'description'):
-            remark = obj.description.remark
-            return remark
-        return None
+    def get_assignment_status(obj):
+        if obj.created.date() < datetime.date(2021, 10, 1):
+            return "Old Project"
+        if obj.support.exists():
+            return "Assigned"
+        else:
+            return "Unassigned"
 
     @staticmethod
     def get_submission(obj):
@@ -78,6 +71,22 @@ class EngineeringSerializer(serializers.ModelSerializer):
             'email': consultant.email,
             'location': consultant.current_city
         }
+
+    @staticmethod
+    def get_support(obj):
+        data = []
+        for support in obj.support.filter(end=None):
+            data.append({
+                "email": support.support.email,
+                "name": support.support.employee_name,
+            })
+        if len(data) < 1:
+            for support in obj.support.all():
+                data.append({
+                    "email": support.support.email,
+                    "name": support.support.employee_name,
+                })
+        return data
 
     @staticmethod
     def get_support_status(obj):
@@ -111,15 +120,6 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 elif support_status.frequency in ('twice_a_month', 'independent'):
                     return "Independent"
         return None
-
-    @staticmethod
-    def get_assignment_status(obj):
-        if obj.created.date() < datetime.date(2021, 10, 1):
-            return "Old Project"
-        if obj.support.all():
-            return "Assigned"
-        else:
-            return "Unassigned"
 
 
 class EngineeringDetailSerializer(serializers.ModelSerializer):
