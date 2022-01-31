@@ -180,6 +180,15 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def filters(self, request):
         try:
             data = {
+                "project_status": [
+                    {'name': 'new', 'display_name': 'New'},
+                    {'name': 'received', 'display_name': 'Received'},
+                    {'name': 'on_boarded', 'display_name': 'On Boarded'},
+                    {'name': 'joined', 'display_name': 'Joined'},
+                    {'name': 'complete', 'display_name': 'Complete'},
+                    {'name': 'cancelled', 'display_name': 'Cancelled'},
+                    {'name': 'terminated', 'display_name': 'Terminated'},
+                ],
                 "support_status": [
                     {'name': 'training', 'display_name': 'Training'},
                     {'name': 'active', 'display_name': 'Active'},
