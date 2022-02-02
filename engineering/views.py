@@ -51,6 +51,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 if 'client' in filters:
                     projects = projects.filter(submission__client__iexact=filters['client'])
 
+                if 'status' in filters:
+                    projects = projects.filter(statuses__status=filters['status'], statuses__is_current=True)
+
                 if 'assignment' in filters:
                     if filters['assignment'] == 'assigned':
                         projects = projects.exclude(support=None)
@@ -336,7 +339,8 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def blocker(self, request, *args, **kwargs):
         try:
             update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
-            update.blocker_resolved = request.data.get('blocker_resolved', None)
+            update.blocker_resolved = request.data.get('blocker_resolved', update.blocker_resolved)
+            update.blocker_solution = request.data.get('blocker_solution', update.blocker_solution)
             update.save()
 
             # Activity
