@@ -79,7 +79,7 @@ class PetitionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Petition
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'status',
-                  'total_documents', 'uploaded_documents')
+                  'total_documents', 'uploaded_documents', 'expiry_date')
 
     @staticmethod
     def get_consultant(obj):
