@@ -1,16 +1,14 @@
 import json
-import os
 from datetime import date
 from django.contrib.auth.models import ContentType
 from rest_framework.test import APITestCase, APIClient
 
 from activity.models import Activity
-from attachment.models import Attachment
 from employee.models import User, Team, Role
 from project.models import Project
 from utils_app.models import Choice, ObjectGroup, Field
 from consultant.factories import Setup as consultant_setup
-from marketing.models import Submission, Lead, VendorCompany, VendorContact, Test, Interview, VendorLayer
+from marketing.models import Submission, Lead, VendorCompany, VendorContact, Test, Interview
 
 
 class Setup:
@@ -58,14 +56,10 @@ class Setup:
         position = Choice.objects.create(name="SDE", display_name="Software Developer",
                                          content_type=content_type, field="position",)
         lead = Lead.objects.create(
-            owner=data['user'],
-            status=data.get("status", "Submitted"),
-            city=data.get("city", "New York, US"),
-            position=data.get("position", position),
-            vendor_company=data.get("vendor_company"),
-            job_desc=data.get("job_desc", "Job Description"),
-            primary_skill=data.get("primary_skill", "Python"),
-            job_title=data.get("job_title","Python Developer"),
+            owner=data['user'], status=data.get("status", "Submitted"),
+            city=data.get("city", "New York, US"), position=data.get("position", position),
+            vendor_company=data.get("vendor_company"), job_desc=data.get("job_desc", "Job Description"),
+            primary_skill=data.get("primary_skill", "Python"), job_title=data.get("job_title","Python Developer"),
         )
         return lead
 
@@ -89,7 +83,7 @@ class Setup:
     @staticmethod
     def create_test(data):
         return Test.objects.create(
-            link=data.get("link", "test/lisnk"), deadline=data.get("date", date.today()),
+            link=data.get("link", "test/link"), deadline=data.get("date", date.today()),
             status=data.get('status', "assigned"), submit_date=data.get("submit_date", date.today()),
             skills=data.get('skills', ["python"]), submission=data.get("submission"), submitted_by=data.get('user')
         )
@@ -97,15 +91,11 @@ class Setup:
     @staticmethod
     def create_interview(data):
         return Interview.objects.create(
-                round=data.get("round", 0),
-                feedback=data.get("feedback", "feedback text"),
-                supervisor=data.get("user", None),
-                submission=data.get("submission", None),
-                tech_stack=data.get("texh_stack", "java, python"),
-                coding_present=data.get("coding", True),
-                status=data.get("status", "scheduled"),
-                screening_type=data.get('screening_type', 'interview'),
                 interview_mode=data.get("interview_mode", "skype"),
+                supervisor=data.get("user", None), submission=data.get("submission", None),
+                round=data.get("round", 0), feedback=data.get("feedback", "feedback text"),
+                tech_stack=data.get("tech_stack", "java, python"), coding_present=data.get("coding", True),
+                status=data.get("status", "scheduled"), screening_type=data.get('screening_type', 'interview'),
             )
 
 
@@ -230,8 +220,8 @@ class LeadTest(APITestCase):
         self.assertEqual(res.data["data"]["city"], "East Coast")
 
     def test_fields(self):
-        group = ObjectGroup.objects.create(name="owner", model="lead", status="Submitted")
         field = Field.objects.create(name="status", model="lead", app_label="marketing")
+        group = ObjectGroup.objects.create(name="owner", model="lead", status="Submitted")
         group.fields.add(field)
 
         res = self.client.get(f"/api/lead/{self.lead.id}/fields/")
@@ -278,8 +268,8 @@ class V2SubmissionTest(APITestCase):
         self.assertEqual(res.data["data"]["test"], False)
 
     def test_fields(self):
-        group = ObjectGroup.objects.create(name="owner", model="submission", status="Submitted")
         field = Field.objects.create(name="status", model="submission", app_label="marketing")
+        group = ObjectGroup.objects.create(name="owner", model="submission", status="Submitted")
         group.fields.add(field)
 
         res = self.client.get(f"/api/v2/submission/{self.submission.id}/fields/")
@@ -300,8 +290,8 @@ class V2SubmissionTest(APITestCase):
     def test_activity(self):
         content_type = ContentType.objects.get(model="submission")
         Activity.objects.create(
-            activity_type='created', user=self.setup.user, desc="activity description",
-            object_id=self.submission.id, content_type=content_type
+            object_id=self.submission.id, content_type=content_type,
+            activity_type='created', user=self.setup.user, desc="activity description"
         )
 
         res = self.client.get(f"/api/v2/submission/{self.submission.id}/activities/")
@@ -358,16 +348,16 @@ class SubmissionTest(APITestCase):
 
     def test_list(self):
         filter_json = {
-            "status": ["Submitted"],
-            "position": [self.submission.lead.position.id],
-            "vendor": [self.submission.lead.vendor_company.id],
             "incomplete": False,
+            "status": ["Submitted"],
             "client": ["client_name"],
             "marketer": [self.setup.user.id],
+            "position": [self.submission.lead.position.id],
+            "vendor": [self.submission.lead.vendor_company.id],
             "consultant": [self.submission.consultant_marketing.consultant.id]
         }
 
-        res = self.client.get(f"/api/submission/?query=python&filter_json={json.dumps(filter_json)}&sort_by=created&filter_for=my")
+        res = self.client.get(f"/api/submission/?query=python&filter_json={json.dumps(filter_json)}&sort_by=created")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"][0]["id"], self.submission.id)
 
@@ -414,12 +404,12 @@ class SubmissionTest(APITestCase):
         self.assertEqual(res.data["data"][0]["client"], "client_name")
 
     def test_did_you_mean(self):
-        res = self.client.get("/api/submission/did_you_mean/?client=client_name&")
+        res = self.client.get("/api/submission/did_you_mean/?client=client_name")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"], ["client_name"])
 
     def test_clients(self):
-        res = self.client.get("/api/submission/client/?query=client_name&")
+        res = self.client.get("/api/submission/client/?query=client_name")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"], ["client_name"])
 
@@ -435,7 +425,8 @@ class VendorLayerTest(APITestCase):
 
     def test_vendor_layer(self):
         data = {"company": self.setup.vendor_company.id, "submission": self.submission.id}
-        res_create = self.client.post(f"/api/vendor_layer/", data=data)
+
+        res_create = self.client.post("/api/vendor_layer/", data=data)
         self.assertEqual(res_create.status_code, 201)
         self.assertEqual(res_create.data['data']['level'], 1)
 
