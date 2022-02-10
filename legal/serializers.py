@@ -113,7 +113,7 @@ class PetitionGetSerializer(serializers.ModelSerializer):
         model = Petition
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'docs', 'reasons',
                   'status', 'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active', 'rfe',
-                  'expiry_date')
+                  'expiry_date', 'is_withdraw')
 
     @staticmethod
     def get_rfe(obj):
