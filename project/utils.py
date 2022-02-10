@@ -155,7 +155,7 @@ class ProjectUtil:
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
-                employer__iexact=self.employer,
+                submission__created_by__team__name=self.project.submission.created_by.team.name,
             ).count()
             return total_count, team_count
         except Exception as error:

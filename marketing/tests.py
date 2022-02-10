@@ -59,7 +59,7 @@ class Setup:
             owner=data['user'], status=data.get("status", "Submitted"),
             city=data.get("city", "New York, US"), position=data.get("position", position),
             vendor_company=data.get("vendor_company"), job_desc=data.get("job_desc", "Job Description"),
-            primary_skill=data.get("primary_skill", "Python"), job_title=data.get("job_title","Python Developer"),
+            primary_skill=data.get("primary_skill", "Python"), job_title=data.get("job_title", "Python Developer"),
         )
         return lead
 
@@ -95,7 +95,7 @@ class Setup:
                 supervisor=data.get("user", None), submission=data.get("submission", None),
                 round=data.get("round", 0), feedback=data.get("feedback", "feedback text"),
                 tech_stack=data.get("tech_stack", "java, python"), coding_present=data.get("coding", True),
-                status=data.get("status", "scheduled"), screening_type=data.get('screening_type', 'interview'),
+                status=data.get("status", "Scheduled"), screening_type=data.get('screening_type', 'interview'),
             )
 
 
@@ -441,3 +441,34 @@ class VendorLayerTest(APITestCase):
 
         res = self.client.delete(f"/api/vendor_layer/{res_create.data['data']['id']}/")
         self.assertEqual(res.status_code, 204)
+
+
+class InterviewTest(APITestCase):
+    def setUp(self):
+        self.setup = Setup()
+        lead = self.setup.create_lead({"user": self.setup.user, "vendor_company": self.setup.vendor_company})
+        submission = self.setup.create_submission({"lead": lead.id})
+        self.interview = self.setup.create_interview({"submission": submission, "user": self.setup.user})
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.setup.user)
+
+    def test_retrieve(self):
+        res = self.client.get(f"/api/interview/{self.interview.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["data"]["id"], self.interview.id)
+
+    def test_list(self):
+        filter_json = {
+            "assignment": "assigned",
+            "coding_interview": "yes",
+            "status": "Scheduled",
+            "ctb": [self.interview.supervisor.id],
+            "client": ["client_name"],
+            "marketer": [self.interview.supervisor.id],
+            "vendor": [self.setup.vendor_company.id],
+            "consultant": [self.interview.submission.consultant_marketing.consultant.id]
+        }
+        res = self.client.get(f"/api/interview/?query={self.interview.id}&filter_json={json.dumps(filter_json)}")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["data"][0]["id"], self.interview.id)
