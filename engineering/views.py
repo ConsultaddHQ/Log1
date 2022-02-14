@@ -133,6 +133,20 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             statuses__is_current=True,
                             statuses__status__istartswith='terminated').count(),
                     }
+                },
+                "assignment_count": {
+                    "all": {
+                        "display_name": "All",
+                        "count": projects.count(),
+                    },
+                    "assigned": {
+                        "display_name": "Assigned",
+                        "count": projects.filter(support__isnull=False, created__gt="2021-10-01").count(),
+                    },
+                    "unassigned": {
+                        "display_name": "Unassigned",
+                        "count": projects.filter(support__isnull=True, created__gt="2021-10-01").count(),
+                    }
                 }
             }
 
@@ -197,6 +211,11 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     {'name': 'active', 'display_name': 'Active'},
                     {'name': 'less_active', 'display_name': 'Less Active'},
                     {'name': 'independent', 'display_name': 'Independent'},
+                ],
+                "assignment_status": [
+                    {'name': 'all', 'display_name': 'All'},
+                    {'name': 'assigned', 'display_name': 'Assigned'},
+                    {'name': 'unassigned', 'display_name': 'Unassigned'},
                 ]
             }
             return Response({"data": data}, status=200)
