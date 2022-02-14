@@ -136,6 +136,7 @@ class ProjectUtil:
         self.statuses = fetch_project_status()
         self.consultant = project.submission.consultant_marketing.consultant
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
+        self.team_name = project.submission.created_by.team.name
         if project.end_date:
             self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
         if self.project.employer:
@@ -155,7 +156,7 @@ class ProjectUtil:
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
-                submission__created_by__team__name=self.project.submission.created_by.team.name,
+                submission__created_by__team__name=self.team_name,
             ).count()
             return total_count, team_count
         except Exception as error:
@@ -208,10 +209,10 @@ class ProjectUtil:
                 }],
                 "potentialAction": [{
                     "@type": "ActionCard",
-                    "name": f"{self.employer} - {team}",
+                    "name": f"{self.team_name} - {team}",
                     "actions": [{
                         "@type": "HttpPOST",
-                        "name": f"{self.employer} - {team}",
+                        "name": f"{self.team_name} - {team}",
                         "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
                     }]
                 }, {

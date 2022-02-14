@@ -149,7 +149,7 @@ class PetitionViewSets(ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=202)
+            return Response({"result": serializer.data, "message": "Petition Updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -549,7 +549,7 @@ class PetitionViewSets(ModelViewSet):
     def withdraw(self, request, pk):
         try:
             petition = get_object_or_404(Petition, id=pk)
-            petition.is_withdraw = request.data.get("withdraw", True)
+            petition.is_withdraw = True
             petition.save()
             return Response({"message": "Withdraw Successfully"}, status=202)
         except Exception as error:
