@@ -56,9 +56,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
                 if 'assignment' in filters:
                     if filters['assignment'] == 'assigned':
-                        projects = projects.exclude(support=None)
+                        projects = projects.filter(support__isnull=False, created__gt="2021-10-01")
                     if filters['assignment'] == 'unassigned':
-                        projects = projects.filter(support=None)
+                        projects = projects.filter(support__isnull=True, created__gt="2021-10-01")
 
             if filter_for == 'my':
                 projects = projects.filter(support__support=request.user)
@@ -137,7 +137,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "assignment_count": {
                     "all": {
                         "display_name": "All",
-                        "count": projects.count(),
+                        "count": Project.objects.filter(
+                            statuses__is_current=True, statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
+                        ).count(),
                     },
                     "assigned": {
                         "display_name": "Assigned",

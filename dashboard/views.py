@@ -92,6 +92,10 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 last = date.today().replace(day=1) - timedelta(days=1)
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
+            elif filter_by_time == 'last_12_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
+                first = last + timedelta(days=1) + relativedelta(months=-12)
+
             else:
                 # this_month
                 first = date.today().replace(day=1)
@@ -158,6 +162,14 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
                 prev_last = last + relativedelta(months=-6)
                 prev_first = first + relativedelta(months=-6)
+
+            elif filter_by_time == 'last_12_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
+                first = last + timedelta(days=1) + relativedelta(months=-12)
+
+                prev_last = last + relativedelta(months=-12)
+                prev_first = first + relativedelta(months=-12)
+
             else:
                 # this_month
                 last = date.today()
