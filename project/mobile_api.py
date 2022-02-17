@@ -409,7 +409,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             timesheet = get_object_or_404(
                 TimeSheet, id=kwargs.get('pk', None),
                 project__consultant=request.user,
-                status__in=['draft', 'rejected'],
+                status__in=['draft', 'rejected', 'submitted'],
                 is_active=True,
             )
             timesheet_id = timesheet.id
