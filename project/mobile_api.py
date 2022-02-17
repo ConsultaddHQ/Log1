@@ -394,7 +394,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
             queryset = TimeSheet.objects.filter(
-                project=project, status__in=['draft', 'rejected'], is_active=True
+                project=project, status__in=['draft', 'rejected', 'submitted'], is_active=True
             ).order_by('end')
             serializer = self.serializer_class(queryset, many=True)
             return Response({"result": serializer.data}, status=200)
