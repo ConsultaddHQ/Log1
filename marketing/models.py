@@ -8,7 +8,7 @@ from employee.models import User
 from activity.models import Comment
 from attachment.models import Attachment
 from consultant.models import ConsultantMarketing
-from utils_app.models import TimeStampedModel, Choice
+from utils_app.models import TimeStampedModel, Choice, Field
 
 STATUS_CHOICES = (
     ('new', 'New'),
@@ -337,24 +337,9 @@ class TestFeedback(TimeStampedModel):
         return f'{self.submitted_by.employee_name} test feedback'
 
 
-class TestFeedbackTemplate(models.Model):
-    name = models.CharField(_('Name'), max_length=30)
-    fields = models.ManyToManyField(Choice, blank=True)
-    is_active = models.BooleanField(_('Is Active'), default=True)
-    display_name = models.CharField(_('Display name'), max_length=30)
-    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='feedback_templates')
-
-    class Meta:
-        ordering = ('-created',)
-
-    def __str__(self):
-        return f'{self.display_name}'
-
-
-class TestFeedbackValue(TimeStampedModel):
+class FeedbackAttribute(TimeStampedModel):
     value = models.TextField(_('Value'), null=True, blank=True)
-    field = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name='values')
+    attribute = models.ForeignKey(Field, on_delete=models.PROTECT, related_name='values')
     feedback = models.ForeignKey(
         TestFeedback, on_delete=models.CASCADE,
         null=True, blank=True, related_name='values',
@@ -367,10 +352,10 @@ class TestFeedbackValue(TimeStampedModel):
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
-        return super(TestFeedbackValue, self).save(*args, **kwargs)
+        return super(FeedbackAttribute, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.field.display_name}: {self.feedback}'
+        return f'{self.field.name}: {self.feedback}'
 
 
 class Interview(TimeStampedModel):

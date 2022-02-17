@@ -8,8 +8,7 @@ from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
-from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, \
-    TestFeedback, TestFeedbackValue, TestFeedbackTemplate
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -527,17 +526,3 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_check_list(obj):
         return get_project_check_list(obj)
-
-
-class ChoiceNameSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Choice
-        fields = ('id', 'name', 'display_name', 'description')
-
-
-class TestFeedbackTemplateSerializer(serializers.ModelSerializer):
-    fields = ChoiceNameSerializer(many=True)
-
-    class Meta:
-        model = TestFeedbackTemplate
-        fields = ('id', 'name', 'fields', 'type')
