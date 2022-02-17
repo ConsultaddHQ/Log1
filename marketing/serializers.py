@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from utils_app.models import Choice
 from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
@@ -7,7 +8,8 @@ from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
-from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, \
+    TestFeedback, TestFeedbackValue, TestFeedbackTemplate
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -525,3 +527,17 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_check_list(obj):
         return get_project_check_list(obj)
+
+
+class ChoiceNameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Choice
+        fields = ('id', 'name', 'display_name', 'description')
+
+
+class TestFeedbackTemplateSerializer(serializers.ModelSerializer):
+    fields = ChoiceNameSerializer(many=True)
+
+    class Meta:
+        model = TestFeedbackTemplate
+        fields = ('id', 'name', 'fields', 'type')

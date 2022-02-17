@@ -310,6 +310,69 @@ class Test(TimeStampedModel):
         return self.submission.created_by
 
 
+class TestFeedback(TimeStampedModel):
+    attachments = GenericRelation(Attachment)
+    is_offline = models.BooleanField(_('Offline Test'), default=False)
+    test = models.ForeignKey(
+        Test, on_delete=models.PROTECT,
+        related_name='test',
+        verbose_name='Test'
+    )
+    submitted_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='test_feedback',
+        verbose_name='Feedback Submitted'
+    )
+
+    class Meta:
+        ordering = ('-modified',)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(TestFeedback, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.submitted_by.employee_name} test feedback'
+
+
+class TestFeedbackTemplate(models.Model):
+    name = models.CharField(_('Name'), max_length=30)
+    fields = models.ManyToManyField(Choice, blank=True)
+    is_active = models.BooleanField(_('Is Active'), default=True)
+    display_name = models.CharField(_('Display name'), max_length=30)
+    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='feedback_templates')
+
+    class Meta:
+        ordering = ('-created',)
+
+    def __str__(self):
+        return f'{self.display_name}'
+
+
+class TestFeedbackValue(TimeStampedModel):
+    value = models.TextField(_('Value'), null=True, blank=True)
+    field = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name='values')
+    feedback = models.ForeignKey(
+        TestFeedback, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='values',
+    )
+
+    class Meta:
+        ordering = ('-modified',)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(TestFeedbackValue, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.field.display_name}: {self.feedback}'
+
+
 class Interview(TimeStampedModel):
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)

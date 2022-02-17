@@ -2520,3 +2520,160 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class EvaluationTemplateViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = TestFeedbackTemplate.objects.all()
+    authentication_classes = (TokenAuthentication,)
+    serializer_class = TestFeedbackTemplateSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            template_id = kwargs.get('pk', None)
+            template = get_object_or_404(TestFeedbackTemplate, id=template_id, is_active=True)
+            serializer = self.serializer_class(template)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            template = TestFeedbackTemplate.objects.filter(is_active=True)
+            data = template.values('id', 'name', 'display_name')
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class EvaluationViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, CreateModelMixin, UpdateModelMixin):
+    queryset = Evaluation.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = EvaluationSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            evaluations = Evaluation.objects.filter(candidate_id=kwargs.get('id'))
+            serializer = self.serializer_class(evaluations, many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            evaluation = get_obj_or_404(Evaluation, id=kwargs.get('pk'))
+            serializer = EvaluationDetailSerializer(evaluation)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            user_id = request.user.id
+            candidate_id = kwargs.get('id')
+            eval_type_id = request.data.get('type', None)
+            candidate = get_obj_or_404(Candidate, id=candidate_id)
+            eval_type = EvaluationTemplate.objects.filter(id=eval_type_id)
+            if not eval_type:
+                return Response({"message": "Evaluation type not found"}, status=404)
+
+            evaluation = Evaluation.objects.create(
+                created_by_id=user_id,
+                candidate_id=candidate_id,
+                type=eval_type.first().display_name,
+                verdict=request.data.get('verdict'),
+                rating=request.data.get('rating', 0.0),
+                description=request.data.get('description'),
+            )
+            field_values = request.data.get('field_values', None)
+            for field in field_values:
+                EvaluationValue.objects.create(
+                    evaluation=evaluation,
+                    field_id=field['field_id'],
+                    value=field['value']
+                )
+
+            # Adding tags
+            tagged_users = request.data.get('tagged_user', [])
+            if len(tagged_users) > 0:
+                tag_data = {
+                    "model": "evaluation",
+                    "users": tagged_users,
+                    "object_id": evaluation.id,
+                }
+
+                create_tag(tag_data)
+
+            # Creating activity
+            event_type = 'created'
+            content_type = ContentType.objects.get(model='evaluation')
+            title = f"{request.user.name} added {evaluation.type} feedback of {evaluation.candidate.name}"
+            activity_notification(user_id, evaluation.candidate, title, event_type, content_type)
+
+            # Email Notification
+            event = 'add_update_evaluation'
+            email_title = "Interview Feedback added"
+            subject = f"Beats - Feedback added for {candidate.name}"
+            send_email_notification(candidate, subject, email_title, title, user_id, event)
+
+            return Response({"message": "Evaluation Created"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            user_id = request.user.id
+            evaluation = get_obj_or_404(Evaluation, id=kwargs.get('pk'))
+            if evaluation.created_by.id != user_id:
+                return Response({"message": ACCESS_DENIED}, status=403)
+
+            serializer = self.serializer_class(evaluation, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+            tagged_users = request.data.get('tagged_user', [])
+            if len(tagged_users) > 0:
+                if evaluation.tags.all():
+                    update_tag(evaluation.tags.first(), tagged_users)
+                else:
+                    tag_data = {
+                        "model": "evaluation",
+                        "users": tagged_users,
+                        "object_id": evaluation.id,
+                    }
+
+                    create_tag(tag_data)
+
+            field_values = request.data.get('field_values', [])
+            for field in field_values:
+                eval_value = EvaluationValue.objects.filter(
+                    evaluation=evaluation,
+                    field_id=field['field_id']
+                )
+                if eval_value:
+                    eval_value = eval_value.first()
+                    eval_value.value = field['value']
+                    eval_value.save()
+
+            # Creating activity
+            event_type = 'updated'
+            content_type = ContentType.objects.get(model='evaluation')
+            title = f"{request.user.name} updated {evaluation.type} feedback of {evaluation.candidate.name}"
+            activity_notification(user_id, evaluation.candidate, title, event_type, content_type)
+
+            # Email Notification
+            event = 'add_update_evaluation'
+            email_title = "Interview Feedback updated"
+            subject = f"Beats - Feedback updated for {evaluation.candidate.name}"
+            send_email_notification(evaluation.candidate, subject, email_title, title, user_id, event)
+
+            return Response({"message": "Evaluation Updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
