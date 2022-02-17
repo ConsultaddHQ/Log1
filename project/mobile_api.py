@@ -95,7 +95,7 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
         try:
             screenshot = False
             zero_hours = request.GET.get('zero_hours', None)
-            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status__in=['draft', 'rejected'],
+            timesheet = get_object_or_404(TimeSheet, id=kwargs.get('pk'), status__in=['draft', 'rejected', 'submitted'],
                                           is_active=True)
             timesheet_id = timesheet.id
             timesheet.status = 'submitted'
