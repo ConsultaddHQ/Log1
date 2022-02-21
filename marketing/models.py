@@ -312,6 +312,7 @@ class Test(TimeStampedModel):
 
 class TestFeedback(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    is_design = models.BooleanField(_('design'), default=False)
     is_offline = models.BooleanField(_('Offline Test'), default=False)
     test = models.ForeignKey(
         Test, on_delete=models.PROTECT,
@@ -320,8 +321,12 @@ class TestFeedback(TimeStampedModel):
     )
     submitted_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
-        related_name='test_feedback',
+        related_name='test_feedback_by',
         verbose_name='Feedback Submitted'
+    )
+    reviewed_by = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name='test_reviewed_by',
+        null=True, blank=True, verbose_name='Feedback Reviewed'
     )
 
     class Meta:
@@ -339,7 +344,7 @@ class TestFeedback(TimeStampedModel):
 
 class FeedbackAttribute(TimeStampedModel):
     value = models.TextField(_('Value'), null=True, blank=True)
-    attribute = models.ForeignKey(Field, on_delete=models.PROTECT, related_name='values')
+    field = models.ForeignKey(Field, on_delete=models.CASCADE, related_name='attribute')
     feedback = models.ForeignKey(
         TestFeedback, on_delete=models.CASCADE,
         null=True, blank=True, related_name='values',

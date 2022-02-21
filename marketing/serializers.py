@@ -8,7 +8,8 @@ from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
-from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, \
+    FeedbackAttribute, TestFeedback
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -526,3 +527,37 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_check_list(obj):
         return get_project_check_list(obj)
+
+
+class FeedbackAttributeSerializer(serializers.ModelSerializer):
+    field = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeedbackAttribute
+        fields = ('id', 'field', 'value')
+
+    @staticmethod
+    def get_field(obj):
+        return obj.field.name
+
+
+class TestFeedbackSerializer(serializers.ModelSerializer):
+    attachments = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
+    attributes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TestFeedback
+        fields = ('id', 'attachments', 'is_offline', 'test', 'attributes', 'submitted_by')
+
+    @staticmethod
+    def get_submitted_by(obj):
+        return obj.submitted_by.employee_name
+
+    @staticmethod
+    def get_attachments(obj):
+        return AttachmentGetSerializer(obj.attachments.all(), many=True).data
+
+    @staticmethod
+    def get_attributes(obj):
+        return FeedbackAttributeSerializer(FeedbackAttribute.objects.filter(feedback=obj), many=True).data

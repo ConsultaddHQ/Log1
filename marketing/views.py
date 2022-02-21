@@ -17,7 +17,6 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
-from marketing.models import TestFeedback, FeedbackAttribute
 from utils_app.models import Field
 from marketing.serializers import *
 from activity.models import Activity
@@ -2457,78 +2456,83 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['put'], detail=True, url_path='feedback')
+    @action(methods=['post', 'get'], detail=True, url_path='feedback')
     def submit_test_feedback(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
-            feedback = TestFeedback.objects.create(
-                test=test,
-                submitted_by=request.user,
-                is_offline=request.data.get('is_offline', False),
-            )
-            field_values = request.data.get('field_values', None)
-            for field in field_values:
-                attribute = Field.objects.get(name=field['name'])
-                FeedbackAttribute.objects.create(
-                    feedback=feedback,
-                    attribute=attribute,
-                    value=field['value'],
+            if request.method == 'GET':
+                try:
+                    test = get_object_or_404(Test, id=pk)
+                    feedback = TestFeedback.objects.filter(test=test)
+                    serializer = TestFeedbackSerializer(feedback, many=True)
+                    return Response({"data": serializer.data}, status=200)
+                except Exception as error:
+                    return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+            else:
+                test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
+                feedback = TestFeedback.objects.create(
+                    test=test,
+                    submitted_by=request.user,
+                    is_offline=request.data.get('is_offline', False),
                 )
+                field_values = request.data.get('field_values', None)
+                for field in field_values:
+                    attribute = Field.objects.get(name=field['name'], model="testfeedback", app_label='marketing')
+                    FeedbackAttribute.objects.create(feedback=feedback, field=attribute, value=field['value'])
 
-            # Activity
-            desc = f"Test status updated to {test.get_status_display()} by {request.user.employee_name}"
-            create_activity(test.submission.id, 'submission', request.user, desc, 'update')
+                # Activity
+                desc = f"Test status updated to {test.get_status_display()} by {request.user.employee_name}"
+                create_activity(test.submission.id, 'submission', request.user, desc, 'update')
 
-            file = request.FILES.get('file')
-            if file:
-                file_data = {
-                    "file": file,
-                    "type": 'test_feedback',
-                    "object_id": test.id,
-                    "model": "testfeedback",
-                    "creator": request.user,
+                file = request.FILES.get('file')
+                if file:
+                    file_data = {
+                        "file": file,
+                        "type": 'test_feedback',
+                        "object_id": test.id,
+                        "model": "testfeedback",
+                        "creator": request.user,
+                    }
+                    create_attachment(file_data)
+                # App Notification
+                user_list = [user for user in test.engineer.all()]
+                user_list.append(test.submitted_by)
+                title = f"Feedback Added for Test :: {test.submission.consultant.name}"
+
+                notification_data = {
+                    'title': title,
+                    'category': 'alert',
+                    'description': title,
+                    'target_type': 'user',
+                    'sender_user_type': 'user',
+                    'parent_type': 'submission',
+                    'sender_id': request.user.id,
+                    'recipient_user_type': 'user',
+                    'parent_id': test.submission.id,
+                    'target_id': test.submitted_by.id,
                 }
-                create_attachment(file_data)
-            # App Notification
-            user_list = [user for user in test.engineer.all()]
-            user_list.append(test.submitted_by)
-            title = f"Feedback Added for Test :: {test.submission.consultant.name}"
+                create_notification(user_list, notification_data)
 
-            notification_data = {
-                'title': title,
-                'category': 'alert',
-                'description': title,
-                'target_type': 'user',
-                'sender_user_type': 'user',
-                'parent_type': 'submission',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'parent_id': test.submission.id,
-                'target_id': test.submitted_by.id,
-            }
-            create_notification(user_list, notification_data)
+                # Push Notification
+                message_body = {
+                    "body": title,
+                    "title": title,
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "https://app.log1.com",
+                    "data": {
+                        'target': 'test',
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target_id': test.id,
+                        'timestamp': str(datetime.now()),
+                    },
+                }
 
-            # Push Notification
-            message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "data": {
-                    'target': 'test',
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target_id': test.id,
-                    'timestamp': str(datetime.now()),
-                },
-            }
+                object_ids = [user.id for user in user_list]
+                push_notification(object_ids, message_body)
 
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
-
-            serializer = TestCreateSerializer(test)
-            return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)
+                return Response({"message": "Test feedback added"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

@@ -1,7 +1,8 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
-from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, Test
+from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
+    Test, TestFeedback, FeedbackAttribute
 # InterviewGuest
 
 
@@ -110,6 +111,22 @@ class TestAdmin(ExportActionModelAdmin):
                      'submission__created_by__employee_name', 'is_offline')
     list_display = ('id', 'submission', 'status', 'skills', 'is_video', 'is_offline', 'deadline', 'submit_date',
                     'submitted_by', 'feedback', 'cancel_reason')
+
+
+@admin.register(TestFeedback)
+class TestFeedbackAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_filter = ('is_offline', )
+    search_fields = ('id','submitted_by__employee_name', 'is_offline')
+    list_display = ('id', 'is_offline', 'test', 'submitted_by', 'created', 'modified')
+
+
+@admin.register(FeedbackAttribute)
+class FeedbackAttributeAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_filter = ('field__name', 'feedback__submitted_by__employee_name')
+    search_fields = ('id', 'field__name', 'value', 'feedback__submitted_by__employee_name')
+    list_display = ('id', 'value', 'field', 'feedback', 'created', 'modified')
 
 #
 # @admin.register(InterviewGuest)
