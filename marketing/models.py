@@ -284,7 +284,7 @@ class Question(TimeStampedModel):
 class Answer(TimeStampedModel):
     submitted_by = models.ForeignKey(User, on_delete=models.CASCADE)
     value = models.CharField(_('Value'), max_length=100, null=True, blank=True)
-    question = models.OneToOneField(Question, on_delete=models.CASCADE, related_name='answer')
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
 
     object_id = models.PositiveIntegerField(_('Object Id'), )
     content_object = GenericForeignKey('content_type', 'object_id')

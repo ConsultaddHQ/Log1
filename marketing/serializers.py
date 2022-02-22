@@ -1,6 +1,5 @@
 from rest_framework import serializers
 
-from utils_app.models import Choice
 from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
@@ -8,7 +7,7 @@ from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
-from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, Answer
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -526,3 +525,20 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_check_list(obj):
         return get_project_check_list(obj)
+
+
+class AnswerSerializer(serializers.ModelSerializer):
+    question = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Answer
+        fields = ('id', 'question', 'value', 'submitted_by', 'created', 'object_id')
+
+    @staticmethod
+    def get_submitted_by(obj):
+        return obj.submitted_by.employee_name
+
+    @staticmethod
+    def get_question(obj):
+        return obj.question.name
