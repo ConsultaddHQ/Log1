@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation
@@ -259,8 +260,50 @@ class VendorLayer(TimeStampedModel):
         return f'{self.id}:L{self.level} {self.vendor_company.name}'
 
 
+class Questions(models.Model):
+    TYPE = (
+        ('text', 'Text'),
+        ('choice', 'Choice'),
+        ('document', 'Document'),
+    )
+    name = models.CharField(_('Field Name'), max_length=50)
+    type = models.CharField(_('Type'), max_length=20, choices=TYPE)
+    display_name = models.CharField(_('Display Name'), max_length=50)
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE,
+        verbose_name='Model Name'
+    )
+
+    def __str__(self):
+        return f'{self.content_type.model} feedback questions'
+
+
+class Feedback(TimeStampedModel):
+    object_id = models.PositiveIntegerField()
+    submitted_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    answer = models.CharField(_('Answer'), max_length=100, null=True, blank=True)
+    question = models.ForeignKey(Questions, on_delete=models.CASCADE, related_name='questions')
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE,
+        verbose_name='Model Name'
+    )
+
+    class Meta:
+        ordering = ('-modified',)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Feedback, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.content_type.model} feedback'
+
+
 class Test(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    feedback_form = GenericRelation(Feedback)
     link = models.TextField(_('Test Link'), null=True, blank=True)
     is_video = models.BooleanField(_('Video Test'), default=False)
     is_offline = models.BooleanField(_('Offline Test'), default=False)
@@ -308,59 +351,6 @@ class Test(TimeStampedModel):
     @property
     def marketer(self):
         return self.submission.created_by
-
-
-class TestFeedback(TimeStampedModel):
-    attachments = GenericRelation(Attachment)
-    is_design = models.BooleanField(_('design'), default=False)
-    is_offline = models.BooleanField(_('Offline Test'), default=False)
-    test = models.ForeignKey(
-        Test, on_delete=models.PROTECT,
-        related_name='test',
-        verbose_name='Test'
-    )
-    submitted_by = models.ForeignKey(
-        User, on_delete=models.PROTECT,
-        related_name='test_feedback_by',
-        verbose_name='Feedback Submitted'
-    )
-    reviewed_by = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name='test_reviewed_by',
-        null=True, blank=True, verbose_name='Feedback Reviewed'
-    )
-
-    class Meta:
-        ordering = ('-modified',)
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.created = timezone.now()
-        self.modified = timezone.now()
-        return super(TestFeedback, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.submitted_by.employee_name} test feedback'
-
-
-class FeedbackAttribute(TimeStampedModel):
-    value = models.TextField(_('Value'), null=True, blank=True)
-    field = models.ForeignKey(Field, on_delete=models.CASCADE, related_name='attribute')
-    feedback = models.ForeignKey(
-        TestFeedback, on_delete=models.CASCADE,
-        null=True, blank=True, related_name='values',
-    )
-
-    class Meta:
-        ordering = ('-modified',)
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.created = timezone.now()
-        self.modified = timezone.now()
-        return super(FeedbackAttribute, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.field.name}: {self.feedback}'
 
 
 class Interview(TimeStampedModel):

@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
-    Test, TestFeedback, FeedbackAttribute
+    Test, Feedback, Questions
 # InterviewGuest
 
 
@@ -113,20 +113,20 @@ class TestAdmin(ExportActionModelAdmin):
                     'submitted_by', 'feedback', 'cancel_reason')
 
 
-@admin.register(TestFeedback)
-class TestFeedbackAdmin(ExportActionModelAdmin):
+@admin.register(Questions)
+class QuestionsAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
-    list_filter = ('is_offline', )
-    search_fields = ('id','submitted_by__employee_name', 'is_offline')
-    list_display = ('id', 'is_offline', 'test', 'submitted_by', 'created', 'modified')
+    search_fields = ('id', 'name')
+    list_filter = ('content_type', 'type')
+    list_display = ('id', 'name', 'display_name', 'type', 'content_type')
 
 
-@admin.register(FeedbackAttribute)
+@admin.register(Feedback)
 class FeedbackAttributeAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
-    list_filter = ('field__name', 'feedback__submitted_by__employee_name')
-    search_fields = ('id', 'field__name', 'value', 'feedback__submitted_by__employee_name')
-    list_display = ('id', 'value', 'field', 'feedback', 'created', 'modified')
+    search_fields = ('id', 'question__name', 'submitted_by__employee_name')
+    list_filter = ('object_id', 'content_type')
+    list_display = ('id', 'object_id', 'submitted_by', 'question', 'answer', 'content_type', 'created', 'modified')
 
 #
 # @admin.register(InterviewGuest)
