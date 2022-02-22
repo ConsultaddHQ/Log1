@@ -18,7 +18,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
-from marketing.models import Questions, Feedback
+from marketing.models import Answer, Question
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
@@ -2523,18 +2523,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['put'], detail=True, url_path='test_form')
+    @action(methods=['post'], detail=True, url_path='test_form')
     def test_feedback_form(self, request, pk):
         try:
             test = get_object_or_404(Test, id=pk)
             form = request.data.get('feedback_form')
-            content_type = ContentType.objects.get(name='test')
+            content_type = ContentType.objects.get(model='test')
             for data in form:
-                question = Questions.objects.get(name=data['name'], content_type=content_type)
-                Feedback.objects.create(
+                question = Question.objects.get(name=data['name'], content_type=content_type)
+                Answer.objects.create(
                     object_id=test.id,
                     question=question,
-                    answer=data['value'],
+                    value=data['value'],
                     content_type=content_type,
                     submitted_by=request.user,
                 )

@@ -116,17 +116,17 @@ class TestAdmin(ExportActionModelAdmin):
 @admin.register(Questions)
 class QuestionsAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
+    list_filter = ('answer_type',)
     search_fields = ('id', 'name')
-    list_filter = ('content_type', 'type')
-    list_display = ('id', 'name', 'display_name', 'type', 'content_type')
+    list_display = ('id', 'name', 'field', 'answer_type', 'created')
 
 
 @admin.register(Feedback)
-class FeedbackAttributeAdmin(ExportActionModelAdmin):
+class AnswerAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
-    search_fields = ('id', 'question__name', 'submitted_by__employee_name')
     list_filter = ('object_id', 'content_type')
-    list_display = ('id', 'object_id', 'submitted_by', 'question', 'answer', 'content_type', 'created', 'modified')
+    search_fields = ('id', 'question__name', 'submitted_by__employee_name')
+    list_display = ('id', 'submitted_by', 'question', 'answer', 'object_id', 'content_type', 'created', 'modified')
 
 #
 # @admin.register(InterviewGuest)
