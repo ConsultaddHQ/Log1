@@ -52,8 +52,10 @@ class TimeSheetViewSets(GenericViewSet, ListModelMixin, UpdateModelMixin, Destro
                                                status='draft').order_by('start')
             data = [i for i in pending]
 
-            submitted = TimeSheet.objects.filter(project_id__in=project_ids, is_active=True,
-                                                 status__in=['submitted', 'rejected', 'approved']).order_by('-start')
+            submitted = TimeSheet.objects.filter(
+                project_id__in=project_ids, is_active=True,
+                status__in=['submitted', 'rejected', 'approved', 'updated']
+            ).order_by('-start')
             for i in submitted:
                 data.append(i)
             total = len(data)
@@ -251,8 +253,10 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             pending = TimeSheet.objects.filter(project_id=pk, is_active=True, status='draft').order_by('start')
             data = [i for i in pending]
 
-            submitted = TimeSheet.objects.filter(project_id=pk, is_active=True,
-                                                 status__in=['submitted', 'rejected', 'approved']).order_by('-start')
+            submitted = TimeSheet.objects.filter(
+                project_id=pk, is_active=True,
+                status__in=['submitted', 'rejected', 'approved', 'updated']
+            ).order_by('-start')
             for i in submitted:
                 data.append(i)
             serializer = self.serializer_class(data, many=True)
@@ -336,7 +340,8 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     @action(methods=['PUT'], detail=True, url_path='cancel')
     def cancel_timesheet(self, request, pk):
         try:
-            timesheet = get_object_or_404(TimeSheet, id=pk, status='submitted', project__consultant=request.user)
+            timesheet = get_object_or_404(TimeSheet, id=pk, status__in=['submitted', 'updated'],
+                                          project__consultant=request.user)
             timesheet.hours = 0
             timesheet.status = 'draft'
             timesheet.con_comment = None
@@ -414,7 +419,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             )
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
-            timesheet.status = 'submitted'
+            timesheet.status = 'submitted' if timesheet.status != 'submitted' else 'updated'
             if zero_hours:
                 timesheet.hours = 0.0
                 timesheet.additional_hours = 0.0

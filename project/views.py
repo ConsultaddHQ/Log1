@@ -1081,7 +1081,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultants = Consultant.objects.filter(
                     id__in=list(consultant_ids),
                     projects__timesheets__is_active=True,
-                    projects__timesheets__status='submitted',
+                    projects__timesheets__status__in=['submitted', 'updated'],
                 ).order_by('id').distinct('id')
 
             if query:
