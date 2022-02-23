@@ -2536,10 +2536,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         else:
             try:
                 test = get_object_or_404(Test, id=pk)
-                engineers = request.data.get('associates', [])
-                for emp_id in engineers:
-                    engineer = User.objects.get(employee_id=emp_id)
-                    test.engineer.add(engineer)
+                # engineers = request.data.get('associates', [])
+                # for emp_id in engineers:
+                #     engineer = User.objects.get(employee_id=emp_id)
+                #     test.engineer.add(engineer)
 
                 # form = json.loads(request.data.get('feedback_form'))
                 form = request.data.get('feedback_form')
@@ -2558,14 +2558,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 for file in request.FILES.getlist('files'):
                     file_data = {
                         "file": file,
-                        "type": 'test',
                         "model": "test",
                         "object_id": test.id,
                         "creator": request.user,
+                        "type": "test_feedback",
                     }
                     create_attachment(file_data)
 
-                return Response({"message": "Test form submitted"}, status=202)
+                return Response({"message": "Test details submitted"}, status=201)
             except Exception as error:
                 write_info(error, request)
                 return str(error)
