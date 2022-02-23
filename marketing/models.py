@@ -267,6 +267,7 @@ class Question(TimeStampedModel):
         ('document', 'Document'),
     )
     name = models.CharField(_('Field Name'), max_length=50)
+    category = models.CharField(_('Question Category'), max_length=50)
     answer_type = models.CharField(_('Type'), max_length=20, choices=TYPE)
     field = models.CharField(_('Field'), max_length=40, null=True, blank=True)
     created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
@@ -304,8 +305,8 @@ class Answer(TimeStampedModel):
 
 
 class Test(TimeStampedModel):
-    feedback_form = GenericRelation(Answer)
     attachments = GenericRelation(Attachment)
+    engineer_feedback = GenericRelation(Answer)
     link = models.TextField(_('Test Link'), null=True, blank=True)
     is_video = models.BooleanField(_('Video Test'), default=False)
     is_offline = models.BooleanField(_('Offline Test'), default=False)

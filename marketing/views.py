@@ -2523,49 +2523,40 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['put', 'get'], detail=True, url_path='detail')
-    def test_detail(self, request, pk):
-        if request.method == 'GET':
-            try:
-                feedback = Answer.objects.filter(object_id=pk, content_type__model='test')
-                serializer = AnswerSerializer(feedback, many=True)
-                return Response({"data": serializer.data}, status=200)
-            except Exception as error:
-                write_info(message=error)
-                return str(error)
-        else:
-            try:
-                test = get_object_or_404(Test, id=pk)
-                # engineers = request.data.get('associates', [])
-                # for emp_id in engineers:
-                #     engineer = User.objects.get(employee_id=emp_id)
-                #     test.engineer.add(engineer)
+    @action(methods=['post'], detail=True, url_path='engineer_feedback')
+    def feedback(self, request, pk):
+        try:
+            test = get_object_or_404(Test, id=pk)
+            engineers = request.data.get('associates', [])
+            for emp_id in engineers:
+                engineer = User.objects.get(employee_id=emp_id)
+                test.engineer.add(engineer)
 
-                # form = json.loads(request.data.get('feedback_form'))
-                form = request.data.get('feedback_form')
-                content_type = ContentType.objects.get(model='test')
-                for data in form:
-                    question = Question.objects.get(name=data['name'])
-                    Answer.objects.create(
-                        object_id=test.id,
-                        question=question,
-                        value=data['value'],
-                        content_type=content_type,
-                        submitted_by=request.user,
-                    )
+            # form = json.loads(request.data.get('feedback_form'))
+            feedback = request.data.get('feedback_form')
+            content_type = ContentType.objects.get(model='test')
+            for data in feedback:
+                question = Question.objects.get(name=data['name'])
+                Answer.objects.create(
+                    object_id=test.id,
+                    question=question,
+                    value=data['value'],
+                    content_type=content_type,
+                    submitted_by=request.user,
+                )
 
-                # upload attachments
-                for file in request.FILES.getlist('files'):
-                    file_data = {
-                        "file": file,
-                        "model": "test",
-                        "object_id": test.id,
-                        "creator": request.user,
-                        "type": "test_feedback",
-                    }
-                    create_attachment(file_data)
+            # upload attachments
+            for file in request.FILES.getlist('files'):
+                file_data = {
+                    "file": file,
+                    "model": "test",
+                    "object_id": test.id,
+                    "creator": request.user,
+                    "type": "test_feedback",
+                }
+                create_attachment(file_data)
 
-                return Response({"message": "Test details submitted"}, status=201)
-            except Exception as error:
-                write_info(error, request)
-                return str(error)
+            return Response({"message": "Feedback submitted"}, status=201)
+        except Exception as error:
+            write_info(error, request)
+            return str(error)
