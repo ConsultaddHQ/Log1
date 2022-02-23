@@ -357,7 +357,7 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     def attachments(self, request, pk):
         try:
             timesheet = get_object_or_404(TimeSheet, id=pk, project__consultant=request.user)
-            attachments = timesheet.attachments.all()
+            attachments = timesheet.attachments.filter(is_active=True)
             data = []
             for attachment in attachments:
                 response, error = get_s3_object(attachment.attachment_file.name)
@@ -434,6 +434,12 @@ class TimeSheetV2ViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 admin_user = User.objects.get(employee_id=2367)
                 content_type = ContentType.objects.get(model='timesheet')
                 if request.FILES.get('file1', None):
+                    attachments = Attachment.objects.filter(object_id=timesheet.id, is_active=True,
+                                                            attachment_type='timesheet')
+                    for attachment in attachments:
+                        attachment.is_active = False
+                        attachment.save()
+
                     Attachment.objects.create(
                         creator=admin_user,
                         object_id=timesheet.id,
