@@ -697,3 +697,55 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /engineer_report/
+class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+    queryset = User.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = EngineerReportSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            engineer = User.objects.filter(projects__statuses__frequency='more_than_2_days',
+                                           projects__statuses__is_current=True)
+            serial = EngineerReportSerializer(engineer[first: last], many=True)
+            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='project')
+    def project(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            project = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))
+            serial = EngineerProjectSerializer(project[first: last], many=True)
+            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='test')
+    def test(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            test = Test.objects.filter(assign_to=kwargs.get('pk'))
+            serial = EngineerTestSerializer(test[first: last], many=True)
+            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='interview')
+    def interview(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            interview = Interview.objects.filter(guest=kwargs.get('pk'))
+            serial = EngineerInterviewSerializer(interview[first: last], many=True)
+            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
