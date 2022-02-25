@@ -116,9 +116,9 @@ class TestAdmin(ExportActionModelAdmin):
 @admin.register(Question)
 class QuestionsAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
-    list_filter = ('answer_type',)
+    list_filter = ('answer_type', 'category')
     search_fields = ('id', 'name')
-    list_display = ('id', 'name', 'field', 'answer_type', 'created')
+    list_display = ('id', 'name', 'field', 'answer_type', 'value', 'category', 'position')
 
 
 @admin.register(Answer)

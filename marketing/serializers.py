@@ -7,7 +7,8 @@ from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
-from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, Answer
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, Answer, \
+    Question
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -459,7 +460,7 @@ class TestGetSerializer(serializers.ModelSerializer):
                   'cancel_reason', 'assigned_to', 'permission', 'engineer_feedback')
 
     @staticmethod
-    def get_engineers(obj):
+    def get_engineer_feedback(obj):
         if obj.engineer.all():
             return obj.engineer.all().values('id', 'employee_name')
         return None
@@ -543,3 +544,10 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_check_list(obj):
         return get_project_check_list(obj)
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Question
+        fields = "__all__"

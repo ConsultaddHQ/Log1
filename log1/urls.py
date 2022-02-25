@@ -27,7 +27,7 @@ from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectS
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets
+    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
@@ -59,6 +59,7 @@ router.register(r'consultant/(?P<consultant_id>[0-9]+)/feedback', ConsultantFeed
 
 router.register(r'test', TestViewSets)
 router.register(r'lead', LeadViewSets)
+router.register(r'question', QuestionViewSets)
 router.register(r'interview', InterviewViewSets)
 router.register(r'submission', SubmissionViewSets)
 router.register(r'vendor_layer', VendorLayerViewSets)

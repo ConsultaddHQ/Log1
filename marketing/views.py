@@ -2536,7 +2536,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             feedback = request.data.get('feedback_form')
             content_type = ContentType.objects.get(model='test')
             for data in feedback:
-                question = Question.objects.get(name=data['name'])
+                question = Question.objects.get(id=data['id'])
                 Answer.objects.create(
                     object_id=test.id,
                     question=question,
@@ -2557,6 +2557,62 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 create_attachment(file_data)
 
             return Response({"message": "Feedback submitted"}, status=201)
+        except Exception as error:
+            write_info(error, request)
+            return str(error)
+
+
+# Route - /question/
+class QuestionViewSets(ModelViewSet):
+    queryset = Question.objects.all()
+    serializer_class = InterviewSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        question_type = request.GET.get('type')
+        order_by = ['category', 'position']
+
+        if question_type == 'online':
+            queryset = Question.objects.filter(category__in=['online', 'test_cases', 'generic']).order_by(*order_by)
+        elif question_type == 'offline':
+            queryset = Question.objects.filter(category__in=['online', 'test_cases', 'generic']).order_by(*order_by)
+        else:
+            queryset = self.queryset.order_by(*order_by)
+
+        serial = QuestionSerializer(queryset, many=True)
+        return Response(serial.data)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data
+            if data.get('position'):
+                question_qs = Question.objects.filter(
+                    category=data['category'], position__gte=data['position']
+                ).order_by('position')
+                for obj in question_qs:
+                    obj.position += 1
+                    obj.save()
+            else:
+                position = Question.objects.filter(category=data['category']).order_by('position').last()
+                position = position.position + 1
+
+            question = Question.objects.create(
+                name=data['name'],
+                answer_type=data['type'],
+                category=data['category'],
+                field=data['display_name'],
+                position=data['position'] if data.get('position', None) else position
+            )
+
+            if question.answer_type == 'select' and data.get('values') is None:
+                question.delete()
+                return Response({"message": "Please provide possible values for the field"})
+            elif question.answer_type == 'select' and data.get('values'):
+                question.value = data['values']
+                question.save()
+
+            return Response({"message": "Question added to form"}, status=202)
         except Exception as error:
             write_info(error, request)
             return str(error)

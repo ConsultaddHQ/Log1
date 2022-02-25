@@ -263,14 +263,25 @@ class VendorLayer(TimeStampedModel):
 class Question(TimeStampedModel):
     TYPE = (
         ('text', 'Text'),
-        ('choice', 'Choice'),
+        ('select', 'Select'),
+        ('char', 'Character'),
+        ('boolean', 'Boolean'),
         ('document', 'Document'),
     )
+    CATEGORY = (
+        ('online', 'Online'),
+        ('generic', 'Generic'),
+        ('offline', 'Offline'),
+        ('guideline', 'Guideline'),
+        ('test_cases', 'Test Cases'),
+    )
     name = models.CharField(_('Field Name'), max_length=50)
-    category = models.CharField(_('Question Category'), max_length=50)
+    field = models.CharField(_('Field'), max_length=100, null=True, blank=True)
+    value = ArrayField(models.CharField(_('Question Value'), max_length=30), blank=True, null=True)
+
+    position = models.IntegerField(_('Position'))
     answer_type = models.CharField(_('Type'), max_length=20, choices=TYPE)
-    field = models.CharField(_('Field'), max_length=40, null=True, blank=True)
-    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
+    category = models.CharField(_('Question Category'), max_length=50, choices=CATEGORY)
 
     def __str__(self):
         return f'{self.field} - {self.answer_type}'
