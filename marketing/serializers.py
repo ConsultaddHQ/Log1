@@ -460,7 +460,7 @@ class TestGetSerializer(serializers.ModelSerializer):
                   'cancel_reason', 'assigned_to', 'permission', 'engineer_feedback')
 
     @staticmethod
-    def get_engineer_feedback(obj):
+    def get_engineers(obj):
         if obj.engineer.all():
             return obj.engineer.all().values('id', 'employee_name')
         return None

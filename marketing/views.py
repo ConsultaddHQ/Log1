@@ -2532,10 +2532,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 engineer = User.objects.get(employee_id=emp_id)
                 test.engineer.add(engineer)
 
-            # form = json.loads(request.data.get('feedback_form'))
-            feedback = request.data.get('feedback_form')
+            payload = json.loads(request.data.get('feedback_form'))
+            # feedback = request.data.get('feedback_form')
             content_type = ContentType.objects.get(model='test')
-            for data in feedback:
+            for data in payload:
                 question = Question.objects.get(id=data['id'])
                 Answer.objects.create(
                     object_id=test.id,
@@ -2576,7 +2576,7 @@ class QuestionViewSets(ModelViewSet):
         if question_type == 'online':
             queryset = Question.objects.filter(category__in=['online', 'test_cases', 'generic']).order_by(*order_by)
         elif question_type == 'offline':
-            queryset = Question.objects.filter(category__in=['online', 'test_cases', 'generic']).order_by(*order_by)
+            queryset = Question.objects.filter(category__in=['offline', 'guideline', 'generic']).order_by(*order_by)
         else:
             queryset = self.queryset.order_by(*order_by)
 
@@ -2602,7 +2602,7 @@ class QuestionViewSets(ModelViewSet):
                 answer_type=data['type'],
                 category=data['category'],
                 field=data['display_name'],
-                position=data['position'] if data.get('position', None) else position
+                position=data['position'] if data.get('position') else position
             )
 
             if question.answer_type == 'select' and data.get('values') is None:
