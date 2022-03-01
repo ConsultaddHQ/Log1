@@ -9,7 +9,7 @@ class PetitionTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Petition
-        fields = ('id', 'petition_type', 'status', 'created', 'is_withdraw')
+        fields = ('id', 'petition_type', 'status', 'created')
 
     @staticmethod
     def get_petition_type(obj):

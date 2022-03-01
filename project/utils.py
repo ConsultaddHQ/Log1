@@ -136,7 +136,6 @@ class ProjectUtil:
         self.statuses = fetch_project_status()
         self.consultant = project.submission.consultant_marketing.consultant
         self.project_start = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
-        self.team_name = project.submission.created_by.team.name
         if project.end_date:
             self.project_end = datetime.strptime(str(project.end_date), '%Y-%m-%d').strftime('%a, %d %B %Y')
         if self.project.employer:

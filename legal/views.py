@@ -96,7 +96,6 @@ class PetitionViewSets(ModelViewSet):
                     'id': petition.id,
                     'status': petition.status,
                     'employer': petition.employer,
-                    'is_withdraw': petition.is_withdraw,
                     'expiry_date': petition.expiry_date,
                     'is_withdrawn': petition.is_withdrawn,
                     'petition_type': petition.petition_type,
