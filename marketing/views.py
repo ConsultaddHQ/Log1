@@ -2585,7 +2585,7 @@ class QuestionViewSets(ModelViewSet):
             if 'superadmin' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            if request.data.get('type') == 'option' and request.data.get('options') is None:
+            if request.data.get('type') == 'option' and request.data.get('options') is []:
                 return Response({"message": "Please provide possible options for the question value"})
 
             if request.data.get('position'):
@@ -2604,7 +2604,7 @@ class QuestionViewSets(ModelViewSet):
                 value=request.data.get('value'),
                 answer_type=request.data.get('type'),
                 category=request.data.get('category'),
-                field=request.data.get('filed', None),
+                field=request.data.get('field', None),
                 options=request.data.get('options', []),
             )
 
