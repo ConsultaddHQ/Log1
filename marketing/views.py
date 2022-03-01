@@ -2554,14 +2554,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                             }
                             create_attachment(file_data)
 
+                # Activity
+                desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
+                create_activity(test.id, 'test', request.user, desc, 'created')
+
                 return Response({"message": "Feedback submitted"}, status=201)
             else:
                 if request.method == 'PUT':
-                    # test = get_object_or_404(Test, id=pk)
-                    # engineers = request.data.get('associates', [])
-                    # for emp_id in engineers:
-                    #     engineer = User.objects.get(employee_id=emp_id)
-                    #     test.engineer.add(engineer)
+                    test = get_object_or_404(Test, id=pk)
+                    engineers = request.data.get('associates', [])
+                    for emp_id in engineers:
+                        engineer = User.objects.get(employee_id=emp_id)
+                        test.engineer.add(engineer)
                     payload = json.loads(request.data.get('feedback_form'))
                     for data in payload:
                         answer = get_object_or_404(Answer, id=data['answer_id'])
@@ -2579,6 +2583,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                                 }
                                 # Is it require to make previous attachment is_current=false
                                 create_attachment(file_data)
+
+                # Activity
+                desc = f"{request.user.employee_name} updated Engineer's feedback for test."
+                create_activity(test.id, 'test', request.user, desc, 'update')
 
                 return Response({"message": "Feedback updated"}, status=202)
         except Exception as error:
