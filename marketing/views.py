@@ -9,6 +9,7 @@ from django.db import transaction
 from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -17,6 +18,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
+from marketing.models import Question
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
@@ -2520,3 +2522,93 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods='post', detail=True, url_path='engineer_feedback')
+    def feedback(self, request, pk):
+        try:
+            test = get_object_or_404(Test, id=pk)
+            engineers = request.data.get('associates', [])
+            for emp_id in engineers:
+                engineer = User.objects.get(employee_id=emp_id)
+                test.engineer.add(engineer)
+            content_type = ContentType.objects.get(model='test')
+            payload = json.loads(request.data.get('feedback_form'))
+            for data in payload:
+                answer = Answer.objects.create(
+                    object_id=test.id,
+                    content_type=content_type,
+                    submitted_by=request.user,
+                    value=data.get("value", None),
+                    question_id=data['question_id'],
+                )
+                question = answer.question
+                if question.answer_type == 'attachment':
+                    for file in request.FILES.getlist(str(question.id)):
+                        file_data = {
+                            "file": file,
+                            "model": "answer",
+                            "creator": request.user,
+                            "type": "test_feedback",
+                            "object_id": answer.id,
+                        }
+                        create_attachment(file_data)
+
+            # Activity
+            desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
+            create_activity(test.id, 'test', request.user, desc, 'created')
+
+            return Response({"message": "Feedback submitted"}, status=201)
+        except Exception as error:
+            write_info(error, request)
+            return str(error)
+
+
+# Route - /question/
+class QuestionViewSets(ModelViewSet):
+    queryset = Question.objects.all()
+    serializer_class = QuestionSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            question_field = request.GET.get('field')
+            queryset = Question.objects.filter(field=question_field).order_by('position')
+            serial = QuestionSerializer(queryset, many=True)
+            return Response({"data": serial.data}, status=200)
+        except Exception as error:
+            write_info(error, request)
+            return str(error)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            if 'superadmin' not in request.user.roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            if request.data.get('type') == 'option' and request.data.get('options') is None:
+                return Response({"message": "Please provide possible options for the question value"})
+
+            if request.data.get('position'):
+                question_qs = Question.objects.filter(
+                    category=request.data.get('category'), position__gte=request.data.get('position')
+                ).order_by('position')
+                for obj in question_qs:
+                    obj.position += 1
+                    obj.save()
+            else:
+                question_qs = Question.objects.filter(category=request.data.get('category')).order_by('position').last()
+                position = question_qs.position + 1
+
+            Question.objects.create(
+                position=position,
+                value=request.data.get('value'),
+                answer_type=request.data.get('type'),
+                category=request.data.get('category'),
+                field=request.data.get('filed', None),
+                options=request.data.get('options', []),
+            )
+
+            return Response({"message": "Question added to form"}, status=201)
+        except Exception as error:
+            write_info(error, request)
+            return str(error)

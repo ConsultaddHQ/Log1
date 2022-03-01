@@ -84,16 +84,19 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 "joining": upcoming_joining,
                 "interviews": upcoming_interviews
             }
+
+            last = date.today().replace(day=1) - timedelta(days=1)
             if filter_by_time == 'last_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last.replace(day=1)
 
             elif filter_by_time == 'last_6_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
+            elif filter_by_time == 'last_12_month':
+                first = last + timedelta(days=1) + relativedelta(months=-12)
+
+            # this_month
             else:
-                # this_month
                 first = date.today().replace(day=1)
                 last = date.today()
 
@@ -145,21 +148,27 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         filter_by_time = request.GET.get("filter_by", None)
 
         try:
+            last = date.today().replace(day=1) - timedelta(days=1)
             if filter_by_time == 'last_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last.replace(day=1)
 
                 prev_last = last + relativedelta(months=-1)
                 prev_first = first + relativedelta(months=-1)
 
             elif filter_by_time == 'last_6_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
                 prev_last = last + relativedelta(months=-6)
                 prev_first = first + relativedelta(months=-6)
+
+            elif filter_by_time == 'last_12_month':
+                first = last + timedelta(days=1) + relativedelta(months=-12)
+
+                prev_last = last + relativedelta(months=-12)
+                prev_first = first + relativedelta(months=-12)
+
+            # this_month
             else:
-                # this_month
                 last = date.today()
                 prev_first, prev_last = None, None
                 first = date.today().replace(day=1)
@@ -244,9 +253,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     percent = int(((new_po - prev_po) / prev_po) * 100)
 
             conversions = {
-                "interview": 0,
-                "joining": 0,
                 "offers": 0,
+                "joining": 0,
+                "interview": 0,
                 "count": {
                     "offer_count": offers_count,
                     "joining_count": joining_count,
@@ -255,9 +264,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 }
             }
             if submissions_count != 0:
-                conversions['interview'] = round((interviews_count / submissions_count) * 100, 2)
-                conversions['joining'] = round((joining_count / submissions_count) * 100, 2)
                 conversions['offers'] = round((offers_count / submissions_count) * 100, 2)
+                conversions['joining'] = round((joining_count / submissions_count) * 100, 2)
+                conversions['interview'] = round((interviews_count / submissions_count) * 100, 2)
 
             result = {
                 "joined_count": new_po,

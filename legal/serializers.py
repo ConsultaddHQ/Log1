@@ -79,7 +79,7 @@ class PetitionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Petition
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'status',
-                  'total_documents', 'uploaded_documents', 'expiry_date')
+                  'total_documents', 'uploaded_documents', 'expiry_date', 'is_withdrawn')
 
     @staticmethod
     def get_consultant(obj):
@@ -113,7 +113,7 @@ class PetitionGetSerializer(serializers.ModelSerializer):
         model = Petition
         fields = ('id', 'petition_type', 'employer', 'consultant', 'assigned_to', 'beneficiary_type', 'docs', 'reasons',
                   'status', 'lca_no', 'uscis_no', 'fedex_no', 'premium_processing', 'created_by', 'is_active', 'rfe',
-                  'expiry_date', 'is_withdraw')
+                  'expiry_date', 'is_withdrawn')
 
     @staticmethod
     def get_rfe(obj):

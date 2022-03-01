@@ -149,6 +149,7 @@ class ProjectUtil:
 
     def fetch_project_count(self, project_status):
         try:
+            team = self.project.submission.created_by.team
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
             total_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one
@@ -156,18 +157,18 @@ class ProjectUtil:
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
-                submission__created_by__team__name=self.team_name,
+                submission__created_by__team=team,
             ).count()
             return total_count, team_count
         except Exception as error:
             write_exception(message=error, request=self.request)
 
     def send_join_notification(self):
-        # Emoji for Message
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             total, team = self.fetch_project_count("joined")
+            team_name = self.project.submission.created_by.team.name
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
@@ -209,10 +210,10 @@ class ProjectUtil:
                 }],
                 "potentialAction": [{
                     "@type": "ActionCard",
-                    "name": f"{self.team_name} - {team}",
+                    "name": f"{team_name} - {team}",
                     "actions": [{
                         "@type": "HttpPOST",
-                        "name": f"{self.team_name} - {team}",
+                        "name": f"{team_name} - {team}",
                         "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
                     }]
                 }, {

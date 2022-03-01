@@ -98,6 +98,7 @@ class PetitionViewSets(ModelViewSet):
                     'employer': petition.employer,
                     'is_withdraw': petition.is_withdraw,
                     'expiry_date': petition.expiry_date,
+                    'is_withdrawn': petition.is_withdrawn,
                     'petition_type': petition.petition_type,
                     'beneficiary_type': petition.beneficiary_type,
                     'assigned_to': petition.assigned_to.employee_name,
@@ -137,7 +138,7 @@ class PetitionViewSets(ModelViewSet):
             consultant.p_is_active = True
             consultant.save()
             serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=201)
+            return Response({"result": serializer.data, "message": "Petition Created"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -549,9 +550,9 @@ class PetitionViewSets(ModelViewSet):
     def withdraw(self, request, pk):
         try:
             petition = get_object_or_404(Petition, id=pk)
-            petition.is_withdraw = True
+            petition.is_withdrawn = True
             petition.save()
-            return Response({"message": "Withdraw Successfully"}, status=202)
+            return Response({"message": "Petition Withdrawn Successfully"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
