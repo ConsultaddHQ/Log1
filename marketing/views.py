@@ -2597,7 +2597,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 # Route - /question/
 class QuestionViewSets(ModelViewSet):
     queryset = Question.objects.all()
-    serializer_class = InterviewSerializer
+    serializer_class = QuestionSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
