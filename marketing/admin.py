@@ -3,7 +3,6 @@ from import_export.admin import ExportActionModelAdmin
 
 from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
     Test, Answer, Question
-# InterviewGuest
 
 
 @admin.register(VendorCompany)
@@ -127,17 +126,3 @@ class AnswerAdmin(ExportActionModelAdmin):
     list_filter = ('object_id', 'content_type')
     search_fields = ('id', 'question__value', 'submitted_by__employee_name')
     list_display = ('id', 'submitted_by', 'question', 'value', 'object_id', 'content_type', 'created', 'modified')
-
-#
-# @admin.register(InterviewGuest)
-# class InterviewGuestAdmin(ExportActionModelAdmin):
-#     actions = ['export_as_csv']
-#     list_filter = ('guest_type', 'coding_present')
-#     search_fields = ('id', 'interview__id')
-#     list_display = ('id', 'interview', 'guest_type', 'coding_present', 'remark', 'tech_stack', 'engineers_display')
-#
-#     def engineers_display(self, obj):
-#         return ", ".join([
-#             user.employee_name for user in obj.engineers.all()
-#         ])
-#     engineers_display.short_description = "Engineers"
