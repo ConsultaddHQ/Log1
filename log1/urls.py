@@ -15,8 +15,8 @@ from dashboard.views import MarketingDashboardViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
+from project.mobile_api import TimeSheetViewSet, PayrollScheduleViewSet
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
-from project.mobile_api import TimeSheetViewSets, PayrollScheduleViewSets, TimeSheetV2ViewSets, Test
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
@@ -27,7 +27,7 @@ from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectS
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets
+    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
@@ -59,6 +59,7 @@ router.register(r'consultant/(?P<consultant_id>[0-9]+)/feedback', ConsultantFeed
 
 router.register(r'test', TestViewSets)
 router.register(r'lead', LeadViewSets)
+router.register(r'question', QuestionViewSets)
 router.register(r'interview', InterviewViewSets)
 router.register(r'submission', SubmissionViewSets)
 router.register(r'vendor_layer', VendorLayerViewSets)
@@ -103,11 +104,9 @@ router.register(r'consultant_app', ConsultantAppViewSet)
 router.register(r'consultant_auth', ConsultantAuthViewSet)
 router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
-router.register(r'timesheet', TimeSheetViewSets)
-router.register(r'payroll', PayrollScheduleViewSets)
-router.register(r'timesheet_v2', TimeSheetV2ViewSets)
+router.register(r'timesheet', TimeSheetViewSet)
+router.register(r'payroll', PayrollScheduleViewSet)
 
-router.register(r'test', Test)
 router.register(r'utility', UtilityViewSet)
 router.register(r'util', TeamsTargetViewSet)
 
