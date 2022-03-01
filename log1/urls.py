@@ -23,7 +23,7 @@ from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringRe
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
      ProjectOrderViewSet, ProjectSupportViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
-    TrainingCheckListViewSet
+    TrainingCheckListViewSet, EngineerReportViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
@@ -70,6 +70,7 @@ router.register(r'vendor_contact', VendorContactViewSets)
 router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'project_order', ProjectOrderViewSet)
+router.register(r'engineer_report', EngineerReportViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'project/(?P<project_id>[0-9]+)/updates', ProjectUpdateViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/support', ProjectSupportViewSet)

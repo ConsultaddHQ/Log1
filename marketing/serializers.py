@@ -547,7 +547,19 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
+    title = serializers.SerializerMethodField()
+    value = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ('id', 'value', 'field', 'answer_type', 'options', 'category', 'position')
+        fields = ('id', 'title', 'value', 'field', 'answer_type', 'options', 'category', 'position')
+
+    @staticmethod
+    def get_value(obj):
+        if obj.answer_type == 'boolean':
+            return False
+        return None
+
+    @staticmethod
+    def get_title(obj):
+        return obj.value
