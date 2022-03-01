@@ -4,8 +4,9 @@ from rest_framework import serializers
 
 from employee.models import User
 from attachment.models import Attachment
+from marketing.models import Test, Interview
 from attachment.serializers import AttachmentGetSerializer
-from project.models import Project, SupportStatus, TimeSheet
+from project.models import Project, SupportStatus, TimeSheet, ProjectSupport
 from engineering.models import ProjectDescription, ProjectUpdate, TrainingCheckList, TrainingAgenda
 
 
@@ -288,3 +289,156 @@ class TrainingCheckListSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainingCheckList
         fields = '__all__'
+
+
+class EngineerProjectSerializer(serializers.ModelSerializer):
+    client = serializers.SerializerMethodField()
+    timezone = serializers.SerializerMethodField()
+    frequency = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    technology = serializers.SerializerMethodField()
+    joining_date = serializers.SerializerMethodField()
+    project_status = serializers.SerializerMethodField()
+    support_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSupport
+        fields = ('id', 'created', 'end', 'start', 'feedback', 'support_status', 'client', 'consultant', 'technology',
+                  'joining_date', 'frequency', 'project_status', 'timezone')
+
+    @staticmethod
+    def get_support_status(obj):
+        status = obj.statuses.filter(is_current=True).first()
+        if obj.project.statuses.filter(status__istartswith='terminated').first():
+            return 'terminated'
+        elif obj.project.start_date and obj.project.start_date > date.today():
+            return 'training'
+        elif status:
+            if status.frequency == 'more_than_2_days':
+                return 'active'
+            elif status.frequency == 'less_than_3_days':
+                return 'less_active'
+            elif status.frequency in ('twice_a_month', 'independent'):
+                return 'independent'
+        else:
+            return None
+
+    @staticmethod
+    def get_frequency(obj):
+        status = obj.statuses.filter(is_current=True).first()
+        if status:
+            return status.frequency
+        return None
+
+    @staticmethod
+    def get_project_status(obj):
+        return obj.project.status
+
+    @staticmethod
+    def get_client(obj):
+        return obj.project.submission.client
+
+    @staticmethod
+    def get_technology(obj):
+        return obj.project.submission.lead.primary_skill
+
+    @staticmethod
+    def get_timezone(obj):
+        return "EST"
+
+    @staticmethod
+    def get_joining_date(obj):
+        return obj.project.start_date
+
+    @staticmethod
+    def get_consultant(obj):
+        data = {
+            'name': obj.project.consultant.name,
+            'email': obj.project.consultant.email,
+            'contact': obj.project.consultant.phone_no
+        }
+        return data
+
+
+class EngineerReportSerializer(serializers.ModelSerializer):
+    project = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'project')
+
+    @staticmethod
+    def get_project(obj):
+        project = EngineerProjectSerializer(obj.projects.filter(statuses__frequency='more_than_2_days',
+                                                                statuses__is_current=True), many=True).data
+        data = {
+            "bandwidth": len(project),
+            "data": project
+        }
+        return data
+
+
+class EngineerTestSerializer(serializers.ModelSerializer):
+    client = serializers.SerializerMethodField()
+    job_title = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
+    consultant_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Test
+        fields = ('id', 'status', 'deadline', 'company_name', 'marketer_name', 'consultant_name',
+                  'client', 'job_title', 'skills')
+
+    @staticmethod
+    def get_client(obj):
+        return obj.submission.client
+
+    @staticmethod
+    def get_job_title(obj):
+        return obj.submission.lead.job_title
+
+    @staticmethod
+    def get_company_name(obj):
+        return obj.submission.lead.vendor_company.name
+
+    @staticmethod
+    def get_marketer_name(obj):
+        return obj.submission.created_by.employee_name
+
+    @staticmethod
+    def get_consultant_name(obj):
+        return obj.submission.consultant_marketing.consultant.name
+
+
+class EngineerInterviewSerializer(serializers.ModelSerializer):
+    client = serializers.SerializerMethodField()
+    supervisor = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
+    consultant_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Interview
+        fields = ('id', 'status', 'company_name', 'marketer_name', 'consultant_name', 'client',
+                  'round', 'start_time', 'supervisor')
+
+    @staticmethod
+    def get_client(obj):
+        return obj.submission.client
+
+    @staticmethod
+    def get_supervisor(obj):
+        return obj.supervisor.employee_name
+
+    @staticmethod
+    def get_company_name(obj):
+        return obj.submission.lead.vendor_company.name
+
+    @staticmethod
+    def get_marketer_name(obj):
+        return obj.submission.created_by.employee_name
+
+    @staticmethod
+    def get_consultant_name(obj):
+        return obj.submission.consultant_marketing.consultant.name
