@@ -263,25 +263,19 @@ class VendorLayer(TimeStampedModel):
 class Question(TimeStampedModel):
     TYPE = (
         ('text', 'Text'),
-        ('select', 'Select'),
-        ('char', 'Character'),
+        ('option', 'Option'),
         ('boolean', 'Boolean'),
-        ('document', 'Document'),
+        ('integer', 'Integer'),
+        ('long_text', 'Long Text'),
+        ('attachment', 'Attachment'),
     )
-    CATEGORY = (
-        ('online', 'Online'),
-        ('generic', 'Generic'),
-        ('offline', 'Offline'),
-        ('guideline', 'Guideline'),
-        ('test_cases', 'Test Cases'),
-    )
-    name = models.CharField(_('Field Name'), max_length=50)
-    field = models.CharField(_('Field'), max_length=100, null=True, blank=True)
-    value = ArrayField(models.CharField(_('Question Value'), max_length=30), blank=True, null=True)
+    value = models.TextField(_('Question Value'))
+    field = models.CharField(_('Model Field'), max_length=100, null=True, blank=True)
+    options = ArrayField(models.CharField(_('Choices'), max_length=30, blank=True), blank=True)
 
-    position = models.IntegerField(_('Position'))
+    category = models.CharField(_('Question Category'), max_length=50)
     answer_type = models.CharField(_('Type'), max_length=20, choices=TYPE)
-    category = models.CharField(_('Question Category'), max_length=50, choices=CATEGORY)
+    position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
 
     def __str__(self):
         return f'{self.field} - {self.answer_type}'
@@ -294,8 +288,9 @@ class Question(TimeStampedModel):
 
 
 class Answer(TimeStampedModel):
+    attachment = GenericRelation(Attachment)
+    value = models.TextField(_('Value'), null=True, blank=True)
     submitted_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    value = models.CharField(_('Value'), max_length=100, null=True, blank=True)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
 
     object_id = models.PositiveIntegerField(_('Object Id'), )
@@ -312,7 +307,7 @@ class Answer(TimeStampedModel):
         return super(Answer, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.question.field}'
+        return f'{self.question.value}'
 
 
 class Test(TimeStampedModel):

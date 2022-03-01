@@ -2523,40 +2523,64 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['post'], detail=True, url_path='engineer_feedback')
+    @action(methods=['post', 'put'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=pk)
-            engineers = request.data.get('associates', [])
-            for emp_id in engineers:
-                engineer = User.objects.get(employee_id=emp_id)
-                test.engineer.add(engineer)
+            if request.method == 'POST':
+                test = get_object_or_404(Test, id=pk)
+                engineers = request.data.get('associates', [])
+                for emp_id in engineers:
+                    engineer = User.objects.get(employee_id=emp_id)
+                    test.engineer.add(engineer)
+                content_type = ContentType.objects.get(model='test')
+                payload = json.loads(request.data.get('feedback_form'))
+                for data in payload:
+                    answer = Answer.objects.create(
+                        object_id=test.id,
+                        content_type=content_type,
+                        submitted_by=request.user,
+                        value=data.get("value", None),  # for attachment type answer value can be as submitted
+                        question_id=data['question_id'],
+                    )
+                    question = answer.question
+                    if question.answer_type == 'attachment':
+                        for file in request.FILES.getlist(str(question.id)):
+                            file_data = {
+                                "file": file,
+                                "model": "answer",
+                                "creator": request.user,
+                                "type": "test_feedback",
+                                "object_id": answer.id,
+                            }
+                            create_attachment(file_data)
 
-            payload = json.loads(request.data.get('feedback_form'))
-            # feedback = request.data.get('feedback_form')
-            content_type = ContentType.objects.get(model='test')
-            for data in payload:
-                question = Question.objects.get(id=data['id'])
-                Answer.objects.create(
-                    object_id=test.id,
-                    question=question,
-                    value=data['value'],
-                    content_type=content_type,
-                    submitted_by=request.user,
-                )
+                return Response({"message": "Feedback submitted"}, status=201)
+            else:
+                if request.method == 'PUT':
+                    # test = get_object_or_404(Test, id=pk)
+                    # engineers = request.data.get('associates', [])
+                    # for emp_id in engineers:
+                    #     engineer = User.objects.get(employee_id=emp_id)
+                    #     test.engineer.add(engineer)
+                    payload = json.loads(request.data.get('feedback_form'))
+                    for data in payload:
+                        answer = get_object_or_404(Answer, id=data['answer_id'])
+                        answer.value = data['value']
+                        answer.save()
 
-            # upload attachments
-            for file in request.FILES.getlist('files'):
-                file_data = {
-                    "file": file,
-                    "model": "test",
-                    "object_id": test.id,
-                    "creator": request.user,
-                    "type": "test_feedback",
-                }
-                create_attachment(file_data)
+                        if answer.question.answer_type == 'attachment':
+                            for file in request.FILES.getlist(answer.id):
+                                file_data = {
+                                    "file": file,
+                                    "model": "answer",
+                                    "creator": request.user,
+                                    "type": "test_feedback",
+                                    "object_id": answer.id,
+                                }
+                                # Is it require to make previous attachment is_current=false
+                                create_attachment(file_data)
 
-            return Response({"message": "Feedback submitted"}, status=201)
+                return Response({"message": "Feedback updated"}, status=202)
         except Exception as error:
             write_info(error, request)
             return str(error)
@@ -2570,23 +2594,22 @@ class QuestionViewSets(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
-        question_type = request.GET.get('type')
-        order_by = ['category', 'position']
-
-        if question_type == 'online':
-            queryset = Question.objects.filter(category__in=['online', 'test_cases', 'generic']).order_by(*order_by)
-        elif question_type == 'offline':
-            queryset = Question.objects.filter(category__in=['offline', 'guideline', 'generic']).order_by(*order_by)
-        else:
-            queryset = self.queryset.order_by(*order_by)
-
-        serial = QuestionSerializer(queryset, many=True)
-        return Response(serial.data)
+        try:
+            question_field = request.GET.get('field')
+            queryset = Question.objects.filter(field=question_field).order_by('position')
+            serial = QuestionSerializer(queryset, many=True)
+            return Response({"data": serial.data}, status=200)
+        except Exception as error:
+            write_info(error, request)
+            return str(error)
 
     def create(self, request, *args, **kwargs):
         try:
+            if 'superadmin' not in request.user.roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
             data = request.data
-            if data.get('position'):
+            position = data.get('position', None)
+            if position:
                 question_qs = Question.objects.filter(
                     category=data['category'], position__gte=data['position']
                 ).order_by('position')
@@ -2594,25 +2617,25 @@ class QuestionViewSets(ModelViewSet):
                     obj.position += 1
                     obj.save()
             else:
-                position = Question.objects.filter(category=data['category']).order_by('position').last()
-                position = position.position + 1
+                question_qs = Question.objects.filter(category=data['category']).order_by('position').last()
+                position = question_qs.position + 1
 
             question = Question.objects.create(
-                name=data['name'],
+                position=position,
+                value=data['value'],
                 answer_type=data['type'],
-                category=data['category'],
-                field=data['display_name'],
-                position=data['position'] if data.get('position') else position
+                field=data.get('field', None),
+                category=data.get('category'),
             )
 
-            if question.answer_type == 'select' and data.get('values') is None:
+            if question.answer_type == 'option' and data.get('options') is None:
                 question.delete()
                 return Response({"message": "Please provide possible values for the field"})
             elif question.answer_type == 'select' and data.get('values'):
                 question.value = data['values']
                 question.save()
 
-            return Response({"message": "Question added to form"}, status=202)
+            return Response({"message": "Question added to form"}, status=201)
         except Exception as error:
             write_info(error, request)
             return str(error)

@@ -550,4 +550,4 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
-        fields = "__all__"
+        fields = ('id', 'value', 'field', 'answer_type', 'options', 'category', 'position')
