@@ -558,6 +558,8 @@ class QuestionSerializer(serializers.ModelSerializer):
     def get_value(obj):
         if obj.answer_type == 'boolean':
             return False
+        elif obj.answer_type == 'attachment':
+            return []
         return None
 
     @staticmethod
