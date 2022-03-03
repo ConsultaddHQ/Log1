@@ -547,7 +547,6 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Question
         fields = ('id', 'value', 'field', 'answer_type', 'options', 'category', 'position')
