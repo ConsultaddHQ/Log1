@@ -1,8 +1,8 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
-from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, Test
-# InterviewGuest
+from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
+    Test, Answer, Question
 
 
 @admin.register(VendorCompany)
@@ -111,16 +111,18 @@ class TestAdmin(ExportActionModelAdmin):
     list_display = ('id', 'submission', 'status', 'skills', 'is_video', 'is_offline', 'deadline', 'submit_date',
                     'submitted_by', 'feedback', 'cancel_reason')
 
-#
-# @admin.register(InterviewGuest)
-# class InterviewGuestAdmin(ExportActionModelAdmin):
-#     actions = ['export_as_csv']
-#     list_filter = ('guest_type', 'coding_present')
-#     search_fields = ('id', 'interview__id')
-#     list_display = ('id', 'interview', 'guest_type', 'coding_present', 'remark', 'tech_stack', 'engineers_display')
-#
-#     def engineers_display(self, obj):
-#         return ", ".join([
-#             user.employee_name for user in obj.engineers.all()
-#         ])
-#     engineers_display.short_description = "Engineers"
+
+@admin.register(Question)
+class QuestionsAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_filter = ('answer_type', 'category')
+    search_fields = ('id', 'value')
+    list_display = ('id', 'value', 'field', 'answer_type', 'options', 'category', 'position')
+
+
+@admin.register(Answer)
+class AnswerAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_filter = ('object_id', 'content_type')
+    search_fields = ('id', 'question__value', 'submitted_by__employee_name')
+    list_display = ('id', 'submitted_by', 'question', 'value', 'object_id', 'content_type', 'created', 'modified')
