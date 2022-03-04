@@ -709,10 +709,45 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def list(self, request, *args, **kwargs):
         try:
             first, last = get_page_limits(request)
-            engineer = User.objects.filter(projects__statuses__frequency='more_than_2_days',
-                                           projects__statuses__is_current=True)
+            query = request.GET.get('query', None)
+            engineer = User.objects.filter(
+                projects__statuses__is_current=True,
+                projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
+            )
+            if query:
+                engineer = engineer.filter(employee_name__istartswith=query)
+
+            projects = Project.objects.all().order_by('id').distinct('id')
+
+            counts = {
+                "support_status": {
+                    "training": {
+                        "display_name": "Training",
+                        "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
+                                                 support__statuses__frequency='more_than_2_days').count()
+                    },
+                    "active": {
+                        "display_name": "Active",
+                        "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
+                                                 support__statuses__frequency='more_than_2_days').count()
+                    },
+                    "less_active": {
+                        "display_name": "Less Active",
+                        "count": projects.filter(support__statuses__is_current=True,
+                                                 support__statuses__frequency='less_than_3_days').count()
+                    },
+                    "independent": {
+                        "display_name": "Independent",
+                        "count": projects.filter(
+                            support__statuses__is_current=True,
+                            support__statuses__frequency__in=['independent', 'twice_a_month']
+                        ).count()
+                    },
+                },
+            }
+
             serial = EngineerReportSerializer(engineer[first: last], many=True)
-            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+            return Response({"data": serial.data, "counts": counts}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -721,7 +756,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def project(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
-            project = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))
+            project = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))\
+                .exclude(project__statuses__status__istartswith='terminated')
             serial = EngineerProjectSerializer(project[first: last], many=True)
             return Response({"data": serial.data, "count": len(serial.data)}, status=200)
         except Exception as error:
@@ -732,7 +768,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def test(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
-            test = Test.objects.filter(assign_to=kwargs.get('pk'))
+            query = request.GET.get('query', None)
+            test = Test.objects.filter(engineer=kwargs.get('pk'))
+            if query:
+                test = test.filter(
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query),
+                )
             serial = EngineerTestSerializer(test[first: last], many=True)
             return Response({"data": serial.data, "count": len(serial.data)}, status=200)
         except Exception as error:
@@ -743,8 +785,20 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def interview(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
-            interview = Interview.objects.filter(guest=kwargs.get('pk'))
+            interview = Interview.objects.filter(Q(guest=kwargs.get('pk')) | Q(supervisor=kwargs.get('pk')))
             serial = EngineerInterviewSerializer(interview[first: last], many=True)
+            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='terminated')
+    def terminated(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            project = ProjectSupport.objects.filter(support__id=kwargs.get('pk'),
+                                                    project__statuses__status__istartswith='terminated')
+            serial = EngineerProjectSerializer(project[first: last], many=True)
             return Response({"data": serial.data, "count": len(serial.data)}, status=200)
         except Exception as error:
             write_exception(error, request)

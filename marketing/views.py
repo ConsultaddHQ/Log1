@@ -2615,21 +2615,3 @@ class QuestionViewSets(ModelViewSet):
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['post'], detail=False, url_path='add')
-    def add_question(self, request, *args, **kwargs):
-        try:
-
-            for data in request.data['data']:
-                Question.objects.create(
-                    value=data['value'],
-                    field=data['field'],
-                    options=data['options'],
-                    position=data['position'],
-                    category=data['category'],
-                    answer_type=data['answer_type'],
-                )
-            return Response({"message": "Question added to form"}, status=201)
-        except Exception as error:
-            write_info(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

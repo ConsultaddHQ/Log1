@@ -293,18 +293,21 @@ class TrainingCheckListSerializer(serializers.ModelSerializer):
 
 class EngineerProjectSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
     timezone = serializers.SerializerMethodField()
     frequency = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     technology = serializers.SerializerMethodField()
+    modified_at = serializers.SerializerMethodField()
     joining_date = serializers.SerializerMethodField()
-    project_status = serializers.SerializerMethodField()
     support_status = serializers.SerializerMethodField()
+    project_status = serializers.SerializerMethodField()
+    support_duration = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
-        fields = ('id', 'created', 'end', 'start', 'feedback', 'support_status', 'client', 'consultant', 'technology',
-                  'joining_date', 'frequency', 'project_status', 'timezone')
+        fields = ('id', 'created', 'frequency', 'start', 'feedback', 'support_status', 'client', 'consultant', 'project',
+                  'joining_date',  'end', 'project_status', 'technology', 'support_duration', 'modified_at', 'timezone')
 
     @staticmethod
     def get_support_status(obj):
@@ -339,8 +342,20 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
         return obj.project.submission.client
 
     @staticmethod
+    def get_project(obj):
+        data = {
+            "id": obj.project.id,
+            "end_date": obj.project.end_date,
+            "is_remote": obj.project.is_remote,
+            "start_date": obj.project.start_date,
+        }
+        return data
+
+    @staticmethod
     def get_technology(obj):
-        return obj.project.submission.lead.primary_skill
+        if hasattr(obj.project, 'description'):
+            return obj.project.description.technology
+        return None
 
     @staticmethod
     def get_timezone(obj):
@@ -351,6 +366,17 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
         return obj.project.start_date
 
     @staticmethod
+    def get_modified_at(obj):
+        update = obj.project.updates.all().order_by('-created').first()
+        if update:
+            data = {
+                "id": update.id,
+                "date": update.created.date()
+            }
+            return data
+        return None
+
+    @staticmethod
     def get_consultant(obj):
         data = {
             'name': obj.project.consultant.name,
@@ -358,6 +384,16 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             'contact': obj.project.consultant.phone_no
         }
         return data
+
+    @staticmethod
+    def get_support_duration(obj):
+        if obj.end:
+            duration = obj.end - obj.start
+        else:
+            duration = date.today() - obj.start
+        months = int(duration.days) // 30
+        days = round(int(duration.days) % 7, 0)
+        return months + days / 10
 
 
 class EngineerReportSerializer(serializers.ModelSerializer):
@@ -369,8 +405,10 @@ class EngineerReportSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_project(obj):
-        project = EngineerProjectSerializer(obj.projects.filter(statuses__frequency='more_than_2_days',
-                                                                statuses__is_current=True), many=True).data
+        project = EngineerProjectSerializer(
+            obj.projects.filter(statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
+                                statuses__is_current=True, project__start_date__lte=date.today()), many=True
+        ).data
         data = {
             "bandwidth": len(project),
             "data": project
