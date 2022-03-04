@@ -180,16 +180,11 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             if pk == 'null' or pk is None:
                 return Response({"error": "Project not found"}, status=400)
 
-            pending = TimeSheet.objects.filter(project_id=pk, is_active=True, status='draft').order_by('start')
-            data = [i for i in pending]
-
             submitted = TimeSheet.objects.filter(
                 project_id=pk, is_active=True,
                 status__in=['submitted', 'rejected', 'approved', 'updated']
             ).order_by('-start')
-            for i in submitted:
-                data.append(i)
-            serializer = self.serializer_class(data, many=True)
+            serializer = self.serializer_class(submitted, many=True)
             return Response({"result": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)

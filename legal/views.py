@@ -163,7 +163,9 @@ class PetitionViewSets(ModelViewSet):
             data = dict()
             consultant_id = request.GET.get('consultant')
             petition_ids = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
-            doc_types = DocumentList.objects.filter(petition_id__in=petition_ids).exclude(doc_type__category="Petition Document")
+            doc_types = DocumentList.objects.filter(
+                petition_id__in=petition_ids
+            ).exclude(doc_type__category="Petition Document")
             categories = Types.objects.exclude(category="Petition Document").order_by('category').distinct('category')
             for category in categories:
                 data[category.category] = []
