@@ -549,15 +549,16 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 class QuestionSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     value = serializers.SerializerMethodField()
+    comment = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ('id', 'title', 'value', 'field', 'answer_type', 'options', 'category', 'position')
+        fields = ('id', 'title', 'value', 'field', 'answer_type', 'options', 'category', 'position', 'comment')
 
     @staticmethod
     def get_value(obj):
         if obj.answer_type == 'boolean':
-            return False
+            return True if obj.value != 'Approach.txt added?' else False
         elif obj.answer_type == 'attachment':
             return []
         return None
@@ -565,3 +566,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_title(obj):
         return obj.value
+
+    @staticmethod
+    def get_comment(obj):
+        return None

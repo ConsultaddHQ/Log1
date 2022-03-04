@@ -337,8 +337,9 @@ class LeadViewSets(ModelViewSet):
             if request.method == 'GET':
                 first, last = get_page_limits(request)
                 sort_by = request.GET.get('sort_by', None)
-                queryset = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
+                queryset = Lead.objects.filter(owner=request.user)
                 queryset, counts = self.get_queryset_and_count(queryset, ['archived'], sort_by)
+                queryset.annotate(submission_count=Count('submission'))
                 if counts == 'error':
                     return Response({"message": ERROR_MSG, "error": str(queryset)}, status=400)
                 data = self.get_data(queryset, first, last)
@@ -2523,7 +2524,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods='post', detail=True, url_path='engineer_feedback')
+    @action(methods=['post'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
             test = get_object_or_404(Test, id=pk)
@@ -2540,6 +2541,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     submitted_by=request.user,
                     value=data.get("value", None),
                     question_id=data['question_id'],
+                    comment=data.get("comment", None),
                 )
                 question = answer.question
                 if question.answer_type == 'attachment':
@@ -2560,7 +2562,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"message": "Feedback submitted"}, status=201)
         except Exception as error:
             write_info(error, request)
-            return str(error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /question/
@@ -2578,7 +2580,7 @@ class QuestionViewSets(ModelViewSet):
             return Response({"data": serial.data}, status=200)
         except Exception as error:
             write_info(error, request)
-            return str(error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -2589,8 +2591,9 @@ class QuestionViewSets(ModelViewSet):
                 return Response({"message": "Please provide possible options for the question value"})
 
             if request.data.get('position'):
+                position = request.data.get('position')
                 question_qs = Question.objects.filter(
-                    category=request.data.get('category'), position__gte=request.data.get('position')
+                    category=request.data.get('category'), position__gte=position
                 ).order_by('position')
                 for obj in question_qs:
                     obj.position += 1
@@ -2611,4 +2614,22 @@ class QuestionViewSets(ModelViewSet):
             return Response({"message": "Question added to form"}, status=201)
         except Exception as error:
             write_info(error, request)
-            return str(error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='add')
+    def add_question(self, request, *args, **kwargs):
+        try:
+
+            for data in request.data['data']:
+                Question.objects.create(
+                    value=data['value'],
+                    field=data['field'],
+                    options=data['options'],
+                    position=data['position'],
+                    category=data['category'],
+                    answer_type=data['answer_type'],
+                )
+            return Response({"message": "Question added to form"}, status=201)
+        except Exception as error:
+            write_info(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

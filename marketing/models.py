@@ -278,7 +278,7 @@ class Question(TimeStampedModel):
     position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
 
     def __str__(self):
-        return f'{self.field} - {self.answer_type}'
+        return f'{self.field} - {self.answer_type} - {self.category}'
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -290,6 +290,7 @@ class Question(TimeStampedModel):
 class Answer(TimeStampedModel):
     attachment = GenericRelation(Attachment)
     value = models.TextField(_('Value'), null=True, blank=True)
+    comment = models.TextField(_('comment'), null=True, blank=True)
     submitted_by = models.ForeignKey(User, on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
 
