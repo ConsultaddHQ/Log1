@@ -209,7 +209,7 @@ class EngineeringViewSetTest(APITestCase):
 
         route = "/api/engineering/?query=&page=1&page_size=10&filter_json={%22support_status%22:%22active%22}"
         res = self.client.get(route)
-        self.assertEqual(res.data['data'][0]['support_status'], 'Active')
+        self.assertEqual(res.data['data'][0]['support_status'], 'Training')
 
         route = "/api/engineering/?query=&page=1&page_size=10&filter_json={%22support_status%22:%22training%22}"
         res = self.client.get(route)

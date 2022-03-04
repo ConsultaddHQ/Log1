@@ -128,7 +128,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
         return CommentGetSerializer(obj.comments.filter(parent_comment=None), many=True).data
 
     @staticmethod
-    def get_attachments(self):
+    def get_attachments(obj):
         return []
 
     @staticmethod

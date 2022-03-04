@@ -639,10 +639,8 @@ class ConsultantViewSets(ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         else:
             try:
-                qs = ConsultantRateRevision.objects.filter(
-                    consultant_id=request.data['consultant'], end=None
-                )
                 prev_rate = 0
+                qs = ConsultantRateRevision.objects.filter(consultant_id=request.data['consultant'], end=None)
                 if qs:
                     prev_rate_obj = qs.first()
                     prev_rate = prev_rate_obj.rate
@@ -656,7 +654,6 @@ class ConsultantViewSets(ModelViewSet):
                     feedback=request.data['feedback'],
                     consultant_id=request.data['consultant']
                 )
-                serializer = ConsultantRateRevisionSerializer(rate_obj)
 
                 # Push Notification
                 title = f"{rate_obj.consultant.name}'s rate revised to {rate_obj.rate} by {request.user.employee_name}"
@@ -665,6 +662,8 @@ class ConsultantViewSets(ModelViewSet):
                 # Activity
                 desc = f"{request.user.employee_name.title()} revised rate from {prev_rate} to {rate_obj.rate}"
                 create_activity(rate_obj.consultant.id, 'consultant', request.user, desc, 'updated')
+
+                serializer = ConsultantRateRevisionSerializer(rate_obj)
                 return Response({"data": serializer.data, "message": "Rate revised"}, status=201)
             except Exception as error:
                 write_exception(error, request)
