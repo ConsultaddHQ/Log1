@@ -779,7 +779,7 @@ def engineering_feedback_notification(feedback, request):
                 }
             ]
         }
-        post_msg_using_webhook(config.engineering_url, data)
+        post_msg_using_webhook(config.candidate_feedback_url, data)
         return "ok"
     except Exception as error:
         write_exception(message=error, request=request)

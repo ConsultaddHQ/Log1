@@ -212,17 +212,17 @@ class ConsultantTest(APITestCase):
         self.assertEqual(res.status_code, 200)
 
     def test_consultant_legal_login(self):
-        data = {"email": f"{self.consultant.first().email}", "password": 123456789}
+        data = {"email": f"{self.consultant.first().email}", "password": "123456789"}
         route = f"/api/consultant_petition/login/"
         res = self.client.post(route, data=json.dumps(data), content_type='application/json')
         self.assertEqual(res.status_code, 202)
 
-        data = {"email": "consultant@email.com", "password": 123456789}
+        data = {"email": "consultant@email.com", "password": "123456789"}
         route = f"/api/consultant_petition/login/"
         res = self.client.post(route, data=data, content_type='application/json')
         self.assertEqual(res.status_code, 400)
 
-        data = {"email1": "consultant@email.com", "password": 123456789}
+        data = {"email1": "consultant@email.com", "password": "123456789"}
         route = f"/api/consultant_petition/login/"
         res = self.client.post(route, data=data, content_type='application/json')
         self.assertEqual(res.status_code, 400)

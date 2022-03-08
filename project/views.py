@@ -416,8 +416,9 @@ class ProjectViewSets(ModelViewSet):
                 if 'status' in filters and len(filters["status"]) > 0:
                     not_joined = Project.objects.none()
                     if 'not_joined' in filters["status"]:
-                        not_joined = projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                                     start_date__lt=date.today())
+                        not_joined = projects.filter(
+                            statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
+                        )
                     projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
                     projects = (projects | not_joined).distinct('id')
             else:
@@ -738,12 +739,55 @@ class ProjectViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /project/<id>/support/
+# Route - /project/<project_id>/support/
 class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectSupport.objects.all()
     serializer_class = ProjectSupportSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+
+    @staticmethod
+    def fetch_scrum_masters(request):
+        scrum_masters = list(User.objects.filter(
+            team=request.user.team, role__name__in=['admin', 'proxy'], account_login=True
+        ).values_list('email', flat=True))
+        return scrum_masters
+
+    def support_assignment_mail(self, support, request):
+        try:
+            project = support.project
+            submission = project.submission
+            consultant = project.submission.consultant
+            scrum_masters = self.fetch_scrum_masters(request)
+
+            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            if os.environ.get('ENV', 'local') == 'prod':
+                to = [submission.created_by.email, project.support.email]
+                cc = ['engineering@consultadd.com'] + scrum_masters
+            else:
+                cc = []
+                to = ['sarang.m@consultadd.com']
+            mail_data = {
+                'to': to, 'cc': cc, 'bcc': [],
+                'template': '../templates/support_assignment.html',
+                'subject': f"{consultant.name}'s support initiated for  {project.submission.client} by"
+                           f" {support.support.employee_name}",
+                'context': {
+                    'support_name': support.support.employee_name,
+                    'client': submission.client, 'support_email': support.support.email,
+                    'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                    'marketer_name': submission.created_by.employee_name, 'start': project_start_date,
+                    'job_title': submission.lead.job_title, 'consultant_phone_no': consultant.phone_no,
+                    'project_location': submission.lead.city, 'consultant_location': consultant.current_city,
+                },
+            }
+            res, msg = send_email(mail_data, 'dimple.s@consultadd.com', request=request)
+            if not msg:
+                return res, "error"
+            return res, "ok"
+        except Exception as error:
+            write_exception(message=error)
+            return error, "error"
 
     def list(self, request, *args, **kwargs):
         try:
@@ -765,8 +809,9 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             if not start:
                 return Response({"message": "Start date can not be empty"}, status=400)
 
+            support_qs = project.support.exists()
             project_support = ProjectSupport.objects.create(
-                project=project, support=support, start=start, end=end, feedback=request.data.get('feedback')
+                project=project, support=support, start=start, end=end, feedback=request.data.get('feedback', None)
             )
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
@@ -776,6 +821,13 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             else:
                 desc = f"{request.user.employee_name} added {support.employee_name} as support person"
             create_activity(project.id, 'projectsupport', request.user, desc, 'created')
+
+            if not support_qs:
+                message, exception_msg = self.support_assignment_mail(project_support, request)
+                if exception_msg != 'Mail sent':
+                    return Response(
+                        {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400
+                    )
             return Response({"message": "Support is added"}, status=201)
         except Exception as error:
             write_exception(error, request)

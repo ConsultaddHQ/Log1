@@ -18,7 +18,6 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
-from marketing.models import Question
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
@@ -2017,7 +2016,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     test_type = 'Offline'
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
-                subject = f'Test Received :: {test_type} :: {consultant.name} :: {skills} '
+                subject = f'Test Received :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills} '
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     response, error = download_s3_object(resume.first().attachment_file.name)
@@ -2084,21 +2083,17 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     response, error = download_s3_object(doc.attachment_file.name)
                     path.append(response)
                 to = [created_by.email]
-                cc = scrum_masters + [config.ENGINEERING] + engineers_email
-                subject = f'Test Completed  :: {test_type} :: {consultant.name} :: {skills}'
                 title = f"Test Completed"
+                cc = scrum_masters + [config.ENGINEERING] + engineers_email
+                subject = f'Test Completed :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills}'
                 mail_data = {
-                    'to': to,
-                    'cc': cc,
-                    'bcc': [],
-                    'subject': subject,
+                    'to': to, 'cc': cc, 'bcc': [],
+                    'subject': subject, 'attachments': path,
                     'template': '../templates/submit_test.html',
                     'context': {
-                        'title': title,
-                        'engineer': engineer,
+                        'title': title, 'engineer': engineer,
                         'remarks': data['remarks'] if data['remarks'] else 'NA'
                     },
-                    'attachments': path
                 }
                 res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
                 delete_temp_file(path)
@@ -2335,10 +2330,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def assign_test(self, request, pk):
         try:
             test = get_object_or_404(Test, id=pk)
-            users = request.data.get('assign_to')
+            users = request.data.get('assign_to', [])
             test.assign_to.clear()
-            user_list = []
-            user_names = []
+            user_list, user_names = [], []
             for user_id in users:
                 user = get_object_or_404(User, id=user_id)
                 test.assign_to.add(user)
@@ -2378,17 +2372,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             # Push Notification
             message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
+                "title": title, "category": "alert",
+                "body": title, "show_in_foreground": True,
                 "click_action": "https://app.log1.com",
                 "data": {
-                    'is_read': False,
-                    'target': 'test',
-                    'is_deleted': False,
-                    'target_id': test.id,
-                    'timestamp': str(datetime.now()),
+                    'target_id': test.id, 'timestamp': str(datetime.now()),
+                    'is_read': False, 'target': 'test', 'is_deleted': False,
                 },
             }
             object_ids = [user.id for user in user_list]
@@ -2523,7 +2512,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods='post', detail=True, url_path='engineer_feedback')
+    @action(methods=['post'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
             test = get_object_or_404(Test, id=pk)
@@ -2560,7 +2549,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"message": "Feedback submitted"}, status=201)
         except Exception as error:
             write_info(error, request)
-            return str(error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /question/
@@ -2585,10 +2574,11 @@ class QuestionViewSets(ModelViewSet):
             if 'superadmin' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            if request.data.get('type') == 'option' and request.data.get('options') is None:
+            if request.data.get('type') == 'option' and request.data.get('options') is []:
                 return Response({"message": "Please provide possible options for the question value"})
 
-            if request.data.get('position'):
+            position = request.data.get('position', None)
+            if position:
                 question_qs = Question.objects.filter(
                     category=request.data.get('category'), position__gte=request.data.get('position')
                 ).order_by('position')
@@ -2604,7 +2594,7 @@ class QuestionViewSets(ModelViewSet):
                 value=request.data.get('value'),
                 answer_type=request.data.get('type'),
                 category=request.data.get('category'),
-                field=request.data.get('filed', None),
+                field=request.data.get('field', None),
                 options=request.data.get('options', []),
             )
 

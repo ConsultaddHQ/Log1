@@ -243,13 +243,21 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
+    visa_type = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
     rate_revision = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit',
-                  'rate_revision')
+                  'rate_revision', 'visa_type')
+
+    @staticmethod
+    def get_visa_type(obj):
+        qs = obj.work_auth.filter(is_current=True)
+        if qs:
+            return qs.first().visa_type
+        return None
 
     @staticmethod
     def get_rate(obj):
