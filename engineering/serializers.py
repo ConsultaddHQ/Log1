@@ -306,8 +306,9 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectSupport
-        fields = ('id', 'created', 'frequency', 'start', 'feedback', 'support_status', 'client', 'consultant', 'project',
-                  'joining_date',  'end', 'project_status', 'technology', 'support_duration', 'modified_at', 'timezone')
+        fields = (
+        'id', 'created', 'frequency', 'start', 'feedback', 'support_status', 'client', 'consultant', 'project',
+        'joining_date', 'end', 'project_status', 'technology', 'support_duration', 'modified_at', 'timezone')
 
     @staticmethod
     def get_support_status(obj):
@@ -343,13 +344,17 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_project(obj):
-        data = {
-            "id": obj.project.id,
-            "end_date": obj.project.end_date,
-            "is_remote": obj.project.is_remote,
-            "start_date": obj.project.start_date,
-        }
-        return data
+        project = obj.project
+        if project.is_remote:
+            data = {
+                "id": project.id,
+                "feedback": project.feedback,
+                "end_date": project.end_date,
+                "is_remote": project.is_remote,
+                "start_date": project.start_date,
+            }
+            return data
+        return project.id
 
     @staticmethod
     def get_technology(obj):
@@ -406,8 +411,10 @@ class EngineerReportSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_project(obj):
         project = EngineerProjectSerializer(
-            obj.projects.filter(statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
-                                statuses__is_current=True, project__start_date__lte=date.today()), many=True
+            obj.projects.filter(
+                statuses__is_current=True, project__start_date__lte=date.today(),
+                statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
+            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True,), many=True
         ).data
         data = {
             "bandwidth": len(project),

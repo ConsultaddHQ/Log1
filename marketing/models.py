@@ -263,6 +263,7 @@ class VendorLayer(TimeStampedModel):
 class Question(TimeStampedModel):
     TYPE = (
         ('text', 'Text'),
+        ('rate', 'Rate'),
         ('option', 'Option'),
         ('boolean', 'Boolean'),
         ('integer', 'Integer'),
@@ -290,7 +291,7 @@ class Question(TimeStampedModel):
 class Answer(TimeStampedModel):
     attachment = GenericRelation(Attachment)
     value = models.TextField(_('Value'), null=True, blank=True)
-    comment = models.TextField(_('comment'), null=True, blank=True)
+    remark = models.TextField(_('Remark'), null=True, blank=True)
     submitted_by = models.ForeignKey(User, on_delete=models.CASCADE)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
 

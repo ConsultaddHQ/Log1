@@ -125,4 +125,5 @@ class AnswerAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
     list_filter = ('object_id', 'content_type')
     search_fields = ('id', 'question__value', 'submitted_by__employee_name')
-    list_display = ('id', 'submitted_by', 'question', 'value', 'object_id', 'content_type', 'created', 'modified')
+    list_display = ('id', 'submitted_by', 'question', 'value', 'object_id', 'content_type', 'created', 'modified',
+                    'comment')

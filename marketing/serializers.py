@@ -558,7 +558,7 @@ class QuestionSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_value(obj):
         if obj.answer_type == 'boolean':
-            return True if obj.value != 'Approach.txt added?' else False
+            return None
         elif obj.answer_type == 'attachment':
             return []
         return None

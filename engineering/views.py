@@ -717,7 +717,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             if query:
                 engineer = engineer.filter(employee_name__istartswith=query)
 
-            projects = Project.objects.all().order_by('id').distinct('id')
+            projects = Project.objects.exclude(statuses__status__istartswith='terminated')
 
             counts = {
                 "support_status": {
@@ -800,6 +800,73 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                                                     project__statuses__status__istartswith='terminated')
             serial = EngineerProjectSerializer(project[first: last], many=True)
             return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='dashboard')
+    def dashboard(self, request, **kwargs):
+        try:
+            project = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))
+            active = project.filter(
+                project__start_date__lte=date.today(),
+                statuses__is_current=True, statuses__frequency='more_than_2_days',
+            ).exclude(project__statuses__status__istartswith='terminated').count()
+            less_active = project.filter(
+                statuses__frequency='less_than_3_days', statuses__is_current=True
+            ).exclude(project__statuses__status__istartswith='terminated').count()
+            independent = project.filter(
+                statuses__is_current=True, statuses__frequency__in=['independent', 'twice_a_month'],
+            ).exclude(project__statuses__status__istartswith='terminated').count()
+            terminated = project.filter(project__statuses__status__istartswith='terminated').count()
+
+            total_project = project.count()
+            project_percentage = {
+                "active": 0,
+                "terminated": 0,
+                "less_active": 0,
+                "independent": 0,
+                "count": {
+                    "active": active,
+                    "total": total_project,
+                    "terminated": terminated,
+                    "less_active": less_active,
+                    "independent": independent,
+                }
+            }
+            if total_project != 0:
+                project_percentage["active"] = round((active/total_project) * 100, 2)
+                project_percentage["terminated"] = round((terminated/total_project) * 100, 2)
+                project_percentage["less_active"] = round((less_active/total_project) * 100, 2)
+                project_percentage["independent"] = round((independent/total_project) * 100, 2)
+
+            test = Test.objects.filter(engineer=kwargs.get('pk'))
+            passed = test.filter(status='passed').count()
+            failed = test.filter(status='failed').count()
+            feedback_due = test.filter(status='feedback_due').count()
+
+            total_test = test.count()
+            test_percentage = {
+                "passed": 0,
+                "failed": 0,
+                "feedback_due": 0,
+                "count": {
+                    "passed": passed,
+                    "failed": failed,
+                    "total": total_test,
+                    "feedback_due": feedback_due,
+                }
+            }
+            if total_test != 0:
+                test_percentage["passed"] = round((passed/total_test) * 100, 2)
+                test_percentage["failed"] = round((failed/total_test) * 100, 2)
+                test_percentage["feedback_due"] = round((feedback_due/total_test) * 100, 2)
+
+            data = {
+                "test": test_percentage,
+                "project": project_percentage,
+            }
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
