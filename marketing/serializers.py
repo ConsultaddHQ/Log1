@@ -7,7 +7,8 @@ from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
-from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact
+from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, Answer, \
+    Question
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -127,7 +128,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
         return CommentGetSerializer(obj.comments.filter(parent_comment=None), many=True).data
 
     @staticmethod
-    def get_attachments(self):
+    def get_attachments(obj):
         return []
 
     @staticmethod
@@ -427,10 +428,28 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         return True
 
 
+class AnswerSerializer(serializers.ModelSerializer):
+    question = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Answer
+        fields = ('id', 'question', 'value', 'submitted_by', 'created', 'object_id')
+
+    @staticmethod
+    def get_submitted_by(obj):
+        return obj.submitted_by.employee_name
+
+    @staticmethod
+    def get_question(obj):
+        return obj.question.name
+
+
 class TestGetSerializer(serializers.ModelSerializer):
     engineers = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     attachments = AttachmentGetSerializer(many=True)
+    engineer_feedback = AnswerSerializer(many=True)
     assigned_to = serializers.SerializerMethodField()
     submitted_by = serializers.SerializerMethodField()
 
@@ -438,7 +457,7 @@ class TestGetSerializer(serializers.ModelSerializer):
         model = Test
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
                   'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments',
-                  'cancel_reason', 'assigned_to', 'permission')
+                  'cancel_reason', 'assigned_to', 'permission', 'engineer_feedback')
 
     @staticmethod
     def get_engineers(obj):
@@ -525,3 +544,24 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_check_list(obj):
         return get_project_check_list(obj)
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+    title = serializers.SerializerMethodField()
+    values = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Question
+        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position')
+
+    @staticmethod
+    def get_values(obj):
+        if obj.answer_type == 'boolean':
+            return False
+        elif obj.answer_type == 'attachment':
+            return []
+        return None
+
+    @staticmethod
+    def get_title(obj):
+        return obj.value

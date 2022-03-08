@@ -14,6 +14,7 @@ from activity.models import Activity
 from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
+from utils_app.calendar import get_profile_picture
 from activity.serializers import ActivitySerializer
 from utils_app.aws_utils import download_s3_object_beats
 from notification.utils import create_notification, push_notification
@@ -707,21 +708,6 @@ def candidate_filter(request):
                 Q(email__iexact=query)
             )
 
-            # keywords = query.split()
-            # if len(keywords) > 2:
-            #     or_lookup = (
-            #             Q(email__iexact=keywords[0]) |
-            #             Q(name__icontains=keywords[0])
-            #     )
-            #     for keyword in keywords[1:]:
-            #         or_lookup.add((
-            #                 Q(email__iexact=keyword) |
-            #                 Q(name__icontains=keyword)
-            #         ), or_lookup.connector)
-            #
-            #     lookup_qs = consultants.filter(or_lookup)
-            #     consultants = all_consultants.union(lookup_qs)
-
         consultants = Consultant.objects.filter(
             id__in=consultants.distinct('id').order_by('id').values_list('id', flat=True)
         )
@@ -749,6 +735,8 @@ def candidate_filter(request):
 def pre_joining_feedback_notification(feedback, request):
     try:
         project = feedback.project
+        title = project.submission.lead.job_title
+        profile_path = get_profile_picture(request.user)
         data = {
             "@type": "MessageCard",
             "themeColor": "#0076D7",
@@ -756,8 +744,10 @@ def pre_joining_feedback_notification(feedback, request):
             "summary": f"Pre-Joining-Call feedback",
             "sections": [
                 {
-                    "activityTitle": f"{project.consultant.name} :: {project.submission.lead.job_title} :: {project.submission.client}",
+                    "activityTitle": f"{project.consultant.name} :: {title} :: {project.submission.client}",
+                    "activitySubtitle": f"***Pre joining feedback by {request.user.name}***",
                     "activityText": feedback.description,
+                    "activityImage": profile_path,
                     "markdown": True
                 }
             ]
@@ -772,22 +762,24 @@ def pre_joining_feedback_notification(feedback, request):
 def engineering_feedback_notification(feedback, request):
     try:
         project = feedback.project
+        profile_path = get_profile_picture(request.user)
         data = {
             "@type": "MessageCard",
             "themeColor": "#0076D7",
             "@context": "http://schema.org/extensions",
-            "summary": f"***Support Issue feedback***",
+            "summary": f"***Engineering Issue***",
             "sections": [
                 {
                     "activityTitle": f"***{project.consultant.name}*** :: ***{project.submission.lead.job_title}*** "
                                      f":: ***{project.submission.client}***",
-                    "activitySubtitle": f"***Issue feedback added***",
+                    "activitySubtitle": f"***Engineering Issue feedback by {request.user.name}***",
                     "activityText": feedback.description,
+                    "activityImage": profile_path,
                     "markdown": True
                 }
             ]
         }
-        post_msg_using_webhook(config.engineering_url, data)
+        post_msg_using_webhook(config.candidate_feedback_url, data)
         return "ok"
     except Exception as error:
         write_exception(message=error, request=request)

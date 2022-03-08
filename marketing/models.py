@@ -1,8 +1,9 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.utils.translation import ugettext_lazy as _
-from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 
 from employee.models import User
 from activity.models import Comment
@@ -259,8 +260,59 @@ class VendorLayer(TimeStampedModel):
         return f'{self.id}:L{self.level} {self.vendor_company.name}'
 
 
+class Question(TimeStampedModel):
+    TYPE = (
+        ('text', 'Text'),
+        ('option', 'Option'),
+        ('boolean', 'Boolean'),
+        ('integer', 'Integer'),
+        ('long_text', 'Long Text'),
+        ('attachment', 'Attachment'),
+    )
+    value = models.TextField(_('Question Value'))
+    field = models.CharField(_('Model Field'), max_length=100, null=True, blank=True)
+    options = ArrayField(models.CharField(_('Choices'), max_length=30, blank=True), blank=True)
+
+    category = models.CharField(_('Question Category'), max_length=50)
+    answer_type = models.CharField(_('Type'), max_length=20, choices=TYPE)
+    position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
+
+    def __str__(self):
+        return f'{self.field} - {self.answer_type}'
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Question, self).save(*args, **kwargs)
+
+
+class Answer(TimeStampedModel):
+    attachment = GenericRelation(Attachment)
+    value = models.TextField(_('Value'), null=True, blank=True)
+    submitted_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
+
+    object_id = models.PositiveIntegerField(_('Object Id'), )
+    content_object = GenericForeignKey('content_type', 'object_id')
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ('-modified',)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Answer, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.question.value}'
+
+
 class Test(TimeStampedModel):
     attachments = GenericRelation(Attachment)
+    engineer_feedback = GenericRelation(Answer)
     link = models.TextField(_('Test Link'), null=True, blank=True)
     is_video = models.BooleanField(_('Video Test'), default=False)
     is_offline = models.BooleanField(_('Offline Test'), default=False)

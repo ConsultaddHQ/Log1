@@ -63,6 +63,8 @@ class Types(models.Model):
 class Petition(TimeStampedModel):
     comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is Petition Active'), default=True)
+    is_withdrawn = models.BooleanField(_('Withdraw Petition'), default=False)
+    expiry_date = models.DateField(_('Expiry Date'), null=True, default=None)
     lca_no = models.CharField(_('LCA No.'), max_length=40, null=True, blank=True)
     employer = models.CharField(_('Employer'), max_length=20, default='Consultadd')
     status = models.CharField(_('Status'), choices=PETITION_STATUSES, max_length=20)

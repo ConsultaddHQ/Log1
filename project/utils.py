@@ -148,6 +148,7 @@ class ProjectUtil:
 
     def fetch_project_count(self, project_status):
         try:
+            team = self.project.submission.created_by.team
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
             total_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one
@@ -155,29 +156,29 @@ class ProjectUtil:
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
-                employer__iexact=self.employer,
+                submission__created_by__team=team,
             ).count()
             return total_count, team_count
         except Exception as error:
             write_exception(message=error, request=self.request)
 
     def send_join_notification(self):
-        # Emoji for Message
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             total, team = self.fetch_project_count("joined")
+            team_name = self.project.submission.created_by.team.name
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
             if self.project.is_remote or self.project.submission.lead.is_w2:
                 activity_title = f"***{self.project.consultant.name.strip()}*** joined ***Remote*** project at " \
                                  f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title}***"
+                                 f"***{self.project.submission.lead.job_title.strip()}***"
             else:
                 activity_title = f"***{self.consultant.name.strip()}*** joined project at " \
                                  f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title}***"
+                                 f"***{self.project.submission.lead.job_title.strip()}***"
 
             profile_path = get_profile_picture(self.user)
             data = {
@@ -208,10 +209,10 @@ class ProjectUtil:
                 }],
                 "potentialAction": [{
                     "@type": "ActionCard",
-                    "name": f"{self.employer} - {team}",
+                    "name": f"{team_name} - {team}",
                     "actions": [{
                         "@type": "HttpPOST",
-                        "name": f"{self.employer} - {team}",
+                        "name": f"{team_name} - {team}",
                         "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
                     }]
                 }, {
@@ -318,7 +319,7 @@ class ProjectUtil:
             months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
             activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title}***, terminated from " \
+                                 f"***{self.project.submission.lead.job_title.strip()}***, terminated from " \
                                  f"***{self.project.submission.client}*** with the end date of ***{self.project_end}***"
             profile_path = get_profile_picture(self.user)
             data = {
@@ -368,8 +369,8 @@ class ProjectUtil:
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
 
             activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title}***, cancelled at " \
-                                 f"***{self.project.submission.client}***"
+                                 f"***{self.project.submission.lead.job_title.strip()}***, cancelled at " \
+                                 f"***{self.project.submission.client.strip()}***"
             profile_path = get_profile_picture(self.user)
             data = {
                 "@type": "MessageCard",

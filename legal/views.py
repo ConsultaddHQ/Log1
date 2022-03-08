@@ -96,6 +96,8 @@ class PetitionViewSets(ModelViewSet):
                     'id': petition.id,
                     'status': petition.status,
                     'employer': petition.employer,
+                    'expiry_date': petition.expiry_date,
+                    'is_withdrawn': petition.is_withdrawn,
                     'petition_type': petition.petition_type,
                     'beneficiary_type': petition.beneficiary_type,
                     'assigned_to': petition.assigned_to.employee_name,
@@ -118,6 +120,7 @@ class PetitionViewSets(ModelViewSet):
                 status='assigned',
                 created_by=request.user,
                 employer=request.data['employer'],
+                expiry_date=request.data['expiry_date'],
                 beneficiary_id=request.data['consultant'],
                 assigned_to_id=request.data['assigned_to'],
                 petition_type=request.data['petition_type'],
@@ -134,7 +137,7 @@ class PetitionViewSets(ModelViewSet):
             consultant.p_is_active = True
             consultant.save()
             serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=201)
+            return Response({"result": serializer.data, "message": "Petition Created"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -146,7 +149,7 @@ class PetitionViewSets(ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             serializer = self.serializer_class(petition)
-            return Response({"result": serializer.data}, status=202)
+            return Response({"result": serializer.data, "message": "Petition Updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
@@ -160,7 +163,9 @@ class PetitionViewSets(ModelViewSet):
             data = dict()
             consultant_id = request.GET.get('consultant')
             petition_ids = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
-            doc_types = DocumentList.objects.filter(petition_id__in=petition_ids).exclude(doc_type__category="Petition Document")
+            doc_types = DocumentList.objects.filter(
+                petition_id__in=petition_ids
+            ).exclude(doc_type__category="Petition Document")
             categories = Types.objects.exclude(category="Petition Document").order_by('category').distinct('category')
             for category in categories:
                 data[category.category] = []
@@ -197,6 +202,7 @@ class PetitionViewSets(ModelViewSet):
                 status='assigned',
                 created_by=request.user,
                 employer=request.data['employer'],
+                expiry_date=request.data['expiry_date'],
                 beneficiary_id=request.data['consultant'],
                 assigned_to_id=request.data['assigned_to'],
                 petition_type=request.data['petition_type'],
@@ -537,6 +543,17 @@ class PetitionViewSets(ModelViewSet):
                 )
                 serializer = ConsultantCommentGetSerializer(comment)
                 return Response({"result": serializer.data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=["put"], detail=True, url_path='withdraw')
+    def withdraw(self, request, pk):
+        try:
+            petition = get_object_or_404(Petition, id=pk)
+            petition.is_withdrawn = True
+            petition.save()
+            return Response({"message": "Petition Withdrawn Successfully"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)

@@ -201,6 +201,7 @@ class SupportStatus(models.Model):
 class TimeSheet(TimeStampedModel):
     TIMESHEET_STATUS = (
         ('draft', 'Draft'),
+        ('updated', 'Updated'),
         ('rejected', 'Rejected'),
         ('approved', 'Approved'),
         ('submitted', 'Submitted'),
