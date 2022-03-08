@@ -2083,9 +2083,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     response, error = download_s3_object(doc.attachment_file.name)
                     path.append(response)
                 to = [created_by.email]
-                cc = scrum_masters + [config.ENGINEERING] + engineers_email
-                subject = f'Test Completed  :: {test_type} :: {consultant.name} :: {skills}'
                 title = f"Test Completed"
+                cc = scrum_masters + [config.ENGINEERING] + engineers_email
+                subject = f'Test Completed :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills}'
                 mail_data = {
                     'to': to, 'cc': cc, 'bcc': [],
                     'subject': subject, 'attachments': path,
@@ -2512,7 +2512,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods='post', detail=True, url_path='engineer_feedback')
+    @action(methods=['post'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
             test = get_object_or_404(Test, id=pk)
@@ -2549,7 +2549,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"message": "Feedback submitted"}, status=201)
         except Exception as error:
             write_info(error, request)
-            return str(error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /question/
@@ -2574,7 +2574,7 @@ class QuestionViewSets(ModelViewSet):
             if 'superadmin' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            if request.data.get('type') == 'option' and request.data.get('options') is None:
+            if request.data.get('type') == 'option' and request.data.get('options') is []:
                 return Response({"message": "Please provide possible options for the question value"})
 
             position = request.data.get('position', None)
@@ -2594,7 +2594,7 @@ class QuestionViewSets(ModelViewSet):
                 value=request.data.get('value'),
                 answer_type=request.data.get('type'),
                 category=request.data.get('category'),
-                field=request.data.get('filed', None),
+                field=request.data.get('field', None),
                 options=request.data.get('options', []),
             )
 
