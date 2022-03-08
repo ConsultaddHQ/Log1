@@ -548,18 +548,16 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
 class QuestionSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
-    value = serializers.SerializerMethodField()
-    comment = serializers.SerializerMethodField()
+    values = serializers.SerializerMethodField()
+    remark = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ('id', 'title', 'value', 'field', 'answer_type', 'options', 'category', 'position', 'comment')
+        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position', 'remark')
 
     @staticmethod
-    def get_value(obj):
-        if obj.answer_type == 'boolean':
-            return None
-        elif obj.answer_type == 'attachment':
+    def get_values(obj):
+        if obj.answer_type == 'attachment':
             return []
         return None
 

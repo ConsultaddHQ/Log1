@@ -2084,9 +2084,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     response, error = download_s3_object(doc.attachment_file.name)
                     path.append(response)
                 to = [created_by.email]
-                cc = scrum_masters + [config.ENGINEERING] + engineers_email
-                subject = f'Test Completed  :: {test_type} :: {consultant.name} :: {skills}'
                 title = f"Test Completed"
+                cc = scrum_masters + [config.ENGINEERING] + engineers_email
+                subject = f'Test Completed :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills}'
                 mail_data = {
                     'to': to, 'cc': cc, 'bcc': [],
                     'subject': subject, 'attachments': path,
