@@ -336,7 +336,7 @@ class LeadViewSets(ModelViewSet):
             if request.method == 'GET':
                 first, last = get_page_limits(request)
                 sort_by = request.GET.get('sort_by', None)
-                queryset = Lead.objects.filter(owner=request.user)
+                queryset = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
                 queryset, counts = self.get_queryset_and_count(queryset, ['archived'], sort_by)
                 queryset.annotate(submission_count=Count('submission'))
                 if counts == 'error':
