@@ -707,19 +707,50 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
-    def support_status_filter(support_qs, support_status):
+    def support_status_filter(queryset, support_status):
+        queryset = queryset.filter(statuses__is_current=True)
         if support_status == 'training':
-            support_qs = support_qs.filter(statuses__frequency='more_than_2_days', statuses__is_current=True,
-                                           project__start_date__gte=date.today())
+            queryset = queryset.filter(
+                statuses__frequency='more_than_2_days',
+                project__start_date__gte=date.today()
+            )
         elif support_status == 'active':
-            support_qs = support_qs.filter(statuses__frequency='more_than_2_days', statuses__is_current=True,
-                                           project__start_date__lte=date.today())
+            queryset = queryset.filter(
+                statuses__frequency='more_than_2_days',
+                project__start_date__lte=date.today()
+            )
         elif support_status == 'less_active':
-            support_qs = support_qs.filter(statuses__is_current=True, statuses__frequency='less_than_3_days')
+            queryset = queryset.filter(
+                statuses__frequency='less_than_3_days'
+            )
         elif support_status == 'independent':
-            support_qs = support_qs.filter(statuses__is_current=True,
-                                           statuses__frequency__in=['independent', 'twice_a_month'])
-        return support_qs
+            queryset = queryset.filter(
+                statuses__frequency__in=['independent', 'twice_a_month']
+            )
+        return queryset
+
+    @staticmethod
+    def project_support_filter(queryset, support_status):
+        queryset = queryset.filter(projects__statuses__is_current=True)
+        if support_status == 'training':
+            queryset = queryset.filter(
+                support__statuses__frequency='more_than_2_days',
+                start_date__gte=date.today()
+            )
+        elif support_status == 'active':
+            queryset = queryset.filter(
+                support__statuses__frequency='more_than_2_days',
+                start_date__lte=date.today()
+            )
+        elif support_status == 'less_active':
+            queryset = queryset.filter(
+                support__statuses__frequency='less_than_3_days'
+            )
+        elif support_status == 'independent':
+            queryset = queryset.filter(
+                support__statuses__frequency__in=['independent', 'twice_a_month']
+            )
+        return queryset
 
     def list(self, request, *args, **kwargs):
         try:
@@ -730,40 +761,35 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 projects__statuses__is_current=True,
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
+
             if query:
-                engineer = engineer.filter(employee_name__istartswith=query)
+                engineer = engineer.filter(employee_name__istartswith=query.lstrip())
 
             projects = Project.objects.exclude(statuses__status__istartswith='terminated')
 
             counts = {
                 "support_status": {
-                    "training": {
-                        "display_name": "Training",
-                        "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
-                                                 support__statuses__frequency='more_than_2_days').count()
-                    },
                     "active": {
                         "display_name": "Active",
-                        "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
-                                                 support__statuses__frequency='more_than_2_days').count()
+                        "count": self.project_support_filter(projects, 'active').count()
+                    },
+                    "training": {
+                        "display_name": "Training",
+                        "count": self.project_support_filter(projects, 'training').count()
                     },
                     "less_active": {
                         "display_name": "Less Active",
-                        "count": projects.filter(support__statuses__is_current=True,
-                                                 support__statuses__frequency='less_than_3_days').count()
+                        "count": self.project_support_filter(projects, 'less_active').count()
                     },
                     "independent": {
                         "display_name": "Independent",
-                        "count": projects.filter(
-                            support__statuses__is_current=True,
-                            support__statuses__frequency__in=['independent', 'twice_a_month']
-                        ).count()
+                        "count": self.project_support_filter(projects, 'independent').count()
                     },
                 },
             }
 
-            serial = EngineerReportSerializer(engineer[first: last], many=True)
-            return Response({"data": serial.data, "counts": counts, "total": len(serial.data)}, status=200)
+            serializer = EngineerReportSerializer(engineer[first: last], many=True)
+            return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -775,10 +801,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.GET.get('query', None)
             support_status = request.GET.get('status', None)
 
-            projects = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))\
-                .exclude(project__statuses__status__istartswith='terminated')
+            projects = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk')
+            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
             if query:
-                projects = projects.filter(project__consultant__name__istartswith=query)
+                projects = projects.filter(project__consultant__name__istartswith=query.lstrip())
             if support_status:
                 projects = self.support_status_filter(projects, support_status)
 
@@ -800,8 +827,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     Q(submission__consultant_marketing__consultant__name__istartswith=query),
                 )
 
-            serial = EngineerTestSerializer(test[first: last], many=True)
-            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+            serializer = EngineerTestSerializer(test[first: last], many=True)
+            return Response({"data": serializer.data, "count": test.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -836,8 +863,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.GET.get('query', None)
             support_status = request.GET.get('status', None)
 
-            projects = ProjectSupport.objects.filter(support__id=kwargs.get('pk'),
-                                                     project__statuses__status__istartswith='terminated')
+            projects = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk'),
+                project__statuses__is_current=True,
+                project__statuses__status__istartswith='terminated'
+            )
             if query:
                 projects = projects.filter(project__consultant__name__istartswith=query)
             if support_status:
