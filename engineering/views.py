@@ -15,10 +15,10 @@ from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
 from activity.views import create_activity
-from engineering.utils import tag_and_notify
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, DONT_HAVE_ACCESS, get_page_limits, write_exception
+from engineering.utils import tag_and_notify, interview_stats, project_support_filter
 
 
 # Route - /engineering/
@@ -729,29 +729,6 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             )
         return queryset
 
-    @staticmethod
-    def project_support_filter(queryset, support_status):
-        queryset = queryset.filter(projects__statuses__is_current=True)
-        if support_status == 'training':
-            queryset = queryset.filter(
-                support__statuses__frequency='more_than_2_days',
-                start_date__gte=date.today()
-            )
-        elif support_status == 'active':
-            queryset = queryset.filter(
-                support__statuses__frequency='more_than_2_days',
-                start_date__lte=date.today()
-            )
-        elif support_status == 'less_active':
-            queryset = queryset.filter(
-                support__statuses__frequency='less_than_3_days'
-            )
-        elif support_status == 'independent':
-            queryset = queryset.filter(
-                support__statuses__frequency__in=['independent', 'twice_a_month']
-            )
-        return queryset
-
     def list(self, request, *args, **kwargs):
         try:
             first, last = get_page_limits(request)
@@ -763,7 +740,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             ).order_by('employee_id').distinct('employee_id')
 
             if query:
-                engineer = engineer.filter(employee_name__istartswith=query.lstrip())
+                engineer = engineer.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
 
             projects = Project.objects.exclude(statuses__status__istartswith='terminated')
 
@@ -771,19 +748,19 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "support_status": {
                     "active": {
                         "display_name": "Active",
-                        "count": self.project_support_filter(projects, 'active').count()
+                        "count": project_support_filter(projects, 'active').count()
                     },
                     "training": {
                         "display_name": "Training",
-                        "count": self.project_support_filter(projects, 'training').count()
+                        "count": project_support_filter(projects, 'training').count()
                     },
                     "less_active": {
                         "display_name": "Less Active",
-                        "count": self.project_support_filter(projects, 'less_active').count()
+                        "count": project_support_filter(projects, 'less_active').count()
                     },
                     "independent": {
                         "display_name": "Independent",
-                        "count": self.project_support_filter(projects, 'independent').count()
+                        "count": project_support_filter(projects, 'independent').count()
                     },
                 },
             }
@@ -805,12 +782,12 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 support__id=kwargs.get('pk')
             ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
             if query:
-                projects = projects.filter(project__consultant__name__istartswith=query.lstrip())
+                projects = projects.filter(project__consultant__name__istartswith=query.lstrip().replace(':amp:', '&'))
             if support_status:
                 projects = self.support_status_filter(projects, support_status)
 
-            serial = EngineerProjectSerializer(projects[first: last], many=True)
-            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+            serializer = EngineerProjectSerializer(projects[first: last], many=True)
+            return Response({"data": serializer.data, "total": projects.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -823,8 +800,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             test = Test.objects.filter(engineer=kwargs.get('pk'))
             if query:
                 test = test.filter(
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query),
+                    Q(submission__created_by__employee_name__istartswith=query.lstrip().replace(':amp:', '&')) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query.lstrip().replace(':amp:', '&')),
                 )
 
             serializer = EngineerTestSerializer(test[first: last], many=True)
@@ -848,10 +825,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 interview = Interview.objects.filter(Q(guest=kwargs.get('pk')) | Q(supervisor=kwargs.get('pk')))
 
             if query:
-                interview = interview.filter(submission__consultant_marketing__consultant=query)
+                interview = interview.filter(submission__consultant_marketing__consultant=query.lstrip(
+                ).replace(':amp:', '&'))
 
-            serial = EngineerInterviewSerializer(interview[first: last], many=True)
-            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+            serializer = EngineerInterviewSerializer(interview[first: last], many=True)
+            return Response({"data": serializer.data, "count": interview.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -869,12 +847,12 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 project__statuses__status__istartswith='terminated'
             )
             if query:
-                projects = projects.filter(project__consultant__name__istartswith=query)
+                projects = projects.filter(project__consultant__name__istartswith=query.lstrip().replace(':amp:', '&'))
             if support_status:
                 projects = self.support_status_filter(projects, support_status)
 
-            serial = EngineerProjectSerializer(projects[first: last], many=True)
-            return Response({"data": serial.data, "count": len(serial.data)}, status=200)
+            serializer = EngineerProjectSerializer(projects[first: last], many=True)
+            return Response({"data": serializer.data, "count": projects.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -882,38 +860,21 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='dashboard')
     def dashboard(self, request, **kwargs):
         try:
-            project_qs = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))
-            active = project_qs.filter(
-                project__start_date__lte=date.today(),
-                statuses__is_current=True, statuses__frequency='more_than_2_days',
-            ).exclude(project__statuses__status__istartswith='terminated').count()
-            less_active = project_qs.filter(
-                statuses__frequency='less_than_3_days', statuses__is_current=True
-            ).exclude(project__statuses__status__istartswith='terminated').count()
-            independent = project_qs.filter(
-                statuses__is_current=True, statuses__frequency__in=['independent', 'twice_a_month'],
-            ).exclude(project__statuses__status__istartswith='terminated').count()
-            terminated = project_qs.filter(project__statuses__status__istartswith='terminated').count()
+            projects = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))
+            project_qs = projects.exclude(project__statuses__status__istartswith='terminated')
+            active = self.support_status_filter(project_qs, 'active').count()
+            less_active = self.support_status_filter(project_qs, 'less_active').count()
+            independent = self.support_status_filter(project_qs, 'independent').count()
+            terminated = projects.filter(project__statuses__status__istartswith='terminated').count()
 
-            total_project = project_qs.count()
+            total_project = projects.count()
             project = {
-                "active": 0,
-                "terminated": 0,
-                "less_active": 0,
-                "independent": 0,
-                "count": {
                     "active": active,
                     "total": total_project,
                     "terminated": terminated,
                     "less_active": less_active,
                     "independent": independent,
                 }
-            }
-            if total_project != 0:
-                project["active"] = int((active/total_project) * 100)
-                project["terminated"] = int((terminated/total_project) * 100)
-                project["less_active"] = int((less_active/total_project) * 100)
-                project["independent"] = int((independent/total_project) * 100)
 
             test_qs = Test.objects.filter(engineer=kwargs.get('pk'))
             passed = test_qs.filter(status='passed').count()
@@ -922,72 +883,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             total_test = test_qs.count()
             test = {
-                "passed": 0,
-                "failed": 0,
-                "feedback_due": 0,
-                "count": {
                     "passed": passed,
                     "failed": failed,
                     "total": total_test,
                     "feedback_due": feedback_due,
                 }
-            }
-            if total_test != 0:
-                test["passed"] = int((passed/total_test) * 100)
-                test["failed"] = int((failed/total_test) * 100)
-                test["feedback_due"] = int((feedback_due/total_test) * 100)
-
-            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'))
-            sup_offer = sup_interview_qs.filter(status='offer').count()
-            sup_failed = sup_interview_qs.filter(status='failed').count()
-            sup_next_round = sup_interview_qs.filter(status='next_round').count()
-            sup_feedback_due = sup_interview_qs.filter(status='feedback_due').count()
-
-            total_sup_interview = sup_interview_qs.count()
-            sup_interview = {
-                "offer": 0,
-                "failed": 0,
-                "next_round": 0,
-                "feedback_due": 0,
-                "count": {
-                    "offer": sup_offer,
-                    "failed": sup_failed,
-                    "total": total_sup_interview,
-                    "next_round": sup_next_round,
-                    "feedback_due": sup_feedback_due
-                }
-            }
-            if total_sup_interview != 0:
-                sup_interview["offer"] = int((sup_offer/total_sup_interview) * 100)
-                sup_interview["failed"] = int((sup_failed/total_sup_interview) * 100)
-                sup_interview["next_round"] = int((sup_next_round/total_sup_interview) * 100)
-                sup_interview["feedback_due"] = int((sup_feedback_due/total_sup_interview) * 100)
-
-            guest_interview_qs = Interview.objects.filter(guest=kwargs.get('pk'))
-            guest_offer = guest_interview_qs.filter(status='offer').count()
-            guest_failed = guest_interview_qs.filter(status='failed').count()
-            guest_next_round = guest_interview_qs.filter(status='next_round').count()
-            guest_feedback_due = guest_interview_qs.filter(status='feedback_due').count()
-
-            total_guest_interview = guest_interview_qs.count()
-            guest_interview = {
-                "offer": 0,
-                "failed": 0,
-                "next_round": 0,
-                "feedback_due": 0,
-                "count": {
-                    "offer": guest_offer,
-                    "failed": guest_failed,
-                    "total": total_guest_interview,
-                    "next_round": guest_next_round,
-                    "feedback_due": guest_feedback_due
-                }
-            }
-            if total_guest_interview != 0:
-                guest_interview["offer"] = int((guest_offer/total_guest_interview) * 100)
-                guest_interview["failed"] = int((guest_failed/total_guest_interview) * 100)
-                guest_interview["next_round"] = int((guest_next_round/total_guest_interview) * 100)
-                guest_interview["feedback_due"] = int((guest_feedback_due/total_guest_interview) * 100)
 
             update_qs = ProjectUpdate.objects.filter(
                 project__support__support=kwargs.get('pk')).order_by('project_id').distinct('project_id')
@@ -999,10 +899,15 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             technology_ls.remove(None)
             total_technology = len(technology_ls)
-            technology = {"count": {"total": total_technology}}
+            technology = {"total": total_technology}
             for item in technology_ls:
-                technology[item] = int((technology_ls.count(item)/total_technology) * 100)
-                technology["count"][item] = technology_ls.count(item)
+                technology[item] = technology_ls.count(item)
+
+            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'))
+            sup_interview = interview_stats(sup_interview_qs)
+
+            guest_interview_qs = Interview.objects.filter(guest=kwargs.get('pk'))
+            guest_interview = interview_stats(guest_interview_qs)
 
             data = {
                 "test": test,

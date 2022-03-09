@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
@@ -63,3 +63,44 @@ def tag_and_notify(update, tags, user, tag_type='create'):
         },
     }
     push_notification(tags, message_body)
+
+
+def interview_stats(queryset):
+    offer = queryset.filter(status='offer').count()
+    failed = queryset.filter(status='failed').count()
+    next_round = queryset.filter(status='next_round').count()
+
+    feedback_due = queryset.filter(status='feedback_due').count()
+    total_interview = queryset.count()
+    interview_count = {
+            "offer": offer,
+            "failed": failed,
+            "total": total_interview,
+            "next_round": next_round,
+            "feedback_due": feedback_due
+        }
+
+    return interview_count
+
+
+def project_support_filter(queryset, support_status):
+    queryset = queryset.filter(support__statuses__is_current=True)
+    if support_status == 'training':
+        queryset = queryset.filter(
+            support__statuses__frequency='more_than_2_days',
+            start_date__gte=date.today()
+        )
+    elif support_status == 'active':
+        queryset = queryset.filter(
+            support__statuses__frequency='more_than_2_days',
+            start_date__lte=date.today()
+        )
+    elif support_status == 'less_active':
+        queryset = queryset.filter(
+            support__statuses__frequency='less_than_3_days'
+        )
+    elif support_status == 'independent':
+        queryset = queryset.filter(
+            support__statuses__frequency__in=['independent', 'twice_a_month']
+        )
+    return queryset
