@@ -306,9 +306,8 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectSupport
-        fields = (
-        'id', 'created', 'frequency', 'start', 'feedback', 'support_status', 'client', 'consultant', 'project',
-        'joining_date', 'end', 'project_status', 'technology', 'support_duration', 'modified_at', 'timezone')
+        fields = ('id', 'created', 'frequency', 'start', 'feedback', 'support_status', 'client', 'consultant', 'project',
+                  'joining_date', 'end', 'project_status', 'technology', 'support_duration', 'modified_at', 'timezone')
 
     @staticmethod
     def get_support_status(obj):
@@ -397,8 +396,8 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
         else:
             duration = date.today() - obj.start
         months = int(duration.days) // 30
-        days = round(int(duration.days) % 7, 0)
-        return months + days / 10
+        weeks = round(int(duration.days - months*30) // 7, 0)
+        return months + weeks / 10
 
 
 class EngineerReportSerializer(serializers.ModelSerializer):
@@ -414,8 +413,8 @@ class EngineerReportSerializer(serializers.ModelSerializer):
             obj.projects.filter(
                 statuses__is_current=True, project__start_date__lte=date.today(),
                 statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
-            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True,), many=True
-        ).data
+            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True,),
+            many=True).data
         data = {
             "bandwidth": len(project),
             "data": project
@@ -432,8 +431,8 @@ class EngineerTestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Test
-        fields = ('id', 'status', 'deadline', 'company_name', 'marketer_name', 'consultant_name',
-                  'client', 'job_title', 'skills')
+        fields = ('id', 'status', 'deadline', 'company_name',  'skills',
+                  'consultant_name','client', 'job_title', 'marketer_name')
 
     @staticmethod
     def get_client(obj):
@@ -465,8 +464,8 @@ class EngineerInterviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        fields = ('id', 'status', 'company_name', 'marketer_name', 'consultant_name', 'client',
-                  'round', 'start_time', 'supervisor')
+        fields = ('id', 'status', 'round', 'consultant_name', 'client',
+                  'company_name', 'start_time', 'supervisor', 'marketer_name')
 
     @staticmethod
     def get_client(obj):

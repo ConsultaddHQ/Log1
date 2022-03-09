@@ -2521,18 +2521,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             for emp_id in engineers:
                 engineer = User.objects.get(employee_id=emp_id)
                 test.engineer.add(engineer)
+
             content_type = ContentType.objects.get(model='test')
             payload = json.loads(request.data.get('feedback_form'))
             for data in payload:
+                question = get_object_or_404(Question, id=data['question_id'])
                 answer = Answer.objects.create(
                     object_id=test.id,
+                    question=question,
                     content_type=content_type,
                     submitted_by=request.user,
-                    value=data.get("value", None),
-                    question_id=data['question_id'],
-                    comment=data.get("comment", None),
+                    value=f'{data.get("value")}: {data.get("comment")}' if question.category == 'guideline' and data.get('comment') is not None else data.get("value", None),
                 )
-                question = answer.question
                 if question.answer_type == 'attachment':
                     for file in request.FILES.getlist(str(question.id)):
                         file_data = {

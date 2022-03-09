@@ -549,11 +549,11 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 class QuestionSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     values = serializers.SerializerMethodField()
-    remark = serializers.SerializerMethodField()
+    comment = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position', 'remark')
+        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position', 'comment')
 
     @staticmethod
     def get_values(obj):
