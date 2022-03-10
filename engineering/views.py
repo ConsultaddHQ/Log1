@@ -447,6 +447,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "notes": description.notes,
                     "remark": description.remark,
                     "resource": description.resource,
+                    "timezone": description.timezone,
                     "technology": description.technology,
                     "description": description.description,
                     "consultant_preferred_time": description.consultant_preferred_time
@@ -807,7 +808,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.GET.get('query', None)
 
             engineer = User.objects.filter(
-                projects__statuses__is_current=True,
+                projects__statuses__is_current=True, projects__end=None,
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
 

@@ -292,83 +292,58 @@ class TrainingCheckListSerializer(serializers.ModelSerializer):
 
 
 class EngineerProjectSerializer(serializers.ModelSerializer):
-    client = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
-    timezone = serializers.SerializerMethodField()
-    frequency = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
-    technology = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
     modified_at = serializers.SerializerMethodField()
-    joining_date = serializers.SerializerMethodField()
     support_status = serializers.SerializerMethodField()
-    project_status = serializers.SerializerMethodField()
     support_duration = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
-        fields = ('id', 'created', 'frequency', 'start', 'feedback', 'support_status', 'client', 'consultant',
-                  'project', 'joining_date', 'end', 'project_status', 'technology', 'support_duration',
-                  'modified_at', 'timezone')
+        fields = ('id', 'created', 'start', 'end', 'feedback', 'support_status', 'consultant', 'project', 'description',
+                  'support_duration', 'modified_at')
 
     @staticmethod
     def get_support_status(obj):
         status = obj.statuses.filter(is_current=True).first()
         if obj.project.statuses.filter(status__istartswith='terminated').first():
-            return 'terminated'
+            return 'Terminated'
         elif obj.project.start_date and obj.project.start_date > date.today():
-            return 'training'
+            return 'Training'
         elif status:
             if status.frequency == 'more_than_2_days':
-                return 'active'
+                return 'Active'
             elif status.frequency == 'less_than_3_days':
-                return 'less_active'
+                return 'Less_Active'
             elif status.frequency in ('twice_a_month', 'independent'):
-                return 'independent'
+                return 'Independent'
         else:
             return None
 
     @staticmethod
-    def get_frequency(obj):
-        status = obj.statuses.filter(is_current=True).first()
-        if status:
-            return status.frequency
-        return None
-
-    @staticmethod
-    def get_project_status(obj):
-        return obj.project.status
-
-    @staticmethod
-    def get_client(obj):
-        return obj.project.submission.client
-
-    @staticmethod
     def get_project(obj):
         project = obj.project
-        if project.is_remote:
+        data = {
+            "id": project.id,
+            "status": project.status,
+            "end_date": project.end_date,
+            "feedback": project.feedback,
+            "is_remote": project.is_remote,
+            "start_date": project.start_date,
+            "client": project.submission.client
+        }
+        return data
+
+    @staticmethod
+    def get_description(obj):
+        if hasattr(obj.project, 'description'):
             data = {
-                "id": project.id,
-                "feedback": project.feedback,
-                "end_date": project.end_date,
-                "is_remote": project.is_remote,
-                "start_date": project.start_date,
+                "timezone": obj.project.description.timezone,
+                "technology": obj.project.description.timezone
             }
             return data
-        return project.id
-
-    @staticmethod
-    def get_technology(obj):
-        if hasattr(obj.project, 'description'):
-            return obj.project.description.technology
         return None
-
-    @staticmethod
-    def get_timezone(obj):
-        return "EST"
-
-    @staticmethod
-    def get_joining_date(obj):
-        return obj.project.start_date
 
     @staticmethod
     def get_modified_at(obj):
@@ -383,10 +358,12 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant(obj):
+        consultant = obj.project.consultant
         data = {
-            'name': obj.project.consultant.name,
-            'email': obj.project.consultant.email,
-            'contact': obj.project.consultant.phone_no
+            "id": consultant.id,
+            'name': consultant.name,
+            'email': consultant.email,
+            'contact': consultant.phone_no
         }
         return data
 
