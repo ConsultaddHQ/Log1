@@ -901,7 +901,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             if query:
                 query = query.strip().replace(':amp:', '&')
-                interview = interview.filter(submission__consultant_marketing__consultant=query)
+                interview = interview.filter(submission__consultant_marketing__consultant__name__istartswith=query)
 
             serializer = EngineerInterviewSerializer(interview[first: last], many=True)
             return Response({"data": serializer.data, "count": interview.count()}, status=200)
