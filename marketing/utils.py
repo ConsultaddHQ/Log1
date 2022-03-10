@@ -283,7 +283,8 @@ def test_received_notification(user, test, timezone):
                 {
                     "activityTitle": f"Test Received",
                     "activitySubtitle": f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from "
-                                        f"***{test.submission.client}*** for ***{test.submission.consultant.name}*** ",
+                                        f" ***{test.submission.client.strip()}*** for "
+                                        f" ***{test.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{test.marketer.employee_name}*** from "
                                     f"***{test.marketer.team.name}***",
                     "activityImage": profile_path,

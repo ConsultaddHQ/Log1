@@ -732,7 +732,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         return queryset
 
     @staticmethod
-    def project_filter(queryset, support_status):
+    def project_filter_counts(queryset, support_status):
         queryset = queryset.filter(support__statuses__is_current=True)
         if support_status == 'training':
             queryset = queryset.filter(
@@ -752,20 +752,18 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             queryset = queryset.filter(
                 support__statuses__frequency__in=['independent', 'twice_a_month']
             )
-        return queryset
+        return queryset.count()
 
     @staticmethod
     def interview_status_filter_count(queryset, interview_status=None):
         if interview_status:
-            queryset = queryset.filter(status=interview_status).count()
-            return queryset
+            queryset = queryset.filter(status=interview_status)
         return queryset.count()
 
     @staticmethod
     def test_status_filter_count(queryset, test_status=None):
         if test_status:
-            queryset = queryset.filter(status=test_status).count()
-            return queryset
+            queryset = queryset.filter(status=test_status)
         return queryset.count()
 
     @staticmethod
@@ -778,7 +776,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         elif duration == 'this_quarter':
             last = date.today()
             if last.month < 6:
-                first = last + timedelta(days=1) + relativedelta(months=-last.month+1)
+                first = last + timedelta(days=1) + relativedelta(months=-last.month + 1)
             else:
                 first = last + timedelta(days=1) + relativedelta(months=-last.month + 6)
             first = first.replace(day=1)
@@ -797,11 +795,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         elif duration == 'last_12_month':
             first = last + timedelta(days=1) + relativedelta(months=-12)
 
-        # this_month
+        # This Month
         else:
             first = date.today().replace(day=1)
             last = date.today()
-        print(first, last)
         return first, last
 
     def list(self, request, *args, **kwargs):
@@ -822,19 +819,19 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "support_status": {
                     "active": {
                         "display_name": "Active",
-                        "count": self.project_filter(projects, 'active').count()
+                        "count": self.project_filter_counts(projects, 'active')
                     },
                     "training": {
                         "display_name": "Training",
-                        "count": self.project_filter(projects, 'training').count()
+                        "count": self.project_filter_counts(projects, 'training')
                     },
                     "less_active": {
                         "display_name": "Less Active",
-                        "count": self.project_filter(projects, 'less_active').count()
+                        "count": self.project_filter_counts(projects, 'less_active')
                     },
                     "independent": {
                         "display_name": "Independent",
-                        "count": self.project_filter(projects, 'independent').count()
+                        "count": self.project_filter_counts(projects, 'independent')
                     },
                 },
             }
@@ -874,16 +871,15 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             test = Test.objects.filter(engineer=kwargs.get('pk'))
-            total_test = test.count()
             if query:
                 query = query.strip().replace(':amp:', '&')
                 test = test.filter(
                     Q(submission__created_by__employee_name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__name__istartswith=query),
-                    )
+                )
 
             serializer = EngineerTestSerializer(test[first: last], many=True)
-            return Response({"data": serializer.data, "count": total_test}, status=200)
+            return Response({"data": serializer.data, "count": test.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -901,13 +897,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 interview = Interview.objects.filter(supervisor=kwargs.get('pk'))
             else:
                 interview = Interview.objects.filter(Q(guest=kwargs.get('pk')) | Q(supervisor=kwargs.get('pk')))
-            total_interview = interview.count()
+
             if query:
                 query = query.strip().replace(':amp:', '&')
                 interview = interview.filter(submission__consultant_marketing__consultant=query)
 
             serializer = EngineerInterviewSerializer(interview[first: last], many=True)
-            return Response({"data": serializer.data, "count": total_interview}, status=200)
+            return Response({"data": serializer.data, "count": interview.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -937,9 +933,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='dashboard/project')
+    @action(methods=['get'], detail=True, url_path='summary/project')
     def project_card(self, request, **kwargs):
-
         try:
             duration = request.GET.get('filter_by', 'this_month')
             first, last = self.filter_by_time(duration)
@@ -966,7 +961,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='dashboard/test')
+    @action(methods=['get'], detail=True, url_path='summary/test')
     def test_card(self, request, **kwargs):
         try:
             duration = request.GET.get('filter_by', 'this_month')
@@ -984,7 +979,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='dashboard/interview')
+    @action(methods=['get'], detail=True, url_path='summary/interview')
     def interview_card(self, request, **kwargs):
         try:
             duration = request.GET.get('filter_by', 'this_month')
@@ -1017,7 +1012,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='dashboard/technology')
+    @action(methods=['get'], detail=True, url_path='summary/technology')
     def technology_card(self, request, **kwargs):
         try:
             duration = request.GET.get('filter_by', 'this_month')

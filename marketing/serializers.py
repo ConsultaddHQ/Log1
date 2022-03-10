@@ -554,24 +554,6 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
-    title = serializers.SerializerMethodField()
-    values = serializers.SerializerMethodField()
-    comment = serializers.SerializerMethodField()
-
     class Meta:
         model = Question
-        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position', 'comment')
-
-    @staticmethod
-    def get_values(obj):
-        if obj.answer_type == 'attachment':
-            return []
-        return None
-
-    @staticmethod
-    def get_title(obj):
-        return obj.value
-
-    @staticmethod
-    def get_comment(obj):
-        return None
+        fields = ('id', 'title', 'answer_type', 'options', 'category', 'position')

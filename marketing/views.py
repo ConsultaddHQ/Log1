@@ -2592,11 +2592,13 @@ class QuestionViewSets(ModelViewSet):
 
             Question.objects.create(
                 position=position,
-                value=request.data.get('value'),
-                answer_type=request.data.get('type'),
-                category=request.data.get('category'),
-                field=request.data.get('field', None),
+                title=request.data.get('title'),
+                field=request.data.get('field'),
                 options=request.data.get('options', []),
+                answer_type=request.data.get('type', 'text'),
+                category=request.data.get('category', 'basic'),
+                description=request.data.get('description', None),
+                placeholder=request.data.get('placeholder', None),
             )
 
             return Response({"message": "Question added to form"}, status=201)
