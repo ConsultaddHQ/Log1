@@ -263,6 +263,7 @@ class VendorLayer(TimeStampedModel):
 class Question(TimeStampedModel):
     TYPE = (
         ('text', 'Text'),
+        ('rate', 'Rate'),
         ('option', 'Option'),
         ('boolean', 'Boolean'),
         ('integer', 'Integer'),
@@ -278,7 +279,7 @@ class Question(TimeStampedModel):
     position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
 
     def __str__(self):
-        return f'{self.field} - {self.answer_type}'
+        return f'{self.field} - {self.answer_type} - {self.category}'
 
     def save(self, *args, **kwargs):
         if not self.id:

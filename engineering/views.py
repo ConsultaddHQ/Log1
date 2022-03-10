@@ -697,3 +697,273 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /engineer_report/
+class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+    queryset = User.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = EngineerReportSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    @staticmethod
+    def support_status_filter(queryset, support_status):
+        queryset = queryset.filter(statuses__is_current=True)
+        if support_status == 'training':
+            queryset = queryset.filter(
+                statuses__frequency='more_than_2_days',
+                project__start_date__gte=date.today()
+            )
+        elif support_status == 'active':
+            queryset = queryset.filter(
+                statuses__frequency='more_than_2_days',
+                project__start_date__lte=date.today()
+            )
+        elif support_status == 'less_active':
+            queryset = queryset.filter(
+                statuses__frequency='less_than_3_days'
+            )
+        elif support_status == 'independent':
+            queryset = queryset.filter(
+                statuses__frequency__in=['independent', 'twice_a_month']
+            )
+        return queryset
+
+    @staticmethod
+    def project_filter(queryset, support_status):
+        queryset = queryset.filter(support__statuses__is_current=True)
+        if support_status == 'training':
+            queryset = queryset.filter(
+                support__statuses__frequency='more_than_2_days',
+                start_date__gte=date.today()
+            )
+        elif support_status == 'active':
+            queryset = queryset.filter(
+                support__statuses__frequency='more_than_2_days',
+                start_date__lte=date.today()
+            )
+        elif support_status == 'less_active':
+            queryset = queryset.filter(
+                support__statuses__frequency='less_than_3_days'
+            )
+        elif support_status == 'independent':
+            queryset = queryset.filter(
+                support__statuses__frequency__in=['independent', 'twice_a_month']
+            )
+        return queryset
+
+    @staticmethod
+    def interview_status_filter_count(queryset, interview_status=None):
+        if interview_status:
+            queryset = queryset.filter(status=interview_status).count()
+        return queryset.count()
+
+    @staticmethod
+    def test_status_filter_count(queryset, test_status=None):
+        if test_status:
+            queryset = queryset.filter(status=test_status).count()
+        return queryset.count()
+
+    def list(self, request, *args, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+
+            engineer = User.objects.filter(
+                projects__statuses__is_current=True,
+                projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
+            ).order_by('employee_id').distinct('employee_id')
+
+            if query:
+                engineer = engineer.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
+
+            projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
+            counts = {
+                "support_status": {
+                    "active": {
+                        "display_name": "Active",
+                        "count": self.project_filter(projects, 'active').count()
+                    },
+                    "training": {
+                        "display_name": "Training",
+                        "count": self.project_filter(projects, 'training').count()
+                    },
+                    "less_active": {
+                        "display_name": "Less Active",
+                        "count": self.project_filter(projects, 'less_active').count()
+                    },
+                    "independent": {
+                        "display_name": "Independent",
+                        "count": self.project_filter(projects, 'independent').count()
+                    },
+                },
+            }
+            serializer = EngineerReportSerializer(engineer[first: last], many=True)
+            return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='project')
+    def project(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            support_status = request.GET.get('status', None)
+
+            projects = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk')
+            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+
+            if query:
+                projects = projects.filter(project__consultant__name__istartswith=query.lstrip().replace(':amp:', '&'))
+            total_count = projects.count()
+            if support_status:
+                projects = self.support_status_filter(projects, support_status)
+
+            serializer = EngineerProjectSerializer(projects[first: last], many=True)
+            return Response({"data": serializer.data, "count": total_count}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='test')
+    def test(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            test = Test.objects.filter(engineer=kwargs.get('pk'))
+            if query:
+                query = query.strip().replace(':amp:', '&')
+                test = test.filter(
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query),
+                )
+
+            serializer = EngineerTestSerializer(test[first: last], many=True)
+            return Response({"data": serializer.data, "count": test.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='interview')
+    def interview(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            guest_type = request.GET.get('type', 'all')
+
+            if guest_type == 'guest':
+                interview = Interview.objects.filter(guest=kwargs.get('pk'))
+            elif guest_type == 'ctb':
+                interview = Interview.objects.filter(supervisor=kwargs.get('pk'))
+            else:
+                interview = Interview.objects.filter(Q(guest=kwargs.get('pk')) | Q(supervisor=kwargs.get('pk')))
+
+            if query:
+                query = query.strip().replace(':amp:', '&')
+                interview = interview.filter(submission__consultant_marketing__consultant=query)
+
+            serializer = EngineerInterviewSerializer(interview[first: last], many=True)
+            return Response({"data": serializer.data, "count": interview.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='terminated')
+    def terminated(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            support_status = request.GET.get('status', None)
+
+            projects = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk'),
+                project__statuses__is_current=True,
+                project__statuses__status__istartswith='terminated'
+            )
+            if query:
+                projects = projects.filter(project__consultant__name__istartswith=query.lstrip().replace(':amp:', '&'))
+
+            total_count = projects.count()
+            if support_status:
+                projects = self.support_status_filter(projects, support_status)
+
+            serializer = EngineerProjectSerializer(projects[first: last], many=True)
+            return Response({"data": serializer.data, "count": total_count}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='dashboard')
+    def dashboard(self, request, **kwargs):
+        try:
+            project_qs = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))
+            active = self.support_status_filter(project_qs, 'active').exclude(
+                project__statuses__status__istartswith='terminated').count()
+            less_active = self.support_status_filter(project_qs, 'less_active').exclude(
+                project__statuses__status__istartswith='terminated').count()
+            independent = self.support_status_filter(project_qs, 'independent').exclude(
+                project__statuses__status__istartswith='terminated').count()
+            terminated = project_qs.filter(project__statuses__status__istartswith='terminated').count()
+
+            project_counts = {
+                "active": active,
+                "terminated": terminated,
+                "less_active": less_active,
+                "independent": independent,
+                "total": project_qs.count(),
+            }
+
+            test_qs = Test.objects.filter(engineer=kwargs.get('pk'))
+            test_counts = {
+                "total": self.test_status_filter_count(test_qs),
+                "passed": self.test_status_filter_count(test_qs, 'passed'),
+                "failed": self.test_status_filter_count(test_qs, 'failed'),
+                "feedback_due": self.test_status_filter_count(test_qs, 'feedback_due'),
+            }
+
+            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'))
+            supervisor_interview_counts = {
+                "total": self.interview_status_filter_count(sup_interview_qs),
+                "offer": self.interview_status_filter_count(sup_interview_qs, 'offer'),
+                "failed": self.interview_status_filter_count(sup_interview_qs, 'failed'),
+                "next_round": self.interview_status_filter_count(sup_interview_qs, 'next_round'),
+                "feedback_due": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')
+            }
+
+            guest_interview_qs = Interview.objects.filter(guest=kwargs.get('pk'))
+            guest_interview_counts = {
+                "total": self.interview_status_filter_count(guest_interview_qs),
+                "offer": self.interview_status_filter_count(guest_interview_qs, 'offer'),
+                "failed": self.interview_status_filter_count(guest_interview_qs, 'failed'),
+                "next_round": self.interview_status_filter_count(guest_interview_qs, 'next_round'),
+                "feedback_due": self.interview_status_filter_count(guest_interview_qs, 'feedback_due'),
+            }
+
+            technology_ls = []
+            update_qs = ProjectUpdate.objects.filter(
+                project__support__support=kwargs.get('pk')
+            ).order_by('project_id').distinct('project_id')
+            for obj in update_qs:
+                if hasattr(obj.project, 'description') and hasattr(obj.project.description, 'technology'):
+                    technology_ls.append(obj.project.description.technology)
+
+            technology_ls.remove(None)
+            total_technology = len(technology_ls)
+            technology = {"total": total_technology}
+            for item in technology_ls:
+                technology[item] = int((technology_ls.count(item)/total_technology) * 100)
+                technology[item] = technology_ls.count(item)
+
+            data = {
+                "test": test_counts,
+                "technology": technology,
+                "project": project_counts,
+                "guest_interview": guest_interview_counts,
+                "sup_interview": supervisor_interview_counts,
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)

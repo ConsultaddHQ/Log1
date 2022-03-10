@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 from datetime import date, timedelta
+from django.shortcuts import get_object_or_404
 from rest_framework.test import APITestCase, APIClient
 
 from activity.views import create_activity
@@ -127,11 +128,12 @@ class Setup:
     def project_update(self, project_id):
         project = Project.objects.get(id=project_id)
         return ProjectUpdate.objects.create(
+            project=project,
+            start="2021-09-09",
             update_by=self.user,
             update="test update",
             blocker="test blocker",
-            project=project,
-            start="2021-09-09"
+            blocker_resolved=False,
         )
 
     def project_description(self, project_id):
@@ -329,6 +331,13 @@ class ProjectUpdateViewSetTest(APITestCase):
         res = self.client.put(route, data={'attachment_id': attachment.first().id})
         self.assertEqual(res.status_code, 202)
         self.assertNotEqual(len(res.data['message']), "Document removed")
+
+    def test_blocker(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/{self.project_update.id}/blocker/"
+        res = self.client.put(route, data={'blocker_resolved': True, "blocker_solution": "blocker solution content"})
+        self.assertEqual(res.status_code, 202)
+        update = get_object_or_404(ProjectUpdate, id=self.project_update.id)
+        self.assertEqual(update.blocker_solution, "blocker solution content")
 
 
 class ProjectSummaryViewSetTest(APITestCase):

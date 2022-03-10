@@ -255,18 +255,19 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
 
 class TestListSerializer(serializers.ModelSerializer):
-    assigned_to = serializers.SerializerMethodField()
     client = serializers.SerializerMethodField()
-    marketer_id = serializers.SerializerMethodField()
     job_title = serializers.SerializerMethodField()
+    marketer_id = serializers.SerializerMethodField()
+    assigned_to = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
-        fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id',
-                  'consultant_name', 'client', 'job_title', 'skills', 'created', 'modified', 'assigned_to')
+        fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id', 'client',
+                  'consultant_name', 'submitted_by', 'job_title', 'skills', 'created', 'modified', 'assigned_to')
 
     @staticmethod
     def get_client(obj):
@@ -279,6 +280,12 @@ class TestListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_job_title(obj):
         return obj.submission.lead.job_title
+
+    @staticmethod
+    def get_submitted_by(obj):
+        if obj.submitted_by:
+            return obj.submitted_by.employee_name
+        return None
 
     @staticmethod
     def get_company_name(obj):
@@ -549,19 +556,22 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 class QuestionSerializer(serializers.ModelSerializer):
     title = serializers.SerializerMethodField()
     values = serializers.SerializerMethodField()
+    comment = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position')
+        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position', 'comment')
 
     @staticmethod
     def get_values(obj):
-        if obj.answer_type == 'boolean':
-            return False
-        elif obj.answer_type == 'attachment':
+        if obj.answer_type == 'attachment':
             return []
         return None
 
     @staticmethod
     def get_title(obj):
         return obj.value
+
+    @staticmethod
+    def get_comment(obj):
+        return None
