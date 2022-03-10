@@ -731,7 +731,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @staticmethod
     def project_filter(queryset, support_status):
-        queryset = queryset.filter(projects__statuses__is_current=True)
+        queryset = queryset.filter(support__statuses__is_current=True)
         if support_status == 'training':
             queryset = queryset.filter(
                 support__statuses__frequency='more_than_2_days',
@@ -777,8 +777,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             if query:
                 engineer = engineer.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
 
-            projects = Project.objects.exclude(statuses__status__istartswith='terminated')
-
+            projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = {
                 "support_status": {
                     "active": {
@@ -799,7 +798,6 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     },
                 },
             }
-            print(counts)
             serializer = EngineerReportSerializer(engineer[first: last], many=True)
             return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
         except Exception as error:
