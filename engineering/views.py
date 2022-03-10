@@ -817,8 +817,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             if query:
                 engineer = engineer.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
 
-            projects = Project.objects.exclude(statuses__status__istartswith='terminated')
-
+            projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = {
                 "support_status": {
                     "active": {
