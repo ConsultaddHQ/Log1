@@ -2592,34 +2592,41 @@ class QuestionViewSets(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         try:
+            data = request.data
             if 'superadmin' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            if request.data.get('type') == 'option' and request.data.get('options') is []:
+            if data.get('type') == 'option' and data.get('options') is []:
                 return Response({"message": "Please provide possible options for the question value"})
 
-            if request.data.get('position'):
-                position = request.data.get('position')
+            if data.get('position'):
+                position = data.get('position')
                 question_qs = Question.objects.filter(
-                    category=request.data.get('category'), position__gte=position
+                    form_name=data.get('form_name'), position__gte=position, catgeory=data.get('category')
                 ).order_by('position')
                 for obj in question_qs:
                     obj.position += 1
                     obj.save()
             else:
-                question_qs = Question.objects.filter(category=request.data.get('category')).order_by('position').last()
+                question_qs = Question.objects.filter(
+                    category=data.get('category'), form_name=data.get('form_name')
+                ).order_by('position').last()
                 position = question_qs.position + 1
 
-            Question.objects.create(
+            question = Question.objects.create(
                 position=position,
                 title=request.data.get('title'),
-                field=request.data.get('field'),
+                category=request.data.get('category'),
+                form_name=request.data.get('form_name'),
                 options=request.data.get('options', []),
                 answer_type=request.data.get('type', 'text'),
-                category=request.data.get('category', 'basic'),
                 description=request.data.get('description', None),
                 placeholder=request.data.get('placeholder', None),
             )
+            if data.get("child_id", []):
+                for question_id in data["child_id"]:
+                    sub_question = get_object_or_404(Question, id=question_id)
+                    question.child_questions.add(sub_question)
 
             return Response({"message": "Question added to form"}, status=201)
         except Exception as error:
