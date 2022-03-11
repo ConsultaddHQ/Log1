@@ -2579,13 +2579,13 @@ class QuestionViewSets(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            question_field = request.GET.get("type", None)
+            question_field = request.GET.get("form_name", None)
             queryset = Question.objects.filter(
                 form_name=question_field
-            ).exclude(Q(category="test_cases") | Q(answer_type="parent")).order_by('position')
-            # this dependents on whether this api will show parent questions in future.
-            serial = QuestionSerializer(queryset, many=True)
-            return Response({"data": serial.data}, status=200)
+            ).exclude(answer_type="parent").order_by('position')
+
+            serializer = QuestionSerializer(queryset, many=True)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

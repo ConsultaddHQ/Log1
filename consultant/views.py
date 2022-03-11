@@ -1230,18 +1230,26 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
-            queryset = ConsultantPOC.objects.filter(
-                poc_type=request.data['poc_type'], consultant=request.data['consultant'], end=None
-            )
+            poc_type = request.data['poc_type']
+            if poc_type == 'relation':
+                poc_type = 'retention'
+                queryset = ConsultantPOC.objects.filter(
+                    poc_type='retention', consultant=request.data['consultant'], end=None
+                )
+            else:
+                queryset = ConsultantPOC.objects.filter(
+                    poc_type='recruiter', consultant=request.data['consultant'], end=None
+                )
             if queryset:
                 previous_poc = queryset.first()
                 previous_poc.end = date.today()
                 previous_poc.save()
+
             poc = ConsultantPOC.objects.create(
+                poc_type=poc_type,
+                start=date.today(),
                 poc_id=request.data['poc'],
-                poc_type=request.data['poc_type'],
                 consultant_id=request.data['consultant'],
-                start=date.today()
             )
 
             # Push Notification

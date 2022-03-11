@@ -322,7 +322,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_project(obj):
         project = obj.project
-        data = {
+        return {
             "id": project.id,
             "status": project.status,
             "end_date": project.end_date,
@@ -331,39 +331,35 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             "start_date": project.start_date,
             "client": project.submission.client
         }
-        return data
 
     @staticmethod
     def get_description(obj):
         if hasattr(obj.project, 'description'):
-            data = {
+            return {
                 "timezone": obj.project.description.timezone,
-                "technology": obj.project.description.timezone
+                "technology": obj.project.description.technology
             }
-            return data
         return None
 
     @staticmethod
     def get_modified_at(obj):
         update = obj.project.updates.all().order_by('-created').first()
         if update:
-            data = {
+            return {
                 "id": update.id,
                 "date": update.created.date()
             }
-            return data
         return None
 
     @staticmethod
     def get_consultant(obj):
         consultant = obj.project.consultant
-        data = {
+        return {
             "id": consultant.id,
             'name': consultant.name,
             'email': consultant.email,
             'contact': consultant.phone_no
         }
-        return data
 
     @staticmethod
     def get_support_duration(obj):
@@ -405,15 +401,22 @@ class EngineerTestSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant(obj):
-        submission = obj.submission
-        data = {
-            "client": submission.client,
-            "name": submission.consultant.name,
-            "job_title": submission.lead.job_title,
-            "company_name": submission.lead.vendor_company.name,
-            "marketer_name": submission.created_by.employee_name,
+        consultant = obj.submission.consultant
+        return {
+            "id": consultant.id,
+            "name": consultant.name,
+            "email": consultant.email,
         }
-        return data
+
+    @staticmethod
+    def get_submission(obj):
+        submission = obj.submission
+        return {
+            "client": submission.client,
+            "job_title": submission.lead.job_title,
+            "marketer_name": submission.created_by.employee_name,
+            "vendor_company": submission.lead.vendor_company.name,
+        }
 
 
 class EngineerInterviewSerializer(serializers.ModelSerializer):
@@ -430,11 +433,20 @@ class EngineerInterviewSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant(obj):
-        submission = obj.submission
+        consultant = obj.submission.consultant
         data = {
-            "client": submission.client,
-            "name": submission.consultant.name,
-            "company_name": submission.lead.vendor_company.name,
-            "marketer_name": submission.created_by.employee_name,
+            "id": consultant.id,
+            "name": consultant.name,
+            "email": consultant.email,
         }
         return data
+
+    @staticmethod
+    def get_submission(obj):
+        submission = obj.submission
+        return {
+            "client": submission.client,
+            "job_title": submission.lead.job_title,
+            "marketer_name": submission.created_by.employee_name,
+            "vendor_company": submission.lead.vendor_company.name,
+        }

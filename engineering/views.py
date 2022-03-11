@@ -808,7 +808,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.GET.get('query', None)
 
             engineer = User.objects.filter(
-                projects__statuses__is_current=True, projects__end=None,
+                projects__statuses__is_current=True,
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
 
@@ -1019,9 +1019,9 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=True, url_path='summary/technology')
     def technology_card(self, request, **kwargs):
         try:
+            technology_ls = []
             duration = request.GET.get('filter_by', 'this_month')
             first, last = self.filter_by_time(duration)
-            technology_ls = []
             update_qs = ProjectUpdate.objects.filter(
                 project__support__support=kwargs.get('pk'), project__description__created__range=[first, last]
             ).order_by('project_id').distinct('project_id')

@@ -397,7 +397,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_relation(obj):
-        queryset = obj.pocs.filter(end=None, poc_type='relation')
+        queryset = obj.pocs.filter(end=None, poc_type='retention')
         if queryset:
             poc = queryset.first().poc
             data = {

@@ -1040,7 +1040,7 @@ class EngineeringProjectsViewSets(GenericViewSet, ListModelMixin):
                 consultant=OuterRef("consultant_id"), end=None, poc_type='recruiter')
 
             relation = ConsultantPOC.objects.filter(
-                consultant=OuterRef("consultant_id"), end=None, poc_type='relation')
+                consultant=OuterRef("consultant_id"), end=None, poc_type='retention')
 
             data = projects.annotate(
                 location=F('city'),
