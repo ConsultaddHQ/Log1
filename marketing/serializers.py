@@ -554,6 +554,14 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
+    child = serializers.SerializerMethodField()
+
     class Meta:
         model = Question
-        fields = ('id', 'title', 'answer_type', 'options', 'category', 'position')
+        fields = ("id", "title", "category", "answer_type", "position", "child", "options")
+
+    @staticmethod
+    def get_child(obj):
+        if obj.answer_type == 'parent':
+            return QuestionSerializer(obj.child_questions.all(), many=True).data
+        return None

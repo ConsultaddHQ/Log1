@@ -307,9 +307,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support_status(obj):
         status = obj.statuses.filter(is_current=True).first()
-        if obj.project.statuses.filter(status__istartswith='terminated').first():
-            return 'Terminated'
-        elif obj.project.start_date and obj.project.start_date > date.today():
+        if obj.project.start_date and obj.project.start_date > date.today():
             return 'Training'
         elif status:
             if status.frequency == 'more_than_2_days':
@@ -399,66 +397,44 @@ class EngineerReportSerializer(serializers.ModelSerializer):
 
 
 class EngineerTestSerializer(serializers.ModelSerializer):
-    client = serializers.SerializerMethodField()
-    job_title = serializers.SerializerMethodField()
-    company_name = serializers.SerializerMethodField()
-    marketer_name = serializers.SerializerMethodField()
-    consultant_name = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
-        fields = ('id', 'status', 'deadline', 'company_name', 'skills', 'consultant_name', 'client', 'job_title',
-                  'marketer_name')
+        fields = ('id', 'status', 'deadline', 'skills', 'consultant')
 
     @staticmethod
-    def get_client(obj):
-        return obj.submission.client
-
-    @staticmethod
-    def get_job_title(obj):
-        return obj.submission.lead.job_title
-
-    @staticmethod
-    def get_company_name(obj):
-        return obj.submission.lead.vendor_company.name
-
-    @staticmethod
-    def get_marketer_name(obj):
-        return obj.submission.created_by.employee_name
-
-    @staticmethod
-    def get_consultant_name(obj):
-        return obj.submission.consultant_marketing.consultant.name
+    def get_consultant(obj):
+        submission = obj.submission
+        data = {
+            "client": submission.client,
+            "name": submission.consultant.name,
+            "job_title": submission.lead.job_title,
+            "company_name": submission.lead.vendor_company.name,
+            "marketer_name": submission.created_by.employee_name,
+        }
+        return data
 
 
 class EngineerInterviewSerializer(serializers.ModelSerializer):
-    client = serializers.SerializerMethodField()
     supervisor = serializers.SerializerMethodField()
-    company_name = serializers.SerializerMethodField()
-    marketer_name = serializers.SerializerMethodField()
-    consultant_name = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
-        fields = ('id', 'status', 'round', 'consultant_name', 'client',
-                  'company_name', 'start_time', 'supervisor', 'marketer_name')
-
-    @staticmethod
-    def get_client(obj):
-        return obj.submission.client
+        fields = ('id', 'status', 'round', 'consultant', 'start_time', 'supervisor',)
 
     @staticmethod
     def get_supervisor(obj):
         return obj.supervisor.employee_name
 
     @staticmethod
-    def get_company_name(obj):
-        return obj.submission.lead.vendor_company.name
-
-    @staticmethod
-    def get_marketer_name(obj):
-        return obj.submission.created_by.employee_name
-
-    @staticmethod
-    def get_consultant_name(obj):
-        return obj.submission.consultant_marketing.consultant.name
+    def get_consultant(obj):
+        submission = obj.submission
+        data = {
+            "client": submission.client,
+            "name": submission.consultant.name,
+            "company_name": submission.lead.vendor_company.name,
+            "marketer_name": submission.created_by.employee_name,
+        }
+        return data

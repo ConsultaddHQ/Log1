@@ -209,6 +209,7 @@ class Question(TimeStampedModel):
     TYPE = (
         ('text', 'Text'),
         ('rate', 'Rate'),
+        ('child', 'Child'),
         ('option', 'Option'),
         ('parent', 'Parent'),
         ('boolean', 'Boolean'),
@@ -217,6 +218,8 @@ class Question(TimeStampedModel):
         ('no_remark', 'No Remark'),
         ('yes_remark', 'Yes Remark'),
         ('attachment', 'Attachment'),
+        ('no_attachment', 'No Attachment'),
+        ('yes_attachment', 'Yes Attachment'),
     )
     title = models.TextField(_('Question Title'))
     is_active = models.BooleanField(_('Is active'), default=True)
