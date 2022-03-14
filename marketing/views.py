@@ -2581,8 +2581,8 @@ class QuestionViewSets(ModelViewSet):
         try:
             question_field = request.GET.get("form_name", None)
             queryset = Question.objects.filter(
-                form_name=question_field
-            ).exclude(answer_type="parent").order_by('position')
+                form_name=question_field, is_current=True
+            ).exclude(Q(answer_type="parent") | Q(category="test_cases")).order_by('position')
 
             serializer = QuestionSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
@@ -2639,7 +2639,9 @@ class QuestionViewSets(ModelViewSet):
             form_name = request.GET.get('type', None)
             category = request.GET.get('category', None)
             question_count = request.GET.get('count', None)
-            queryset = Question.objects.filter(form_name=form_name, answer_type='parent').order_by('position')
+            queryset = Question.objects.filter(
+                form_name=form_name, answer_type='parent', is_current=True
+            ).order_by('position')
 
             if question_count:
                 queryset = queryset.filter(position__lte=question_count)

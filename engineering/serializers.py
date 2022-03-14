@@ -394,10 +394,11 @@ class EngineerReportSerializer(serializers.ModelSerializer):
 
 class EngineerTestSerializer(serializers.ModelSerializer):
     consultant = serializers.SerializerMethodField()
+    submission = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
-        fields = ('id', 'status', 'deadline', 'skills', 'consultant')
+        fields = ('id', 'status', 'deadline', 'skills', 'consultant', 'submission')
 
     @staticmethod
     def get_consultant(obj):
@@ -422,10 +423,11 @@ class EngineerTestSerializer(serializers.ModelSerializer):
 class EngineerInterviewSerializer(serializers.ModelSerializer):
     supervisor = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
+    submission = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
-        fields = ('id', 'status', 'round', 'consultant', 'start_time', 'supervisor',)
+        fields = ('id', 'status', 'round', 'consultant', 'start_time', 'supervisor', 'submission')
 
     @staticmethod
     def get_supervisor(obj):
