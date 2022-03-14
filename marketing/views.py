@@ -2581,9 +2581,9 @@ class QuestionViewSets(ModelViewSet):
         try:
             question_field = request.GET.get("form_name", None)
             queryset = Question.objects.filter(
-                form_name=question_field, is_current=True
-            ).exclude(Q(answer_type="parent") | Q(category="test_cases")).order_by('position')
-
+                form_name=question_field, is_active=True
+            ).exclude(Q(answer_type="parent") | Q(category="child")).order_by('position')
+            breakpoint()
             serializer = QuestionSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -2640,7 +2640,7 @@ class QuestionViewSets(ModelViewSet):
             category = request.GET.get('category', None)
             question_count = request.GET.get('count', None)
             queryset = Question.objects.filter(
-                form_name=form_name, answer_type='parent', is_current=True
+                form_name=form_name, answer_type='parent', is_active=True
             ).order_by('position')
 
             if question_count:
