@@ -292,103 +292,74 @@ class TrainingCheckListSerializer(serializers.ModelSerializer):
 
 
 class EngineerProjectSerializer(serializers.ModelSerializer):
-    client = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
-    timezone = serializers.SerializerMethodField()
-    frequency = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
-    technology = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
     modified_at = serializers.SerializerMethodField()
-    joining_date = serializers.SerializerMethodField()
     support_status = serializers.SerializerMethodField()
-    project_status = serializers.SerializerMethodField()
     support_duration = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
-        fields = ('id', 'created', 'frequency', 'start', 'feedback', 'support_status', 'client', 'consultant',
-                  'project', 'joining_date', 'end', 'project_status', 'technology', 'support_duration',
-                  'modified_at', 'timezone')
+        fields = ('id', 'created', 'start', 'end', 'feedback', 'support_status', 'consultant', 'project', 'description',
+                  'support_duration', 'modified_at')
 
     @staticmethod
     def get_support_status(obj):
         status = obj.statuses.filter(is_current=True).first()
-        if obj.project.statuses.filter(status__istartswith='terminated').first():
-            return 'terminated'
-        elif obj.project.start_date and obj.project.start_date > date.today():
-            return 'training'
+        if obj.project.start_date and obj.project.start_date > date.today():
+            return 'Training'
         elif status:
             if status.frequency == 'more_than_2_days':
-                return 'active'
+                return 'Active'
             elif status.frequency == 'less_than_3_days':
-                return 'less_active'
+                return 'Less_Active'
             elif status.frequency in ('twice_a_month', 'independent'):
-                return 'independent'
+                return 'Independent'
         else:
             return None
 
     @staticmethod
-    def get_frequency(obj):
-        status = obj.statuses.filter(is_current=True).first()
-        if status:
-            return status.frequency
-        return None
-
-    @staticmethod
-    def get_project_status(obj):
-        return obj.project.status
-
-    @staticmethod
-    def get_client(obj):
-        return obj.project.submission.client
-
-    @staticmethod
     def get_project(obj):
         project = obj.project
-        if project.is_remote:
-            data = {
-                "id": project.id,
-                "feedback": project.feedback,
-                "end_date": project.end_date,
-                "is_remote": project.is_remote,
-                "start_date": project.start_date,
-            }
-            return data
-        return project.id
+        return {
+            "id": project.id,
+            "status": project.status,
+            "end_date": project.end_date,
+            "feedback": project.feedback,
+            "is_remote": project.is_remote,
+            "start_date": project.start_date,
+            "client": project.submission.client
+        }
 
     @staticmethod
-    def get_technology(obj):
+    def get_description(obj):
         if hasattr(obj.project, 'description'):
-            return obj.project.description.technology
+            return {
+                "timezone": obj.project.description.timezone,
+                "technology": obj.project.description.technology
+            }
         return None
-
-    @staticmethod
-    def get_timezone(obj):
-        return "EST"
-
-    @staticmethod
-    def get_joining_date(obj):
-        return obj.project.start_date
 
     @staticmethod
     def get_modified_at(obj):
         update = obj.project.updates.all().order_by('-created').first()
         if update:
-            data = {
+            return {
                 "id": update.id,
                 "date": update.created.date()
             }
-            return data
         return None
 
     @staticmethod
     def get_consultant(obj):
-        data = {
-            'name': obj.project.consultant.name,
-            'email': obj.project.consultant.email,
-            'contact': obj.project.consultant.phone_no
+        consultant = obj.project.consultant
+        return {
+            "id": consultant.id,
+            'name': consultant.name,
+            'email': consultant.email,
+            'contact': consultant.phone_no
         }
-        return data
 
     @staticmethod
     def get_support_duration(obj):
@@ -422,66 +393,62 @@ class EngineerReportSerializer(serializers.ModelSerializer):
 
 
 class EngineerTestSerializer(serializers.ModelSerializer):
-    client = serializers.SerializerMethodField()
-    job_title = serializers.SerializerMethodField()
-    company_name = serializers.SerializerMethodField()
-    marketer_name = serializers.SerializerMethodField()
-    consultant_name = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    submission = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
-        fields = ('id', 'status', 'deadline', 'company_name', 'skills', 'consultant_name', 'client', 'job_title',
-                  'marketer_name')
+        fields = ('id', 'status', 'deadline', 'skills', 'consultant', 'submission')
 
     @staticmethod
-    def get_client(obj):
-        return obj.submission.client
+    def get_consultant(obj):
+        consultant = obj.submission.consultant
+        return {
+            "id": consultant.id,
+            "name": consultant.name,
+            "email": consultant.email,
+        }
 
     @staticmethod
-    def get_job_title(obj):
-        return obj.submission.lead.job_title
-
-    @staticmethod
-    def get_company_name(obj):
-        return obj.submission.lead.vendor_company.name
-
-    @staticmethod
-    def get_marketer_name(obj):
-        return obj.submission.created_by.employee_name
-
-    @staticmethod
-    def get_consultant_name(obj):
-        return obj.submission.consultant_marketing.consultant.name
+    def get_submission(obj):
+        submission = obj.submission
+        return {
+            "client": submission.client,
+            "job_title": submission.lead.job_title,
+            "marketer_name": submission.created_by.employee_name,
+            "vendor_company": submission.lead.vendor_company.name,
+        }
 
 
 class EngineerInterviewSerializer(serializers.ModelSerializer):
-    client = serializers.SerializerMethodField()
     supervisor = serializers.SerializerMethodField()
-    company_name = serializers.SerializerMethodField()
-    marketer_name = serializers.SerializerMethodField()
-    consultant_name = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    submission = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
-        fields = ('id', 'status', 'round', 'consultant_name', 'client',
-                  'company_name', 'start_time', 'supervisor', 'marketer_name')
-
-    @staticmethod
-    def get_client(obj):
-        return obj.submission.client
+        fields = ('id', 'status', 'round', 'consultant', 'start_time', 'supervisor', 'submission')
 
     @staticmethod
     def get_supervisor(obj):
         return obj.supervisor.employee_name
 
     @staticmethod
-    def get_company_name(obj):
-        return obj.submission.lead.vendor_company.name
+    def get_consultant(obj):
+        consultant = obj.submission.consultant
+        data = {
+            "id": consultant.id,
+            "name": consultant.name,
+            "email": consultant.email,
+        }
+        return data
 
     @staticmethod
-    def get_marketer_name(obj):
-        return obj.submission.created_by.employee_name
-
-    @staticmethod
-    def get_consultant_name(obj):
-        return obj.submission.consultant_marketing.consultant.name
+    def get_submission(obj):
+        submission = obj.submission
+        return {
+            "client": submission.client,
+            "job_title": submission.lead.job_title,
+            "marketer_name": submission.created_by.employee_name,
+            "vendor_company": submission.lead.vendor_company.name,
+        }

@@ -2525,23 +2525,40 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             payload = json.loads(request.data.get('feedback_form'))
             for data in payload:
                 question = get_object_or_404(Question, id=data['question_id'])
-                answer = Answer.objects.create(
-                    object_id=test.id,
-                    question=question,
-                    content_type=content_type,
-                    submitted_by=request.user,
-                    value=f'{data.get("value")}: {data.get("comment")}' if question.category == 'guideline' and data.get('comment') is not None else data.get("value", None),
-                )
-                if question.answer_type == 'attachment':
-                    for file in request.FILES.getlist(str(question.id)):
-                        file_data = {
-                            "file": file,
-                            "model": "answer",
-                            "creator": request.user,
-                            "type": "test_feedback",
-                            "object_id": answer.id,
-                        }
-                        create_attachment(file_data)
+                if question.answer_type in ['no_remark', 'yes_remark'] and data.get('comment') is not None:
+                    value = f'{data.get("value")}: {data.get("comment")}'
+                else:
+                    value = data.get("value", None)
+
+                if question.answer_type == 'parent' and data.get("child", None):
+                    child = json.loads(data["child"])
+                    for item in child:
+                        Answer.objects.create(
+                            object_id=test.id,
+                            answer=item["value"],
+                            parent_question=question,
+                            content_type=content_type,
+                            submitted_by=request.user,
+                            question_id=item["question_id"],
+                        )
+                else:
+                    answer = Answer.objects.create(
+                        answer=value,
+                        question=question,
+                        object_id=test.id,
+                        content_type=content_type,
+                        submitted_by=request.user,
+                    )
+                    if question.answer_type in ['attachment', 'no_attachment', 'yes_attachment']:
+                        for file in request.FILES.getlist(str(question.id)):
+                            file_data = {
+                                "file": file,
+                                "model": "answer",
+                                "creator": request.user,
+                                "type": "test_feedback",
+                                "object_id": answer.id,
+                            }
+                            create_attachment(file_data)
 
             # Activity
             desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
@@ -2562,44 +2579,77 @@ class QuestionViewSets(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            question_field = request.GET.get('field')
-            queryset = Question.objects.filter(field=question_field).order_by('position')
-            serial = QuestionSerializer(queryset, many=True)
-            return Response({"data": serial.data}, status=200)
+            question_field = request.GET.get("form_name", None)
+            queryset = Question.objects.filter(
+                form_name=question_field, is_active=True
+            ).exclude(Q(answer_type="parent") | Q(category="child")).order_by('position')
+            serializer = QuestionSerializer(queryset, many=True)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
+            data = request.data
             if 'superadmin' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            if request.data.get('type') == 'option' and request.data.get('options') is []:
+            if data.get('type') == 'option' and data.get('options') is []:
                 return Response({"message": "Please provide possible options for the question value"})
 
-            if request.data.get('position'):
-                position = request.data.get('position')
+            if data.get('position'):
+                position = data.get('position')
                 question_qs = Question.objects.filter(
-                    category=request.data.get('category'), position__gte=position
+                    form_name=data.get('form_name'), position__gte=position, catgeory=data.get('category')
                 ).order_by('position')
                 for obj in question_qs:
                     obj.position += 1
                     obj.save()
             else:
-                question_qs = Question.objects.filter(category=request.data.get('category')).order_by('position').last()
+                question_qs = Question.objects.filter(
+                    category=data.get('category'), form_name=data.get('form_name')
+                ).order_by('position').last()
                 position = question_qs.position + 1
 
-            Question.objects.create(
+            question = Question.objects.create(
                 position=position,
-                value=request.data.get('value'),
-                answer_type=request.data.get('type'),
+                title=request.data.get('title'),
                 category=request.data.get('category'),
-                field=request.data.get('field', None),
+                form_name=request.data.get('form_name'),
                 options=request.data.get('options', []),
+                answer_type=request.data.get('type', 'text'),
+                description=request.data.get('description', None),
+                placeholder=request.data.get('placeholder', None),
             )
+            if data.get("child_id", []):
+                for question_id in data["child_id"]:
+                    sub_question = get_object_or_404(Question, id=question_id)
+                    question.child_questions.add(sub_question)
 
             return Response({"message": "Question added to form"}, status=201)
+        except Exception as error:
+            write_info(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='parent')
+    def parent(self, request):
+        try:
+            form_name = request.GET.get('type', None)
+            category = request.GET.get('category', None)
+            question_count = request.GET.get('count', None)
+            queryset = Question.objects.filter(
+                form_name=form_name, answer_type='parent', is_active=True
+            ).order_by('position')
+
+            if question_count:
+                queryset = queryset.filter(position__lte=question_count)
+
+            if category:
+                queryset = queryset.filter(category=category)
+
+            serializer = QuestionSerializer(queryset, many=True)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

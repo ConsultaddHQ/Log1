@@ -1,5 +1,7 @@
 import os
 import json
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 from django.db.models import Q, Max
 from django.shortcuts import get_object_or_404
@@ -445,6 +447,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "notes": description.notes,
                     "remark": description.remark,
                     "resource": description.resource,
+                    "timezone": description.timezone,
                     "technology": description.technology,
                     "description": description.description,
                     "consultant_preferred_time": description.consultant_preferred_time
@@ -730,7 +733,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         return queryset
 
     @staticmethod
-    def project_filter(queryset, support_status):
+    def project_filter_counts(queryset, support_status):
         queryset = queryset.filter(support__statuses__is_current=True)
         if support_status == 'training':
             queryset = queryset.filter(
@@ -750,19 +753,54 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             queryset = queryset.filter(
                 support__statuses__frequency__in=['independent', 'twice_a_month']
             )
-        return queryset
+        return queryset.count()
 
     @staticmethod
     def interview_status_filter_count(queryset, interview_status=None):
         if interview_status:
-            queryset = queryset.filter(status=interview_status).count()
+            queryset = queryset.filter(status=interview_status)
         return queryset.count()
 
     @staticmethod
     def test_status_filter_count(queryset, test_status=None):
         if test_status:
-            queryset = queryset.filter(status=test_status).count()
+            queryset = queryset.filter(status=test_status)
         return queryset.count()
+
+    @staticmethod
+    def filter_by_time(duration):
+        last = date.today().replace(day=1) - timedelta(days=1)
+
+        if duration == 'last_month':
+            first = last.replace(day=1)
+
+        elif duration == 'this_quarter':
+            last = date.today()
+            if last.month < 6:
+                first = last + timedelta(days=1) + relativedelta(months=-last.month + 1)
+            else:
+                first = last + timedelta(days=1) + relativedelta(months=-last.month + 6)
+            first = first.replace(day=1)
+
+        elif duration == 'last_quarter':
+            if last.month < 6:
+                last = last + timedelta(days=1) + relativedelta(months=-last.month)
+                first = last + timedelta(days=1) + relativedelta(months=-6)
+            else:
+                last = last + timedelta(days=1) + relativedelta(months=-last.month + 6)
+                first = last + timedelta(days=1) + relativedelta(months=-6)
+
+        elif duration == 'last_6_month':
+            first = last + timedelta(days=1) + relativedelta(months=-6)
+
+        elif duration == 'last_12_month':
+            first = last + timedelta(days=1) + relativedelta(months=-12)
+
+        # This Month
+        else:
+            first = date.today().replace(day=1)
+            last = date.today()
+        return first, last
 
     def list(self, request, *args, **kwargs):
         try:
@@ -782,22 +820,23 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "support_status": {
                     "active": {
                         "display_name": "Active",
-                        "count": self.project_filter(projects, 'active').count()
+                        "count": self.project_filter_counts(projects, 'active')
                     },
                     "training": {
                         "display_name": "Training",
-                        "count": self.project_filter(projects, 'training').count()
+                        "count": self.project_filter_counts(projects, 'training')
                     },
                     "less_active": {
                         "display_name": "Less Active",
-                        "count": self.project_filter(projects, 'less_active').count()
+                        "count": self.project_filter_counts(projects, 'less_active')
                     },
                     "independent": {
                         "display_name": "Independent",
-                        "count": self.project_filter(projects, 'independent').count()
+                        "count": self.project_filter_counts(projects, 'independent')
                     },
                 },
             }
+
             serializer = EngineerReportSerializer(engineer[first: last], many=True)
             return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
         except Exception as error:
@@ -862,7 +901,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             if query:
                 query = query.strip().replace(':amp:', '&')
-                interview = interview.filter(submission__consultant_marketing__consultant=query)
+                interview = interview.filter(
+                    Q(submission__created_by__employee_name__istartswith=query) |
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                )
 
             serializer = EngineerInterviewSerializer(interview[first: last], many=True)
             return Response({"data": serializer.data, "count": interview.count()}, status=200)
@@ -895,10 +937,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='dashboard')
-    def dashboard(self, request, **kwargs):
+    @action(methods=['get'], detail=True, url_path='summary/project')
+    def project_card(self, request, **kwargs):
         try:
-            project_qs = ProjectSupport.objects.filter(support__id=kwargs.get('pk'))
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+            project_qs = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk'), statuses__created__range=[first, last]
+            )
             active = self.support_status_filter(project_qs, 'active').exclude(
                 project__statuses__status__istartswith='terminated').count()
             less_active = self.support_status_filter(project_qs, 'less_active').exclude(
@@ -914,16 +960,36 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "independent": independent,
                 "total": project_qs.count(),
             }
+            return Response({"data": project_counts}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-            test_qs = Test.objects.filter(engineer=kwargs.get('pk'))
+    @action(methods=['get'], detail=True, url_path='summary/test')
+    def test_card(self, request, **kwargs):
+        try:
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+
+            test_qs = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
             test_counts = {
                 "total": self.test_status_filter_count(test_qs),
                 "passed": self.test_status_filter_count(test_qs, 'passed'),
                 "failed": self.test_status_filter_count(test_qs, 'failed'),
                 "feedback_due": self.test_status_filter_count(test_qs, 'feedback_due'),
             }
+            return Response({"data": test_counts}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'))
+    @action(methods=['get'], detail=True, url_path='summary/interview')
+    def interview_card(self, request, **kwargs):
+        try:
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+
+            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'), created__range=[first, last])
             supervisor_interview_counts = {
                 "total": self.interview_status_filter_count(sup_interview_qs),
                 "offer": self.interview_status_filter_count(sup_interview_qs, 'offer'),
@@ -932,7 +998,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "feedback_due": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')
             }
 
-            guest_interview_qs = Interview.objects.filter(guest=kwargs.get('pk'))
+            guest_interview_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
             guest_interview_counts = {
                 "total": self.interview_status_filter_count(guest_interview_qs),
                 "offer": self.interview_status_filter_count(guest_interview_qs, 'offer'),
@@ -941,29 +1007,36 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "feedback_due": self.interview_status_filter_count(guest_interview_qs, 'feedback_due'),
             }
 
+            data = {
+                "guest_interview": guest_interview_counts,
+                "supervisor_interview": supervisor_interview_counts,
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='summary/technology')
+    def technology_card(self, request, **kwargs):
+        try:
             technology_ls = []
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
             update_qs = ProjectUpdate.objects.filter(
-                project__support__support=kwargs.get('pk')
+                project__support__support=kwargs.get('pk'), project__description__created__range=[first, last]
             ).order_by('project_id').distinct('project_id')
             for obj in update_qs:
                 if hasattr(obj.project, 'description') and hasattr(obj.project.description, 'technology'):
                     technology_ls.append(obj.project.description.technology)
 
-            technology_ls.remove(None)
+            if technology_ls:
+                technology_ls.remove(None)
             total_technology = len(technology_ls)
             technology = {"total": total_technology}
             for item in technology_ls:
-                technology[item] = int((technology_ls.count(item)/total_technology) * 100)
                 technology[item] = technology_ls.count(item)
 
-            data = {
-                "test": test_counts,
-                "technology": technology,
-                "project": project_counts,
-                "guest_interview": guest_interview_counts,
-                "sup_interview": supervisor_interview_counts,
-            }
-            return Response({"data": data}, status=200)
+            return Response({"data": technology}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)

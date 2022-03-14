@@ -11,74 +11,6 @@ from attachment.models import Attachment
 from consultant.models import ConsultantMarketing
 from utils_app.models import TimeStampedModel, Choice
 
-STATUS_CHOICES = (
-    ('new', 'New'),
-    ('draft', 'Draft'),
-    ('sub', 'Submitted'),
-    ('archived', 'Archived'),
-)
-
-TEST_STATUS_CHOICES = (
-    ('new', 'New'),
-    ('passed', 'Passed'),
-    ('failed', 'Failed'),
-    ('assigned', 'Assigned'),
-    ('cancelled', 'Cancelled'),
-    ('feedback_due', 'Feedback Due'),
-)
-
-SUB_CHOICES = (
-    ('draft', 'Draft'),
-    ('sub', 'Submitted'),
-    ('project', 'Project'),
-    ('in_offer', 'In Offer'),
-    ('interview', 'Interview'),
-)
-
-STAGES_CHOICE = (
-    ('open', 'Open'),
-    ('close', 'Close'),
-)
-
-SCREENING_STATUS_CHOICES = (
-    ('offer', 'offer'),
-    ('failed', 'Failed'),
-    ('cancelled', 'Cancelled'),
-    ('scheduled', 'Scheduled'),
-    ('next_round', 'Next Round'),
-    ('rescheduled', 'Rescheduled'),
-    ('feedback_due', 'Feedback Due'),
-)
-
-INTERVIEW_MODE = (
-    ('skype', 'Skype'),
-    ('webex', 'Webex'),
-    ('dial_in', 'Dial In'),
-    ('hangouts', 'Hangout'),
-    ('video_call', 'Video Call'),
-    ('voice_call', 'Voice Call'),
-)
-
-SCREENING_CHOICES = (
-    ('ip_screening', 'IP Tech Screening'),
-    ('vendor_screening', 'Vendor Tech Screening'),
-    ('interview', 'Interview'),
-)
-
-FAILURE_CHOICES = (
-    ('resume_error', 'Error In Resume'),
-    ('hired_else', 'Hired Someone Else'),
-    ('internal_hiring', 'Internal Hiring'),
-    ('system_updated', 'System Auto Update'),
-    ('caught_mimicking', 'Caught us Mimicking'),
-    ('insufficient_skills', 'Insufficient Skills'),
-    ('test_failed', 'Test Failed during Interview'),
-    ('feedback_not_received', 'Never Received Feedback'),
-    ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
-    ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
-    ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
-)
-
 
 class VendorCompany(models.Model):
     name = models.CharField(_('Company'), max_length=100)
@@ -121,6 +53,12 @@ class VendorContact(TimeStampedModel):
 
 
 class Lead(TimeStampedModel):
+    STATUS_CHOICES = (
+        ('new', 'New'),
+        ('draft', 'Draft'),
+        ('sub', 'Submitted'),
+        ('archived', 'Archived'),
+    )
     is_w2 = models.BooleanField(default=False)
     job_desc = models.TextField(_('Job Description'))
     city = models.CharField(_('City'), max_length=50, blank=True, null=True)
@@ -166,6 +104,13 @@ class Lead(TimeStampedModel):
 
 
 class Submission(TimeStampedModel):
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('sub', 'Submitted'),
+        ('project', 'Project'),
+        ('in_offer', 'In Offer'),
+        ('interview', 'Interview'),
+    )
     attachments = GenericRelation(Attachment)
     rank = models.IntegerField(_('Rank'), default=0)
     employer = models.CharField(_('Employer'), max_length=50)
@@ -176,7 +121,7 @@ class Submission(TimeStampedModel):
     email = models.EmailField(_('Marketing Email'), null=True, blank=True)
     client = models.CharField(_('Client'), max_length=100, null=True, blank=True)
     phone = models.CharField(_('Marketing Phone'), max_length=30, null=True, blank=True)
-    status = models.CharField(_('Status'), max_length=20, choices=SUB_CHOICES, default='sub')
+    status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='sub')
 
     # Consultant Profile
     visa_end = models.DateField(_('Visa End Date'), blank=True, null=True)
@@ -264,22 +209,31 @@ class Question(TimeStampedModel):
     TYPE = (
         ('text', 'Text'),
         ('rate', 'Rate'),
+        ('child', 'Child'),
         ('option', 'Option'),
+        ('parent', 'Parent'),
         ('boolean', 'Boolean'),
         ('integer', 'Integer'),
         ('long_text', 'Long Text'),
+        ('no_remark', 'No Remark'),
+        ('yes_remark', 'Yes Remark'),
         ('attachment', 'Attachment'),
+        ('no_attachment', 'No Attachment'),
+        ('yes_attachment', 'Yes Attachment'),
     )
-    value = models.TextField(_('Question Value'))
-    field = models.CharField(_('Model Field'), max_length=100, null=True, blank=True)
-    options = ArrayField(models.CharField(_('Choices'), max_length=30, blank=True), blank=True)
-
+    title = models.TextField(_('Question Title'))
+    is_active = models.BooleanField(_('Is active'), default=True)
     category = models.CharField(_('Question Category'), max_length=50)
     answer_type = models.CharField(_('Type'), max_length=20, choices=TYPE)
+    child_questions = models.ManyToManyField('self', null=True, blank=True)
     position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
+    placeholder = models.TextField(_('Field Placeholder'), null=True, blank=True)
+    description = models.TextField(_('Question Description'), null=True, blank=True)
+    form_name = models.CharField(_('Form Name'), max_length=100, null=True, blank=True)
+    options = ArrayField(models.CharField(_('Choices'), max_length=30, blank=True), blank=True)
 
     def __str__(self):
-        return f'{self.field} - {self.answer_type} - {self.category}'
+        return f'{self.title} - {self.answer_type}'
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -290,9 +244,14 @@ class Question(TimeStampedModel):
 
 class Answer(TimeStampedModel):
     attachment = GenericRelation(Attachment)
-    value = models.TextField(_('Value'), null=True, blank=True)
     submitted_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    answer = models.TextField(_('Answer Value'), null=True, blank=True)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='answer')
+    parent_question = models.ForeignKey(
+        Question, on_delete=models.CASCADE,
+        related_name='parent_answers',
+        null=True, blank=True
+    )
 
     object_id = models.PositiveIntegerField(_('Object Id'), )
     content_object = GenericForeignKey('content_type', 'object_id')
@@ -308,10 +267,18 @@ class Answer(TimeStampedModel):
         return super(Answer, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.question.value}'
+        return f'{self.question.title}'
 
 
 class Test(TimeStampedModel):
+    STATUS_CHOICES = (
+        ('new', 'New'),
+        ('passed', 'Passed'),
+        ('failed', 'Failed'),
+        ('assigned', 'Assigned'),
+        ('cancelled', 'Cancelled'),
+        ('feedback_due', 'Feedback Due'),
+    )
     attachments = GenericRelation(Attachment)
     engineer_feedback = GenericRelation(Answer)
     link = models.TextField(_('Test Link'), null=True, blank=True)
@@ -319,9 +286,9 @@ class Test(TimeStampedModel):
     is_offline = models.BooleanField(_('Offline Test'), default=False)
     feedback = models.TextField(_('Test Feedback'), null=True, blank=True)
     deadline = models.DateField(_('Test Deadline'), null=True, blank=True)
+    status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES)
     cancel_reason = models.TextField(_('Cancellation Reason'), null=True, blank=True)
     engineer_remarks = models.TextField(_("Engineer Remarks"), null=True, blank=True)
-    status = models.CharField(_('Status'), max_length=20, choices=TEST_STATUS_CHOICES)
     submit_date = models.DateTimeField(_('Test Submission Date'), null=True, blank=True)
     additional_details = models.TextField(_('Additional Details'), null=True, blank=True)
     skills = ArrayField(models.CharField(_('Skills'), max_length=30), blank=True, null=True)
@@ -364,6 +331,41 @@ class Test(TimeStampedModel):
 
 
 class Interview(TimeStampedModel):
+    STATUS_CHOICES = (
+        ('offer', 'offer'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+        ('scheduled', 'Scheduled'),
+        ('next_round', 'Next Round'),
+        ('rescheduled', 'Rescheduled'),
+        ('feedback_due', 'Feedback Due'),
+    )
+    INTERVIEW_MODE = (
+        ('skype', 'Skype'),
+        ('webex', 'Webex'),
+        ('dial_in', 'Dial In'),
+        ('hangouts', 'Hangout'),
+        ('video_call', 'Video Call'),
+        ('voice_call', 'Voice Call'),
+    )
+    TYPE_CHOICES = (
+        ('ip_screening', 'IP Tech Screening'),
+        ('vendor_screening', 'Vendor Tech Screening'),
+        ('interview', 'Interview'),
+    )
+    FAILURE_CHOICES = (
+        ('resume_error', 'Error In Resume'),
+        ('hired_else', 'Hired Someone Else'),
+        ('internal_hiring', 'Internal Hiring'),
+        ('system_updated', 'System Auto Update'),
+        ('caught_mimicking', 'Caught us Mimicking'),
+        ('insufficient_skills', 'Insufficient Skills'),
+        ('test_failed', 'Test Failed during Interview'),
+        ('feedback_not_received', 'Never Received Feedback'),
+        ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
+        ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
+        ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
+    )
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
     guest_remark = models.TextField(_('Remark'), blank=True, null=True)
@@ -377,9 +379,9 @@ class Interview(TimeStampedModel):
     tech_stack = models.TextField(_('Technology required'), null=True, blank=True)
     attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
     calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
+    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=TYPE_CHOICES)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
-    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=SCREENING_CHOICES)
-    status = models.CharField(_('Status'), max_length=20, choices=SCREENING_STATUS_CHOICES, default='scheduled')
+    status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
         max_length=50, choices=FAILURE_CHOICES),
