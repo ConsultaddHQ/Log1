@@ -218,7 +218,7 @@ def coder_assigned_notification(user, interview):
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
-                    "activityTitle": f"Coding assignment",
+                    "activityTitle": "Coding assignment",
                     "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
                                         f" ***{interview.submission.consultant.name}*** ",
                     "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
@@ -226,24 +226,24 @@ def coder_assigned_notification(user, interview):
                     "activityImage": profile_path,
                     "facts": [
                         {
-                            "name": f"Technology",
-                            "value": f"{interview.tech_stack}"
+                            "name": "Technology",
+                            "value": str(interview.tech_stack)
                         },
                         {
-                            "name": f"Supervisor",
-                            "value": f"{interview.supervisor.employee_name}"
+                            "name": "Supervisor",
+                            "value": str(interview.supervisor.employee_name)
                         },
                         {
-                            "name": f"Date",
-                            "value": f"{interview.start_time.strftime('%a, %d %B')}"
+                            "name": "Date",
+                            "value": str(interview.start_time.strftime('%a, %d %B'))
                         },
                         {
-                            "name": f"Time",
+                            "name": "Time",
                             "value": f"{interview.start_time.strftime('%I:%M %p EST')} - "
                                      f"{interview.end_time.strftime('%I:%M %p EST')}"
                         },
                         {
-                            "name": f"Coding Expert",
+                            "name": "Coding Expert",
                             "value": coding_experts
                         }
                     ],
@@ -274,6 +274,16 @@ def test_received_notification(user, test, timezone):
         else:
             deadline = test.deadline.strftime('%a, %d %B %Y')
 
+        client = test.submission.client
+        subtitle = f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from Unknown client for " \
+                   f" ***{test.submission.consultant.name}*** "
+        if client:
+            if len(client) > 1:
+                subtitle = f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from " \
+                           f"***{test.submission.client.strip()}*** for " \
+                           f" ***{test.submission.consultant.name}*** "
+
+        activity_text = f"Requested by ***{test.marketer.employee_name}*** from ***{test.marketer.team.name}***"
         data = {
             "@type": "MessageCard",
             "themeColor": "#0076D7",
@@ -281,20 +291,17 @@ def test_received_notification(user, test, timezone):
             "summary": f"Coding expert request for Interview ",
             "sections": [
                 {
-                    "activityTitle": f"Test Received",
-                    "activitySubtitle": f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from "
-                                        f" ***{test.submission.client.strip()}*** for "
-                                        f" ***{test.submission.consultant.name}*** ",
-                    "activityText": f"Requested by ***{test.marketer.employee_name}*** from "
-                                    f"***{test.marketer.team.name}***",
+                    "activitySubtitle": subtitle,
                     "activityImage": profile_path,
+                    "activityText": activity_text,
+                    "activityTitle": "Test Received",
                     "facts": [
                         {
-                            "name": f"Timezone",
+                            "name": "Timezone",
                             "value": timezone
                         },
                         {
-                            "name": f"Deadline",
+                            "name": "Deadline",
                             "value": deadline
                         }
                     ],
