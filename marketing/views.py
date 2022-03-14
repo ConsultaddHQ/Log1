@@ -2583,7 +2583,6 @@ class QuestionViewSets(ModelViewSet):
             queryset = Question.objects.filter(
                 form_name=question_field, is_active=True
             ).exclude(Q(answer_type="parent") | Q(category="child")).order_by('position')
-            breakpoint()
             serializer = QuestionSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
