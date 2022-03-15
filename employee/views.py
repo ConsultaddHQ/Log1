@@ -179,14 +179,16 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['put'], detail=True, url_path='technology')
-    def technology(self, request, pk):
+    @action(methods=['put'], detail=False, url_path='technology')
+    def technology(self, request):
         try:
-            user = get_object_or_404(User, id=pk)
-            technology = request.data.get('technology')
-            user.technology = technology
-            user.save()
-            return Response({"message": "Profile Updated"}, status=202)
+            user = get_object_or_404(User, id=request.user.id)
+            technology = request.data.get("technology", [])
+            if technology:
+                user.technology = technology
+                user.save()
+                return Response({"message": "Technology Updated"}, status=202)
+            return Response({"message": "Add Technology"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
