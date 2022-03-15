@@ -806,14 +806,19 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
 
             engineer = User.objects.filter(
                 projects__statuses__is_current=True,
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
 
-            if query:
-                engineer = engineer.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
+            if category:
+                query = query.lstrip().replace(':amp:', '&')
+                if category == 'engineer_name':
+                    engineer = engineer.filter(employee_name__istartswith=query)
+                elif category == 'consultant_name':
+                    engineer = engineer.filter(projects__project__consultant__name__istartswith=query)
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = {
@@ -848,14 +853,24 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
             support_status = request.GET.get('status', None)
 
             projects = ProjectSupport.objects.filter(
                 support__id=kwargs.get('pk')
             ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
 
-            if query:
-                projects = projects.filter(project__consultant__name__istartswith=query.lstrip().replace(':amp:', '&'))
+            if category:
+                query = query.lstrip().replace(':amp:', '&')
+                if category == 'engineer_name':
+                    projects = projects.filter(support__employee_name__istartswith=query)
+                elif category == 'consultant_name':
+                    projects = projects.filter(project__consultant__name__istartswith=query)
+                elif category == 'client':
+                    projects = projects.filter(project__submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
+
             total_count = projects.count()
             if support_status:
                 projects = self.support_status_filter(projects, support_status)
