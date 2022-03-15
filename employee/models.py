@@ -1,3 +1,4 @@
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -94,6 +95,7 @@ class User(AbstractUser, PermissionsMixin):
     employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
+    technology = ArrayField(models.CharField(_('Technologies'), max_length=30, blank=True), blank=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name='employees', null=True, blank=True)
 

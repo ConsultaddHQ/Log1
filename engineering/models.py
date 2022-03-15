@@ -19,6 +19,7 @@ class ProjectDescription(TimeStampedModel):
     technology = models.CharField(_('Technology'), max_length=500, null=True)
     update_by = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='description')
+    daily_support_hour = models.CharField(_('Daily Support Hour'), max_length=30, null=True, blank=True)
     consultant_preferred_time = models.CharField(_('Preferred Time'), max_length=30, null=True, blank=True)
 
     def save(self, *args, **kwargs):

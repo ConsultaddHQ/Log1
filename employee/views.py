@@ -179,6 +179,18 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['put'], detail=True, url_path='technology')
+    def technology(self, request, pk):
+        try:
+            user = get_object_or_404(User, id=pk)
+            technology = request.data.get('technology')
+            user.technology = technology
+            user.save()
+            return Response({"message": "Profile Updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['post'], detail=False, url_path='bulk_register')
     def bulk_register(self, request, *args, **kwargs):
         try:
