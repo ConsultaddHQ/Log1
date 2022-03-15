@@ -262,6 +262,7 @@ class TestListSerializer(serializers.ModelSerializer):
     submitted_by = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
+    engineer_associated = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
@@ -301,6 +302,10 @@ class TestListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_consultant_name(obj):
         return obj.submission.consultant_marketing.consultant.name
+
+    @staticmethod
+    def get_engineer_associated(obj):
+        return obj.engineer.all().values('id', 'employee_name')
 
 
 class TestCreateSerializer(serializers.ModelSerializer):
@@ -400,6 +405,7 @@ class SubmissionConProfile(serializers.ModelSerializer):
             "visa_start": submission.visa_start,
             "current_city": submission.current_city,
             "date_of_birth": submission.date_of_birth,
+            "marketer": submission.created_by.employee_name,
         }
 
 
