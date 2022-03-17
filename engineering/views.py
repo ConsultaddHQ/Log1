@@ -850,7 +850,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     },
                     "total": {
                         "display_name": "Total",
-                        "count": self.project_filter_counts(projects, 'independent')
+                        "count": self.project_filter_counts(projects, 'total')
                     },
                 },
             }
@@ -1039,13 +1039,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 {"name": "feedback_due", "count": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')},
             ]
 
-            guest_interview_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
+            guest_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
             guest_interview_counts = [
-                {"name": "total", "count": self.interview_status_filter_count(guest_interview_qs)},
-                {"name": "offer", "count": self.interview_status_filter_count(guest_interview_qs, 'offer')},
-                {"name": "failed", "count": self.interview_status_filter_count(guest_interview_qs, 'failed')},
-                {"name": "next_round", "count": self.interview_status_filter_count(guest_interview_qs, 'next_round')},
-                {"name": "feedback_due", "count": self.interview_status_filter_count(guest_interview_qs, 'feedback_due')},
+                {"name": "total", "count": self.interview_status_filter_count(guest_qs)},
+                {"name": "offer", "count": self.interview_status_filter_count(guest_qs, 'offer')},
+                {"name": "failed", "count": self.interview_status_filter_count(guest_qs, 'failed')},
+                {"name": "next_round", "count": self.interview_status_filter_count(guest_qs, 'next_round')},
+                {"name": "feedback_due", "count": self.interview_status_filter_count(guest_qs, 'feedback_due')},
             ]
 
             data = {
@@ -1090,8 +1090,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def category(self, request, *args, **kwargs):
         data = [
             {'name': 'client', 'display_name': 'Client Name'},
+            {'name': 'vendor_name', 'display_name': 'Vendor Name'},
             {'name': 'support_name', 'display_name': 'Support Name'},
             {'name': 'consultant_name', 'display_name': 'Consultant Name'},
-            {'name': 'vendor_name', 'display_name': 'Vendor Name'},
         ]
         return Response({"data": data}, status=200)

@@ -267,7 +267,8 @@ class TestListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Test
         fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id', 'client',
-                  'consultant_name', 'submitted_by', 'job_title', 'skills', 'created', 'modified', 'assigned_to')
+                  'consultant_name', 'submitted_by', 'job_title', 'skills', 'created', 'modified', 'assigned_to',
+                  'engineer_associated')
 
     @staticmethod
     def get_client(obj):
