@@ -161,7 +161,7 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
     def attachments(self, request, pk):
         try:
             timesheet = get_object_or_404(TimeSheet, id=pk, project__consultant=request.user)
-            attachments = timesheet.attachments.filter(is_active=True)
+            attachments = timesheet.attachments.all()
             data = []
             for attachment in attachments:
                 response, error = get_s3_object(attachment.attachment_file.name)

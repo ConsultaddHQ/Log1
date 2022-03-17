@@ -129,9 +129,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             teams = request.GET.get('teams', None)
             user_type = request.GET.get('type', None)
             users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
-            if user_type == 'relation':
-                users = users.filter(team__name='Retention')
-            elif user_type:
+            if user_type:
                 users = users.filter(role__name__iexact=user_type)
             elif teams:
                 teams = teams.split(",")
