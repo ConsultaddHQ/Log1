@@ -450,6 +450,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "timezone": description.timezone,
                     "technology": description.technology,
                     "description": description.description,
+                    "daily_support_hour": description.daily_support_hour,
                     "consultant_preferred_time": description.consultant_preferred_time
                 }
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
@@ -734,7 +735,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @staticmethod
     def project_filter_counts(queryset, support_status):
-        queryset = queryset.filter(support__statuses__is_current=True)
+        queryset = queryset.filter(support__statuses__is_current=True, support__end=None)
         if support_status == 'training':
             queryset = queryset.filter(
                 support__statuses__frequency='more_than_2_days',
@@ -753,6 +754,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             queryset = queryset.filter(
                 support__statuses__frequency__in=['independent', 'twice_a_month']
             )
+        else:
+            queryset = queryset.filter(support__end=None)
         return queryset.count()
 
     @staticmethod
@@ -806,14 +809,25 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
 
             engineer = User.objects.filter(
                 projects__statuses__is_current=True,
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
 
-            if query:
-                engineer = engineer.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
+            if category:
+                query = query.lstrip().replace(':amp:', '&')
+                if category == 'support_name':
+                    engineer = engineer.filter(employee_name__istartswith=query)
+                elif category == 'consultant_name':
+                    engineer = engineer.filter(projects__project__consultant__name__istartswith=query)
+                elif category == 'client':
+                    engineer = engineer.filter(projects__project__submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    engineer = engineer.filter(
+                        projects__project__submission__lead__vendor_company__name__istartswith=query
+                    )
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = {
@@ -834,6 +848,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         "display_name": "Independent",
                         "count": self.project_filter_counts(projects, 'independent')
                     },
+                    "total": {
+                        "display_name": "Total",
+                        "count": self.project_filter_counts(projects, 'total')
+                    },
                 },
             }
 
@@ -848,14 +866,22 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
             support_status = request.GET.get('status', None)
 
             projects = ProjectSupport.objects.filter(
                 support__id=kwargs.get('pk')
             ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
 
-            if query:
-                projects = projects.filter(project__consultant__name__istartswith=query.lstrip().replace(':amp:', '&'))
+            if category:
+                query = query.lstrip().replace(':amp:', '&')
+                if category == 'consultant_name':
+                    projects = projects.filter(project__consultant__name__istartswith=query)
+                elif category == 'client':
+                    projects = projects.filter(project__submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
+
             total_count = projects.count()
             if support_status:
                 projects = self.support_status_filter(projects, support_status)
@@ -871,13 +897,17 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
             test = Test.objects.filter(engineer=kwargs.get('pk'))
-            if query:
-                query = query.strip().replace(':amp:', '&')
-                test = test.filter(
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query),
-                )
+
+            if category:
+                query = query.lstrip().replace(':amp:', '&')
+                if category == 'consultant_name':
+                    test = test.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+                elif category == 'client':
+                    test = test.filter(submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    test = test.filter(submission__lead__vendor_company__name__istartswith=query)
 
             serializer = EngineerTestSerializer(test[first: last], many=True)
             return Response({"data": serializer.data, "count": test.count()}, status=200)
@@ -890,6 +920,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
             guest_type = request.GET.get('type', 'all')
 
             if guest_type == 'guest':
@@ -899,12 +930,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             else:
                 interview = Interview.objects.filter(Q(guest=kwargs.get('pk')) | Q(supervisor=kwargs.get('pk')))
 
-            if query:
-                query = query.strip().replace(':amp:', '&')
-                interview = interview.filter(
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                )
+            if category:
+                query = query.lstrip().replace(':amp:', '&')
+                if category == 'consultant_name':
+                    interview = interview.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+                elif category == 'client':
+                    interview = interview.filter(submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    interview = interview.filter(submission__lead__vendor_company__name__istartswith=query)
 
             serializer = EngineerInterviewSerializer(interview[first: last], many=True)
             return Response({"data": serializer.data, "count": interview.count()}, status=200)
@@ -917,6 +950,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
             support_status = request.GET.get('status', None)
 
             projects = ProjectSupport.objects.filter(
@@ -924,8 +958,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 project__statuses__is_current=True,
                 project__statuses__status__istartswith='terminated'
             )
-            if query:
-                projects = projects.filter(project__consultant__name__istartswith=query.lstrip().replace(':amp:', '&'))
+            if category:
+                query = query.lstrip().replace(':amp:', '&')
+                if category == 'consultant_name':
+                    projects = projects.filter(project__consultant__name__istartswith=query)
+                elif category == 'client':
+                    projects = projects.filter(project__submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
 
             total_count = projects.count()
             if support_status:
@@ -953,13 +993,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 project__statuses__status__istartswith='terminated').count()
             terminated = project_qs.filter(project__statuses__status__istartswith='terminated').count()
 
-            project_counts = {
-                "active": active,
-                "terminated": terminated,
-                "less_active": less_active,
-                "independent": independent,
-                "total": project_qs.count(),
-            }
+            project_counts = [
+                {"name": "active", "count": active},
+                {"name": "terminated", "count": terminated},
+                {"name": "less_active", "count": less_active},
+                {"name": "independent", "count": independent},
+                {"name": "total", "count": project_qs.count()},
+            ]
             return Response({"data": project_counts}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -972,12 +1012,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first, last = self.filter_by_time(duration)
 
             test_qs = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
-            test_counts = {
-                "total": self.test_status_filter_count(test_qs),
-                "passed": self.test_status_filter_count(test_qs, 'passed'),
-                "failed": self.test_status_filter_count(test_qs, 'failed'),
-                "feedback_due": self.test_status_filter_count(test_qs, 'feedback_due'),
-            }
+            test_counts = [
+                {"name": "total", "count": self.test_status_filter_count(test_qs)},
+                {"name": "passed", "count": self.test_status_filter_count(test_qs, 'passed')},
+                {"name": "failed", "count": self.test_status_filter_count(test_qs, 'failed')},
+                {"name": "feedback_due", "count": self.test_status_filter_count(test_qs, 'feedback_due')},
+            ]
+
             return Response({"data": test_counts}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -990,22 +1031,22 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first, last = self.filter_by_time(duration)
 
             sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'), created__range=[first, last])
-            supervisor_interview_counts = {
-                "total": self.interview_status_filter_count(sup_interview_qs),
-                "offer": self.interview_status_filter_count(sup_interview_qs, 'offer'),
-                "failed": self.interview_status_filter_count(sup_interview_qs, 'failed'),
-                "next_round": self.interview_status_filter_count(sup_interview_qs, 'next_round'),
-                "feedback_due": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')
-            }
+            supervisor_interview_counts = [
+                {"name": "total", "count": self.interview_status_filter_count(sup_interview_qs)},
+                {"name": "offer", "count": self.interview_status_filter_count(sup_interview_qs, 'offer')},
+                {"name": "failed", "count": self.interview_status_filter_count(sup_interview_qs, 'failed')},
+                {"name": "next_round", "count": self.interview_status_filter_count(sup_interview_qs, 'next_round')},
+                {"name": "feedback_due", "count": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')},
+            ]
 
-            guest_interview_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
-            guest_interview_counts = {
-                "total": self.interview_status_filter_count(guest_interview_qs),
-                "offer": self.interview_status_filter_count(guest_interview_qs, 'offer'),
-                "failed": self.interview_status_filter_count(guest_interview_qs, 'failed'),
-                "next_round": self.interview_status_filter_count(guest_interview_qs, 'next_round'),
-                "feedback_due": self.interview_status_filter_count(guest_interview_qs, 'feedback_due'),
-            }
+            guest_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
+            guest_interview_counts = [
+                {"name": "total", "count": self.interview_status_filter_count(guest_qs)},
+                {"name": "offer", "count": self.interview_status_filter_count(guest_qs, 'offer')},
+                {"name": "failed", "count": self.interview_status_filter_count(guest_qs, 'failed')},
+                {"name": "next_round", "count": self.interview_status_filter_count(guest_qs, 'next_round')},
+                {"name": "feedback_due", "count": self.interview_status_filter_count(guest_qs, 'feedback_due')},
+            ]
 
             data = {
                 "guest_interview": guest_interview_counts,
@@ -1031,12 +1072,26 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             if technology_ls:
                 technology_ls.remove(None)
-            total_technology = len(technology_ls)
-            technology = {"total": total_technology}
-            for item in technology_ls:
-                technology[item] = technology_ls.count(item)
-
+            distinct_technology_ls = set(technology_ls)
+            technology = [{"name": "total", "count": len(distinct_technology_ls)}]
+            for item in distinct_technology_ls:
+                technology.append(
+                    {
+                        "name": item,
+                        "count": technology_ls.count(item),
+                    }
+                )
             return Response({"data": technology}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='category')
+    def category(self, request, *args, **kwargs):
+        data = [
+            {'name': 'client', 'display_name': 'Client Name'},
+            {'name': 'vendor_name', 'display_name': 'Vendor Name'},
+            {'name': 'support_name', 'display_name': 'Support Name'},
+            {'name': 'consultant_name', 'display_name': 'Consultant Name'},
+        ]
+        return Response({"data": data}, status=200)
