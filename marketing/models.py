@@ -12,6 +12,25 @@ from consultant.models import ConsultantMarketing
 from utils_app.models import TimeStampedModel, Choice
 
 
+QUESTION_TYPE = (
+        ('text', 'Text'),
+        ('rate', 'Rate'),
+        ('child', 'Child'),
+        ('option', 'Option'),
+        ('parent', 'Parent'),
+        ('boolean', 'Boolean'),
+        ('integer', 'Integer'),
+        ('long_text', 'Long Text'),
+        ('no_remark', 'No Remark'),
+        ('yes_remark', 'Yes Remark'),
+        ('attachment', 'Attachment'),
+        ('no_question', 'No Question'),
+        ('yes_question', 'Yes Question'),
+        ('no_attachment', 'No Attachment'),
+        ('yes_attachment', 'Yes Attachment'),
+    )
+
+
 class VendorCompany(models.Model):
     name = models.CharField(_('Company'), max_length=100)
     created_by = models.CharField(_('Created By'), max_length=50, null=True, blank=True)
@@ -206,28 +225,13 @@ class VendorLayer(TimeStampedModel):
 
 
 class Question(TimeStampedModel):
-    TYPE = (
-        ('text', 'Text'),
-        ('rate', 'Rate'),
-        ('child', 'Child'),
-        ('option', 'Option'),
-        ('parent', 'Parent'),
-        ('boolean', 'Boolean'),
-        ('integer', 'Integer'),
-        ('long_text', 'Long Text'),
-        ('no_remark', 'No Remark'),
-        ('yes_remark', 'Yes Remark'),
-        ('attachment', 'Attachment'),
-        ('no_attachment', 'No Attachment'),
-        ('yes_attachment', 'Yes Attachment'),
-    )
     title = models.TextField(_('Question Title'))
     is_active = models.BooleanField(_('Is active'), default=True)
     category = models.CharField(_('Question Category'), max_length=50)
-    answer_type = models.CharField(_('Type'), max_length=20, choices=TYPE)
     child_questions = models.ManyToManyField('self', null=True, blank=True)
     position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
     placeholder = models.TextField(_('Field Placeholder'), null=True, blank=True)
+    answer_type = models.CharField(_('Type'), max_length=20, choices=QUESTION_TYPE)
     description = models.TextField(_('Question Description'), null=True, blank=True)
     form_name = models.CharField(_('Form Name'), max_length=100, null=True, blank=True)
     options = ArrayField(models.CharField(_('Choices'), max_length=30, blank=True), blank=True)
@@ -240,6 +244,20 @@ class Question(TimeStampedModel):
             self.created = timezone.now()
         self.modified = timezone.now()
         return super(Question, self).save(*args, **kwargs)
+
+
+class ChildQuestion(TimeStampedModel):
+    child_question = models.ManyToManyField(Question, null=True)
+    parent_question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='child_question')
+
+    def __str__(self):
+        return str(self.parent_question.title)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(ChildQuestion, self).save(*args, **kwargs)
 
 
 class Answer(TimeStampedModel):
