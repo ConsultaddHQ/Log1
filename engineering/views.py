@@ -994,13 +994,12 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             terminated = project_qs.filter(project__statuses__status__istartswith='terminated').count()
 
             project_counts = [
-                {"name": "active", "count": active},
-                {"name": "terminated", "count": terminated},
-                {"name": "less_active", "count": less_active},
-                {"name": "independent", "count": independent},
-                {"name": "total", "count": project_qs.count()},
+                {"name": "Active", "count": active},
+                {"name": "Terminated", "count": terminated},
+                {"name": "Less Active", "count": less_active},
+                {"name": "Independent", "count": independent},
             ]
-            return Response({"data": project_counts}, status=200)
+            return Response({"data": project_counts, "total": project_qs.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -1013,12 +1012,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             test_qs = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
             test_counts = [
-                {"name": "total", "count": self.test_status_filter_count(test_qs)},
-                {"name": "passed", "count": self.test_status_filter_count(test_qs, 'passed')},
-                {"name": "failed", "count": self.test_status_filter_count(test_qs, 'failed')},
-                {"name": "feedback_due", "count": self.test_status_filter_count(test_qs, 'feedback_due')},
+                {"name": "Passed", "count": self.test_status_filter_count(test_qs, 'passed')},
+                {"name": "Failed", "count": self.test_status_filter_count(test_qs, 'failed')},
+                {"name": "Feedback Due", "count": self.test_status_filter_count(test_qs, 'feedback_due')},
             ]
-
             return Response({"data": test_counts}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -1032,25 +1029,29 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'), created__range=[first, last])
             supervisor_interview_counts = [
-                {"name": "total", "count": self.interview_status_filter_count(sup_interview_qs)},
-                {"name": "offer", "count": self.interview_status_filter_count(sup_interview_qs, 'offer')},
-                {"name": "failed", "count": self.interview_status_filter_count(sup_interview_qs, 'failed')},
-                {"name": "next_round", "count": self.interview_status_filter_count(sup_interview_qs, 'next_round')},
-                {"name": "feedback_due", "count": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')},
+                {"name": "Offer", "count": self.interview_status_filter_count(sup_interview_qs, 'offer')},
+                {"name": "Failed", "count": self.interview_status_filter_count(sup_interview_qs, 'failed')},
+                {"name": "Next Round", "count": self.interview_status_filter_count(sup_interview_qs, 'next_round')},
+                {"name": "Feedback Due", "count": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')},
             ]
 
             guest_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
             guest_interview_counts = [
-                {"name": "total", "count": self.interview_status_filter_count(guest_qs)},
-                {"name": "offer", "count": self.interview_status_filter_count(guest_qs, 'offer')},
-                {"name": "failed", "count": self.interview_status_filter_count(guest_qs, 'failed')},
-                {"name": "next_round", "count": self.interview_status_filter_count(guest_qs, 'next_round')},
-                {"name": "feedback_due", "count": self.interview_status_filter_count(guest_qs, 'feedback_due')},
+                {"name": "Offer", "count": self.interview_status_filter_count(guest_qs, 'offer')},
+                {"name": "Failed", "count": self.interview_status_filter_count(guest_qs, 'failed')},
+                {"name": "Next Round", "count": self.interview_status_filter_count(guest_qs, 'next_round')},
+                {"name": "Feedback Due", "count": self.interview_status_filter_count(guest_qs, 'feedback_due')},
             ]
 
             data = {
-                "guest_interview": guest_interview_counts,
-                "supervisor_interview": supervisor_interview_counts,
+                "guest_interview": {
+                    "status_counts": guest_interview_counts,
+                    "total": self.interview_status_filter_count(guest_qs),
+                },
+                "supervisor_interview": {
+                    "status_counts": supervisor_interview_counts,
+                    "total": self.interview_status_filter_count(sup_interview_qs),
+                }
             }
             return Response({"data": data}, status=200)
         except Exception as error:

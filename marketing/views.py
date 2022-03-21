@@ -2456,10 +2456,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if file:
                 file_data = {
                     "file": file,
-                    "type": 'test_feedback',
-                    "object_id": test.id,
                     "model": "test",
+                    "object_id": test.id,
                     "creator": request.user,
+                    "type": 'test_feedback',
                 }
                 create_attachment(file_data)
             # App Notification
@@ -2524,33 +2524,35 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 else:
                     value = data.get("value", None)
 
-                if question.answer_type == 'parent' and data.get("child", None):
-                    child = json.loads(data["child"])
-                    for item in child:
-                        Answer.objects.create(
-                            object_id=test.id,
-                            answer=item["value"],
-                            parent_question=question,
-                            content_type=content_type,
-                            submitted_by=request.user,
-                            question_id=item["question_id"],
-                        )
+                if 'parent_question_id' in data:
+                    parent_question_id = data['parent_question_id']
                 else:
-                    answer = Answer.objects.create(
-                        answer=value,
-                        question=question,
-                        object_id=test.id,
-                        content_type=content_type,
-                        submitted_by=request.user,
-                    )
-                    if question.answer_type in ['attachment', 'no_attachment', 'yes_attachment']:
-                        for file in request.FILES.getlist(str(question.id)):
+                    parent_question_id = None
+                Answer.objects.create(
+                    answer=value,
+                    object_id=pk,
+                    question=question,
+                    content_type=content_type,
+                    submitted_by=request.user,
+                    parent_question_id=parent_question_id,
+                )
+
+                attachments = json.loads(request.data.get('attachment'))
+                for question_id, attachment in attachments.items():
+                    if 'parent' in attachment.keys():
+                        answer = Answer.objects.filter(
+                            object_id=pk,
+                            question_id=question_id,
+                            parent_question_id=attachment['parent']
+                        )
+
+                        for file in request.FILES.getlist(attachment['file']):
                             file_data = {
                                 "file": file,
                                 "model": "answer",
+                                "object_id": answer.id,
                                 "creator": request.user,
                                 "type": "test_feedback",
-                                "object_id": answer.id,
                             }
                             create_attachment(file_data)
 
@@ -2639,7 +2641,7 @@ class QuestionViewSets(ModelViewSet):
             no_of_questions = int(value)
             cq = question.child_question.first()
             if cq:
-                questions = cq.child_question.all().order_by('position')[:no_of_questions + 1]
+                questions = cq.child_question.all().order_by('position')[:no_of_questions]
                 serializer = ParentQuestionSerializer(questions, many=True)
                 return Response({"data": serializer.data}, status=200)
             return Response({"message": ERROR_MSG, "error": "Child question not found"}, status=404)
