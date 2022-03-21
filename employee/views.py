@@ -440,7 +440,7 @@ class ResetPasswordViewSets(GenericViewSet):
                 }
                 res, error = user.send_mail(mail_data)
                 if error == "ok":
-                    return Response({"message": "Mail sent", "data": res}, status=200)
+                    return Response({"message": f"Mail sent on {user.email}", "data": res}, status=200)
                 else:
                     write_info(message=res, function='token_request')
                     return Response({"message": "Something went wrong", "error": str(res)}, status=400)
