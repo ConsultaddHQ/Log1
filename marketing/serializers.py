@@ -460,7 +460,9 @@ class AnswerSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_parent_question(obj):
-        return obj.question.title
+        if obj.parent_question:
+            return obj.parent_question.title
+        return None
 
 
 class TestGetSerializer(serializers.ModelSerializer):
