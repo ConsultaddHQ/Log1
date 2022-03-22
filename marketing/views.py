@@ -2520,41 +2520,31 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             for data in payload:
                 question = get_object_or_404(Question, id=data['question_id'])
                 if question.answer_type in ['no_remark', 'yes_remark'] and data.get('comment') is not None:
-                    value = f'{data.get("value")}: {data.get("comment")}'
+                    value = f'{data.get("answer")}: {data.get("comment")}'
                 else:
-                    value = data.get("value", None)
+                    value = data.get("answer", None)
 
-                if question.answer_type == 'parent' and data.get("child", None):
-                    child = json.loads(data["child"])
-                    for item in child:
-                        Answer.objects.create(
-                            object_id=test.id,
-                            answer=item["value"],
-                            parent_question=question,
-                            content_type=content_type,
-                            submitted_by=request.user,
-                            question_id=item["question_id"],
-                        )
-                else:
-                    answer = Answer.objects.create(
-                        answer=value,
-                        question=question,
-                        object_id=test.id,
-                        content_type=content_type,
-                        submitted_by=request.user,
-                    )
-                    if question.answer_type in ['attachment', 'no_attachment', 'yes_attachment']:
-                        for file in request.FILES.getlist(str(question.id)):
-                            file_data = {
-                                "file": file,
-                                "model": "answer",
-                                "creator": request.user,
-                                "type": "test_feedback",
-                                "object_id": answer.id,
-                            }
-                            create_attachment(file_data)
-                test.status = "feedback_due"
-                test.save()
+                answer = Answer.objects.create(
+                    answer=value,
+                    question=question,
+                    object_id=test.id,
+                    submitted_by=request.user,
+                    content_type=content_type,
+                    parent_question_id=data.get('parent_question_id', None)
+                )
+
+                if request.FILES.getlist(question.id):
+                    for file in request.FILES.getlist(question.id):
+                        file_data = {
+                            "file": file,
+                            "model": "answer",
+                            "object_id": answer.id,
+                            "type": "test_feedback",
+                            "creator": request.user,
+                        }
+                        create_attachment(file_data)
+            test.status = 'feedback_due'
+            test.save()
 
             # Activity
             desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
