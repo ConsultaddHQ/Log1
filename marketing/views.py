@@ -1,15 +1,12 @@
 import os
 import pytz
-import json
 import difflib
-from datetime import date, datetime
+from datetime import date
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -17,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from constance import config
+from marketing.utils import *
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
@@ -32,9 +29,6 @@ from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
-    date_filter, get_users_and_attendees, test_received_notification, coder_request_notification, \
-    coder_assigned_notification
 
 
 # Route - /vendor_company/
@@ -2581,8 +2575,8 @@ class QuestionViewSets(ModelViewSet):
         try:
             question_field = request.GET.get("form_name", None)
             queryset = Question.objects.filter(
-                form_name=question_field, is_active=True
-            ).exclude(Q(answer_type="parent") | Q(category="child")).order_by('position')
+                form_name=question_field, is_active=True, category__in=['basic', 'generic', 'guideline']
+            ).order_by('position')
             serializer = QuestionSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -2632,24 +2626,23 @@ class QuestionViewSets(ModelViewSet):
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='parent')
-    def parent(self, request):
+    @action(methods=['get'], detail=True, url_path='parent')
+    def parent(self, request, pk):
         try:
-            form_name = request.GET.get('type', None)
-            category = request.GET.get('category', None)
-            question_count = request.GET.get('count', None)
-            queryset = Question.objects.filter(
-                form_name=form_name, answer_type='parent', is_active=True
-            ).order_by('position')
+            qs = Question.objects.filter(id=pk)
+            if qs:
+                question = qs.first()
+            else:
+                return Response({"message": ERROR_MSG, "error": "Question not found"}, status=400)
 
-            if question_count:
-                queryset = queryset.filter(position__lte=question_count)
-
-            if category:
-                queryset = queryset.filter(category=category)
-
-            serializer = QuestionSerializer(queryset, many=True)
-            return Response({"data": serializer.data}, status=200)
+            value = request.GET.get('value', None)
+            no_of_questions = int(value)
+            cq = question.child_question.first()
+            if cq:
+                questions = cq.child_question.all().order_by('position')[:no_of_questions + 1]
+                serializer = ParentQuestionSerializer(questions, many=True)
+                return Response({"data": serializer.data}, status=200)
+            return Response({"message": ERROR_MSG, "error": "Child question not found"}, status=404)
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

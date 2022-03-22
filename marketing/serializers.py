@@ -560,14 +560,35 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
-    child = serializers.SerializerMethodField()
+    dependent = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ("id", "title", "category", "answer_type", "position", "child", "options")
+        fields = ("id", "title", "category", "answer_type", "position", "options", "dependent")
+
+    @staticmethod
+    def get_dependent(obj):
+        if obj.child_question.first() and obj.answer_type in ['yes_question', 'no_question']:
+            return QuestionSerializer(obj.child_question.first().child_question.all(), many=True).data
+        return None
+
+
+class ParentQuestionSerializer(serializers.ModelSerializer):
+    child = serializers.SerializerMethodField()
+    dependent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Question
+        fields = ("id", "title", "category", "answer_type", "position", "options", "child", "dependent")
 
     @staticmethod
     def get_child(obj):
-        if obj.answer_type == 'parent':
-            return QuestionSerializer(obj.child_questions.all(), many=True).data
+        if obj.child_question.first():
+            return QuestionSerializer(obj.child_question.first().child_question.all(), many=True).data
+        return None
+
+    @staticmethod
+    def get_dependent(obj):
+        if obj.child_question.first() and obj.answer_type in ['yes_question', 'no_question']:
+            return QuestionSerializer(obj.child_question.first().child_question.all(), many=True).data
         return None
