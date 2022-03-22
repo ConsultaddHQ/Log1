@@ -2635,11 +2635,11 @@ class QuestionViewSets(ModelViewSet):
             else:
                 return Response({"message": ERROR_MSG, "error": "Question not found"}, status=400)
 
-            value = request.GET.get('value', None)
+            value = request.GET.get('value', 15)
             no_of_questions = int(value)
             cq = question.child_question.first()
             if cq:
-                questions = cq.child_question.all().order_by('position')[:no_of_questions + 1]
+                questions = cq.child_question.all().order_by('position')[:no_of_questions]
                 serializer = ParentQuestionSerializer(questions, many=True)
                 return Response({"data": serializer.data}, status=200)
             return Response({"message": ERROR_MSG, "error": "Child question not found"}, status=404)
