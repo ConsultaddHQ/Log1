@@ -2635,7 +2635,9 @@ class QuestionViewSets(ModelViewSet):
             else:
                 return Response({"message": ERROR_MSG, "error": "Question not found"}, status=400)
 
-            value = request.GET.get('value', 15)
+            value = request.GET.get('value', None)
+            if not value:
+                return Response({"message": "value is empty"}, status=400)
             no_of_questions = int(value)
             cq = question.child_question.first()
             if cq:
