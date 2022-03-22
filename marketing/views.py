@@ -2553,6 +2553,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                                 "object_id": answer.id,
                             }
                             create_attachment(file_data)
+                test.status = "feedback_due"
+                test.save()
 
             # Activity
             desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."

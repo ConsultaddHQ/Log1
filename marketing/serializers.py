@@ -444,10 +444,11 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 class AnswerSerializer(serializers.ModelSerializer):
     question = serializers.SerializerMethodField()
     submitted_by = serializers.SerializerMethodField()
+    parent_question = serializers.SerializerMethodField()
 
     class Meta:
         model = Answer
-        fields = ('id', 'question', 'value', 'submitted_by', 'created', 'object_id')
+        fields = ('id', 'question', 'answer', 'submitted_by', 'created', 'object_id', 'parent_question')
 
     @staticmethod
     def get_submitted_by(obj):
@@ -455,7 +456,11 @@ class AnswerSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_question(obj):
-        return obj.question.name
+        return obj.question.title
+
+    @staticmethod
+    def get_parent_question(obj):
+        return obj.question.title
 
 
 class TestGetSerializer(serializers.ModelSerializer):
