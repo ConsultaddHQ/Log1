@@ -2520,41 +2520,31 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             for data in payload:
                 question = get_object_or_404(Question, id=data['question_id'])
                 if question.answer_type in ['no_remark', 'yes_remark'] and data.get('comment') is not None:
-                    value = f'{data.get("value")}: {data.get("comment")}'
+                    value = f'{data.get("answer")}: {data.get("comment")}'
                 else:
-                    value = data.get("value", None)
+                    value = data.get("answer", None)
 
-                if 'parent_question_id' in data:
-                    parent_question_id = data['parent_question_id']
-                else:
-                    parent_question_id = None
-                Answer.objects.create(
+                answer = Answer.objects.create(
                     answer=value,
-                    object_id=pk,
                     question=question,
-                    content_type=content_type,
+                    object_id=test.id,
                     submitted_by=request.user,
-                    parent_question_id=parent_question_id,
+                    content_type=content_type,
+                    parent_question_id=data.get('parent_question_id', None)
                 )
-
-                attachments = json.loads(request.data.get('attachment'))
-                for question_id, attachment in attachments.items():
-                    if 'parent' in attachment.keys():
-                        answer = Answer.objects.filter(
-                            object_id=pk,
-                            question_id=question_id,
-                            parent_question_id=attachment['parent']
-                        )
-
-                        for file in request.FILES.getlist(attachment['file']):
-                            file_data = {
-                                "file": file,
-                                "model": "answer",
-                                "object_id": answer.id,
-                                "creator": request.user,
-                                "type": "test_feedback",
-                            }
-                            create_attachment(file_data)
+                attachment_id = f"{question.id}-{answer.parent_question_id}" if answer.parent_question else question.id
+                if request.FILES.getlist(attachment_id):
+                    for file in request.FILES.getlist(attachment_id):
+                        file_data = {
+                            "file": file,
+                            "model": "answer",
+                            "object_id": answer.id,
+                            "type": "test_feedback",
+                            "creator": request.user,
+                        }
+                        create_attachment(file_data)
+            test.status = 'feedback_due'
+            test.save()
 
             # Activity
             desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
@@ -2597,7 +2587,7 @@ class QuestionViewSets(ModelViewSet):
             if data.get('position'):
                 position = data.get('position')
                 question_qs = Question.objects.filter(
-                    form_name=data.get('form_name'), position__gte=position, catgeory=data.get('category')
+                    form_name=data.get('form_name'), position__gte=position, category=data.get('category')
                 ).order_by('position')
                 for obj in question_qs:
                     obj.position += 1
@@ -2608,7 +2598,7 @@ class QuestionViewSets(ModelViewSet):
                 ).order_by('position').last()
                 position = question_qs.position + 1
 
-            question = Question.objects.create(
+            Question.objects.create(
                 position=position,
                 title=request.data.get('title'),
                 category=request.data.get('category'),
@@ -2618,10 +2608,6 @@ class QuestionViewSets(ModelViewSet):
                 description=request.data.get('description', None),
                 placeholder=request.data.get('placeholder', None),
             )
-            if data.get("child_id", []):
-                for question_id in data["child_id"]:
-                    sub_question = get_object_or_404(Question, id=question_id)
-                    question.child_questions.add(sub_question)
 
             return Response({"message": "Question added to form"}, status=201)
         except Exception as error:
@@ -2638,6 +2624,8 @@ class QuestionViewSets(ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": "Question not found"}, status=400)
 
             value = request.GET.get('value', None)
+            if not value:
+                return Response({"message": "value is empty"}, status=400)
             no_of_questions = int(value)
             cq = question.child_question.first()
             if cq:

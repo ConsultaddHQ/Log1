@@ -17,9 +17,9 @@ QUESTION_TYPE = (
         ('rate', 'Rate'),
         ('child', 'Child'),
         ('option', 'Option'),
-        ('parent', 'Parent'),
-        ('boolean', 'Boolean'),
         ('integer', 'Integer'),
+        ('boolean', 'Boolean'),
+        ('headline', 'Headline'),
         ('long_text', 'Long Text'),
         ('no_remark', 'No Remark'),
         ('yes_remark', 'Yes Remark'),
@@ -228,7 +228,6 @@ class Question(TimeStampedModel):
     title = models.TextField(_('Question Title'))
     is_active = models.BooleanField(_('Is active'), default=True)
     category = models.CharField(_('Question Category'), max_length=50)
-    child_questions = models.ManyToManyField('self', null=True, blank=True)
     position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
     placeholder = models.TextField(_('Field Placeholder'), null=True, blank=True)
     answer_type = models.CharField(_('Type'), max_length=20, choices=QUESTION_TYPE)

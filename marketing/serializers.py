@@ -444,10 +444,11 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 class AnswerSerializer(serializers.ModelSerializer):
     question = serializers.SerializerMethodField()
     submitted_by = serializers.SerializerMethodField()
+    parent_question = serializers.SerializerMethodField()
 
     class Meta:
         model = Answer
-        fields = ('id', 'question', 'value', 'submitted_by', 'created', 'object_id')
+        fields = ('id', 'question', 'answer', 'submitted_by', 'created', 'object_id', 'parent_question')
 
     @staticmethod
     def get_submitted_by(obj):
@@ -455,16 +456,22 @@ class AnswerSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_question(obj):
-        return obj.question.name
+        return obj.question.title
+
+    @staticmethod
+    def get_parent_question(obj):
+        if obj.parent_question:
+            return obj.parent_question.title
+        return None
 
 
 class TestGetSerializer(serializers.ModelSerializer):
     engineers = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     attachments = AttachmentGetSerializer(many=True)
-    engineer_feedback = AnswerSerializer(many=True)
     assigned_to = serializers.SerializerMethodField()
     submitted_by = serializers.SerializerMethodField()
+    engineer_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
@@ -497,6 +504,11 @@ class TestGetSerializer(serializers.ModelSerializer):
         if user == obj.marketer:
             update = True
         return {'update': update}
+
+    @staticmethod
+    def get_engineer_feedback(obj):
+        answers = Answer.objects.filter(object_id=obj.id).order_by("id")
+        return AnswerSerializer(answers, many=True).data
 
 
 class SubmissionSupportSerializer(serializers.ModelSerializer):
