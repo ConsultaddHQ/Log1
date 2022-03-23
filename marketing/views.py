@@ -2456,10 +2456,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if file:
                 file_data = {
                     "file": file,
-                    "type": 'test_feedback',
-                    "object_id": test.id,
                     "model": "test",
+                    "object_id": test.id,
                     "creator": request.user,
+                    "type": 'test_feedback',
                 }
                 create_attachment(file_data)
             # App Notification
