@@ -469,9 +469,9 @@ class TestGetSerializer(serializers.ModelSerializer):
     engineers = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     attachments = AttachmentGetSerializer(many=True)
-    engineer_feedback = AnswerSerializer(many=True)
     assigned_to = serializers.SerializerMethodField()
     submitted_by = serializers.SerializerMethodField()
+    engineer_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
@@ -504,6 +504,11 @@ class TestGetSerializer(serializers.ModelSerializer):
         if user == obj.marketer:
             update = True
         return {'update': update}
+
+    @staticmethod
+    def get_engineer_feedback(obj):
+        answer = Answer.objects.filter(object_id=obj.id).order_by("id")
+        return AnswerSerializer(answer, many=True).data
 
 
 class SubmissionSupportSerializer(serializers.ModelSerializer):
