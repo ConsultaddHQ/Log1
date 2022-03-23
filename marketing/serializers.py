@@ -507,8 +507,8 @@ class TestGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_engineer_feedback(obj):
-        answer = Answer.objects.filter(object_id=obj.id).order_by("id")
-        return AnswerSerializer(answer, many=True).data
+        answers = Answer.objects.filter(object_id=obj.id).order_by("id")
+        return AnswerSerializer(answers, many=True).data
 
 
 class SubmissionSupportSerializer(serializers.ModelSerializer):

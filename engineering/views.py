@@ -734,35 +734,50 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         return queryset
 
     @staticmethod
-    def project_filter_counts(queryset, support_status):
+    def project_filter_counts(queryset):
         queryset = queryset.filter(support__statuses__is_current=True, support__end=None)
-        if support_status == 'training':
-            queryset = queryset.filter(
-                support__statuses__frequency='more_than_2_days',
-                start_date__gte=date.today()
-            )
-        elif support_status == 'active':
-            queryset = queryset.filter(
-                support__statuses__frequency='more_than_2_days',
-                start_date__lte=date.today()
-            )
-        elif support_status == 'less_active':
-            queryset = queryset.filter(
-                support__statuses__frequency='less_than_3_days'
-            )
-        elif support_status == 'independent':
-            queryset = queryset.filter(
-                support__statuses__frequency__in=['independent', 'twice_a_month']
-            )
-        else:
-            queryset = queryset.filter(support__end=None)
-        return queryset.count()
+        return {
+            "support_status": {
+                "active": {
+                    "display_name": "Active",
+                    "count": queryset.filter(
+                        support__statuses__frequency='more_than_2_days',
+                        start_date__lte=date.today()
+                    ).count()},
+                "training": {
+                    "display_name": "Training",
+                    "count": queryset.filter(
+                        support__statuses__frequency='more_than_2_days',
+                        start_date__gte=date.today()).count()
+                },
+                "less_active": {
+                    "display_name": "Less Active",
+                    "count": queryset.filter(
+                        support__statuses__frequency='less_than_3_days'
+                    ).count()
+                },
+                "independent": {
+                    "display_name": "Independent",
+                    "count": queryset.filter(
+                        support__statuses__frequency__in=['independent', 'twice_a_month']
+                    ).count()
+                },
+                "total": {
+                    "display_name": "Total",
+                    "count": queryset.count()
+                },
+            },
+        }
 
     @staticmethod
-    def interview_status_filter_count(queryset, interview_status=None):
-        if interview_status:
-            queryset = queryset.filter(status=interview_status)
-        return queryset.count()
+    def interview_status_filter_count(queryset):
+        return [
+            {"name": "Offer", "count": queryset.filter(status='offer').count()},
+            {"name": "Failed", "count": queryset.filter(status='failed').count()},
+            {"name": "Cancelled", "count": queryset.filter(status='cancelled').count()},
+            {"name": "Next Round", "count": queryset.filter(status='next_round').count()},
+            {"name": "Feedback Due", "count": queryset.filter(status='feedback_due').count()},
+        ]
 
     @staticmethod
     def test_status_filter_count(queryset, test_status=None):
@@ -816,44 +831,24 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
 
-            if category:
+            if query:
                 query = query.lstrip().replace(':amp:', '&')
-                if category == 'support_name':
+                if category:
+                    if category == 'support_name':
+                        engineer = engineer.filter(employee_name__istartswith=query)
+                    elif category == 'consultant_name':
+                        engineer = engineer.filter(projects__project__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        engineer = engineer.filter(projects__project__submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        engineer = engineer.filter(
+                            projects__project__submission__lead__vendor_company__name__istartswith=query
+                        )
+                else:
                     engineer = engineer.filter(employee_name__istartswith=query)
-                elif category == 'consultant_name':
-                    engineer = engineer.filter(projects__project__consultant__name__istartswith=query)
-                elif category == 'client':
-                    engineer = engineer.filter(projects__project__submission__client__istartswith=query)
-                elif category == 'vendor_name':
-                    engineer = engineer.filter(
-                        projects__project__submission__lead__vendor_company__name__istartswith=query
-                    )
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
-            counts = {
-                "support_status": {
-                    "active": {
-                        "display_name": "Active",
-                        "count": self.project_filter_counts(projects, 'active')
-                    },
-                    "training": {
-                        "display_name": "Training",
-                        "count": self.project_filter_counts(projects, 'training')
-                    },
-                    "less_active": {
-                        "display_name": "Less Active",
-                        "count": self.project_filter_counts(projects, 'less_active')
-                    },
-                    "independent": {
-                        "display_name": "Independent",
-                        "count": self.project_filter_counts(projects, 'independent')
-                    },
-                    "total": {
-                        "display_name": "Total",
-                        "count": self.project_filter_counts(projects, 'total')
-                    },
-                },
-            }
+            counts = self.project_filter_counts(projects)
 
             serializer = EngineerReportSerializer(engineer[first: last], many=True)
             return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
@@ -873,14 +868,17 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 support__id=kwargs.get('pk')
             ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
 
-            if category:
+            if query:
                 query = query.lstrip().replace(':amp:', '&')
-                if category == 'consultant_name':
+                if category:
+                    if category == 'consultant_name':
+                        projects = projects.filter(project__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        projects = projects.filter(project__submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
+                else:
                     projects = projects.filter(project__consultant__name__istartswith=query)
-                elif category == 'client':
-                    projects = projects.filter(project__submission__client__istartswith=query)
-                elif category == 'vendor_name':
-                    projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
 
             total_count = projects.count()
             if support_status:
@@ -900,14 +898,17 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             category = request.GET.get('category', None)
             test = Test.objects.filter(engineer=kwargs.get('pk'))
 
-            if category:
+            if query:
                 query = query.lstrip().replace(':amp:', '&')
-                if category == 'consultant_name':
+                if category:
+                    if category == 'consultant_name':
+                        test = test.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        test = test.filter(submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        test = test.filter(submission__lead__vendor_company__name__istartswith=query)
+                else:
                     test = test.filter(submission__consultant_marketing__consultant__name__istartswith=query)
-                elif category == 'client':
-                    test = test.filter(submission__client__istartswith=query)
-                elif category == 'vendor_name':
-                    test = test.filter(submission__lead__vendor_company__name__istartswith=query)
 
             serializer = EngineerTestSerializer(test[first: last], many=True)
             return Response({"data": serializer.data, "count": test.count()}, status=200)
@@ -930,14 +931,20 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             else:
                 interview = Interview.objects.filter(Q(guest=kwargs.get('pk')) | Q(supervisor=kwargs.get('pk')))
 
-            if category:
+            if query:
                 query = query.lstrip().replace(':amp:', '&')
-                if category == 'consultant_name':
+                if category:
+                    query = query.lstrip().replace(':amp:', '&')
+                    if category == 'consultant_name':
+                        interview = interview.filter(
+                            submission__consultant_marketing__consultant__name__istartswith=query
+                        )
+                    elif category == 'client':
+                        interview = interview.filter(submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        interview = interview.filter(submission__lead__vendor_company__name__istartswith=query)
+                else:
                     interview = interview.filter(submission__consultant_marketing__consultant__name__istartswith=query)
-                elif category == 'client':
-                    interview = interview.filter(submission__client__istartswith=query)
-                elif category == 'vendor_name':
-                    interview = interview.filter(submission__lead__vendor_company__name__istartswith=query)
 
             serializer = EngineerInterviewSerializer(interview[first: last], many=True)
             return Response({"data": serializer.data, "count": interview.count()}, status=200)
@@ -958,14 +965,17 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 project__statuses__is_current=True,
                 project__statuses__status__istartswith='terminated'
             )
-            if category:
+            if query:
                 query = query.lstrip().replace(':amp:', '&')
-                if category == 'consultant_name':
+                if category:
+                    if category == 'consultant_name':
+                        projects = projects.filter(project__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        projects = projects.filter(project__submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
+                else:
                     projects = projects.filter(project__consultant__name__istartswith=query)
-                elif category == 'client':
-                    projects = projects.filter(project__submission__client__istartswith=query)
-                elif category == 'vendor_name':
-                    projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
 
             total_count = projects.count()
             if support_status:
@@ -1031,30 +1041,18 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first, last = self.filter_by_time(duration)
 
             sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'), created__range=[first, last])
-            supervisor_interview_counts = [
-                {"name": "Offer", "count": self.interview_status_filter_count(sup_interview_qs, 'offer')},
-                {"name": "Failed", "count": self.interview_status_filter_count(sup_interview_qs, 'failed')},
-                {"name": "Cancelled", "count": self.interview_status_filter_count(sup_interview_qs, 'cancelled')},
-                {"name": "Next Round", "count": self.interview_status_filter_count(sup_interview_qs, 'next_round')},
-                {"name": "Feedback Due", "count": self.interview_status_filter_count(sup_interview_qs, 'feedback_due')},
-            ]
+            supervisor_interview_counts = self.interview_status_filter_count(sup_interview_qs)
 
             guest_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
-            guest_interview_counts = [
-                {"name": "Offer", "count": self.interview_status_filter_count(guest_qs, 'offer')},
-                {"name": "Failed", "count": self.interview_status_filter_count(guest_qs, 'failed')},
-                {"name": "Cancelled", "count": self.interview_status_filter_count(guest_qs, 'cancelled')},
-                {"name": "Next Round", "count": self.interview_status_filter_count(guest_qs, 'next_round')},
-                {"name": "Feedback Due", "count": self.interview_status_filter_count(guest_qs, 'feedback_due')},
-            ]
+            guest_interview_counts = self.interview_status_filter_count(guest_qs)
 
             data = {
                 "guest_interview": {
-                    "total": self.interview_status_filter_count(guest_qs),
+                    "total": guest_qs.count(),
                     "status_counts": guest_interview_counts,
                 },
                 "supervisor_interview": {
-                    "total": self.interview_status_filter_count(sup_interview_qs),
+                    "total": sup_interview_qs.count(),
                     "status_counts": supervisor_interview_counts,
                 }
             }
@@ -1092,7 +1090,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
     @action(methods=['get'], detail=False, url_path='category')
-    def category(self, request, *args, **kwargs):
+    def category(self, request):
         data = [
             {'name': 'client', 'display_name': 'Client Name'},
             {'name': 'vendor_name', 'display_name': 'Vendor Name'},

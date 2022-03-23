@@ -424,10 +424,8 @@ class ResetPasswordViewSets(GenericViewSet):
                         ip_address=ip if ip else '127.0.0.1'
                     )
                 mail_data = {
-                    'to': [user.email],
-                    'cc': [],
-                    'bcc': [],
                     'subject': 'Reset Log1 Password',
+                    'to': [user.email], 'cc': [], 'bcc': [],
                     'template': '../templates/password_reset.html',
                     'context': {
                         'employee_id': user.employee_id,
