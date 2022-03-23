@@ -2587,7 +2587,7 @@ class QuestionViewSets(ModelViewSet):
             if data.get('position'):
                 position = data.get('position')
                 question_qs = Question.objects.filter(
-                    form_name=data.get('form_name'), position__gte=position, catgeory=data.get('category')
+                    form_name=data.get('form_name'), position__gte=position, category=data.get('category')
                 ).order_by('position')
                 for obj in question_qs:
                     obj.position += 1
@@ -2598,7 +2598,7 @@ class QuestionViewSets(ModelViewSet):
                 ).order_by('position').last()
                 position = question_qs.position + 1
 
-            question = Question.objects.create(
+            Question.objects.create(
                 position=position,
                 title=request.data.get('title'),
                 category=request.data.get('category'),
@@ -2608,10 +2608,6 @@ class QuestionViewSets(ModelViewSet):
                 description=request.data.get('description', None),
                 placeholder=request.data.get('placeholder', None),
             )
-            if data.get("child_id", []):
-                for question_id in data["child_id"]:
-                    sub_question = get_object_or_404(Question, id=question_id)
-                    question.child_questions.add(sub_question)
 
             return Response({"message": "Question added to form"}, status=201)
         except Exception as error:

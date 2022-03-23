@@ -8,7 +8,7 @@ from employee.models import User, Team, Role
 from project.models import Project
 from utils_app.models import Choice, ObjectGroup, Field
 from consultant.factories import Setup as consultant_setup
-from marketing.models import Submission, Lead, VendorCompany, VendorContact, Test, Interview, Question
+from marketing.models import Submission, Lead, VendorCompany, VendorContact, Test, Interview, Question, ChildQuestion
 
 
 class Setup:
@@ -19,9 +19,10 @@ class Setup:
             username=8000,
             team=self.team,
             employee_id=8000,
-            password='consultadd',
-            email='demo@log1.com',
             employee_name='Demo',
+            email='demo@log1.com',
+            password='consultadd',
+            technology=['python'],
         )
         self.user.role.add(role)
 
@@ -40,6 +41,7 @@ class Setup:
     def admin_setup(self):
         admin_role = Role.objects.create(name="admin")
         admin_user = User.objects.create(
+            technology=[],
             username=8001,
             team=self.team,
             employee_id=8001,
@@ -101,11 +103,12 @@ class Setup:
     @staticmethod
     def create_question(data):
         return Question.objects.create(
+            is_active=True,
             position=data.get('position', 1),
             category=data.get('category', 'basic'),
             answer_type=data.get('type', 'option'),
-            value=data.get('value', 'Primary Technology'),
-            field=data.get('field', 'online_test_feedback'),
+            title=data.get('title', 'Primary Technology'),
+            form_name=data.get('form_name', 'test_online'),
             options=data.get('options', ['Java', 'Python']),
         )
 
@@ -519,9 +522,39 @@ class TestViewSet(APITestCase):
         self.client.force_authenticate(user=self.user)
 
     def test_list(self):
-        res = self.client.get("/api/question/?field=online_test_feedback")
+        res = self.client.get("/api/question/?form_name=test_online")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"][0]["position"], 1)
+
+    def test_parent(self):
+        payload = [
+            {
+                "position": 9,
+                "child": None,
+                "options": [],
+                "category": "basic",
+                "answer_type": "child",
+                "title": "Number of coding questions",
+             },
+            {
+                "child": None,
+                "options": [],
+                "position": 10,
+                "category": "parent",
+                "title": "Question 1",
+                "answer_type": "headline",
+             }
+        ]
+        for data in payload:
+            self.setup.create_question(data)
+        parent_question = Question.objects.get(title="Number of coding questions")
+        child_question = ChildQuestion.objects.create(
+            parent_question=Question.objects.get(title="Number of coding questions")
+        )
+        child_question.child_question.add(Question.objects.get(title="Question 1"))
+        res = self.client.get(f"/api/question/{parent_question.id}/parent/?value=1")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data["data"][0]['title'], "Question 1")
 
     def test_create(self):
         role = Role.objects.create(name="superadmin")
@@ -529,13 +562,23 @@ class TestViewSet(APITestCase):
 
         data = {
             "type": "option",
-            "position": 2,
-            "value": "Select type of test",
             "category": "basic",
-            "field": "offline_test_feedback",
-            "options": ["online", "offline"]
+            "title": "Secondary tech",
+            "form_name": "test_online",
+            "options": ["Django", "Flask", "Spring"]
         }
+        res = self.client.post("/api/question/", data=json.dumps(data), content_type="application/json")
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data["message"], "Question added to form")
 
+        data = {
+            "position": 2,
+            "type": "option",
+            "category": "basic",
+            "title": "Platform",
+            "form_name": "test_online",
+            "options": ["Django", "Flask", "Spring"]
+        }
         res = self.client.post("/api/question/", data=json.dumps(data), content_type="application/json")
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data["message"], "Question added to form")
