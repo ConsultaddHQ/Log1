@@ -1,6 +1,3 @@
-import os
-import json
-import requests
 from itertools import chain
 from datetime import timedelta, datetime
 
@@ -11,7 +8,6 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q, F, Value, CharField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
-
 from rest_framework.mixins import *
 from rest_framework.decorators import action
 from rest_framework import exceptions
@@ -20,10 +16,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from api_key.models import APIKey
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
+from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
@@ -793,15 +789,11 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
 class LoginViewSet(GenericViewSet, CreateModelMixin):
     serializer_class = UserSerializer
     queryset = User.objects.all()
+    authentication_classes = (HasAPIKey,)
 
     def create(self, request, *args, **kwargs):
         result = {}
         try:
-            api_key = request.data.get('api_key', None)
-            if not api_key:
-                return Response({"message": "Api Key not found"}, status=401)
-            if not APIKey.objects.is_valid(api_key):
-                return Response({"message": "Unauthorized"}, status=401)
 
             data = {
                 "role": request.data.get('role'),
@@ -812,43 +804,46 @@ class LoginViewSet(GenericViewSet, CreateModelMixin):
                 "gender": request.data.get('gender').lower(),
                 "password": request.data.get('password').strip(),
                 "employee_id": int(request.data.get('employee_id')),
+                "roles": request.data.get('roles', [])
             }
 
-            headers = {"Content-Type": "application/json"}
-
-            # Beats login
-            url = f"{os.environ.get('beats_url')}"
-            data['api_key'] = os.environ.get('beats_api_key')
-            response = requests.request('post', url=url, headers=headers, data=json.dumps(data))
-            if response.status_code == 201:
-                result["Beats"] = "Created"
-            else:
-                result["Beats"] = response.text
-
-            # India Beats login
-            url = f"{os.environ.get('india_beats_url')}"
-            data['api_key'] = os.environ.get('india_beats_api_key')
-            response = requests.request('post', url=url, headers=headers, data=json.dumps(data))
-            if response.status_code == 201:
-                result["India Beats"] = "Created"
-            else:
-                result["India Beats"] = response.text
-
             # Log1 login
-            user = User.objects.filter(employee_id__exact=data["employee_id"])
-            if user:
-                result["Log1"] = str({"message": "User already exist"})
-                return Response({"message": result}, status=400)
 
-            team = get_object_or_404(Team, name=data['team'])
-            user = User.objects.create_user(
-                data["employee_id"], data["email"], data["name"], team,
-                data["gender"], data["phone"], data["password"]
-            )
-            r = Role.objects.get(name=data['role'])
-            user.role.add(r)
-            result["Log1"] = "Created"
-            return Response({"message": result}, status=400)
+            user = User.objects.create_user(**data)
+
+            result["Log1"] = f'{user.id} Created'
+            return Response({"message": result}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": result, "error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='bulk_create')
+    def create_bulk(self, request, *args, **kwargs):
+        result = {}
+        try:
+
+            records = request.data.get('data')
+            roles = [record.get('roles', []) for record in records]
+            users = [User(
+                team=record.get('team'),
+                email=record.get('email'),
+                phone=record.get('phone'),
+                gender=record.get('gender'),
+                employee_name=record.get('name'),
+                username=int(record.get('employee_id')),
+                employee_id=int(record.get('employee_id')),
+            ) for record in records]
+            for user, role in zip(users, roles):
+                for role_name in role:
+                    role_object = Role.objects.get(name=role_name)
+                    user.role.add(role_object)
+
+            users = User.objects.bulk_create(users)
+            users = [user.employee_id for user in users]
+            result["response"] = f"{len(users)} users  Created"
+            result["users"] = users
+
+            return Response({"message": result}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": result, "error": str(error)}, status=400)
