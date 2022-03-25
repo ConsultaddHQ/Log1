@@ -2519,7 +2519,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             payload = json.loads(request.data.get('feedback_form'))
             for data in payload:
                 question = get_object_or_404(Question, id=data['question_id'])
-                if question.answer_type in ['no_remark', 'yes_remark'] and data.get('comment') is not None:
+                if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
+                        and data.get('comment') is not None:
                     value = f'{data.get("answer")}: {data.get("comment")}'
                 else:
                     value = data.get("answer", None)
@@ -2543,7 +2544,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                             "creator": request.user,
                         }
                         create_attachment(file_data)
+
             test.status = 'feedback_due'
+            test.submitted_by = request.user
+            test.submit_date = datetime.now()
+            test.engineer_remarks = request.data.get('remarks')
             test.save()
 
             # Activity
