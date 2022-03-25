@@ -76,6 +76,8 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         try:
             employee_id = request.data.get('employee_id', None)
+            if not employee_id.isnumeric():
+                return Response({"message": "Enter valid Employee Id"}, status=400)
             if employee_id:
                 queryset = User.objects.filter(employee_id=employee_id)
                 if not queryset:

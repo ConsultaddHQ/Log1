@@ -1622,7 +1622,10 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['put'], detail=True, url_path='cancel_interview')
     def cancel_interview(self, request, pk):
         try:
-            interview = get_object_or_404(Interview, id=pk, submission__created_by=request.user)
+            qs = Interview.objects.filter(id=pk, submission__created_by=request.user)
+            if not qs:
+                return Response({"message": "You don't have access"}, status=404)
+            interview = qs.first()
             try:
                 if interview.calendar_id:
                     calendar = Calendar(request=request)

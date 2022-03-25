@@ -762,7 +762,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
             if os.environ.get('ENV', 'local') == 'prod':
-                to = [submission.created_by.email, project.support.email]
+                support_emails = list(project.support.all().values_list('support__email', flat=True))
+                to = [submission.created_by.email] + support_emails
                 cc = ['engineering@consultadd.com'] + scrum_masters
             else:
                 cc = []
