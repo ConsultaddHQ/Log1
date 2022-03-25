@@ -2519,7 +2519,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             payload = json.loads(request.data.get('feedback_form'))
             for data in payload:
                 question = get_object_or_404(Question, id=data['question_id'])
-                if question.answer_type in ['no_remark', 'yes_remark'] and data.get('comment') is not None:
+                if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
+                        and data.get('comment') is not None:
                     value = f'{data.get("answer")}: {data.get("comment")}'
                 else:
                     value = data.get("answer", None)
@@ -2543,14 +2544,26 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                             "creator": request.user,
                         }
                         create_attachment(file_data)
+
             test.status = 'feedback_due'
+            test.submitted_by = request.user
+            test.submit_date = datetime.now()
+            test.engineer_remarks = request.data.get('remarks')
             test.save()
 
             # Activity
-            desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
-            create_activity(test.id, 'test', request.user, desc, 'created')
+            desc = f"{request.user.employee_name} completed test and submitted engineer feedback"
+            create_activity(test.submission.id, 'submission', request.user, desc, 'created')
 
-            return Response({"message": "Feedback submitted"}, status=201)
+            # test submit mail
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, error = self.send_test_mail(test, request.data, 'submit', request)
+                if error == 'error':
+                    write_info(message=res, function='create-send_test_mail', request=request)
+                    return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+
+            return Response({"message": "Feedback submitted", "mail": res}, status=201)
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
