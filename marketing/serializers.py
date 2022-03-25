@@ -441,28 +441,44 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         return True
 
 
-class AnswerSerializer(serializers.ModelSerializer):
-    question = serializers.SerializerMethodField()
-    submitted_by = serializers.SerializerMethodField()
-    parent_question = serializers.SerializerMethodField()
+class QuestionAnswerSerializer(serializers.ModelSerializer):
+    question_answer = serializers.SerializerMethodField()
 
     class Meta:
         model = Answer
-        fields = ('id', 'question', 'answer', 'submitted_by', 'created', 'object_id', 'parent_question')
+        fields = ('question_answer',)
 
     @staticmethod
-    def get_submitted_by(obj):
-        return obj.submitted_by.employee_name
-
-    @staticmethod
-    def get_question(obj):
-        return obj.question.title
-
-    @staticmethod
-    def get_parent_question(obj):
-        if obj.parent_question:
-            return obj.parent_question.title
-        return None
+    def get_question_answer(obj):
+        if ": " in obj.answer and obj.question.answer_type in ["yes_attachment", "no_attachment", "yes_remark",
+                                                               "no_remark"]:
+            answer = obj.answer.split(": ")
+        else:
+            answer = [obj.answer, None]
+        data = {
+            "answer": answer[0],
+            "remark": answer[1],
+            "answer_id": obj.id,
+            "ques_id": obj.question.id,
+            "ques_title": obj.question.title,
+            "ques_category": obj.question.category,
+            "answer_type": obj.question.answer_type,
+            "child": [],
+            "attachment": AttachmentGetSerializer(obj.attachment.all(), many=True).data,
+        }
+        if obj.question.category == 'parent_child':
+            for question in obj.question.child_question.first().child_question.all():
+                child_ques_answers = Answer.objects.filter(object_id=obj.object_id, parent_question=question).order_by(
+                    'question__position')
+                if child_ques_answers:
+                    child_data = {
+                        "ques_id": question.id, "ques_title": question.title,
+                        "ques_category": question.category, "answer_type": question.answer_type, "child": []
+                    }
+                    for question_answer in child_ques_answers:
+                        child_data['child'].append(QuestionAnswerSerializer(question_answer).data)
+                    data["child"].append(child_data)
+        return data
 
 
 class TestGetSerializer(serializers.ModelSerializer):
@@ -507,8 +523,8 @@ class TestGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_engineer_feedback(obj):
-        answers = Answer.objects.filter(object_id=obj.id).order_by("id")
-        return AnswerSerializer(answers, many=True).data
+        answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by("id")
+        return QuestionAnswerSerializer(answers, many=True).data
 
 
 class SubmissionSupportSerializer(serializers.ModelSerializer):
@@ -596,7 +612,9 @@ class ParentQuestionSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_child(obj):
         if obj.child_question.first():
-            return QuestionSerializer(obj.child_question.first().child_question.all(), many=True).data
+            return QuestionSerializer(
+                obj.child_question.first().child_question.filter().order_by('position'), many=True
+            ).data
         return None
 
     @staticmethod
