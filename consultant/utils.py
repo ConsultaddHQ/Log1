@@ -772,7 +772,7 @@ def engineering_feedback_notification(feedback, request):
                 {
                     "activityTitle": f"***{project.consultant.name}*** :: ***{project.submission.lead.job_title}*** "
                                      f":: ***{project.submission.client}***",
-                    "activitySubtitle": f"***Engineering Issue feedback by {request.user.name}***",
+                    "activitySubtitle": f"***Engineering Issue feedback by {request.user.employee_name}***",
                     "activityText": feedback.description,
                     "activityImage": profile_path,
                     "markdown": True

@@ -31,6 +31,9 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
             fcm_token = request.data.get('fcm_token', None)
             if not fcm_token:
                 return Response({"message": "Token not found"}, status=400)
+            fcm = FCMDevice.objects.filter(device_id=fcm_token)
+            if fcm:
+                return Response({"message": "Token already exist"}, status=404)
             content_type = ContentType.objects.get(model='user')
             FCMDevice.objects.get_or_create(
                 type='web',

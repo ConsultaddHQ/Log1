@@ -241,12 +241,14 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def timesheet(self, request, pk):
         try:
             first, last = get_page_limits(request)
+            end = request.GET.get('end')
             start = request.GET.get('start', None)
-            end = request.GET.get('end', date.today())
             qs = Project.objects.filter(id=pk)
             if qs:
                 timesheets = qs.first().timesheets.exclude(status='draft')
                 if start:
+                    if not end:
+                        end = date.today().strftime('%Y-%m-%d')
                     timesheets = timesheets.filter(start__range=[start, end])
                 total = timesheets.count()
                 serializer = TimesheetSerializer(timesheets[first:last], many=True)
@@ -780,10 +782,15 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         ]
 
     @staticmethod
-    def test_status_filter_count(queryset, test_status=None):
-        if test_status:
-            queryset = queryset.filter(status=test_status)
-        return queryset.count()
+    def test_status_filter_count(queryset):
+        return [
+            {"name": "New", "count": queryset.filter(status='new').count()},
+            {"name": "Passed", "count": queryset.filter(status='passed').count()},
+            {"name": "Failed", "count": queryset.filter(status='failed').count()},
+            {"name": "Assigned", "count": queryset.filter(status='assigned').count()},
+            {"name": "Cancelled", "count": queryset.filter(status='cancelled').count()},
+            {"name": "Feedback_due", "count": queryset.filter(status='feedback_due').count()},
+        ]
 
     @staticmethod
     def filter_by_time(duration):
@@ -819,6 +826,21 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first = date.today().replace(day=1)
             last = date.today()
         return first, last
+
+    @staticmethod
+    def project_search(queryset, query, category):
+        if query:
+            query = query.lstrip().replace(':amp:', '&')
+            if category:
+                if category == 'consultant_name':
+                    queryset = queryset.filter(project__consultant__name__istartswith=query)
+                elif category == 'client':
+                    queryset = queryset.filter(project__submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    queryset = queryset.filter(project__submission__lead__vendor_company__name__istartswith=query)
+            else:
+                queryset = queryset.filter(project__consultant__name__istartswith=query)
+        return queryset
 
     def list(self, request, *args, **kwargs):
         try:
@@ -868,17 +890,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 support__id=kwargs.get('pk')
             ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
 
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                if category:
-                    if category == 'consultant_name':
-                        projects = projects.filter(project__consultant__name__istartswith=query)
-                    elif category == 'client':
-                        projects = projects.filter(project__submission__client__istartswith=query)
-                    elif category == 'vendor_name':
-                        projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
-                else:
-                    projects = projects.filter(project__consultant__name__istartswith=query)
+            projects = self.project_search(projects, query, category)
 
             total_count = projects.count()
             if support_status:
@@ -965,17 +977,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 project__statuses__is_current=True,
                 project__statuses__status__istartswith='terminated'
             )
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                if category:
-                    if category == 'consultant_name':
-                        projects = projects.filter(project__consultant__name__istartswith=query)
-                    elif category == 'client':
-                        projects = projects.filter(project__submission__client__istartswith=query)
-                    elif category == 'vendor_name':
-                        projects = projects.filter(project__submission__lead__vendor_company__name__istartswith=query)
-                else:
-                    projects = projects.filter(project__consultant__name__istartswith=query)
+
+            projects = self.project_search(projects, query, category)
 
             total_count = projects.count()
             if support_status:
@@ -1020,16 +1023,9 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             duration = request.GET.get('filter_by', 'this_month')
             first, last = self.filter_by_time(duration)
 
-            test_qs = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
-            test_counts = [
-                {"name": "New", "count": self.test_status_filter_count(test_qs, 'new')},
-                {"name": "Passed", "count": self.test_status_filter_count(test_qs, 'passed')},
-                {"name": "Failed", "count": self.test_status_filter_count(test_qs, 'failed')},
-                {"name": "Assigned", "count": self.test_status_filter_count(test_qs, 'assigned')},
-                {"name": "Cancelled", "count": self.test_status_filter_count(test_qs, 'cancelled')},
-                {"name": "Feedback_due", "count": self.test_status_filter_count(test_qs, 'feedback_due')},
-            ]
-            return Response({"data": test_counts, "total": self.test_status_filter_count(test_qs)}, status=200)
+            queryset = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
+            test_counts = self.test_status_filter_count(queryset)
+            return Response({"data": test_counts, "total": queryset.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)

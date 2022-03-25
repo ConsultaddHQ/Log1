@@ -731,8 +731,8 @@ class MarketingReportViewSets(GenericViewSet):
         try:
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
-            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
-                                                                                                 '%Y-%m-%d').date():
+            if start and end and datetime.strptime(
+                    start, '%Y-%m-%d').date() > datetime.strptime(end, '%Y-%m-%d').date():
                 return Response({'message': 'Invalid date filter'}, status=400)
             if not start:
                 start = date.today() - timedelta(days=30)
