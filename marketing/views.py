@@ -2552,10 +2552,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.save()
 
             # Activity
-            desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
+            desc = f"{request.user.employee_name} completed test and submitted engineer feedback"
             create_activity(test.id, 'test', request.user, desc, 'created')
 
-            return Response({"message": "Feedback submitted"}, status=201)
+            # test submit mail
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, error = self.send_test_mail(test, request.data, 'submit', request)
+                if error == 'error':
+                    write_info(message=res, function='create-send_test_mail', request=request)
+                    return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+
+            return Response({"message": "Feedback submitted", "mail": res}, status=201)
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
