@@ -2513,7 +2513,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def feedback(self, request, pk):
         try:
             test = get_object_or_404(Test, id=pk)
-            engineers = request.data.get('associates', [])
+            engineers = json.loads(request.data.get('associates', '[]'))
             for emp_id in engineers:
                 engineer = User.objects.get(employee_id=emp_id)
                 test.engineer.add(engineer)
