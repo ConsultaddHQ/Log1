@@ -2555,7 +2555,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.save()
 
             # Activity
-            desc = f"{request.user.employee_name} completed test and submitted engineer feedback"
+            desc = f"{request.user.employee_name} completed test TST-{test.id} and submitted engineer feedback"
             create_activity(test.submission.id, 'submission', request.user, desc, 'created')
 
             # test submit mail
