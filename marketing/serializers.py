@@ -467,7 +467,7 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
             "attachment": AttachmentGetSerializer(obj.attachment.all(), many=True).data,
         }
         if obj.question.category == 'parent_child':
-            for question in obj.question.child_question.first().child_question.all():
+            for question in obj.question.child_question.first().child_question.filter().order_by('position'):
                 child_ques_answers = Answer.objects.filter(object_id=obj.object_id, parent_question=question).order_by(
                     'question__position')
                 if child_ques_answers:
@@ -523,7 +523,7 @@ class TestGetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_engineer_feedback(obj):
-        answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by("id")
+        answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by("question__position")
         return QuestionAnswerSerializer(answers, many=True).data
 
 
