@@ -32,11 +32,13 @@ class ConsultantResetPasswordTokenAdmin(admin.ModelAdmin):
 @admin.register(ConsultantToken)
 class ConsultantTokenAdmin(admin.ModelAdmin):
     list_display = ('consultant', 'key', 'created')
+    search_fields = ('consultant__name', 'consultant__email', 'key')
 
 
 @admin.register(ConsultantPetitionToken)
 class ConsultantPetitionTokenAdmin(admin.ModelAdmin):
     list_display = ('consultant', 'key', 'created')
+    search_fields = ('consultant__name', 'consultant__email', 'key')
 
 
 @admin.register(ConsultantProfile)
@@ -101,6 +103,7 @@ class PayrollEmployerAdmin(ExportActionModelAdmin):
 @admin.register(ConsultantPOC)
 class ConsultantPOCAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
+    list_filter = ('poc_type',)
     list_display = ('id', 'consultant', 'poc_type', 'poc', 'start', 'end')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'poc__employee_name')
 

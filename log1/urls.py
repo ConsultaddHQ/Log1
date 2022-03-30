@@ -15,15 +15,15 @@ from dashboard.views import MarketingDashboardViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
-from project.mobile_api import TimeSheetViewSet, PayrollScheduleViewSet
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
+from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, TimeSheetV2ViewSet
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
      ProjectOrderViewSet, ProjectSupportViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
-    TrainingCheckListViewSet
+    TrainingCheckListViewSet, EngineerReportViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
@@ -70,6 +70,7 @@ router.register(r'vendor_contact', VendorContactViewSets)
 router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'project_order', ProjectOrderViewSet)
+router.register(r'engineer_report', EngineerReportViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'project/(?P<project_id>[0-9]+)/updates', ProjectUpdateViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/support', ProjectSupportViewSet)
@@ -104,6 +105,7 @@ router.register(r'consultant_auth', ConsultantAuthViewSet)
 router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
 router.register(r'timesheet', TimeSheetViewSet)
+router.register(r'timesheet_v2', TimeSheetViewSet)
 router.register(r'payroll', PayrollScheduleViewSet)
 
 router.register(r'utility', UtilityViewSet)

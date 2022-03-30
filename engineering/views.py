@@ -1,5 +1,7 @@
 import os
 import json
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
 
 from django.db.models import Q, Max
 from django.shortcuts import get_object_or_404
@@ -66,10 +68,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 projects = projects.filter(
-                    Q(submission__client__istartswith=query) |
                     Q(support__support__employee_name__istartswith=query) |
-                    Q(submission__created_by__employee_name__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query) |
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
@@ -243,11 +242,13 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             first, last = get_page_limits(request)
             start = request.GET.get('start', None)
-            end = request.GET.get('end', date.today())
-            qs = Project.objects.filter(id=pk)
-            if qs:
-                timesheets = qs.first().timesheets.exclude(status='draft')
+            end = request.GET.get('end', date.today().strftime('%Y-%m-%d'))
+            projects = Project.objects.filter(id=pk)
+            if projects:
+                timesheets = projects.first().timesheets.exclude(status='draft')
                 if start:
+                    if not end:
+                        end = date.today().strftime('%Y-%m-%d')
                     timesheets = timesheets.filter(start__range=[start, end])
                 total = timesheets.count()
                 serializer = TimesheetSerializer(timesheets[first:last], many=True)
@@ -445,8 +446,10 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
                     "notes": description.notes,
                     "remark": description.remark,
                     "resource": description.resource,
+                    "timezone": description.timezone,
                     "technology": description.technology,
                     "description": description.description,
+                    "daily_support_hour": description.daily_support_hour,
                     "consultant_preferred_time": description.consultant_preferred_time
                 }
             recruiter, retention = project.consultant.recruiter, project.consultant.relation
@@ -697,3 +700,398 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /engineer_report/
+class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+    queryset = User.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = EngineerReportSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    @staticmethod
+    def support_status_filter(queryset, support_status):
+        if support_status == 'training':
+            queryset = queryset.filter(
+                statuses__is_current=True,
+                statuses__frequency='more_than_2_days',
+                project__start_date__gte=date.today()
+            )
+        elif support_status == 'active':
+            queryset = queryset.filter(
+                statuses__is_current=True,
+                statuses__frequency='more_than_2_days',
+                project__start_date__lte=date.today()
+            )
+        elif support_status == 'less_active':
+            queryset = queryset.filter(
+                statuses__is_current=True,
+                statuses__frequency='less_than_3_days'
+            )
+        elif support_status == 'independent':
+            queryset = queryset.filter(
+                statuses__is_current=True,
+                statuses__frequency__in=['independent', 'twice_a_month']
+            )
+        return queryset
+
+    @staticmethod
+    def project_filter_counts(queryset):
+        queryset = queryset.filter(support__statuses__is_current=True, support__end=None)
+        return {
+            "support_status": {
+                "active": {
+                    "display_name": "Active",
+                    "count": queryset.filter(
+                        support__statuses__frequency='more_than_2_days',
+                        start_date__lte=date.today()
+                    ).count()},
+                "training": {
+                    "display_name": "Training",
+                    "count": queryset.filter(
+                        support__statuses__frequency='more_than_2_days',
+                        start_date__gte=date.today()).count()
+                },
+                "less_active": {
+                    "display_name": "Less Active",
+                    "count": queryset.filter(
+                        support__statuses__frequency='less_than_3_days'
+                    ).count()
+                },
+                "independent": {
+                    "display_name": "Independent",
+                    "count": queryset.filter(
+                        support__statuses__frequency__in=['independent', 'twice_a_month']
+                    ).count()
+                },
+                "total": {
+                    "display_name": "Total",
+                    "count": queryset.count()
+                },
+            },
+        }
+
+    @staticmethod
+    def interview_status_filter_count(queryset):
+        return [
+            {"name": "Offer", "count": queryset.filter(status='offer').count()},
+            {"name": "Failed", "count": queryset.filter(status='failed').count()},
+            {"name": "Cancelled", "count": queryset.filter(status='cancelled').count()},
+            {"name": "Next Round", "count": queryset.filter(status='next_round').count()},
+            {"name": "Feedback Due", "count": queryset.filter(status='feedback_due').count()},
+        ]
+
+    @staticmethod
+    def test_status_filter_count(queryset):
+        return [
+            {"name": "New", "count": queryset.filter(status='new').count()},
+            {"name": "Passed", "count": queryset.filter(status='passed').count()},
+            {"name": "Failed", "count": queryset.filter(status='failed').count()},
+            {"name": "Assigned", "count": queryset.filter(status='assigned').count()},
+            {"name": "Cancelled", "count": queryset.filter(status='cancelled').count()},
+            {"name": "Feedback_due", "count": queryset.filter(status='feedback_due').count()},
+        ]
+
+    @staticmethod
+    def filter_by_time(duration):
+        last = date.today().replace(day=1) - timedelta(days=1)
+
+        if duration == 'last_month':
+            first = last.replace(day=1)
+
+        elif duration == 'this_quarter':
+            last = date.today()
+            if last.month < 6:
+                first = last + timedelta(days=1) + relativedelta(months=-last.month + 1)
+            else:
+                first = last + timedelta(days=1) + relativedelta(months=-last.month + 6)
+            first = first.replace(day=1)
+            last = last + timedelta(days=1)
+
+        elif duration == 'last_quarter':
+            if last.month < 6:
+                last = last + timedelta(days=1) + relativedelta(months=-last.month)
+                first = last + timedelta(days=1) + relativedelta(months=-6)
+            else:
+                last = last + timedelta(days=1) + relativedelta(months=-last.month + 6)
+                first = last + timedelta(days=1) + relativedelta(months=-6)
+
+        elif duration == 'last_6_month':
+            first = last + timedelta(days=1) + relativedelta(months=-6)
+
+        elif duration == 'last_12_month':
+            first = last + timedelta(days=1) + relativedelta(months=-12)
+
+        # This Month
+        else:
+            first = date.today().replace(day=1)
+            last = date.today() + timedelta(days=1)
+        return first, last
+
+    @staticmethod
+    def project_search(queryset, query, category):
+        if query:
+            query = query.lstrip().replace(':amp:', '&')
+            if category:
+                if category == 'consultant_name':
+                    queryset = queryset.filter(project__consultant__name__istartswith=query)
+                elif category == 'client':
+                    queryset = queryset.filter(project__submission__client__istartswith=query)
+                elif category == 'vendor_name':
+                    queryset = queryset.filter(project__submission__lead__vendor_company__name__istartswith=query)
+            else:
+                queryset = queryset.filter(project__consultant__name__istartswith=query)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
+
+            engineer = User.objects.filter(
+                projects__statuses__is_current=True,
+                projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
+            ).order_by('employee_id').distinct('employee_id')
+
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if category:
+                    if category == 'support_name':
+                        engineer = engineer.filter(employee_name__istartswith=query)
+                    elif category == 'consultant_name':
+                        engineer = engineer.filter(projects__project__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        engineer = engineer.filter(projects__project__submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        engineer = engineer.filter(
+                            projects__project__submission__lead__vendor_company__name__istartswith=query
+                        )
+                else:
+                    engineer = engineer.filter(employee_name__istartswith=query)
+
+            projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
+            counts = self.project_filter_counts(projects)
+
+            serializer = EngineerReportSerializer(engineer[first: last], many=True)
+            return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='project')
+    def project(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
+            support_status = request.GET.get('status', None)
+
+            projects = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk')
+            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+
+            projects = self.project_search(projects, query, category)
+
+            total_count = projects.count()
+            if support_status:
+                projects = self.support_status_filter(projects, support_status)
+
+            serializer = EngineerProjectSerializer(projects[first: last], many=True)
+            return Response({"data": serializer.data, "count": total_count}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='test')
+    def test(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
+            test = Test.objects.filter(engineer=kwargs.get('pk'))
+
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if category:
+                    if category == 'consultant_name':
+                        test = test.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        test = test.filter(submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        test = test.filter(submission__lead__vendor_company__name__istartswith=query)
+                else:
+                    test = test.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+
+            serializer = EngineerTestSerializer(test[first: last], many=True)
+            return Response({"data": serializer.data, "count": test.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='interview')
+    def interview(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
+            guest_type = request.GET.get('type', 'all')
+
+            if guest_type == 'guest':
+                interview = Interview.objects.filter(guest=kwargs.get('pk'))
+            elif guest_type == 'ctb':
+                interview = Interview.objects.filter(supervisor=kwargs.get('pk'))
+            else:
+                interview = Interview.objects.filter(Q(guest=kwargs.get('pk')) | Q(supervisor=kwargs.get('pk')))
+
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if category:
+                    query = query.lstrip().replace(':amp:', '&')
+                    if category == 'consultant_name':
+                        interview = interview.filter(
+                            submission__consultant_marketing__consultant__name__istartswith=query
+                        )
+                    elif category == 'client':
+                        interview = interview.filter(submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        interview = interview.filter(submission__lead__vendor_company__name__istartswith=query)
+                else:
+                    interview = interview.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+
+            serializer = EngineerInterviewSerializer(interview[first: last], many=True)
+            return Response({"data": serializer.data, "count": interview.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='terminated')
+    def terminated(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
+            support_status = request.GET.get('status', None)
+
+            projects = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk'),
+                project__statuses__is_current=True,
+                project__statuses__status__istartswith='terminated'
+            )
+
+            projects = self.project_search(projects, query, category)
+
+            total_count = projects.count()
+            if support_status:
+                projects = self.support_status_filter(projects, support_status)
+
+            serializer = EngineerProjectSerializer(projects[first: last], many=True)
+            return Response({"data": serializer.data, "count": total_count}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='summary/project')
+    def project_card(self, request, **kwargs):
+        try:
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+            project_qs = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk'), statuses__created__range=[first, last]
+            ).distinct()
+            active = self.support_status_filter(project_qs, 'active').exclude(
+                project__statuses__status__istartswith='terminated').count()
+            less_active = self.support_status_filter(project_qs, 'less_active').exclude(
+                project__statuses__status__istartswith='terminated').count()
+            independent = self.support_status_filter(project_qs, 'independent').exclude(
+                project__statuses__status__istartswith='terminated').count()
+            terminated = project_qs.filter(project__statuses__status__istartswith='terminated').count()
+
+            project_counts = [
+                {"name": "Active", "count": active},
+                {"name": "Terminated", "count": terminated},
+                {"name": "Less Active", "count": less_active},
+                {"name": "Independent", "count": independent},
+            ]
+            return Response({"data": project_counts, "total": project_qs.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='summary/test')
+    def test_card(self, request, **kwargs):
+        try:
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+
+            queryset = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
+            test_counts = self.test_status_filter_count(queryset)
+            return Response({"data": test_counts, "total": queryset.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='summary/interview')
+    def interview_card(self, request, **kwargs):
+        try:
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+
+            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'), created__range=[first, last])
+            supervisor_interview_counts = self.interview_status_filter_count(sup_interview_qs)
+
+            guest_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
+            guest_interview_counts = self.interview_status_filter_count(guest_qs)
+
+            data = {
+                "guest_interview": {
+                    "total": guest_qs.count(),
+                    "status_counts": guest_interview_counts,
+                },
+                "supervisor_interview": {
+                    "total": sup_interview_qs.count(),
+                    "status_counts": supervisor_interview_counts,
+                }
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='summary/technology')
+    def technology_card(self, request, **kwargs):
+        try:
+            technology_ls, technology = [], []
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+            update_qs = ProjectUpdate.objects.filter(
+                project__support__support=kwargs.get('pk'), project__description__created__range=[first, last]
+            ).order_by('project_id').distinct('project_id')
+            for obj in update_qs:
+                if hasattr(obj.project, 'description') and hasattr(obj.project.description, 'technology'):
+                    technology_ls.append(obj.project.description.technology)
+
+            if technology_ls and None in technology_ls:
+                technology_ls.remove(None)
+            distinct_technology_ls = set(technology_ls)
+            for item in distinct_technology_ls:
+                technology.append(
+                    {
+                        "name": item,
+                        "count": technology_ls.count(item),
+                    }
+                )
+            return Response({"data": technology, "total": len(technology_ls)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='category')
+    def category(self, request):
+        data = [
+            {'name': 'client', 'display_name': 'Client Name'},
+            {'name': 'vendor_name', 'display_name': 'Vendor Name'},
+            {'name': 'support_name', 'display_name': 'Support Name'},
+            {'name': 'consultant_name', 'display_name': 'Consultant Name'},
+        ]
+        return Response({"data": data}, status=200)

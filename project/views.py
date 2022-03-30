@@ -1,4 +1,3 @@
-import os
 import json
 from datetime import datetime, date
 
@@ -63,11 +62,9 @@ class ProjectViewSets(ModelViewSet):
                     'client': project.submission.client.title(), 'consultant_email': project.consultant.email,
                 },
             }
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email(mail_data, config.RELATIONS, request=request)
-                if not msg:
-                    return res, "error"
+            res, msg = send_email(mail_data, config.RELATIONS, request=request)
+            if not msg:
+                return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -108,11 +105,9 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email(mail_data, submission.created_by.email, request=request)
-                if not msg:
-                    return res, "error"
+            res, msg = send_email(mail_data, submission.created_by.email, request=request)
+            if not msg:
+                return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -168,12 +163,10 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
-                delete_temp_file(path)
-                if not msg:
-                    return res, "error"
+            res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
+            delete_temp_file(path)
+            if not msg:
+                return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -243,11 +236,9 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, msg = send_email_attachment_multiple(mail_data, marketer.email, request=request)
-                if not msg:
-                    return res, "error"
+            res, msg = send_email_attachment_multiple(mail_data, marketer.email, request=request)
+            if not msg:
+                return res, "error"
             return res, "ok"
         except Exception as error:
             write_exception(message=f"Offer mail error for {marketer.email}: {error}")
@@ -309,9 +300,7 @@ class ProjectViewSets(ModelViewSet):
                     'vendor_name': vendor_name, 'start': project_start_date, 'remark': project.feedback,
                 }
             }
-            res1 = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res1, msg1 = send_email(mail_data, marketer.email, request=request)
+            res1, msg1 = send_email(mail_data, marketer.email, request=request)
 
             mail_data_eng = {
                 'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
@@ -325,9 +314,7 @@ class ProjectViewSets(ModelViewSet):
                     'vendor_company': submission.lead.vendor_company.name, 'po_type': po_type,
                 }
             }
-            res2 = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res2, msg2 = send_email(mail_data_eng, marketer.email, request=request)
+            res2, msg2 = send_email(mail_data_eng, marketer.email, request=request)
 
             return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
@@ -662,9 +649,7 @@ class ProjectViewSets(ModelViewSet):
                     except Exception as error:
                         write_exception(error, request)
 
-                res, error = 'development server', 'development server'
-                if os.environ.get('ENV', 'local') == 'prod':
-                    res, error = self.po_mail(project, path, self.fetch_scrum_masters(request), po_type, request)
+                res, error = self.po_mail(project, path, self.fetch_scrum_masters(request), po_type, request)
 
                 delete_temp_file(path)
                 if not error == 'error':
@@ -753,23 +738,20 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         ).values_list('email', flat=True))
         return scrum_masters
 
-    def support_assignment_mail(self, support, request):
+    @staticmethod
+    def support_assignment_mail(support, request):
         try:
             project = support.project
             submission = project.submission
             consultant = project.submission.consultant
-            scrum_masters = self.fetch_scrum_masters(request)
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-            if os.environ.get('ENV', 'local') == 'prod':
-                to = [submission.created_by.email, project.support.email]
-                cc = ['engineering@consultadd.com'] + scrum_masters
-            else:
-                cc = []
-                to = ['sarang.m@consultadd.com']
+            support_emails = list(project.support.all().values_list('support__email', flat=True))
+
             mail_data = {
-                'to': to, 'cc': cc, 'bcc': [],
+                'cc': ['engineering@consultadd.com'], 'bcc': [],
                 'template': '../templates/support_assignment.html',
+                'to': [submission.created_by.email] + support_emails,
                 'subject': f"{consultant.name}'s support initiated for  {project.submission.client} by"
                            f" {support.support.employee_name}",
                 'context': {
@@ -781,7 +763,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     'project_location': submission.lead.city, 'consultant_location': consultant.current_city,
                 },
             }
-            res, msg = send_email(mail_data, 'dimple.s@consultadd.com', request=request)
+            res, msg = send_email(mail_data, request.user.email, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -852,7 +834,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
     @action(methods=['put'], detail=True, url_path="status")
     def status(self, request, project_id, pk):
         try:
-            support = get_object_or_404(ProjectSupport, id=pk)
+            support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
             status = request.data.get('status')
             start = request.data.get('change_date')
             prev_support = support.statuses.filter(is_current=True)
@@ -885,12 +867,9 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             )
             submission = project.submission
             consultant = project.submission.consultant
-            if os.environ.get('ENV', 'local') == 'prod':
-                to = [project.created_by.email, support.email]
-                cc = ['engineering@consultadd.com']
-            else:
-                to = ['sarang.m@consultadd.com']
-                cc = []
+            to = [project.created_by.email, support.email]
+            cc = ['engineering@consultadd.com']
+
             mail_data = {
                 'template': '../templates/support_initiate.html',
                 'to': to, 'cc': cc, 'bcc': [],
@@ -916,7 +895,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
     def remove_support(self, request, project_id, pk):
         try:
             if 'admin' in request.user.roles and 'engineer' in request.user.roles:
-                support = get_object_or_404(ProjectSupport, id=pk)
+                support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
                 desc = f"{request.user.employee_name} removed {support.support.employee_name} as support person"
                 create_activity(support.project.id, 'projectsupport', request.user, desc, 'deleted')
                 support.delete()
@@ -1040,7 +1019,7 @@ class EngineeringProjectsViewSets(GenericViewSet, ListModelMixin):
                 consultant=OuterRef("consultant_id"), end=None, poc_type='recruiter')
 
             relation = ConsultantPOC.objects.filter(
-                consultant=OuterRef("consultant_id"), end=None, poc_type='relation')
+                consultant=OuterRef("consultant_id"), end=None, poc_type='retention')
 
             data = projects.annotate(
                 location=F('city'),
@@ -1075,7 +1054,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         start = request.GET.get('start', None)
-        end = request.GET.get('end', date.today())
+        end = request.GET.get('end', date.today().strftime('%Y-%m-%d'))
 
         try:
             projects = Project.objects.filter(
@@ -1093,6 +1072,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             if projects:
                 ids = list(projects.values_list('id', flat=True))
                 if start:
+                    if not end:
+                        end = date.today().strftime('%Y-%m-%d')
                     queryset = TimeSheet.objects.filter(
                         project__in=ids, start__range=[start, end]
                     ).exclude(status='draft')
@@ -1171,9 +1152,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         hours=0, remark=timesheet.remark, project=timesheet.project,
                         status='rejected', start=timesheet.start, end=timesheet.end,
                     )
-                    recipient_content_type = ContentType.objects.get(model='consultant')
                     sender_content_type = ContentType.objects.get(model='user')
                     target_content_type = ContentType.objects.get(model='timesheet')
+                    recipient_content_type = ContentType.objects.get(model='consultant')
 
                     if timesheet.remark or len(timesheet.remark) != 0:
                         title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \

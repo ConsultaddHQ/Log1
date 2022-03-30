@@ -1,3 +1,4 @@
+import os
 from celery import shared_task
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
@@ -7,17 +8,23 @@ from log1.utils import write_exception, write_info
 
 @shared_task
 def send_email(mail_data, from_email, reply_to=None, request=None):
+    if os.environ.get('ENV', 'local') == 'prod':
+        to = mail_data["to"]
+        cc = mail_data["cc"]
+        bcc = mail_data["bcc"]
+    else:
+        cc, bcc = [], []
+        to = ['sarang.m@consultadd.com']
+
     if reply_to is None:
         reply_to = []
     try:
         msg = EmailMultiAlternatives(
-            subject=mail_data["subject"],
-            from_email=from_email,
-            bcc=mail_data["bcc"],
-            to=mail_data["to"],
-            cc=mail_data["cc"],
-            reply_to=reply_to,
             body="body",
+            reply_to=reply_to,
+            to=to, cc=cc, bcc=bcc,
+            from_email=from_email,
+            subject=mail_data["subject"],
         )
 
         body = render_to_string(mail_data["template"], mail_data["context"])
@@ -37,13 +44,19 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None):
     try:
+        if os.environ.get('ENV', 'local') == 'prod':
+            to = mail_data["to"]
+            cc = mail_data["cc"]
+            bcc = mail_data["bcc"]
+        else:
+            cc, bcc = [], []
+            to = ['sarang.m@consultadd.com']
+
         msg = EmailMultiAlternatives(
-            subject=mail_data["subject"],
-            body=mail_data["body"],
+            to=to, cc=cc, bcc=bcc,
             from_email=from_email,
-            bcc=mail_data["bcc"],
-            to=mail_data["to"],
-            cc=mail_data["cc"],
+            body=mail_data["body"],
+            subject=mail_data["subject"],
         )
         msg.send()
         return "mail sent", True
@@ -57,17 +70,23 @@ def send_email_without_template(mail_data, from_email, request=None):
 
 @shared_task
 def send_email_attachment_multiple(mail_data, from_email, reply_to=None, request=None):
+    if os.environ.get('ENV', 'local') == 'prod':
+        to = mail_data["to"]
+        cc = mail_data["cc"]
+        bcc = mail_data["bcc"]
+    else:
+        cc, bcc = [], []
+        to = ['sarang.m@consultadd.com']
+
     if reply_to is None:
         reply_to = []
     try:
         msg = EmailMultiAlternatives(
-            subject=mail_data["subject"],
-            from_email=from_email,
-            bcc=mail_data["bcc"],
-            to=mail_data["to"],
-            cc=mail_data["cc"],
-            reply_to=reply_to,
             body="body",
+            reply_to=reply_to,
+            from_email=from_email,
+            to=to, cc=cc, bcc=bcc,
+            subject=mail_data["subject"],
         )
 
         body = render_to_string(mail_data["template"], mail_data["context"])

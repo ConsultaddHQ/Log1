@@ -1,15 +1,12 @@
 import os
 import pytz
-import json
 import difflib
-from datetime import date, datetime
+from datetime import date
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -17,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from constance import config
+from marketing.utils import *
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
@@ -32,9 +29,6 @@ from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from marketing.utils import change_to_feedback_due, create_submission, submission_is_complete, get_interview_title, \
-    date_filter, get_users_and_attendees, test_received_notification, coder_request_notification, \
-    coder_assigned_notification
 
 
 # Route - /vendor_company/
@@ -1628,7 +1622,10 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['put'], detail=True, url_path='cancel_interview')
     def cancel_interview(self, request, pk):
         try:
-            interview = get_object_or_404(Interview, id=pk, submission__created_by=request.user)
+            qs = Interview.objects.filter(id=pk, submission__created_by=request.user)
+            if not qs:
+                return Response({"message": "You don't have access"}, status=404)
+            interview = qs.first()
             try:
                 if interview.calendar_id:
                     calendar = Calendar(request=request)
@@ -2462,10 +2459,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             if file:
                 file_data = {
                     "file": file,
-                    "type": 'test_feedback',
-                    "object_id": test.id,
                     "model": "test",
+                    "object_id": test.id,
                     "creator": request.user,
+                    "type": 'test_feedback',
                 }
                 create_attachment(file_data)
             # App Notification
@@ -2516,37 +2513,60 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def feedback(self, request, pk):
         try:
             test = get_object_or_404(Test, id=pk)
-            engineers = request.data.get('associates', [])
+            engineers = json.loads(request.data.get('associates', '[]'))
             for emp_id in engineers:
                 engineer = User.objects.get(employee_id=emp_id)
                 test.engineer.add(engineer)
+
             content_type = ContentType.objects.get(model='test')
             payload = json.loads(request.data.get('feedback_form'))
             for data in payload:
+                question = get_object_or_404(Question, id=data['question_id'])
+                if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
+                        and data.get('comment') is not None:
+                    value = f'{data.get("answer")}: {data.get("comment")}'
+                else:
+                    value = data.get("answer", None)
+
                 answer = Answer.objects.create(
+                    answer=value,
+                    question=question,
                     object_id=test.id,
-                    content_type=content_type,
                     submitted_by=request.user,
-                    value=data.get("value", None),
-                    question_id=data['question_id'],
+                    content_type=content_type,
+                    parent_question_id=data.get('parent_question_id', None)
                 )
-                question = answer.question
-                if question.answer_type == 'attachment':
-                    for file in request.FILES.getlist(str(question.id)):
+                attachment_id = f"{question.id}-{answer.parent_question_id}" if answer.parent_question else question.id
+                if request.FILES.getlist(attachment_id):
+                    for file in request.FILES.getlist(attachment_id):
                         file_data = {
                             "file": file,
                             "model": "answer",
-                            "creator": request.user,
-                            "type": "test_feedback",
                             "object_id": answer.id,
+                            "type": "test_feedback",
+                            "creator": request.user,
                         }
                         create_attachment(file_data)
 
-            # Activity
-            desc = f"Engineer's feedback submitted by {request.user.employee_name} for test."
-            create_activity(test.id, 'test', request.user, desc, 'created')
+            test.status = 'feedback_due'
+            test.submitted_by = request.user
+            test.submit_date = datetime.now()
+            test.engineer_remarks = request.data.get('remarks')
+            test.save()
 
-            return Response({"message": "Feedback submitted"}, status=201)
+            # Activity
+            desc = f"{request.user.employee_name} completed test TST-{test.id} and submitted engineer feedback"
+            create_activity(test.submission.id, 'submission', request.user, desc, 'created')
+
+            # test submit mail
+            res = "Development Server"
+            if os.environ.get('ENV', 'local') == 'prod':
+                res, error = self.send_test_mail(test, request.data, 'submit', request)
+                if error == 'error':
+                    write_info(message=res, function='create-send_test_mail', request=request)
+                    return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+
+            return Response({"message": "Feedback submitted", "mail": res}, status=201)
         except Exception as error:
             write_info(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -2561,44 +2581,74 @@ class QuestionViewSets(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            question_field = request.GET.get('field')
-            queryset = Question.objects.filter(field=question_field).order_by('position')
-            serial = QuestionSerializer(queryset, many=True)
-            return Response({"data": serial.data}, status=200)
+            question_field = request.GET.get("form_name", None)
+            queryset = Question.objects.filter(
+                form_name=question_field, is_active=True, category__in=['basic', 'generic', 'guideline']
+            ).order_by('position')
+            serializer = QuestionSerializer(queryset, many=True)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_info(error, request)
-            return str(error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
+            data = request.data
             if 'superadmin' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            if request.data.get('type') == 'option' and request.data.get('options') is []:
+            if data.get('type') == 'option' and data.get('options') is []:
                 return Response({"message": "Please provide possible options for the question value"})
 
-            position = request.data.get('position', None)
-            if position:
+            if data.get('position'):
+                position = data.get('position')
                 question_qs = Question.objects.filter(
-                    category=request.data.get('category'), position__gte=request.data.get('position')
+                    form_name=data.get('form_name'), position__gte=position, category=data.get('category')
                 ).order_by('position')
                 for obj in question_qs:
                     obj.position += 1
                     obj.save()
             else:
-                question_qs = Question.objects.filter(category=request.data.get('category')).order_by('position').last()
+                question_qs = Question.objects.filter(
+                    category=data.get('category'), form_name=data.get('form_name')
+                ).order_by('position').last()
                 position = question_qs.position + 1
 
             Question.objects.create(
                 position=position,
-                value=request.data.get('value'),
-                answer_type=request.data.get('type'),
+                title=request.data.get('title'),
                 category=request.data.get('category'),
-                field=request.data.get('field', None),
+                form_name=request.data.get('form_name'),
                 options=request.data.get('options', []),
+                answer_type=request.data.get('type', 'text'),
+                description=request.data.get('description', None),
+                placeholder=request.data.get('placeholder', None),
             )
 
             return Response({"message": "Question added to form"}, status=201)
         except Exception as error:
             write_info(error, request)
-            return str(error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='parent')
+    def parent(self, request, pk):
+        try:
+            qs = Question.objects.filter(id=pk)
+            if qs:
+                question = qs.first()
+            else:
+                return Response({"message": ERROR_MSG, "error": "Question not found"}, status=400)
+
+            value = request.GET.get('value', None)
+            if not value:
+                return Response({"message": "value is empty"}, status=400)
+            no_of_questions = int(value)
+            cq = question.child_question.first()
+            if cq:
+                questions = cq.child_question.all().order_by('position')[:no_of_questions]
+                serializer = ParentQuestionSerializer(questions, many=True)
+                return Response({"data": serializer.data}, status=200)
+            return Response({"message": ERROR_MSG, "error": "Child question not found"}, status=404)
+        except Exception as error:
+            write_info(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
