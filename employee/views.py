@@ -78,12 +78,14 @@ class EmployeeAuthViewSets(GenericViewSet):
             employee_id = request.data.get('employee_id', None)
             if not employee_id.isnumeric():
                 return Response({"message": "Enter valid Employee Id"}, status=400)
+
             if employee_id:
                 queryset = User.objects.filter(employee_id=employee_id)
                 if not queryset:
                     return Response({"message": "This user not found"}, status=400)
             else:
                 return Response({"message": "Employee Id is Empty"}, status=400)
+
             user = queryset.first()
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:

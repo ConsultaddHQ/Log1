@@ -241,11 +241,11 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def timesheet(self, request, pk):
         try:
             first, last = get_page_limits(request)
-            end = request.GET.get('end')
             start = request.GET.get('start', None)
-            qs = Project.objects.filter(id=pk)
-            if qs:
-                timesheets = qs.first().timesheets.exclude(status='draft')
+            end = request.GET.get('end', date.today().strftime('%Y-%m-%d'))
+            projects = Project.objects.filter(id=pk)
+            if projects:
+                timesheets = projects.first().timesheets.exclude(status='draft')
                 if start:
                     if not end:
                         end = date.today().strftime('%Y-%m-%d')

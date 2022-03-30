@@ -5,6 +5,7 @@ from engineering.models import ProjectDescription, ProjectUpdate, TrainingAgenda
 
 @admin.register(ProjectUpdate)
 class ProjectUpdateAdmin(ExportActionModelAdmin):
+    search_fields = ('id',)
     actions = ["export_as_csv"]
     list_display = ('id', 'update', 'blocker', 'blocker_resolved', 'project', 'type', 'start', 'end')
 
@@ -12,11 +13,13 @@ class ProjectUpdateAdmin(ExportActionModelAdmin):
 @admin.register(ProjectDescription)
 class ProjectDescriptionAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
+    search_fields = ('id', 'project__consultant__name')
     list_display = ('id', 'project', 'remark', 'description', 'update_by', 'technology')
 
 
 @admin.register(TrainingAgenda)
 class TrainingAgendaAdmin(ExportActionModelAdmin):
+    search_fields = ('id',)
     actions = ["export_as_csv"]
     list_display = ('id', 'position', 'project', 'status', 'duration', 'assignment_given', 'assignment_submitted',
                     'created_by')
@@ -24,5 +27,6 @@ class TrainingAgendaAdmin(ExportActionModelAdmin):
 
 @admin.register(TrainingCheckList)
 class TrainingCheckListAdmin(ExportActionModelAdmin):
+    search_fields = ('id',)
     actions = ["export_as_csv"]
     list_display = ('id', 'project', 'status')

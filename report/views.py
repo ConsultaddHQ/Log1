@@ -731,13 +731,16 @@ class MarketingReportViewSets(GenericViewSet):
         try:
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
+
             if start and end and datetime.strptime(
                     start, '%Y-%m-%d').date() > datetime.strptime(end, '%Y-%m-%d').date():
                 return Response({'message': 'Invalid date filter'}, status=400)
+
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
                 end = date.today()
+
             data = list()
             total_bench = total_submissions = total_interviews = total_joined = total_offers = 0
             teams = Team.objects.filter(dept='Marketing')
@@ -806,23 +809,19 @@ class MarketingReportViewSets(GenericViewSet):
             query = request.GET.get('query', None)
             filter_by_team = request.GET.get('filter_by_team', None)
 
+            bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='terminated')
+
             if query:
-                bench_consultant = Consultant.objects.filter(
-                    marketing__status='open', name__istartswith=query.lstrip().replace(':amp:', '&')
-                ).exclude(status__in=['terminated'])
-            else:
-                bench_consultant = Consultant.objects.filter(
-                    marketing__status='open'
-                ).exclude(status__in=['terminated'])
+                bench_consultant = bench_consultant.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
+
             if filter_by_team:
-                bench_consultant = bench_consultant.filter(
-                    marketing__teams__name__iexact=filter_by_team
-                )
+                bench_consultant = bench_consultant.filter(marketing__teams__name__iexact=filter_by_team)
+
             data = list()
             total = bench_consultant.count()
             for consultant in bench_consultant[first:last]:
-                marketing = consultant.marketing.filter(status='open').first()
                 preferred_location = ''
+                marketing = consultant.marketing.filter(status='open').first()
                 if marketing.preferred_location:
                     preferred_location = marketing.preferred_location.replace('\r\n', ', ')
                 teams = ", ".join(list(marketing.teams.all().values_list('name', flat=True)))
@@ -836,18 +835,10 @@ class MarketingReportViewSets(GenericViewSet):
                 project_count = Project.objects.filter(consultant=consultant).count()
                 days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                 data.append({
-                    'days': days,
-                    'teams': teams,
-                    "id": consultant.id,
-                    'recruiter': recruiter,
-                    'name': consultant.name,
-                    'email': consultant.email,
-                    'status': consultant.status,
-                    'project_count': project_count,
-                    'phone_no': consultant.phone_no,
-                    'interview_count': interview_count,
-                    'submission_count': submission_count,
-                    'preferred_location': preferred_location
+                    'id': consultant.id, 'days': days, 'teams': teams, 'recruiter': recruiter,
+                    'submission_count': submission_count, 'preferred_location': preferred_location,
+                    'email': consultant.email, 'status': consultant.status, 'project_count': project_count,
+                    'phone_no': consultant.phone_no, 'interview_count': interview_count, 'name': consultant.name,
                 })
             return Response({'data': data, "total": total}, status=200)
         except Exception as error:
