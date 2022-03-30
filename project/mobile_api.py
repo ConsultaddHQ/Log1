@@ -216,15 +216,15 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
             screenshot = False
             zero_hours = request.GET.get('zero_hours', None)
 
-            qs = TimeSheet.objects.filter(
-                id=kwargs.get('pk'), is_active=True,
+            queryset = TimeSheet.objects.filter(
                 project__consultant=request.user,
+                id=kwargs.get('pk'), is_active=True,
                 status__in=['draft', 'rejected', 'submitted'],
             )
-            if not qs:
-                return Response({"error": "Timesheet not found"}, status=400)
+            if not queryset:
+                return Response({"error": "Timesheet not found"}, status=404)
 
-            timesheet = qs.first()
+            timesheet = queryset.first()
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
             timesheet.status = 'submitted' if timesheet.status != 'submitted' else 'updated'

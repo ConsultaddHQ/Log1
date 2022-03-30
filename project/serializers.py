@@ -95,7 +95,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        return AttachmentSerializer(obj.attachments.all(), many=True).data
+        return AttachmentSerializer(obj.attachments.filter(is_active=True), many=True).data
 
     @staticmethod
     def get_project(obj):
@@ -129,7 +129,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
+        return AttachmentURLSerializer(obj.attachments.filter(is_active=True), many=True).data
 
     @staticmethod
     def get_project(obj):

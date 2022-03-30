@@ -281,7 +281,7 @@ class ConsultantViewSets(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
+        if not ('superadmin' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         data = request.data
         consultant = Consultant.objects.filter(email__iexact=data['email'])

@@ -280,8 +280,7 @@ def test_received_notification(user, test, timezone):
         if client:
             if len(client) > 1:
                 subtitle = f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from " \
-                           f"***{test.submission.client.strip()}*** for " \
-                           f" ***{test.submission.consultant.name}*** "
+                           f"***{test.submission.client.strip()}*** for ***{test.submission.consultant.name}*** "
 
         activity_text = f"Requested by ***{test.marketer.employee_name}*** from ***{test.marketer.team.name}***"
         data = {
