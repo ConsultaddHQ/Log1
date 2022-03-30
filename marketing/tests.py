@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, datetime
 from django.contrib.auth.models import ContentType
 from rest_framework.test import APITestCase, APIClient
 
@@ -86,16 +86,16 @@ class Setup:
     def create_test(data):
         return Test.objects.create(
             link=data.get("link", "test/link"), deadline=data.get("date", date.today()),
-            status=data.get('status', "assigned"), submit_date=data.get("submit_date", date.today()),
+            status=data.get('status', "assigned"), submit_date=data.get("submit_date", datetime.now()),
             skills=data.get('skills', ["python"]), submission=data.get("submission"), submitted_by=data.get('user')
         )
 
     @staticmethod
     def create_interview(data):
         return Interview.objects.create(
-                interview_mode=data.get("interview_mode", "skype"),
                 supervisor=data.get("user", None), submission=data.get("submission", None),
                 round=data.get("round", 0), feedback=data.get("feedback", "feedback text"),
+                interview_mode=data.get("interview_mode", "skype"), start_time=datetime.now(),
                 tech_stack=data.get("tech_stack", "java, python"), coding_present=data.get("coding", True),
                 status=data.get("status", "Scheduled"), screening_type=data.get('screening_type', 'interview'),
             )

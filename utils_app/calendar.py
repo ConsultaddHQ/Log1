@@ -24,7 +24,7 @@ def get_ms_header(request=None):
             access_token = data["access_token"]
 
         headers = {
-            "Authorization": "bearer " + access_token,
+            "Authorization": "bearer " + access_token if access_token else "bearer ",
             "Content-Type": "application/json"
         }
         return headers

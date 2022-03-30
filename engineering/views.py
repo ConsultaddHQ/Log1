@@ -806,6 +806,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             else:
                 first = last + timedelta(days=1) + relativedelta(months=-last.month + 6)
             first = first.replace(day=1)
+            last = last + timedelta(days=1)
 
         elif duration == 'last_quarter':
             if last.month < 6:
@@ -824,7 +825,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         # This Month
         else:
             first = date.today().replace(day=1)
-            last = date.today()
+            last = date.today() + timedelta(days=1)
         return first, last
 
     @staticmethod
