@@ -565,7 +565,7 @@ class EngineeringReportTest(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
 
-    def test_interview_card(self):
+    def test_report_summary(self):
         user = self.setup.user
         project = Project.objects.filter(statuses__is_current=True, statuses__status='new')
         interview = MarketingSetup.create_interview({"user": user, "submission": project.first().submission})
