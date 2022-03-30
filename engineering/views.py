@@ -991,101 +991,6 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='summary/project')
-    def project_card(self, request, **kwargs):
-        try:
-            duration = request.GET.get('filter_by', 'this_month')
-            first, last = self.filter_by_time(duration)
-            project_qs = ProjectSupport.objects.filter(
-                support__id=kwargs.get('pk'), statuses__created__range=[first, last]
-            ).distinct()
-            active = self.support_status_filter(project_qs, 'active').exclude(
-                project__statuses__status__istartswith='terminated').count()
-            less_active = self.support_status_filter(project_qs, 'less_active').exclude(
-                project__statuses__status__istartswith='terminated').count()
-            independent = self.support_status_filter(project_qs, 'independent').exclude(
-                project__statuses__status__istartswith='terminated').count()
-            terminated = project_qs.filter(project__statuses__status__istartswith='terminated').count()
-
-            project_counts = [
-                {"name": "Active", "count": active},
-                {"name": "Terminated", "count": terminated},
-                {"name": "Less Active", "count": less_active},
-                {"name": "Independent", "count": independent},
-            ]
-            return Response({"data": project_counts, "total": project_qs.count()}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
-    @action(methods=['get'], detail=True, url_path='summary/test')
-    def test_card(self, request, **kwargs):
-        try:
-            duration = request.GET.get('filter_by', 'this_month')
-            first, last = self.filter_by_time(duration)
-
-            queryset = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
-            test_counts = self.test_status_filter_count(queryset)
-            return Response({"data": test_counts, "total": queryset.count()}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
-    @action(methods=['get'], detail=True, url_path='summary/interview')
-    def interview_card(self, request, **kwargs):
-        try:
-            duration = request.GET.get('filter_by', 'this_month')
-            first, last = self.filter_by_time(duration)
-
-            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'), created__range=[first, last])
-            supervisor_interview_counts = self.interview_status_filter_count(sup_interview_qs)
-
-            guest_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
-            guest_interview_counts = self.interview_status_filter_count(guest_qs)
-
-            data = {
-                "guest_interview": {
-                    "total": guest_qs.count(),
-                    "status_counts": guest_interview_counts,
-                },
-                "supervisor_interview": {
-                    "total": sup_interview_qs.count(),
-                    "status_counts": supervisor_interview_counts,
-                }
-            }
-            return Response({"data": data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
-    @action(methods=['get'], detail=True, url_path='summary/technology')
-    def technology_card(self, request, **kwargs):
-        try:
-            technology_ls, technology = [], []
-            duration = request.GET.get('filter_by', 'this_month')
-            first, last = self.filter_by_time(duration)
-            update_qs = ProjectUpdate.objects.filter(
-                project__support__support=kwargs.get('pk'), project__description__created__range=[first, last]
-            ).order_by('project_id').distinct('project_id')
-            for obj in update_qs:
-                if hasattr(obj.project, 'description') and hasattr(obj.project.description, 'technology'):
-                    technology_ls.append(obj.project.description.technology)
-
-            if technology_ls and None in technology_ls:
-                technology_ls.remove(None)
-            distinct_technology_ls = set(technology_ls)
-            for item in distinct_technology_ls:
-                technology.append(
-                    {
-                        "name": item,
-                        "count": technology_ls.count(item),
-                    }
-                )
-            return Response({"data": technology, "total": len(technology_ls)}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
     @action(methods=['get'], detail=False, url_path='category')
     def category(self, request):
         data = [
@@ -1095,3 +1000,77 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             {'name': 'consultant_name', 'display_name': 'Consultant Name'},
         ]
         return Response({"data": data}, status=200)
+
+    @action(methods=['get'], detail=True, url_path='summary')
+    def summary(self, request, **kwargs):
+        try:
+            duration = request.GET.get('filter_by', 'this_month')
+            first, last = self.filter_by_time(duration)
+
+            projects = ProjectSupport.objects.filter(
+                support__id=kwargs.get('pk'), statuses__created__range=[first, last]
+            ).distinct()
+            project_qs = projects.exclude(project__statuses__status__istartswith='terminated')
+            active = self.support_status_filter(project_qs, 'active').count()
+            less_active = self.support_status_filter(project_qs, 'less_active').count()
+            independent = self.support_status_filter(project_qs, 'independent').count()
+            terminated = projects.filter(project__statuses__status__istartswith='terminated').count()
+            counts = [
+                {"name": "Active", "count": active},
+                {"name": "Terminated", "count": terminated},
+                {"name": "Less Active", "count": less_active},
+                {"name": "Independent", "count": independent},
+            ]
+            project_counts = {
+                "total": projects.count(),
+                "status_counts": counts
+            }
+
+            queryset = Test.objects.filter(engineer=kwargs.get('pk'), created__range=[first, last])
+            test_counts = {
+                "total": queryset.count(),
+                "status_counts": self.test_status_filter_count(queryset)
+            }
+
+            sup_interview_qs = Interview.objects.filter(supervisor_id=kwargs.get('pk'), created__range=[first, last])
+            supervisor_interview_counts = self.interview_status_filter_count(sup_interview_qs)
+            supervisor_interview = {
+                "total": sup_interview_qs.count(),
+                "status_counts": supervisor_interview_counts
+            }
+
+            guest_qs = Interview.objects.filter(guest=kwargs.get('pk'), created__range=[first, last])
+            guest_interview_counts = self.interview_status_filter_count(guest_qs)
+            guest_interview = {
+                "total": guest_qs.count(),
+                "status_counts": guest_interview_counts
+            }
+
+            technology_ls, technology = [], []
+            update_qs = ProjectUpdate.objects.filter(
+                project__support__support=kwargs.get('pk'), project__description__created__range=[first, last]
+            ).order_by('project_id').distinct('project_id')
+            for obj in update_qs:
+                if hasattr(obj.project, 'description') and hasattr(obj.project.description, 'technology'):
+                    technology_ls.append(obj.project.description.technology)
+            if technology_ls and None in technology_ls:
+                technology_ls.remove(None)
+            distinct_technology_ls = set(technology_ls)
+            for item in distinct_technology_ls:
+                technology.append({"name": item, "count": technology_ls.count(item)})
+            technology_counts = {
+                "total": len(technology_ls),
+                "status_counts": technology
+            }
+
+            data = {
+                "test": test_counts,
+                "project": project_counts,
+                "technology": technology_counts,
+                "guest_interview": guest_interview,
+                "supervisor_interview": supervisor_interview,
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
