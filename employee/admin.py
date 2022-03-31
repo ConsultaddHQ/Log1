@@ -6,7 +6,7 @@ from django.utils.translation import ugettext_lazy as _
 from import_export.admin import ExportActionModelAdmin
 
 from utils_app.admin import ExportCsvMixin
-from .models import User, Role, Team, ResetPasswordToken, Asset, Tagging, Handover
+from employee.models import User, Role, Team, ResetPasswordToken, Asset, Tagging, Handover
 
 admin.site.site_header = "Log1"
 
@@ -15,7 +15,7 @@ admin.site.site_header = "Log1"
 class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     fieldsets = (
         (None, {'fields': ('team', 'employee_id', 'username', 'email', 'password')}),
-        ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role')}),
+        ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role', 'technology')}),
         ('Permissions', {'fields': ('account_login', 'is_active', 'is_superuser', 'is_staff', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )

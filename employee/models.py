@@ -99,9 +99,9 @@ class User(AbstractUser, PermissionsMixin):
     employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
-    technology = ArrayField(models.CharField(_('Technologies'), max_length=30, blank=True), blank=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name='employees', null=True, blank=True)
+    technology = ArrayField(models.CharField(_('Technologies'), max_length=30, blank=True), blank=True, null=True)
 
     objects = UserManager()
 
@@ -187,12 +187,12 @@ class Asset(TimeStampedModel):
     username = models.CharField(_('Username'), max_length=50)
     provider = models.CharField(_('Provider'), max_length=30)
     password = models.CharField(_('Password'), max_length=50)
-    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
     is_deleted = models.BooleanField(_('Is Deleted'), default=False)
-    alter_email = models.EmailField(_('Alternate Email'), max_length=50, null=True, blank=True)
+    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
     number = models.CharField(_('Number'), max_length=50, null=True, blank=True)
     tech = models.CharField(_('Technology'), max_length=40, null=True, blank=True)
     remarks = models.CharField(_('Remarks'), max_length=300, null=True, blank=True)
+    alter_email = models.EmailField(_('Alternate Email'), max_length=50, null=True, blank=True)
     alter_number = models.CharField(_('Alternate Number'), max_length=40, null=True, blank=True)
     asset_type = models.CharField(_('Asset Type'), choices=ASSET_TYPES, max_length=20, null=True, blank=True)
     owner = models.ForeignKey(

@@ -563,41 +563,25 @@ class EngineeringReportTest(APITestCase):
 
         res = self.client.get(f"/api/engineer_report/{user.id}/interview/?query=con")
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['data'][0]['submission']['vendor_company'], "vendor_company_name2")
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
 
-    def test_test_card(self):
-        user = self.setup.user
-        project = Project.objects.filter(statuses__is_current=True, statuses__status='new')
-        test = MarketingSetup.create_test({"user": user, "submission": project.first().submission})
-        test.engineer.add(user)
-
-        res = self.client.get(f"/api/engineer_report/{user.id}/summary/test/")
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['total'], 1)
-
-    def test_interview_card(self):
+    def test_report_summary(self):
         user = self.setup.user
         project = Project.objects.filter(statuses__is_current=True, statuses__status='new')
         interview = MarketingSetup.create_interview({"user": user, "submission": project.first().submission})
         interview.guest.add(user)
-
-        res = self.client.get(f"/api/engineer_report/{user.id}/summary/interview/?filter_by=this_quarter")
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['data']['guest_interview']['total'], 1)
-
-    def test_project_card(self):
-        res = self.client.get(f"/api/engineer_report/{self.setup.user.id}/summary/project/")
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['total'], 2)
-
-    def test_technology_card(self):
-        project = Project.objects.filter(statuses__is_current=True, statuses__status='new')
+        test = MarketingSetup.create_test({"user": user, "submission": project.first().submission})
+        test.engineer.add(user)
         ProjectUpdate.objects.create(project=project.first(), update_by=self.setup.user, type='project')
         ProjectDescription.objects.create(project=project.first(), technology='python')
 
-        res = self.client.get(f"/api/engineer_report/{self.setup.user.id}/summary/technology/")
+        res = self.client.get(f"/api/engineer_report/{user.id}/summary/?filter_by=this_quarter")
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['total'], 1)
+        self.assertEqual(res.data['data']['test']['total'], 1)
+        self.assertEqual(res.data['data']['project']['total'], 2)
+        self.assertEqual(res.data['data']['technology']['total'], 1)
+        self.assertEqual(res.data['data']['guest_interview']['total'], 1)
+        self.assertEqual(res.data['data']['supervisor_interview']['total'], 1)
 
     def test_category(self):
         data = [
