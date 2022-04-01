@@ -124,8 +124,12 @@ class ConsultantV2ViewSets(ModelViewSet):
 
             if sort_by in ['name', 'created']:
                 consultants = consultants.order_by(sort_by)
-
-            serializer = ConsultantV2ListSerializer(consultants[first:last], many=True)
+            data = list()
+            for i in consultants.exclude(status='terminated'):
+                data.append(i)
+            for i in consultants.filter(status='terminated'):
+                data.append(i)
+            serializer = ConsultantV2ListSerializer(data[first:last], many=True)
             return Response({"count": count, "data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)

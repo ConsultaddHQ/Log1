@@ -746,12 +746,16 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             consultant = project.submission.consultant
 
             project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+            poc_emails = list(consultant.pocs.filter(end=None).values_list('poc__email', flat=True))
             support_emails = list(project.support.all().values_list('support__email', flat=True))
+            marketing_poc = list(User.objects.filter(
+                team=submission.created_by.team, role__name='admin'
+            ).values_list('email', flat=True))
 
             mail_data = {
-                'cc': ['engineering@consultadd.com'], 'bcc': [],
                 'template': '../templates/support_assignment.html',
                 'to': [submission.created_by.email] + support_emails,
+                'cc': ['engineering@consultadd.com'] + poc_emails + marketing_poc, 'bcc': [],
                 'subject': f"{consultant.name}'s support initiated for  {project.submission.client} by"
                            f" {support.support.employee_name}",
                 'context': {

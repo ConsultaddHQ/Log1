@@ -1007,6 +1007,7 @@ class InterviewViewSets(ModelViewSet):
                 'failed': queryset.filter(status='failed').count(),
                 'scheduled': queryset.filter(status='scheduled').count(),
                 'cancelled': queryset.filter(status='cancelled').count(),
+                'next_round': queryset.filter(status='next_round').count(),
                 'rescheduled': queryset.filter(status='rescheduled').count(),
                 'feedback_due': queryset.filter(status='feedback_due').count(),
             }
