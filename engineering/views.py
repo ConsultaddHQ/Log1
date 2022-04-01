@@ -742,36 +742,36 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "active": {
                     "display_name": "Active",
                     "count": queryset.filter(
-                        support__end=None,
-                        start_date__lte=date.today(),
                         support__statuses__is_current=True,
-                        support__statuses__frequency='more_than_2_days').count()
-                },
+                        support__end=None, start_date__lt=date.today(),
+                        support__statuses__frequency='more_than_2_days',
+                    ).count()},
                 "training": {
                     "display_name": "Training",
                     "count": queryset.filter(
-                        support__end=None,
-                        start_date__gte=date.today(),
                         support__statuses__is_current=True,
-                        support__statuses__frequency='more_than_2_days').count()
+                        support__end=None, start_date__gte=date.today(),
+                        support__statuses__frequency='more_than_2_days',
+                    ).count()
                 },
                 "less_active": {
                     "display_name": "Less Active",
                     "count": queryset.filter(
                         support__end=None,
                         support__statuses__is_current=True,
-                        support__statuses__frequency='less_than_3_days').count()
+                        support__statuses__frequency='less_than_3_days',
+                    ).count()
                 },
                 "independent": {
                     "display_name": "Independent",
                     "count": queryset.filter(
-                        support__end=None,
-                        support__statuses__is_current=True,
-                        support__statuses__frequency__in=['independent', 'twice_a_month']).count()
+                        support__end=None, support__statuses__is_current=True,
+                        support__statuses__frequency__in=['independent', 'twice_a_month'],
+                    ).count()
                 },
                 "total": {
                     "display_name": "Total",
-                    "count": queryset.filter(support__end=None, support__statuses__is_current=True).count()
+                    "count": queryset.filter(support__statuses__is_current=True, support__end=None).count()
                 },
             },
         }

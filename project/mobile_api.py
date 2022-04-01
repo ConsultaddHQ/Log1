@@ -21,7 +21,7 @@ from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
 from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus
-from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer
+from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer
 
 
 # Route - /payroll/
@@ -239,7 +239,6 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
 
             # Uploading Timesheet Screenshots to S3
             try:
-                admin_user = User.objects.get(employee_id=2367)
                 content_type = ContentType.objects.get(model='timesheet')
                 if request.FILES.get('file1', None):
                     attachments = Attachment.objects.filter(object_id=timesheet.id, is_active=True,
@@ -249,7 +248,7 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
                         attachment.save()
 
                     Attachment.objects.create(
-                        creator=admin_user,
+                        creator_id=1,
                         object_id=timesheet.id,
                         content_type=content_type,
                         attachment_type='timesheet',
@@ -258,7 +257,7 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
                     screenshot = True
                 if request.FILES.get('file2', None):
                     Attachment.objects.create(
-                        creator=admin_user,
+                        creator_id=1,
                         object_id=timesheet.id,
                         content_type=content_type,
                         attachment_type='timesheet',
@@ -337,18 +336,16 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
     def list(self, request, *args, **kwargs):
         try:
-            project_status = ProjectStatus.objects.filter(project=OuterRef('pk'), is_current=True)
-            result = Project.objects.filter(
+            projects = Project.objects.filter(
                 Q(consultant=request.user, statuses__is_current=True) & (
                         Q(statuses__status='joined') |
                         Q(statuses__status__istartswith='terminated') |
                         Q(statuses__status__in=['complete', 'extended'])
                 )
-            ).annotate(
-                client=F('submission__client'),
-                status=Subquery(project_status.values('status')[:1]),
-            ).order_by('-start_date').values('id', 'start_date', 'client', 'employer', 'status')
-            return Response({'result': result}, status=200)
+            ).order_by('-start_date')
+
+            serializer = ProjectTimeSheetSerializer(projects, many=True)
+            return Response({'result': serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
@@ -389,7 +386,6 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
             # Uploading Timesheet Screenshots to S3
             try:
-                admin_user = User.objects.get(employee_id=2367)
                 content_type = ContentType.objects.get(model='timesheet')
                 if request.FILES.get('file1', None):
                     attachments = Attachment.objects.filter(object_id=timesheet.id, is_active=True,
@@ -399,7 +395,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                         attachment.save()
 
                     Attachment.objects.create(
-                        creator=admin_user,
+                        creator_id=1,
                         object_id=timesheet.id,
                         content_type=content_type,
                         attachment_type='timesheet',
@@ -408,7 +404,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     screenshot = True
                 if request.FILES.get('file2', None):
                     Attachment.objects.create(
-                        creator=admin_user,
+                        creator_id=1,
                         object_id=timesheet.id,
                         content_type=content_type,
                         attachment_type='timesheet',
@@ -568,16 +564,14 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
     @action(methods=['PUT'], detail=True, url_path='cancel')
     def cancel_timesheet(self, request, pk):
         try:
-            qs = TimeSheet.objects.filter(
-                id=pk,
-                project__consultant=request.user,
+            queryset = TimeSheet.objects.filter(
+                id=pk, project__consultant=request.user,
                 status__in=['submitted', 'updated'],
             )
-            if qs:
-                timesheet = qs.first()
-            else:
+            if not queryset:
                 return Response({"error": "Timesheet not found"}, status=404)
 
+            timesheet = queryset.first()
             timesheet.hours = 0
             timesheet.status = 'draft'
             timesheet.con_comment = None
