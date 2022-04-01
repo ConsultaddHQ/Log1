@@ -737,36 +737,41 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @staticmethod
     def project_filter_counts(queryset):
-        queryset = queryset.filter(support__statuses__is_current=True, support__end=None)
         return {
             "support_status": {
                 "active": {
                     "display_name": "Active",
                     "count": queryset.filter(
-                        support__statuses__frequency='more_than_2_days',
-                        start_date__lte=date.today()
-                    ).count()},
+                        support__end=None,
+                        start_date__lte=date.today(),
+                        support__statuses__is_current=True,
+                        support__statuses__frequency='more_than_2_days').count()
+                },
                 "training": {
                     "display_name": "Training",
                     "count": queryset.filter(
-                        support__statuses__frequency='more_than_2_days',
-                        start_date__gte=date.today()).count()
+                        support__end=None,
+                        start_date__gte=date.today(),
+                        support__statuses__is_current=True,
+                        support__statuses__frequency='more_than_2_days').count()
                 },
                 "less_active": {
                     "display_name": "Less Active",
                     "count": queryset.filter(
-                        support__statuses__frequency='less_than_3_days'
-                    ).count()
+                        support__end=None,
+                        support__statuses__is_current=True,
+                        support__statuses__frequency='less_than_3_days').count()
                 },
                 "independent": {
                     "display_name": "Independent",
                     "count": queryset.filter(
-                        support__statuses__frequency__in=['independent', 'twice_a_month']
-                    ).count()
+                        support__end=None,
+                        support__statuses__is_current=True,
+                        support__statuses__frequency__in=['independent', 'twice_a_month']).count()
                 },
                 "total": {
                     "display_name": "Total",
-                    "count": queryset.count()
+                    "count": queryset.filter(support__end=None, support__statuses__is_current=True).count()
                 },
             },
         }
@@ -817,9 +822,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
         elif duration == 'last_6_month':
+            last = date.today() + timedelta(days=1)
             first = last + timedelta(days=1) + relativedelta(months=-6)
 
         elif duration == 'last_12_month':
+            last = date.today() + timedelta(days=1)
             first = last + timedelta(days=1) + relativedelta(months=-12)
 
         # This Month
@@ -872,6 +879,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = self.project_filter_counts(projects)
+
+            total = counts['support_status']["total"]['count']
+            independent = counts['support_status']["independent"]['count']
+            counts['support_status']["total"]['count'] = total - independent
 
             serializer = EngineerReportSerializer(engineer[first: last], many=True)
             return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
