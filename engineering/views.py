@@ -743,26 +743,32 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "active": {
                     "display_name": "Active",
                     "count": queryset.filter(
+                        support__statuses__is_current=True,
+                        support__end=None, start_date__lt=date.today(),
                         support__statuses__frequency='more_than_2_days',
-                        start_date__lte=date.today()
-                    ).count()},
+                    ).distinct().count()},
                 "training": {
                     "display_name": "Training",
                     "count": queryset.filter(
+                        support__statuses__is_current=True,
+                        support__end=None, start_date__gte=date.today(),
                         support__statuses__frequency='more_than_2_days',
-                        start_date__gte=date.today()).count()
+                    ).distinct().count()
                 },
                 "less_active": {
                     "display_name": "Less Active",
                     "count": queryset.filter(
-                        support__statuses__frequency='less_than_3_days'
-                    ).count()
+                        support__end=None,
+                        support__statuses__is_current=True,
+                        support__statuses__frequency='less_than_3_days',
+                    ).distinct().count()
                 },
                 "independent": {
                     "display_name": "Independent",
                     "count": queryset.filter(
-                        support__statuses__frequency__in=['independent', 'twice_a_month']
-                    ).count()
+                        support__end=None, support__statuses__is_current=True,
+                        support__statuses__frequency__in=['independent', 'twice_a_month'],
+                    ).distinct().count()
                 },
                 "total": {
                     "display_name": "Total",
@@ -817,9 +823,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
         elif duration == 'last_6_month':
+            last = date.today() + timedelta(days=1)
             first = last + timedelta(days=1) + relativedelta(months=-6)
 
         elif duration == 'last_12_month':
+            last = date.today() + timedelta(days=1)
             first = last + timedelta(days=1) + relativedelta(months=-12)
 
         # This Month

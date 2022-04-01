@@ -413,6 +413,7 @@ class EngineerTestSerializer(serializers.ModelSerializer):
     def get_submission(obj):
         submission = obj.submission
         return {
+            "id": submission.id,
             "client": submission.client,
             "job_title": submission.lead.job_title,
             "marketer_name": submission.created_by.employee_name,
@@ -447,6 +448,7 @@ class EngineerInterviewSerializer(serializers.ModelSerializer):
     def get_submission(obj):
         submission = obj.submission
         return {
+            "id": submission.id,
             "client": submission.client,
             "job_title": submission.lead.job_title,
             "marketer_name": submission.created_by.employee_name,
