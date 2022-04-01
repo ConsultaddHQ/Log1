@@ -737,7 +737,6 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @staticmethod
     def project_filter_counts(queryset):
-        queryset = queryset.filter(support__statuses__is_current=True, support__end=None)
         return {
             "support_status": {
                 "active": {
@@ -746,14 +745,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         support__statuses__is_current=True,
                         support__end=None, start_date__lt=date.today(),
                         support__statuses__frequency='more_than_2_days',
-                    ).distinct().count()},
+                    ).count()},
                 "training": {
                     "display_name": "Training",
                     "count": queryset.filter(
                         support__statuses__is_current=True,
                         support__end=None, start_date__gte=date.today(),
                         support__statuses__frequency='more_than_2_days',
-                    ).distinct().count()
+                    ).count()
                 },
                 "less_active": {
                     "display_name": "Less Active",
@@ -761,18 +760,18 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         support__end=None,
                         support__statuses__is_current=True,
                         support__statuses__frequency='less_than_3_days',
-                    ).distinct().count()
+                    ).count()
                 },
                 "independent": {
                     "display_name": "Independent",
                     "count": queryset.filter(
                         support__end=None, support__statuses__is_current=True,
                         support__statuses__frequency__in=['independent', 'twice_a_month'],
-                    ).distinct().count()
+                    ).count()
                 },
                 "total": {
                     "display_name": "Total",
-                    "count": queryset.count()
+                    "count": queryset.filter(support__statuses__is_current=True, support__end=None).count()
                 },
             },
         }
