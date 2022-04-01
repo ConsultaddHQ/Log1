@@ -246,7 +246,7 @@ class Question(TimeStampedModel):
 
 
 class ChildQuestion(TimeStampedModel):
-    child_question = models.ManyToManyField(Question, null=True)
+    child_question = models.ManyToManyField(Question)
     parent_question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='child_question')
 
     def __str__(self):
