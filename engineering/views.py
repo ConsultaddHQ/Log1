@@ -880,10 +880,6 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = self.project_filter_counts(projects)
 
-            total = counts['support_status']["total"]['count']
-            independent = counts['support_status']["independent"]['count']
-            counts['support_status']["total"]['count'] = total - independent
-
             serializer = EngineerReportSerializer(engineer[first: last], many=True)
             return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
         except Exception as error:
