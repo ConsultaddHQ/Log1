@@ -1054,14 +1054,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             }
 
             technology_ls, technology = [], []
-            update_qs = ProjectUpdate.objects.filter(
-                project__support__support=kwargs.get('pk'), project__description__created__range=[first, last]
-            ).order_by('project_id').distinct('project_id')
-            for obj in update_qs:
+            for obj in projects:
                 if hasattr(obj.project, 'description') and hasattr(obj.project.description, 'technology'):
                     technology_ls.append(obj.project.description.technology)
-            if technology_ls and None in technology_ls:
-                technology_ls.remove(None)
+            [technology_ls.remove(ele) for ele in technology_ls if ele is None]
             distinct_technology_ls = set(technology_ls)
             for item in distinct_technology_ls:
                 technology.append({"name": item, "count": technology_ls.count(item)})
