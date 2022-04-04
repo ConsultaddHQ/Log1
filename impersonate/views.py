@@ -21,18 +21,14 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
         try:
             user_id = request.data.get('id')
             if User.objects.filter(id=user_id).exists():
-                return Response({"message": "You don't have permission to impersonate this User"}, status=403)
-            if request.user.is_superuser:
-                if User.objects.filter(id=user_id).exists():
-                    return Response({"message": "User does not exist"}, status=404)
+                return Response({"message": "User does not exist"}, status=404)
 
+            if request.user.is_superuser:
                 token, created = Token.objects.get_or_create(user_id=user_id)
                 return Response({"data": {"token": token.key}, "message": "User is impersonated"}, status=201)
             else:
                 handovers = Handover.objects.filter(handover_to=request.user)
                 if handovers.filter(user_id=user_id).exists():
-                    if User.objects.filter(id=user_id).exists():
-                        return Response({"message": "User does not exist"}, status=404)
                     token, created = Token.objects.get_or_create(user_id=user_id)
                     return Response({"data": {"token": token.key}, "message": "User is impersonated"}, status=201)
                 else:
