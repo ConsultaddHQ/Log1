@@ -234,7 +234,7 @@ class PetitionViewSets(ModelViewSet):
     @action(methods=['get'], detail=False, url_path='employer')
     def employer(self, request):
         try:
-            data = ['Consultadd', 'NetResolute', 'Pythonwise', 'Zioqu']
+            data = ['Consultadd', 'NetResolute', 'Pythonwise', 'Zioqu', 'Boto3']
             return Response({"result": data}, status=200)
         except Exception as error:
             write_exception(error, request)

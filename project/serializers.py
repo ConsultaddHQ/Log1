@@ -100,7 +100,6 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
 
 class TimeSheetSerializer(serializers.ModelSerializer):
-    attachments = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
     end = serializers.SerializerMethodField()
@@ -108,7 +107,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeSheet
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
-                  'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
+                  'status_updated_by', 'modified', 'remark', 'project', 'con_comment')
 
     @staticmethod
     def get_start(obj):
@@ -117,28 +116,6 @@ class TimeSheetSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_end(obj):
         return obj.end.strftime("%m/%d/%Y")
-
-    @staticmethod
-    def get_attachments(obj):
-        if obj.status == 'rejected':
-            data = []
-            timesheet = TimeSheet.objects.filter(
-                project_id=obj.project.id, is_active=False,
-                end=obj.end, start=obj.start, status='rejected'
-            )
-            for attachment in timesheet.first().attachments.all():
-                data.append({
-                    "id": attachment.id,
-                    "object_id": obj.id,
-                    "attachment_type": attachment.attachment_type,
-                    "file_name": os.path.split(attachment.attachment_file.name)[1],
-                    "type": {
-                        "name": attachment.attachment_type,
-                        "display_name": attachment.get_attachment_type_display(),
-                    },
-                })
-            return data
-        return AttachmentSerializer(obj.attachments.filter(is_active=True), many=True).data
 
     @staticmethod
     def get_project(obj):
