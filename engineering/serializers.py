@@ -415,7 +415,6 @@ class EngineerTestSerializer(serializers.ModelSerializer):
         return {
             "id": submission.id,
             "client": submission.client,
-            "submission_id": submission.id,
             "job_title": submission.lead.job_title,
             "marketer_name": submission.created_by.employee_name,
             "vendor_company": submission.lead.vendor_company.name,
@@ -451,7 +450,6 @@ class EngineerInterviewSerializer(serializers.ModelSerializer):
         return {
             "id": submission.id,
             "client": submission.client,
-            "submission_id": submission.id,
             "job_title": submission.lead.job_title,
             "marketer_name": submission.created_by.employee_name,
             "vendor_company": submission.lead.vendor_company.name,
