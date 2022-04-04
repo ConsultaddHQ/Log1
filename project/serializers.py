@@ -1,3 +1,4 @@
+import os
 from datetime import date
 from django.db.models import Q
 from rest_framework import serializers
@@ -119,11 +120,25 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        timesheet = TimeSheet.objects.filter(
-            project_id=obj.project.id, is_active=False,
-            end=obj.end, start=obj.start, status='rejected'
-        )
-        return AttachmentSerializer(timesheet.first().attachments.all(), many=True).data
+        if obj.status == 'rejected':
+            data = []
+            timesheet = TimeSheet.objects.filter(
+                project_id=obj.project.id, is_active=False,
+                end=obj.end, start=obj.start, status='rejected'
+            )
+            for attachment in timesheet.first().attachments.all():
+                data.append({
+                    "id": attachment.id,
+                    "object_id": obj.id,
+                    "attachment_type": attachment.attachment_type,
+                    "file_name": os.path.split(attachment.attachment_file.name)[1],
+                    "type": {
+                        "name": attachment.attachment_type,
+                        "display_name": attachment.get_attachment_type_display(),
+                    },
+                })
+            return data
+        return AttachmentSerializer(obj.attachments.filter(is_active=True), many=True).data
 
     @staticmethod
     def get_project(obj):

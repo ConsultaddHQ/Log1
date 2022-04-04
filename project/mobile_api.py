@@ -352,7 +352,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            project = get_object_or_404(Project, id=kwargs.get('pk'), consultant=request.user)
             queryset = TimeSheet.objects.filter(
                 project=project, status__in=['draft', 'rejected'], is_active=True
             ).order_by('end')
