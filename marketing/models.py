@@ -227,6 +227,7 @@ class VendorLayer(TimeStampedModel):
 class Question(TimeStampedModel):
     title = models.TextField(_('Question Title'))
     is_active = models.BooleanField(_('Is active'), default=True)
+    is_required = models.BooleanField(_('Is required'), default=True)
     category = models.CharField(_('Question Category'), max_length=50)
     position = models.PositiveIntegerField(_('Position'), null=True, blank=True)
     placeholder = models.TextField(_('Field Placeholder'), null=True, blank=True)

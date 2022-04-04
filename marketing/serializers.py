@@ -592,7 +592,7 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
-        fields = ("id", "title", "category", "answer_type", "position", "options", "dependent")
+        fields = ("id", "title", "category", "answer_type", "position", "is_required", "options", "dependent")
 
     @staticmethod
     def get_dependent(obj):
@@ -607,7 +607,7 @@ class ParentQuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
-        fields = ("id", "title", "category", "answer_type", "position", "options", "child", "dependent")
+        fields = ("id", "title", "category", "answer_type", "position", "is_required", "options", "child", "dependent")
 
     @staticmethod
     def get_child(obj):

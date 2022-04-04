@@ -117,7 +117,8 @@ class QuestionsAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
     search_fields = ('id', 'title')
     list_filter = ('answer_type', 'category', 'form_name', 'is_active')
-    list_display = ('id', 'title', 'form_name', 'answer_type', 'options', 'category', 'position', 'is_active')
+    list_display = ('id', 'title', 'form_name', 'answer_type', 'options', 'category', 'position', 'is_active',
+                    'is_required')
 
 
 @admin.register(ChildQuestion)
