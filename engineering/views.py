@@ -857,7 +857,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             category = request.GET.get('category', None)
 
             engineer = User.objects.filter(
-                project__support__end=None, projects__statuses__is_current=True,
+                projects__end=None, projects__statuses__is_current=True,
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
 

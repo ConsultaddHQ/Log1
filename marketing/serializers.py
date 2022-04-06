@@ -464,7 +464,9 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
             "ques_category": obj.question.category,
             "answer_type": obj.question.answer_type,
             "child": [],
-            "attachment": AttachmentGetSerializer(obj.attachment.all(), many=True).data,
+            "attachment": AttachmentGetSerializer(
+                obj.attachment.filter(attachment_type='test_feedback', model='answer'), many=True
+            ).data,
         }
         if obj.question.category == 'parent_child':
             for question in obj.question.child_question.first().child_question.filter().order_by('position'):
