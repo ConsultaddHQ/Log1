@@ -2538,8 +2538,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     parent_question_id=data.get('parent_question_id', None)
                 )
                 attachment_id = f"{question.id}-{answer.parent_question_id}" if answer.parent_question else question.id
-                if request.FILES.getlist(attachment_id):
-                    for file in request.FILES.getlist(attachment_id):
+                if request.FILES.getlist(str(attachment_id)):
+                    for file in request.FILES.getlist(str(attachment_id)):
                         file_data = {
                             "file": file,
                             "model": "answer",

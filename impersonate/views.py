@@ -20,7 +20,7 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     def create(self, request, *args, **kwargs):
         try:
             user_id = request.data.get('id')
-            if User.objects.filter(id=user_id).exists():
+            if not User.objects.filter(id=user_id).exists():
                 return Response({"message": "User does not exist"}, status=404)
 
             if request.user.is_superuser:
