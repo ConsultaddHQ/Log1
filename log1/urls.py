@@ -105,7 +105,7 @@ router.register(r'consultant_auth', ConsultantAuthViewSet)
 router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
 router.register(r'timesheet', TimeSheetViewSet)
-router.register(r'timesheet_v2', TimeSheetViewSet)
+router.register(r'timesheet_v2', TimeSheetV2ViewSet)
 router.register(r'payroll', PayrollScheduleViewSet)
 
 router.register(r'utility', UtilityViewSet)
