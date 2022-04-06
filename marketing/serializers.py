@@ -456,6 +456,7 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
         else:
             answer = [obj.answer, None]
         data = {
+            "child": [],
             "answer": answer[0],
             "remark": answer[1],
             "answer_id": obj.id,
@@ -463,19 +464,19 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
             "ques_title": obj.question.title,
             "ques_category": obj.question.category,
             "answer_type": obj.question.answer_type,
-            "child": [],
             "attachment": AttachmentGetSerializer(
-                obj.attachment.filter(attachment_type='test_feedback', model='answer'), many=True
+                obj.attachment.filter(attachment_type='test_feedback', content_type__model='answer'), many=True
             ).data,
         }
         if obj.question.category == 'parent_child':
             for question in obj.question.child_question.first().child_question.filter().order_by('position'):
-                child_ques_answers = Answer.objects.filter(object_id=obj.object_id, parent_question=question).order_by(
-                    'question__position')
+                child_ques_answers = Answer.objects.filter(
+                    object_id=obj.object_id, parent_question=question
+                ).order_by('question__position')
                 if child_ques_answers:
                     child_data = {
-                        "ques_id": question.id, "ques_title": question.title,
-                        "ques_category": question.category, "answer_type": question.answer_type, "child": []
+                        "ques_id": question.id, "ques_title": question.title, "child": [],
+                        "ques_category": question.category, "answer_type": question.answer_type,
                     }
                     for question_answer in child_ques_answers:
                         child_data['child'].append(QuestionAnswerSerializer(question_answer).data)
