@@ -8,9 +8,9 @@ from employee.models import User
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
-from engineering.models import TrainingCheckList
 from utils_app.calendar import get_profile_picture
 from consultant.utils import send_notification_for_user
+from engineering.models import TrainingCheckList, ProjectDescription
 from log1.utils import post_msg_using_webhook, password_generator, write_exception
 
 
@@ -489,6 +489,11 @@ def send_support_mail(project, support, request):
 
 def create_checklist(project_id, request):
     try:
+        try:
+            ProjectDescription.objects.create(project_id=project_id)
+        except Exception as error:
+            write_exception(error, request)
+
         file = open('data/checklist.json', 'r')
         data = json.loads(file.read())
         file.close()

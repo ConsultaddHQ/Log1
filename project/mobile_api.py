@@ -77,25 +77,23 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
         try:
             if contact_type == 'finance':
                 to = ['finance@consultadd.com']
-                bcc = ['sarang.m@consultadd.com']
+                bcc = [config.APP_ADMIN, os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
                 to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
-                bcc = []
+                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)
 
             if os.environ.get('ENV', 'local') != 'prod':
-                to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
-                bcc = []
+                to = [config.APP_ADMIN]
                 subject += "Development server"
+                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
 
             mail_data = {
-                'to': to,
-                'cc': [],
-                'bcc': bcc,
                 'subject': subject,
+                'to': to, 'cc': [], 'bcc': bcc,
                 'template': '../templates/timesheet_contact_us.html',
                 'context': {
                     "consultant_name": request.user.name,
@@ -103,7 +101,7 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
                     "message": message,
                 },
             }
-            send_email(mail_data, 'log1@consultadd.com', request=request)
+            send_email(mail_data, 'timesheet@consultadd.com', request=request)
 
             user_list = User.objects.filter(role__name='finance')
             title = f"{request.user.name} has Timesheet issue, please check mail."
@@ -162,7 +160,8 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
         try:
             timesheet = get_object_or_404(TimeSheet, id=pk, project__consultant=request.user)
             attachments = timesheet.attachments.all()
-            data = []
+
+            data = list()
             for attachment in attachments:
                 response, error = get_s3_object(attachment.attachment_file.name)
                 if error:
@@ -352,7 +351,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
     def retrieve(self, request, *args, **kwargs):
         try:
-            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            project = get_object_or_404(Project, id=kwargs.get('pk'), consultant=request.user)
             queryset = TimeSheet.objects.filter(
                 project=project, status__in=['draft', 'rejected'], is_active=True
             ).order_by('end')
@@ -497,25 +496,23 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
         try:
             if contact_type == 'finance':
                 to = ['finance@consultadd.com']
-                bcc = ['sarang.m@consultadd.com']
+                bcc = [config.APP_ADMIN, os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
+                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
-                bcc = []
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)
 
             if os.environ.get('ENV', 'local') != 'prod':
-                to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
-                bcc = []
+                to = [config.APP_ADMIN]
                 subject += "Development server"
+                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
 
             mail_data = {
-                'to': to,
-                'cc': [],
-                'bcc': bcc,
                 'subject': subject,
+                'to': to, 'cc': [], 'bcc': bcc,
                 'template': '../templates/timesheet_contact_us.html',
                 'context': {
                     "consultant_name": request.user.name,
@@ -523,7 +520,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     "message": message,
                 },
             }
-            send_email(mail_data, 'log1@consultadd.com', request=request)
+            send_email(mail_data, 'timesheet@consultadd.com', request=request)
 
             user_list = User.objects.filter(role__name='finance')
             title = f"{request.user.name} has Timesheet issue, please check mail."
@@ -587,8 +584,16 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
     def attachments(self, request, pk):
         try:
             timesheet = get_object_or_404(TimeSheet, id=pk, project__consultant=request.user)
-            attachments = timesheet.attachments.filter(is_active=True)
-            data = []
+            if timesheet.status == 'rejected':
+                timesheet = TimeSheet.objects.filter(
+                    project_id=timesheet.project.id, is_active=False,
+                    end=timesheet.end, start=timesheet.start, status='rejected'
+                )
+                attachments = timesheet.first().attachments.filter(is_active=True)
+            else:
+                attachments = timesheet.attachments.filter(is_active=True)
+
+            data = list()
             for attachment in attachments:
                 response, error = get_s3_object(attachment.attachment_file.name)
                 if error:

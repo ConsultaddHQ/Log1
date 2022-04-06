@@ -737,7 +737,6 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
     @staticmethod
     def project_filter_counts(queryset):
-        queryset = queryset.filter(support__statuses__is_current=True, support__end=None)
         return {
             "support_status": {
                 "active": {
@@ -746,14 +745,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         support__statuses__is_current=True,
                         support__end=None, start_date__lt=date.today(),
                         support__statuses__frequency='more_than_2_days',
-                    ).distinct().count()},
+                    ).count()},
                 "training": {
                     "display_name": "Training",
                     "count": queryset.filter(
                         support__statuses__is_current=True,
                         support__end=None, start_date__gte=date.today(),
                         support__statuses__frequency='more_than_2_days',
-                    ).distinct().count()
+                    ).count()
                 },
                 "less_active": {
                     "display_name": "Less Active",
@@ -761,18 +760,18 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         support__end=None,
                         support__statuses__is_current=True,
                         support__statuses__frequency='less_than_3_days',
-                    ).distinct().count()
+                    ).count()
                 },
                 "independent": {
                     "display_name": "Independent",
                     "count": queryset.filter(
                         support__end=None, support__statuses__is_current=True,
                         support__statuses__frequency__in=['independent', 'twice_a_month'],
-                    ).distinct().count()
+                    ).count()
                 },
                 "total": {
                     "display_name": "Total",
-                    "count": queryset.count()
+                    "count": queryset.filter(support__statuses__is_current=True, support__end=None).count()
                 },
             },
         }
@@ -858,7 +857,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             category = request.GET.get('category', None)
 
             engineer = User.objects.filter(
-                projects__statuses__is_current=True,
+                projects__end=None, projects__statuses__is_current=True,
                 projects__statuses__frequency__in=['more_than_2_days', 'less_than_3_days']
             ).order_by('employee_id').distinct('employee_id')
 
@@ -1055,14 +1054,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             }
 
             technology_ls, technology = [], []
-            update_qs = ProjectUpdate.objects.filter(
-                project__support__support=kwargs.get('pk'), project__description__created__range=[first, last]
-            ).order_by('project_id').distinct('project_id')
-            for obj in update_qs:
+            for obj in projects:
                 if hasattr(obj.project, 'description') and hasattr(obj.project.description, 'technology'):
                     technology_ls.append(obj.project.description.technology)
-            if technology_ls and None in technology_ls:
-                technology_ls.remove(None)
+            [technology_ls.remove(ele) for ele in technology_ls if ele is None]
             distinct_technology_ls = set(technology_ls)
             for item in distinct_technology_ls:
                 technology.append({"name": item, "count": technology_ls.count(item)})
