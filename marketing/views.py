@@ -330,7 +330,7 @@ class LeadViewSets(ModelViewSet):
             if request.method == 'GET':
                 first, last = get_page_limits(request)
                 sort_by = request.GET.get('sort_by', None)
-                queryset = Lead.objects.filter(owner=request.user).annotate(submission_count=Count('submission'))
+                queryset = Lead.objects.filter(owner=request.user)
                 queryset, counts = self.get_queryset_and_count(queryset, ['archived'], sort_by)
                 if counts == 'error':
                     return Response({"message": ERROR_MSG, "error": str(queryset)}, status=400)
@@ -346,17 +346,6 @@ class LeadViewSets(ModelViewSet):
                     leads.update(status='archived')
                     return Response({"message": "Requirement Archived"}, status=202)
                 return Response({"message": "Data not found"}, status=404)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['get'], detail=False, url_path='map')
-    def map(self, request):
-        try:
-            leads = Lead.objects.filter(
-                Q(owner=request.user) | Q(shared_to=request.user)
-            ).values('city').annotate(total=Count('city')).order_by('city')
-            return Response({"data": leads}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
