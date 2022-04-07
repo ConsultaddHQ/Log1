@@ -17,20 +17,17 @@ class ConsultantV2VTest(APITestCase):
         self.client.force_authenticate(user=self.setup.user)
 
     def test_list(self):
-        route = f"/api/v2/consultant/?sort_by=name"
-        res = self.client.get(route)
+        res = self.client.get("/api/v2/consultant/?sort_by=name")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['count']['total'], 5)
 
     def test_filters(self):
-        route = f"/api/v2/consultant/filters/"
-        res = self.client.get(route)
+        res = self.client.get("/api/v2/consultant/filters/")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['data']['on_bench'][0]['name'], 'non_pool')
 
     def test_export(self):
-        route = f"/api/v2/consultant/export/"
-        res = self.client.get(route)
+        res = self.client.get("/api/v2/consultant/export/")
         self.assertEqual(res.status_code, 200)
 
 
@@ -51,8 +48,7 @@ class ConsultantTest(APITestCase):
         self.client.force_authenticate(user=self.setup.user)
 
     def test_consultant_list(self):
-        route_list = f"/api/consultant/"
-        res = self.client.get(route_list)
+        res = self.client.get("/api/consultant/")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(len(res.data['data']), 5)
 
@@ -71,8 +67,7 @@ class ConsultantTest(APITestCase):
         self.assertEqual(res_submission.status_code, 200)
 
     def test_search_consultant(self):
-        route = f"/api/consultant/search/"
-        res = self.client.get(route)
+        res = self.client.get("/api/consultant/search/")
         self.assertEqual(res.status_code, 200)
 
         search_route = f"/api/consultant/search/?query={self.consultant.first().name}"
@@ -81,12 +76,12 @@ class ConsultantTest(APITestCase):
 
     def test_create_and_update_education(self):
         payload = {
-            "city": "East Coast",
             "major": 'major',
-            "remark": "test remark",
-            "org_name": "organisation name test",
             "edu_type": "phd",
+            "city": "East Coast",
+            "remark": "test remark",
             "end_date": "2021-12-15",
+            "org_name": "organisation name test",
         }
         post_route = f"/api/consultant/{self.consultant.first().id}/education/"
         post_res = self.client.post(post_route, data=json.dumps(payload), content_type="application/json")
@@ -102,11 +97,11 @@ class ConsultantTest(APITestCase):
         payload = {
             "city": "East Coast",
             "title": 'Test title',
-            "remark": "test remark",
-            "company": "company name",
             "exp_type": "fresher",
+            "remark": "test remark",
             "end_date": "2021-12-15",
-            "start_date": "2020-12-15"
+            "company": "company name",
+            "start_date": "2020-12-15",
         }
 
         post_route = f"/api/consultant/{self.consultant.first().id}/experience/"
@@ -127,8 +122,8 @@ class ConsultantTest(APITestCase):
         self.assertEqual(len(res.data['data']), 1)
 
     def test_set_password(self):
+        route = "/api/consultant/set_password/"
         payload = {"consultant_id": self.consultant.first().id, "new_password": "test"}
-        route = f"/api/consultant/set_password/"
         res = self.client.post(route, data=json.dumps(payload), content_type="application/json")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['message'], 'Password Changed Successfully')
@@ -152,10 +147,9 @@ class ConsultantTest(APITestCase):
 
     def test_rate_revision(self):
         payload = {
-            "rate": 60,
             "name": "test_employer",
             "feedback": "test_feedback",
-            "start": "2021-12-12",
+            "rate": 60, "start": "2021-12-12",
             "consultant": self.consultant.first().id
         }
         get_route = f"/api/consultant/{self.consultant.first().id}/rate_revision/"
@@ -195,15 +189,15 @@ class ConsultantTest(APITestCase):
             'payroll_employer': 'consultadd',
             'employer_start_date': "2020-01-01",
         }
-        res = self.client.post(f"/api/consultant/", data=data)
+        res = self.client.post("/api/consultant/", data=data)
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.status_code, 201)
 
     def test_update_consultant(self):
         route = f"/api/consultant/{self.consultant.first().id}/"
         res = self.client.put(route, data={"skills": 'Python', 'skype': "robert_jr"})
-        self.assertEqual(res.data['data']['skills'], 'Python')
         self.assertEqual(res.data['message'], "Consultant Updated")
+        self.assertEqual(res.data['data']['skills'], 'Python')
         self.assertEqual(res.status_code, 202)
 
     def test_documents(self):
@@ -212,19 +206,17 @@ class ConsultantTest(APITestCase):
         self.assertEqual(res.status_code, 200)
 
     def test_consultant_legal_login(self):
+        route = "/api/consultant_petition/login/"
         data = {"email": f"{self.consultant.first().email}", "password": "123456789"}
-        route = f"/api/consultant_petition/login/"
         res = self.client.post(route, data=json.dumps(data), content_type='application/json')
         self.assertEqual(res.status_code, 202)
 
         data = {"email": "consultant@email.com", "password": "123456789"}
-        route = f"/api/consultant_petition/login/"
-        res = self.client.post(route, data=data, content_type='application/json')
-        self.assertEqual(res.status_code, 400)
+        res = self.client.post(route, data=json.dumps(data), content_type='application/json')
+        self.assertEqual(res.status_code, 404)
 
         data = {"email1": "consultant@email.com", "password": "123456789"}
-        route = f"/api/consultant_petition/login/"
-        res = self.client.post(route, data=data, content_type='application/json')
+        res = self.client.post(route, data=json.dumps(data), content_type='application/json')
         self.assertEqual(res.status_code, 400)
 
 

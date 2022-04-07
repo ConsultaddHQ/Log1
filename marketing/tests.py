@@ -3,11 +3,11 @@ from datetime import date, datetime
 from django.contrib.auth.models import ContentType
 from rest_framework.test import APITestCase, APIClient
 
+from project.models import Project
 from activity.models import Activity
 from employee.models import User, Team, Role
-from project.models import Project
 from utils_app.models import Choice, ObjectGroup, Field
-from consultant.factories import Setup as consultant_setup
+from consultant.factories import Setup as ConsultantSetup
 from marketing.models import Submission, Lead, VendorCompany, VendorContact, Test, Interview, Question, ChildQuestion
 
 
@@ -56,7 +56,7 @@ class Setup:
     def create_lead(data):
         content_type = ContentType.objects.get(model='lead')
         position = Choice.objects.create(name="SDE", display_name="Software Developer",
-                                         content_type=content_type, field="position",)
+                                         content_type=content_type, field="position", )
         lead = Lead.objects.create(
             owner=data['user'], status=data.get("status", "Submitted"),
             city=data.get("city", "New York, US"), position=data.get("position", position),
@@ -66,7 +66,7 @@ class Setup:
         return lead
 
     def create_submission(self, data):
-        consultant_marketing = consultant_setup.create_consultant(self)
+        consultant_marketing = ConsultantSetup.create_consultant(self)
         submission = Submission.objects.create(
             created_by=self.user,
             lead_id=data.get("lead"),
@@ -78,7 +78,8 @@ class Setup:
             consultant_marketing=consultant_marketing,
             employer=data.get('employer', "Consultadd"),
         )
-        Project.objects.create(city='New York, US', employer='Consultadd', submission=submission,start_date=date.today(),
+        Project.objects.create(city='New York, US', employer='Consultadd', submission=submission,
+                               start_date=date.today(),
                                consultant=consultant_marketing.consultant)
         return submission
 
@@ -93,12 +94,12 @@ class Setup:
     @staticmethod
     def create_interview(data):
         return Interview.objects.create(
-                supervisor=data.get("user", None), submission=data.get("submission", None),
-                round=data.get("round", 0), feedback=data.get("feedback", "feedback text"),
-                interview_mode=data.get("interview_mode", "skype"), start_time=datetime.now(),
-                tech_stack=data.get("tech_stack", "java, python"), coding_present=data.get("coding", True),
-                status=data.get("status", "Scheduled"), screening_type=data.get('screening_type', 'interview'),
-            )
+            supervisor=data.get("user", None), submission=data.get("submission", None),
+            round=data.get("round", 0), feedback=data.get("feedback", "feedback text"),
+            interview_mode=data.get("interview_mode", "skype"), start_time=datetime.now(),
+            tech_stack=data.get("tech_stack", "java, python"), coding_present=data.get("coding", True),
+            status=data.get("status", "Scheduled"), screening_type=data.get('screening_type', 'interview'),
+        )
 
     @staticmethod
     def create_question(data):
@@ -247,19 +248,14 @@ class LeadTest(APITestCase):
         self.lead.status = "new"
         self.lead.save()
 
-        res = self.client.put(f"/api/lead/archived/", data=json.dumps(data), content_type="application/json")
+        res = self.client.put("/api/lead/archived/", data=json.dumps(data), content_type="application/json")
         self.assertEqual(res.status_code, 202)
         lead = Lead.objects.get(id=self.lead.id)
         self.assertEqual(lead.status, 'archived')
 
-        res = self.client.get(f"/api/lead/archived/")
+        res = self.client.get("/api/lead/archived/")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data["data"][0]["status"], "archived")
-
-    def test_map(self):
-        res = self.client.get(f"/api/lead/map/")
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data["data"][0]["city"], "New York, US")
 
 
 class V2SubmissionTest(APITestCase):
@@ -485,10 +481,9 @@ class InterviewTest(APITestCase):
         }
         res = self.client.get(f"/api/interview/?query={self.interview.id}&filter_json={json.dumps(filter_json)}")
         self.assertEqual(res.status_code, 200)
-        # self.assertEqual(res.data["data"][0]["id"], self.interview.id)
 
 
-class TestViewSet(APITestCase):
+class TestFeedbackViewSet(APITestCase):
     def setUp(self):
         self.setup = Setup()
         self.user = self.setup.user
@@ -535,7 +530,7 @@ class TestViewSet(APITestCase):
                 "category": "basic",
                 "answer_type": "child",
                 "title": "Number of coding questions",
-             },
+            },
             {
                 "child": None,
                 "options": [],
@@ -543,7 +538,7 @@ class TestViewSet(APITestCase):
                 "category": "parent",
                 "title": "Question 1",
                 "answer_type": "headline",
-             }
+            }
         ]
         for data in payload:
             self.setup.create_question(data)
