@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from marketing.models import *
 from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
@@ -7,8 +8,6 @@ from activity.serializers import CommentGetSerializer
 from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
-from marketing.models import Lead, Test, Submission, Interview, VendorCompany, VendorLayer, VendorContact, Answer, \
-    Question
 
 
 class VendorCompanySerializer(serializers.ModelSerializer):
@@ -93,16 +92,16 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class SubmissionSerializer(serializers.ModelSerializer):
-    vendor_contact = serializers.SerializerMethodField()
-    attachments = serializers.SerializerMethodField()
-    interviews = serializers.SerializerMethodField()
-    marketer_name = serializers.SerializerMethodField()
-    marketer_id = serializers.SerializerMethodField()
+    lead = LeadSerializer(read_only=True)
+    test = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
-    project = serializers.SerializerMethodField()
-    test = serializers.SerializerMethodField()
-    lead = LeadSerializer(read_only=True)
+    interviews = serializers.SerializerMethodField()
+    marketer_id = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
+    vendor_contact = serializers.SerializerMethodField()
 
     class Meta:
         model = Submission
@@ -110,22 +109,6 @@ class SubmissionSerializer(serializers.ModelSerializer):
                   'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'education', 'linkedin', 'other_link',
                   'current_city', 'attachments', 'interviews', 'test', 'project', 'comments', 'marketer_name',
                   'marketer_id', 'consultant', 'is_complete')
-
-    @staticmethod
-    def get_marketer_name(obj):
-        return obj.created_by.employee_name
-
-    @staticmethod
-    def get_marketer_id(obj):
-        return obj.created_by.id
-
-    @staticmethod
-    def get_consultant(obj):
-        return ConsultantSerializer(obj.consultant).data
-
-    @staticmethod
-    def get_comments(obj):
-        return CommentGetSerializer(obj.comments.filter(parent_comment=None), many=True).data
 
     @staticmethod
     def get_attachments(obj):
@@ -136,18 +119,34 @@ class SubmissionSerializer(serializers.ModelSerializer):
         return None
 
     @staticmethod
+    def get_marketer_id(obj):
+        return obj.created_by.id
+
+    @staticmethod
+    def get_marketer_name(obj):
+        return obj.created_by.employee_name
+
+    @staticmethod
     def get_project(obj):
         if hasattr(obj, 'project'):
             return ProjectSerializer(obj.project).data
         return None
 
     @staticmethod
-    def get_interviews(obj):
-        return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
+    def get_consultant(obj):
+        return ConsultantSerializer(obj.consultant).data
 
     @staticmethod
     def get_test(obj):
         return TestCreateSerializer(obj.test.all().order_by('created'), many=True).data
+
+    @staticmethod
+    def get_interviews(obj):
+        return InterviewGetSerializer(obj.screening.all().order_by('round'), many=True).data
+
+    @staticmethod
+    def get_comments(obj):
+        return CommentGetSerializer(obj.comments.filter(parent_comment=None), many=True).data
 
 
 class VendorLayerSerializer(serializers.ModelSerializer):
@@ -255,18 +254,21 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
 
 class TestListSerializer(serializers.ModelSerializer):
-    assigned_to = serializers.SerializerMethodField()
     client = serializers.SerializerMethodField()
-    marketer_id = serializers.SerializerMethodField()
     job_title = serializers.SerializerMethodField()
+    marketer_id = serializers.SerializerMethodField()
+    assigned_to = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
+    submitted_by = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
+    engineer_associated = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
-        fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id',
-                  'consultant_name', 'client', 'job_title', 'skills', 'created', 'modified', 'assigned_to')
+        fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id', 'client',
+                  'consultant_name', 'submitted_by', 'job_title', 'skills', 'created', 'modified', 'assigned_to',
+                  'engineer_associated')
 
     @staticmethod
     def get_client(obj):
@@ -279,6 +281,12 @@ class TestListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_job_title(obj):
         return obj.submission.lead.job_title
+
+    @staticmethod
+    def get_submitted_by(obj):
+        if obj.submitted_by:
+            return obj.submitted_by.employee_name
+        return None
 
     @staticmethod
     def get_company_name(obj):
@@ -295,6 +303,10 @@ class TestListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_consultant_name(obj):
         return obj.submission.consultant_marketing.consultant.name
+
+    @staticmethod
+    def get_engineer_associated(obj):
+        return obj.engineer.all().values('id', 'employee_name')
 
 
 class TestCreateSerializer(serializers.ModelSerializer):
@@ -394,6 +406,7 @@ class SubmissionConProfile(serializers.ModelSerializer):
             "visa_start": submission.visa_start,
             "current_city": submission.current_city,
             "date_of_birth": submission.date_of_birth,
+            "marketer": submission.created_by.employee_name,
         }
 
 
@@ -428,30 +441,56 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         return True
 
 
-class AnswerSerializer(serializers.ModelSerializer):
-    question = serializers.SerializerMethodField()
-    submitted_by = serializers.SerializerMethodField()
+class QuestionAnswerSerializer(serializers.ModelSerializer):
+    question_answer = serializers.SerializerMethodField()
 
     class Meta:
         model = Answer
-        fields = ('id', 'question', 'value', 'submitted_by', 'created', 'object_id')
+        fields = ('question_answer',)
 
     @staticmethod
-    def get_submitted_by(obj):
-        return obj.submitted_by.employee_name
-
-    @staticmethod
-    def get_question(obj):
-        return obj.question.name
+    def get_question_answer(obj):
+        if ": " in obj.answer and obj.question.answer_type in ["yes_attachment", "no_attachment", "yes_remark",
+                                                               "no_remark"]:
+            answer = obj.answer.split(": ")
+        else:
+            answer = [obj.answer, None]
+        data = {
+            "child": [],
+            "answer": answer[0],
+            "remark": answer[1],
+            "answer_id": obj.id,
+            "ques_id": obj.question.id,
+            "ques_title": obj.question.title,
+            "ques_category": obj.question.category,
+            "answer_type": obj.question.answer_type,
+            "attachment": AttachmentGetSerializer(
+                obj.attachment.filter(attachment_type='test_feedback', content_type__model='answer'), many=True
+            ).data,
+        }
+        if obj.question.category == 'parent_child':
+            for question in obj.question.child_question.first().child_question.filter().order_by('position'):
+                child_ques_answers = Answer.objects.filter(
+                    object_id=obj.object_id, parent_question=question
+                ).order_by('question__position')
+                if child_ques_answers:
+                    child_data = {
+                        "ques_id": question.id, "ques_title": question.title, "child": [],
+                        "ques_category": question.category, "answer_type": question.answer_type,
+                    }
+                    for question_answer in child_ques_answers:
+                        child_data['child'].append(QuestionAnswerSerializer(question_answer).data)
+                    data["child"].append(child_data)
+        return data
 
 
 class TestGetSerializer(serializers.ModelSerializer):
     engineers = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     attachments = AttachmentGetSerializer(many=True)
-    engineer_feedback = AnswerSerializer(many=True)
     assigned_to = serializers.SerializerMethodField()
     submitted_by = serializers.SerializerMethodField()
+    engineer_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Test
@@ -484,6 +523,11 @@ class TestGetSerializer(serializers.ModelSerializer):
         if user == obj.marketer:
             update = True
         return {'update': update}
+
+    @staticmethod
+    def get_engineer_feedback(obj):
+        answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by("question__position")
+        return QuestionAnswerSerializer(answers, many=True).data
 
 
 class SubmissionSupportSerializer(serializers.ModelSerializer):
@@ -547,21 +591,37 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.ModelSerializer):
-    title = serializers.SerializerMethodField()
-    values = serializers.SerializerMethodField()
+    dependent = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
-        fields = ('id', 'title', 'values', 'field', 'answer_type', 'options', 'category', 'position')
+        fields = ("id", "title", "category", "answer_type", "position", "is_required", "options", "dependent")
 
     @staticmethod
-    def get_values(obj):
-        if obj.answer_type == 'boolean':
-            return False
-        elif obj.answer_type == 'attachment':
-            return []
+    def get_dependent(obj):
+        if obj.child_question.first() and obj.answer_type in ['yes_question', 'no_question']:
+            return QuestionSerializer(obj.child_question.first().child_question.all(), many=True).data
+        return None
+
+
+class ParentQuestionSerializer(serializers.ModelSerializer):
+    child = serializers.SerializerMethodField()
+    dependent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Question
+        fields = ("id", "title", "category", "answer_type", "position", "is_required", "options", "child", "dependent")
+
+    @staticmethod
+    def get_child(obj):
+        if obj.child_question.first():
+            return QuestionSerializer(
+                obj.child_question.first().child_question.filter().order_by('position'), many=True
+            ).data
         return None
 
     @staticmethod
-    def get_title(obj):
-        return obj.value
+    def get_dependent(obj):
+        if obj.child_question.first() and obj.answer_type in ['yes_question', 'no_question']:
+            return QuestionSerializer(obj.child_question.first().child_question.all(), many=True).data
+        return None

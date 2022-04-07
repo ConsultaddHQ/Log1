@@ -8,17 +8,13 @@ from notification.utils import create_notification, push_notification
 
 def tag_and_notify(update, tags, user, tag_type='create'):
     user_list = []
-
     if not tags:
         return None
 
     if tag_type == 'create':
         content_type = ContentType.objects.get(model='projectupdate')
-        tag_obj = Tagging.objects.create(
-            content_type=content_type,
-            object_id=update.id,
-        )
-        for tag in tags.split(','):
+        tag_obj = Tagging.objects.create(content_type=content_type, object_id=update.id)
+        for tag in tags.strip().split(','):
             if tag:
                 user = get_object_or_404(User, id=int(tag))
                 user_list.append(user)

@@ -4,8 +4,9 @@ from rest_framework import serializers
 
 from employee.models import User
 from attachment.models import Attachment
+from marketing.models import Test, Interview
 from attachment.serializers import AttachmentGetSerializer
-from project.models import Project, SupportStatus, TimeSheet
+from project.models import Project, SupportStatus, TimeSheet, ProjectSupport
 from engineering.models import ProjectDescription, ProjectUpdate, TrainingCheckList, TrainingAgenda
 
 
@@ -288,3 +289,168 @@ class TrainingCheckListSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainingCheckList
         fields = '__all__'
+
+
+class EngineerProjectSerializer(serializers.ModelSerializer):
+    project = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    modified_at = serializers.SerializerMethodField()
+    support_status = serializers.SerializerMethodField()
+    support_duration = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSupport
+        fields = ('id', 'created', 'start', 'end', 'feedback', 'support_status', 'consultant', 'project', 'description',
+                  'support_duration', 'modified_at')
+
+    @staticmethod
+    def get_support_status(obj):
+        status = obj.statuses.filter(is_current=True).first()
+        if obj.project.start_date and obj.project.start_date > date.today():
+            return 'Training'
+        elif status:
+            if status.frequency == 'more_than_2_days':
+                return 'Active'
+            elif status.frequency == 'less_than_3_days':
+                return 'Less_Active'
+            elif status.frequency in ('twice_a_month', 'independent'):
+                return 'Independent'
+        else:
+            return None
+
+    @staticmethod
+    def get_project(obj):
+        project = obj.project
+        return {
+            "id": project.id,
+            "status": project.status,
+            "end_date": project.end_date,
+            "feedback": project.feedback,
+            "is_remote": project.is_remote,
+            "start_date": project.start_date,
+            "client": project.submission.client
+        }
+
+    @staticmethod
+    def get_description(obj):
+        if hasattr(obj.project, 'description'):
+            return {
+                "timezone": obj.project.description.timezone,
+                "technology": obj.project.description.technology
+            }
+        return None
+
+    @staticmethod
+    def get_modified_at(obj):
+        update = obj.project.updates.all().order_by('-created').first()
+        if update:
+            return {
+                "id": update.id,
+                "date": update.created.date()
+            }
+        return None
+
+    @staticmethod
+    def get_consultant(obj):
+        consultant = obj.project.consultant
+        return {
+            "id": consultant.id,
+            'name': consultant.name,
+            'email': consultant.email,
+            'contact': consultant.phone_no
+        }
+
+    @staticmethod
+    def get_support_duration(obj):
+        if obj.end:
+            duration = obj.end - obj.start
+        else:
+            duration = date.today() - obj.start
+        months = int(duration.days) // 30
+        weeks = round(int(duration.days - months * 30) // 7, 0)
+        return months + weeks / 10
+
+
+class EngineerReportSerializer(serializers.ModelSerializer):
+    project = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'project')
+
+    @staticmethod
+    def get_project(obj):
+        projects = obj.projects.filter(
+            statuses__is_current=True, project__start_date__lte=date.today(),
+            statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
+        ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+        data = {
+            "bandwidth": len(projects),
+            "data": EngineerProjectSerializer(projects, many=True).data
+        }
+        return data
+
+
+class EngineerTestSerializer(serializers.ModelSerializer):
+    consultant = serializers.SerializerMethodField()
+    submission = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Test
+        fields = ('id', 'status', 'deadline', 'skills', 'consultant', 'submission')
+
+    @staticmethod
+    def get_consultant(obj):
+        consultant = obj.submission.consultant
+        return {
+            "id": consultant.id,
+            "name": consultant.name,
+            "email": consultant.email,
+        }
+
+    @staticmethod
+    def get_submission(obj):
+        submission = obj.submission
+        return {
+            "id": submission.id,
+            "client": submission.client,
+            "job_title": submission.lead.job_title,
+            "marketer_name": submission.created_by.employee_name,
+            "vendor_company": submission.lead.vendor_company.name,
+        }
+
+
+class EngineerInterviewSerializer(serializers.ModelSerializer):
+    supervisor = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+    submission = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Interview
+        fields = ('id', 'status', 'round', 'consultant', 'start_time', 'supervisor', 'submission')
+
+    @staticmethod
+    def get_supervisor(obj):
+        return obj.supervisor.employee_name
+
+    @staticmethod
+    def get_consultant(obj):
+        consultant = obj.submission.consultant
+        data = {
+            "id": consultant.id,
+            "name": consultant.name,
+            "email": consultant.email,
+        }
+        return data
+
+    @staticmethod
+    def get_submission(obj):
+        submission = obj.submission
+        return {
+            "id": submission.id,
+            "client": submission.client,
+            "job_title": submission.lead.job_title,
+            "marketer_name": submission.created_by.employee_name,
+            "vendor_company": submission.lead.vendor_company.name,
+        }

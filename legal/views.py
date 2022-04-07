@@ -92,6 +92,7 @@ class PetitionViewSets(ModelViewSet):
                         "id": consultant.id,
                         "name": consultant.name,
                         "email": consultant.email,
+                        "is_active": consultant.is_active
                     },
                     'id': petition.id,
                     'status': petition.status,
@@ -233,7 +234,7 @@ class PetitionViewSets(ModelViewSet):
     @action(methods=['get'], detail=False, url_path='employer')
     def employer(self, request):
         try:
-            data = ['Consultadd', 'NetResolute', 'Pythonwise', 'Zioqu']
+            data = ['Consultadd', 'NetResolute', 'Pythonwise', 'Zioqu', 'Boto3']
             return Response({"result": data}, status=200)
         except Exception as error:
             write_exception(error, request)

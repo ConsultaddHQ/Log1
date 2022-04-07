@@ -330,7 +330,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     rate = serializers.ReadOnlyField()
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
-    relation = serializers.SerializerMethodField()
+    retention = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
     education = serializers.SerializerMethodField()
@@ -342,7 +342,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'relation', 'rate',
+                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'retention', 'rate',
                   'support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer')
 
     @staticmethod
@@ -396,8 +396,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         return None
 
     @staticmethod
-    def get_relation(obj):
-        queryset = obj.pocs.filter(end=None, poc_type='relation')
+    def get_retention(obj):
+        queryset = obj.pocs.filter(end=None, poc_type='retention')
         if queryset:
             poc = queryset.first().poc
             data = {

@@ -1,5 +1,3 @@
-from django.shortcuts import get_object_or_404
-
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -22,7 +20,9 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     def create(self, request, *args, **kwargs):
         try:
             user_id = request.data.get('id')
-            get_object_or_404(User, id=user_id)
+            if not User.objects.filter(id=user_id).exists():
+                return Response({"message": "User does not exist"}, status=404)
+
             if request.user.is_superuser:
                 token, created = Token.objects.get_or_create(user_id=user_id)
                 return Response({"data": {"token": token.key}, "message": "User is impersonated"}, status=201)

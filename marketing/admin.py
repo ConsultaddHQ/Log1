@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
-    Test, Answer, Question
+    Test, Answer, Question, ChildQuestion
 
 
 @admin.register(VendorCompany)
@@ -115,14 +115,22 @@ class TestAdmin(ExportActionModelAdmin):
 @admin.register(Question)
 class QuestionsAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
-    list_filter = ('answer_type', 'category')
-    search_fields = ('id', 'value')
-    list_display = ('id', 'value', 'field', 'answer_type', 'options', 'category', 'position')
+    search_fields = ('id', 'title')
+    list_filter = ('answer_type', 'category', 'form_name', 'is_active')
+    list_display = ('id', 'title', 'form_name', 'answer_type', 'options', 'category', 'position', 'is_active',
+                    'is_required')
+
+
+@admin.register(ChildQuestion)
+class ChildQuestionAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_display = ('id', 'parent_question')
+    search_fields = ('id', 'parent_question_title')
 
 
 @admin.register(Answer)
 class AnswerAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv']
     list_filter = ('object_id', 'content_type')
-    search_fields = ('id', 'question__value', 'submitted_by__employee_name')
-    list_display = ('id', 'submitted_by', 'question', 'value', 'object_id', 'content_type', 'created', 'modified')
+    search_fields = ('id', 'question__title', 'submitted_by__employee_name')
+    list_display = ('id', 'answer', 'submitted_by', 'question', 'object_id', 'content_type', 'parent_question')

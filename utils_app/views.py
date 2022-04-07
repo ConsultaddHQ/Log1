@@ -1,3 +1,4 @@
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
@@ -8,8 +9,11 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 from django.contrib.contenttypes.models import ContentType
 
 from utils_app.models import City, Choice
-from utils_app.serializers import UtilSerializer
 from log1.utils import write_exception, ERROR_MSG
+
+
+class UtilSerializer(serializers.Serializer):
+    name = serializers.CharField()
 
 
 # Route - /city/
@@ -23,7 +27,7 @@ class CityViewSet(ListModelMixin, GenericViewSet):
         try:
             query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
             city = City.objects.filter(name__istartswith=query)
-            data = city[:40].values('id', 'name', 'state')
+            data = city[:10].values('id', 'name', 'state', 'country')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)

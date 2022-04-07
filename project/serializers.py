@@ -1,3 +1,4 @@
+import os
 from datetime import date
 from django.db.models import Q
 from rest_framework import serializers
@@ -7,7 +8,8 @@ from employee.serializers import UserSerializer
 from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
-from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule
+from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
+    ProjectStatus
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -74,8 +76,30 @@ class PayrollScheduleSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class ProjectTimeSheetSerializer(serializers.ModelSerializer):
+    client = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = ('id', 'client', 'start_date', 'employer', 'status')
+
+    @staticmethod
+    def get_status(obj):
+        try:
+            status = ProjectStatus.objects.get(project=obj, is_current=True)
+            return status.status
+        except ProjectStatus.DoesNotExist:
+            return None
+
+    @staticmethod
+    def get_client(obj):
+        if obj.statuses.filter(is_current=True).first().status == 'joined':
+            return obj.submission.client + ' (Active)'
+        return obj.submission.client
+
+
 class TimeSheetSerializer(serializers.ModelSerializer):
-    attachments = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
     end = serializers.SerializerMethodField()
@@ -83,7 +107,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
     class Meta:
         model = TimeSheet
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
-                  'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
+                  'status_updated_by', 'modified', 'remark', 'project', 'con_comment')
 
     @staticmethod
     def get_start(obj):
@@ -92,10 +116,6 @@ class TimeSheetSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_end(obj):
         return obj.end.strftime("%m/%d/%Y")
-
-    @staticmethod
-    def get_attachments(obj):
-        return AttachmentSerializer(obj.attachments.all(), many=True).data
 
     @staticmethod
     def get_project(obj):
@@ -129,7 +149,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachments(obj):
-        return AttachmentURLSerializer(obj.attachments.all(), many=True).data
+        return AttachmentURLSerializer(obj.attachments.filter(is_active=True), many=True).data
 
     @staticmethod
     def get_project(obj):
@@ -172,7 +192,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_ts_status(obj):
         queryset = TimeSheet.objects.filter(project__consultant=obj)
-        submitted_ts = True if queryset.filter(status='submitted') else False
+        submitted_ts = True if queryset.filter(status__in=['submitted', 'updated']) else False
         rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
         return {'submitted': submitted_ts, 'rejected': rejected_ts}
 

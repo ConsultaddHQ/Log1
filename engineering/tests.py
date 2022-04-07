@@ -1,10 +1,12 @@
 from unittest.mock import MagicMock
 from datetime import date, timedelta
+from django.shortcuts import get_object_or_404
 from rest_framework.test import APITestCase, APIClient
 
 from activity.views import create_activity
 from attachment.models import Attachment
 from employee.models import User, Team, Role
+from marketing.tests import Setup as MarketingSetup
 from consultant.models import Consultant, ConsultantMarketing
 from engineering.models import ProjectUpdate, ProjectDescription, TrainingAgenda, TrainingCheckList
 from marketing.models import Submission, Lead, VendorCompany, VendorContact
@@ -21,6 +23,7 @@ class Setup:
             username=1000,
             team=self.team,
             employee_id=1000,
+            technology=['Python'],
             password='consultadd',
             email='admin@log1.com',
             employee_name='Admin Demo',
@@ -127,11 +130,12 @@ class Setup:
     def project_update(self, project_id):
         project = Project.objects.get(id=project_id)
         return ProjectUpdate.objects.create(
+            project=project,
+            start="2021-09-09",
             update_by=self.user,
             update="test update",
             blocker="test blocker",
-            project=project,
-            start="2021-09-09"
+            blocker_resolved=False,
         )
 
     def project_description(self, project_id):
@@ -186,10 +190,10 @@ class EngineeringViewSetTest(APITestCase):
         self.client.force_authenticate(user=self.setup.user)
 
     def test_list_engineering_projects(self):
-        route = f"/api/engineering/?query=vendor_company_name2"
+        route = f"/api/engineering/?query=con"
         res = self.client.get(route)
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.data['data'][0]['submission']['vendor'], 'vendor_company_name2')
+        self.assertEqual(res.data['data'][0]['consultant']['name'], 'consultant name')
 
         route = "/api/engineering/?filter_json={%22project_status%22:%22new%22}"
         res = self.client.get(route)
@@ -330,6 +334,13 @@ class ProjectUpdateViewSetTest(APITestCase):
         self.assertEqual(res.status_code, 202)
         self.assertNotEqual(len(res.data['message']), "Document removed")
 
+    def test_blocker(self):
+        route = f"/api/project/{self.setup.project_ids[0]}/updates/{self.project_update.id}/blocker/"
+        res = self.client.put(route, data={'blocker_resolved': True, "blocker_solution": "blocker solution content"})
+        self.assertEqual(res.status_code, 202)
+        update = get_object_or_404(ProjectUpdate, id=self.project_update.id)
+        self.assertEqual(update.blocker_solution, "blocker solution content")
+
 
 class ProjectSummaryViewSetTest(APITestCase):
     def setUp(self):
@@ -459,3 +470,127 @@ class TrainingCheckListTest(APITestCase):
         res = self.client.put(route, data={"remark": "remark content",})
         self.assertEqual(res.status_code, 202)
         self.assertEqual(res.data['message'], "Checklist updated")
+
+
+class EngineeringReportTest(APITestCase):
+    def setUp(self):
+        self.setup = Setup()
+        self.setup.projects_setup(3)
+
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.setup.user)
+
+    def test_list(self):
+        res = self.client.get("/api/engineer_report/?query=ad")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['employee_id'], 1000)
+
+        res = self.client.get("/api/engineer_report/?query=client&category=client")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['employee_id'], 1000)
+
+        res = self.client.get("/api/engineer_report/?query=ven&category=vendor_name")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['employee_id'], 1000)
+
+        res = self.client.get("/api/engineer_report/?query=ad&category=support_name")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['employee_id'], 1000)
+
+        res = self.client.get("/api/engineer_report/?query=consultant&category=consultant_name")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['employee_id'], 1000)
+
+    def test_project_tab(self):
+        res = self.client.get(f"/api/engineer_report/{self.setup.user.id}/project/?status=active&"
+                              "category=consultant_name&query=con")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
+
+        res = self.client.get(f"/api/engineer_report/{self.setup.user.id}/project/?category=client&query=cli")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
+
+        res = self.client.get(f"/api/engineer_report/{self.setup.user.id}/project/?query=con")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
+
+    def test_terminated_tab(self):
+        res = self.client.get(f"/api/engineer_report/{self.setup.user.id}/terminated/?status=active&"
+                              "category=consultant_name&query=con")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
+
+    def test_test_tab(self):
+        user = self.setup.user
+        project = Project.objects.filter(statuses__is_current=True, statuses__status='new')
+        test = MarketingSetup.create_test({"user": user, "submission": project.first().submission})
+        test.engineer.add(user)
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/test/?category=consultant_name&query=con")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/test/?category=client&query=cli")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['submission']['client'], "client2")
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/test/?category=vendor_name&query=ven")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['submission']['vendor_company'], "vendor_company_name2")
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/test/?query=con")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['submission']['vendor_company'], "vendor_company_name2")
+
+    def test_interview_tab(self):
+        user = self.setup.user
+        project = Project.objects.filter(statuses__is_current=True, statuses__status='new')
+        interview = MarketingSetup.create_interview({"user": user, "submission": project.first().submission})
+        interview.guest.add(user)
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/interview/?category=consultant_name&query=con")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/interview/?category=client&query=cli&type=guest")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['submission']['client'], "client2")
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/interview/?category=vendor_name&query=ven&type=ctb")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['submission']['vendor_company'], "vendor_company_name2")
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/interview/?query=con")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'][0]['consultant']['name'], "consultant name")
+
+    def test_report_summary(self):
+        user = self.setup.user
+        project = Project.objects.filter(statuses__is_current=True, statuses__status='new')
+        interview = MarketingSetup.create_interview({"user": user, "submission": project.first().submission})
+        interview.guest.add(user)
+        test = MarketingSetup.create_test({"user": user, "submission": project.first().submission})
+        test.engineer.add(user)
+        ProjectUpdate.objects.create(project=project.first(), update_by=self.setup.user, type='project')
+        ProjectDescription.objects.create(project=project.first(), technology='python')
+
+        res = self.client.get(f"/api/engineer_report/{user.id}/summary/?filter_by=this_quarter")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data']['test']['total'], 1)
+        self.assertEqual(res.data['data']['project']['total'], 2)
+        self.assertEqual(res.data['data']['technology']['total'], 1)
+        self.assertEqual(res.data['data']['guest_interview']['total'], 1)
+        self.assertEqual(res.data['data']['supervisor_interview']['total'], 1)
+
+    def test_category(self):
+        data = [
+            {'name': 'client', 'display_name': 'Client Name'},
+            {'name': 'vendor_name', 'display_name': 'Vendor Name'},
+            {'name': 'support_name', 'display_name': 'Support Name'},
+            {'name': 'consultant_name', 'display_name': 'Consultant Name'},
+        ]
+
+        res = self.client.get(f"/api/engineer_report/category/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['data'], data)

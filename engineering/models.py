@@ -11,13 +11,15 @@ from project.models import Project, ProjectSupport
 
 class ProjectDescription(TimeStampedModel):
     attachments = GenericRelation(Attachment)
-    notes = models.TextField(_('Notes'), null=True)
-    remark = models.TextField(_('Remark'), null=True)
-    description = models.TextField(_('Description'), null=True)
+    notes = models.TextField(_('Notes'), null=True, blank=True)
+    remark = models.TextField(_('Remark'), null=True, blank=True)
     resource = models.TextField(_('Resource'), blank=True, null=True)
-    technology = models.CharField(_('Technology'), max_length=500, null=True)
+    description = models.TextField(_('Description'), null=True, blank=True)
+    timezone = models.CharField(_('Timezone'), max_length=100, null=True, blank=True)
     update_by = models.ForeignKey(User, on_delete=models.CASCADE, blank=True, null=True)
+    technology = models.CharField(_('Technology'), max_length=500, null=True, blank=True)
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='description')
+    daily_support_hour = models.CharField(_('Daily Support Hour'), max_length=30, null=True, blank=True)
     consultant_preferred_time = models.CharField(_('Preferred Time'), max_length=30, null=True, blank=True)
 
     def save(self, *args, **kwargs):
@@ -37,8 +39,8 @@ class ProjectUpdate(TimeStampedModel):
     )
     tagged_user = GenericRelation(Tagging)
     attachments = GenericRelation(Attachment)
-    end = models.DateField(_('End'), null=True)
-    start = models.DateField(_('Start'), null=True)
+    end = models.DateField(_('End'), null=True, blank=True)
+    start = models.DateField(_('Start'), null=True, blank=True)
     update_by = models.ForeignKey(User, on_delete=models.CASCADE)
     update = models.TextField(_('Update'), null=True, blank=True)
     blocker = models.TextField(_('Blocker'), null=True, blank=True)

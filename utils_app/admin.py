@@ -25,10 +25,10 @@ class ExportCsvMixin:
 
 @admin.register(City)
 class CityAdmin(ExportActionModelAdmin):
-    list_filter = ('state',)
     actions = ["export_as_csv"]
     search_fields = ('name', 'state')
-    list_display = ('id', 'name', 'state')
+    list_filter = ('state', 'country')
+    list_display = ('id', 'name', 'state', 'country')
 
 
 @admin.register(ScrumMeeting)

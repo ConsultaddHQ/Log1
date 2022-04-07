@@ -1,3 +1,4 @@
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -8,12 +9,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
-from api_key.models import APIKey
 from log1.utils import write_exception
 from utils_app.mailing import send_email
 from utils_app.models import TimeStampedModel
 from employee.token import get_token_generator
-
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
@@ -21,13 +20,15 @@ TOKEN_GENERATOR_CLASS = get_token_generator()
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
-    def create_user(self, employee_id, email, name, team=None, gender=None, phone=None, password=None):
+    def create_user(self, employee_id, email, name, team=None, gender=None, phone=None, password=None, roles=[]):
         """
             Create and save a user with the given Employee_id, email, name, and password.
         """
         if not email:
             raise ValueError('Users must have an email address')
         email = self.normalize_email(email)
+        if isinstance(team, str):
+            team = get_object_or_404(Team, team)
         user = self.model(
             team=team,
             email=email,
@@ -37,6 +38,10 @@ class UserManager(BaseUserManager):
             username=int(employee_id),
             employee_id=int(employee_id),
         )
+
+        for role in roles:
+            r = Role.objects.get(name=role)
+            user.role.add(r)
 
         user.set_password(password)
         user.is_active = True
@@ -96,6 +101,7 @@ class User(AbstractUser, PermissionsMixin):
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name='employees', null=True, blank=True)
+    technology = ArrayField(models.CharField(_('Technologies'), max_length=30, blank=True), blank=True, null=True)
 
     objects = UserManager()
 
@@ -181,12 +187,12 @@ class Asset(TimeStampedModel):
     username = models.CharField(_('Username'), max_length=50)
     provider = models.CharField(_('Provider'), max_length=30)
     password = models.CharField(_('Password'), max_length=50)
-    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
     is_deleted = models.BooleanField(_('Is Deleted'), default=False)
-    alter_email = models.EmailField(_('Alternate Email'), max_length=50, null=True, blank=True)
+    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
     number = models.CharField(_('Number'), max_length=50, null=True, blank=True)
     tech = models.CharField(_('Technology'), max_length=40, null=True, blank=True)
     remarks = models.CharField(_('Remarks'), max_length=300, null=True, blank=True)
+    alter_email = models.EmailField(_('Alternate Email'), max_length=50, null=True, blank=True)
     alter_number = models.CharField(_('Alternate Number'), max_length=40, null=True, blank=True)
     asset_type = models.CharField(_('Asset Type'), choices=ASSET_TYPES, max_length=20, null=True, blank=True)
     owner = models.ForeignKey(
