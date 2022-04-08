@@ -1801,9 +1801,12 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
         try:
-            email = request.data.get('email').lower()
+            email = request.data.get('email', None)
             if email:
-                consultant = get_object_or_404(Consultant, email=email)
+                consultant = Consultant.objects.filter(email=email.lower())
+                if not consultant:
+                    return Response({"error": "User not found"}, status=404)
+                consultant = consultant.first()
             else:
                 return Response({"error": "Email is Empty"}, status=400)
             consultant = Consultant.objects.filter(email=consultant.email, pin=request.data.get('password').strip())

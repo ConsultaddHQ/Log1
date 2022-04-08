@@ -17,6 +17,7 @@ class TimeStampedModel(models.Model):
 class City(models.Model):
     name = models.CharField(_('City Name'), max_length=35)
     state = models.CharField(_('State'), max_length=20, blank=True, null=True)
+    country = models.CharField(_('Country'), max_length=20, blank=True, null=True)
 
     def __str__(self):
         return self.name

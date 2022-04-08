@@ -745,7 +745,7 @@ def pre_joining_feedback_notification(feedback, request):
             "sections": [
                 {
                     "activityTitle": f"{project.consultant.name} :: {title} :: {project.submission.client}",
-                    "activitySubtitle": f"***Pre joining feedback by {request.user.name}***",
+                    "activitySubtitle": f"***Pre joining feedback by {request.user.employee_name}***",
                     "activityText": feedback.description,
                     "activityImage": profile_path,
                     "markdown": True
