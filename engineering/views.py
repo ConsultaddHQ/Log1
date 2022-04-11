@@ -847,7 +847,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 elif category == 'vendor_name':
                     queryset = queryset.filter(project__submission__lead__vendor_company__name__istartswith=query)
             else:
-                queryset = queryset.filter(project__consultant__name__istartswith=query)
+                queryset = queryset.filter(
+                    Q(project__consultant__name__istartswith=query) |
+                    Q(project__submission__client__istartswith=query) |
+                    Q(project__submission__lead__vendor_company__name__istartswith=query)
+                )
         return queryset
 
     def list(self, request, *args, **kwargs):
@@ -875,10 +879,18 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             projects__project__submission__lead__vendor_company__name__istartswith=query
                         )
                 else:
-                    engineer = engineer.filter(employee_name__istartswith=query)
+                    engineer = engineer.filter(
+                        Q(employee_name__istartswith=query) |
+                        Q(projects__project__consultant__name__istartswith=query) |
+                        Q(projects__project__submission__client__istartswith=query) |
+                        Q(projects__project__submission__lead__vendor_company__name__istartswith=query)
+                    )
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = self.project_filter_counts(projects)
+            total = counts['support_status']['total']['count']
+            independent = counts['support_status']['independent']['count']
+            counts['support_status']['total']['count'] = total - independent
 
             serializer = EngineerReportSerializer(engineer[first: last], many=True)
             return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
@@ -928,7 +940,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     elif category == 'vendor_name':
                         test = test.filter(submission__lead__vendor_company__name__istartswith=query)
                 else:
-                    test = test.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+                    test = test.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith = query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
 
             serializer = EngineerTestSerializer(test[first: last], many=True)
             return Response({"data": serializer.data, "count": test.count()}, status=200)
@@ -964,7 +980,11 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     elif category == 'vendor_name':
                         interview = interview.filter(submission__lead__vendor_company__name__istartswith=query)
                 else:
-                    interview = interview.filter(submission__consultant_marketing__consultant__name__istartswith=query)
+                    interview = interview.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
 
             serializer = EngineerInterviewSerializer(interview[first: last], many=True)
             return Response({"data": serializer.data, "count": interview.count()}, status=200)

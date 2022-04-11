@@ -100,9 +100,9 @@ class EngineeringSerializer(serializers.ModelSerializer):
             qs = support_qs.first().statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date and obj.start_date >= date.today():
+                if obj.start_date and obj.start_date >= date.today() and support_status.frequency == 'more_than_2_days':
                     return "Training"
-                elif support_status.frequency == 'more_than_2_days':
+                elif support_status.frequency == 'more_than_2_days' and obj.start_date <= date.today():
                     return "Active"
                 elif support_status.frequency == 'less_than_3_days':
                     return "Less Active"
@@ -382,8 +382,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_project(obj):
         projects = obj.projects.filter(
-            statuses__is_current=True, project__start_date__lte=date.today(),
-            statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
+            statuses__is_current=True, statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
         ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
         data = {
             "bandwidth": len(projects),
