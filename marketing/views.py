@@ -2065,10 +2065,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
                 else:
                     engineer = 'NA'
-                test_docs = test.attachments.filter(attachment_type='test_submit')
-                for doc in test_docs:
-                    response, error = download_s3_object(doc.attachment_file.name)
-                    path.append(response)
+                for answer in data:
+                    if answer['answer'] == 'submitted':
+                        ans = Answer.objects.get(id=answer['id'])
+                        test_docs = ans.attachments.filter(attachment_type='test_feedback')
+                        for doc in test_docs:
+                            response, error = download_s3_object(doc.attachment_file.name)
+                            path.append(response)
+
                 to = [created_by.email]
                 title = f"Test Completed"
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
@@ -2081,6 +2085,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'title': title, 'engineer': engineer,
                         'remarks': data['remarks'] if data['remarks'] else 'NA',
                         'details': data,
+                        'remarks': test.engineer_remarks
                     },
                 }
                 res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
@@ -2553,6 +2558,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             ques_answers = Answer.objects.filter(object_id=test.id).reverse()
             for ques_answer in ques_answers:
                 data.append({
+                    "id": ques_answer.id,
                     "answer": ques_answer.answer,
                     "question": ques_answer.question.title,
                     "parent_question": ques_answer.parent_question.title if ques_answer.parent_question else None
