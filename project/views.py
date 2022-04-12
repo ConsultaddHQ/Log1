@@ -909,6 +909,36 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['put'], detail=True, url_path="details")
+    def details(self, request, project_id, pk):
+        try:
+            msg = {}
+            data = request.data
+            support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
+            prev_support = support.statuses.filter(is_current=True).first()
+
+            if prev_support and prev_support.frequency != data['status']:
+                prev_support.is_current = False
+                prev_support.save()
+                SupportStatus.objects.create(
+                    change_date=data.get('change_date', date.today()),
+                    is_current=True, support=support, frequency=data['status'],
+                )
+                msg = {"msg": "status"}
+                if data['frequency'] in ['independent', 'twice_a_month'] and data.get('end') is None:
+                    support.end = date.today()
+                    support.save()
+
+            serializer = ProjectSupportSerializer(support, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            desc = f"{request.user.employee_name} updated support {msg.get('msg', 'details')} "
+            create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
+            return Response({"message": "Support detail is updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /project_order/
 class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
