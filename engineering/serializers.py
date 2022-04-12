@@ -367,6 +367,8 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             duration = obj.end - obj.start
         else:
             duration = date.today() - obj.start
+        if duration.days < 7:
+            return duration.days/100
         months = int(duration.days) // 30
         weeks = round(int(duration.days - months * 30) // 7, 0)
         return months + weeks / 10

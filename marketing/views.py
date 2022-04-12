@@ -2548,10 +2548,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             desc = f"{request.user.employee_name} completed test TST-{test.id} and submitted engineer feedback"
             create_activity(test.submission.id, 'submission', request.user, desc, 'created')
 
+            data = []
+            ques_answers = Answer.objects.filter(object_id=test.id).reverse()
+            for ques_answer in ques_answers:
+                data.append({
+                    "answer": ques_answer.answer,
+                    "question": ques_answer.question.title,
+                    "parent_question": ques_answer.parent_question.title if ques_answer.parent_question else None
+                })
             # test submit mail
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, request.data, 'submit', request)
+                res, error = self.send_test_mail(test, data, 'submit', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
