@@ -2080,10 +2080,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 mail_data = {
                     'to': to, 'cc': cc, 'bcc': [],
                     'subject': subject, 'attachments': path,
-                    'template': '../templates/submit_test.html',
+                    'template': '../templates/submit_engineer_feedback.html',
                     'context': {
-                        'title': title, 'engineer': engineer,
-                        'remarks': test.engineer_remarks
+                        'engineer': engineer, 'title': title,
+                        'details': data, 'remarks': test.engineer_remarks,
                     },
                 }
                 res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
