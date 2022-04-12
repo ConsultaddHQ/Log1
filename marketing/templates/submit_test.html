@@ -1,13 +1,16 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <title></title>
-    <style type="text/css" rel="stylesheet" media="all">
+
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <title></title>
+  <style type="text/css" rel="stylesheet" media="all">
     /* Base ------------------------------ */
 
     @import url("https://fonts.googleapis.com/css?family=Nunito+Sans:400,700&display=swap");
+
     body {
       width: 100% !important;
       height: 100%;
@@ -38,6 +41,7 @@
       opacity: 0;
       overflow: hidden;
     }
+
     /* Type ------------------------------ */
 
     body,
@@ -82,12 +86,13 @@
       margin: .4em 0 1.1875em;
       font-size: 16px;
       line-height: 1.625;
-        margin-bottom: 5px;
+      margin-bottom: 5px;
     }
 
     p.sub {
       font-size: 13px;
     }
+
     /* Utilities ------------------------------ */
 
     .align-right {
@@ -101,6 +106,7 @@
     .align-center {
       text-align: center;
     }
+
     /* Buttons ------------------------------ */
 
     .button {
@@ -148,6 +154,7 @@
     .attributes_item {
       padding: 0;
     }
+
     /* Related Items ------------------------------ */
 
     .related {
@@ -181,6 +188,7 @@
       text-align: center;
       padding: 25px 0 10px;
     }
+
     /* Discount Code ------------------------------ */
 
     .discount {
@@ -202,6 +210,7 @@
       text-align: center;
       font-size: 15px;
     }
+
     /* Social Icons ------------------------------ */
 
     .social {
@@ -218,6 +227,7 @@
       margin: 0 8px 10px 8px;
       padding: 0;
     }
+
     /* Data table ------------------------------ */
 
     .purchase {
@@ -299,6 +309,7 @@
       -premailer-cellpadding: 0;
       -premailer-cellspacing: 0;
     }
+
     /* Masthead ----------------------- */
 
     .email-masthead {
@@ -317,6 +328,7 @@
       text-decoration: none;
       text-shadow: 0 1px 0 white;
     }
+
     /* Body ------------------------------ */
 
     .email-body {
@@ -373,12 +385,26 @@
     }
 
     .f-fallback strong {
-        float: left;
-        width: 35%;
+      float: left;
+      width: 45%;
     }
+
+    .f-fallback .parent-Question strong {
+      width: calc(45% - 10px);
+    }
+
+    .parent-Question {
+      margin-left: 20px;
+    }
+
+    .question {
+      width: 100%;
+    }
+
     /*============ Media Queries ============ */
 
     @media only screen and (max-width: 668px) {
+
       .email-body_inner,
       .email-footer {
         width: 100% !important;
@@ -390,33 +416,49 @@
         width: 100% !important;
         text-align: center !important;
       }
+
       .f-fallback strong {
         float: left;
         width: 40%;
       }
+
+      .f-fallback .parent-Question strong {
+        width: calc(40% - 10px);
+      }
     }
 
     @media only screen and (max-width: 414px) {
-        .content-cell {
-           padding: 15px;
-        }
-        .f-fallback strong {
-          float: left;
-          width: 48%;
-        }
+      .content-cell {
+        padding: 15px;
+      }
+
+      .f-fallback strong {
+        float: left;
+        width: 48%;
+      }
+
+      .f-fallback .parent-Question strong {
+        width: calc(48% - 10px);
+      }
     }
 
     @media only screen and (max-width: 320px) {
-        .f-fallback strong {
-            float: left;
-            width: 50%;
-        }
-        .content-cell {
-            padding: 15px;
-        }
+      .f-fallback strong {
+        float: left;
+        width: 50%;
+      }
+
+      .f-fallback .parent-Question strong {
+        width: calc(50% - 10px);
+      }
+
+      .content-cell {
+        padding: 15px;
+      }
     }
 
     @media (prefers-color-scheme: dark) {
+
       body,
       .email-body,
       .email-body_inner,
@@ -427,6 +469,7 @@
         background-color: #333333 !important;
         color: #FFF !important;
       }
+
       p,
       ul,
       ol,
@@ -436,74 +479,91 @@
       h3 {
         color: #FFF !important;
       }
+
       .attributes_content,
       .discount {
         background-color: #222 !important;
       }
+
       .email-masthead_name {
         text-shadow: none !important;
       }
     }
-    </style>
-    <!--[if mso]>
+  </style>
+  <!--[if mso]>
     <style type="text/css">
       .f-fallback  {
         font-family: Arial, sans-serif;
       }
     </style>
   <![endif]-->
-  </head>
-  <body>
-    <span class="preheader"></span>
-    <table class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
-      <tr>
-        <td align="center">
-          <table class="email-content" width="100%" cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td class="email-masthead">
-                <a href="https://log1.app" class="f-fallback email-masthead_name">
-                <span style="font-weight: bold; font-size: 40px;"><img src="https://log1.app/api/media/assets/images/logo.png" alt="" width="100"/></span>
+</head>
+
+<body>
+  <span class="preheader"></span>
+  <table class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <tr>
+      <td align="center">
+        <table class="email-content" width="100%" cellpadding="0" cellspacing="0" role="presentation">
+          <tr>
+            <td class="email-masthead">
+              <a href="https://log1.app" class="f-fallback email-masthead_name">
+                <span style="font-weight: bold; font-size: 40px;"><img
+                    src="https://log1.app/api/media/assets/images/logo.png" alt="" width="100" /></span>
               </a>
-              </td>
-            </tr>
-            <!-- Email Body -->
-            <tr>
-              <td class="email-body" width="570" cellpadding="0" cellspacing="0">
-                <table class="email-body_inner" align="center" width="570" cellpadding="0" cellspacing="0" role="presentation">
-                  <!-- Body content -->
-                  <tr>
-                    <td class="content-cell">
-                      <div class="f-fallback">
-                        <h1>{{title}}</h1>
-                            <p><strong>People Associated:</strong> {{engineer}}</p>
-                            <p><strong>Remarks:</strong> {{remarks}}</p>
-                        <p><strong>Thanks,
+            </td>
+          </tr>
+          <!-- Email Body -->
+          <tr>
+            <td class="email-body" width="570" cellpadding="0" cellspacing="0">
+              <table class="email-body_inner" align="center" width="570" cellpadding="0" cellspacing="0"
+                role="presentation">
+                <!-- Body content -->
+                <tr>
+                  <td class="content-cell">
+                    <div class="f-fallback">
+                      <h1 style="margin-bottom: 25px;">{{title}}</h1>
+                      <p><strong>People Associated:</strong> {{engineer}}</p>
+
+                        {% for project in details %}
+                            <div class="question">
+                                <p><strong>{{ project.question }}</strong> {{ project.answer }}</p>
+                            </div>
+                            {% if project.parent_question %}
+                                <div class="parent-Question">
+                                    {{ project.parent_question }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                      <p style="margin-top: 30px;"><strong>Thanks,
                           <br>The Log1 Team</strong></p>
-                      </div>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td>
-                <table class="email-footer" align="center" width="570" cellpadding="0" cellspacing="0" role="presentation">
-                  <tr>
-                    <td class="content-cell" align="center">
-                      <p class="f-fallback sub align-center">&copy; 2019 Log1. All rights reserved.</p>
-                      <p class="f-fallback sub align-center">
-                        Consultadd Inc.
-                        <br>110 Wall Street., Ney York City,
-                        <br>NY, 10005
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <table class="email-footer" align="center" width="570" cellpadding="0" cellspacing="0"
+                role="presentation">
+                <tr>
+                  <td class="content-cell" align="center">
+                    <p class="f-fallback sub align-center">&copy; 2019 Log1. All rights reserved.</p>
+                    <p class="f-fallback sub align-center">
+                      Consultadd Inc.
+                      <br>110 Wall Street., Ney York City,
+                      <br>NY, 10005
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+
 </html>

@@ -2079,7 +2079,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'template': '../templates/submit_test.html',
                     'context': {
                         'title': title, 'engineer': engineer,
-                        'remarks': data['remarks'] if data['remarks'] else 'NA'
+                        'remarks': data['remarks'] if data['remarks'] else 'NA',
+                        'details': data,
                     },
                 }
                 res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
