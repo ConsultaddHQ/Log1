@@ -58,9 +58,13 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
                 if 'assignment' in filters:
                     if filters['assignment'] == 'assigned':
-                        projects = projects.filter(support__isnull=False, created__gt="2021-10-01")
+                        projects = projects.filter(
+                            support_required=True, support__isnull=False, created__gt="2021-10-01"
+                        )
                     if filters['assignment'] == 'unassigned':
-                        projects = projects.filter(support__isnull=True, created__gt="2021-10-01")
+                        projects = projects.filter(
+                            support_required=True, support__isnull=True, created__gt="2021-10-01"
+                        )
 
             if filter_for == 'my':
                 projects = projects.filter(support__support=request.user)
@@ -78,24 +82,28 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "support_status": {
                     "training": {
                         "display_name": "Training",
-                        "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
-                                                 support__statuses__frequency='more_than_2_days').count()
+                        "count": projects.filter(
+                            start_date__gt=date.today(), support__statuses__is_current=True,
+                            support__statuses__frequency='more_than_2_days', support_required=True,
+                        ).count()
                     },
                     "active": {
                         "display_name": "Active",
-                        "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
-                                                 support__statuses__frequency='more_than_2_days').count()
+                        "count": projects.filter(
+                            start_date__lte=date.today(), support__statuses__is_current=True,
+                            support__statuses__frequency='more_than_2_days', support_required=True
+                        ).count()
                     },
                     "less_active": {
                         "display_name": "Less Active",
-                        "count": projects.filter(support__statuses__is_current=True,
-                                                 support__statuses__frequency='less_than_3_days').count()
+                        "count": projects.filter(support__statuses__frequency='less_than_3_days',
+                                                 support__statuses__is_current=True, support_required=True).count()
                     },
                     "independent": {
                         "display_name": "Independent",
                         "count": projects.filter(
-                            support__statuses__is_current=True,
-                            support__statuses__frequency__in=['independent', 'twice_a_month']
+                            support__statuses__is_current=True, support__statuses__frequency='less_than_3_days',
+                            support__statuses__frequency__in=['independent', 'twice_a_month'], support_required=True
                         ).count()
                     },
                 },
@@ -137,22 +145,28 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     "all": {
                         "display_name": "All",
                         "count": Project.objects.filter(
-                            statuses__is_current=True, statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
+                            statuses__is_current=True, support_required=True,
+                            statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
                         ).count(),
                     },
                     "assigned": {
                         "display_name": "Assigned",
-                        "count": projects.filter(support__isnull=False, created__gt="2021-10-01").count(),
+                        "count": projects.filter(
+                            support_required=True, support__isnull=False, created__gt="2021-10-01"
+                        ).count(),
                     },
                     "unassigned": {
                         "display_name": "Unassigned",
-                        "count": projects.filter(support__isnull=True, created__gt="2021-10-01").count(),
+                        "count": projects.filter(
+                            support_required=True, support__isnull=True, created__gt="2021-10-01"
+                        ).count(),
                     }
                 }
             }
 
             if filter_json:
                 if 'support_status' in filters:
+                    projects = projects.filter(support_required=True)
                     if filters['support_status'] == 'training':
                         projects = projects.filter(
                             start_date__gt=date.today(),

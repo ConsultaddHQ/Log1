@@ -173,7 +173,8 @@ class ProjectViewSets(ModelViewSet):
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):
-        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
+        if project.support_required is True:
+            support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
 
         message = "Project created"
@@ -489,7 +490,7 @@ class ProjectViewSets(ModelViewSet):
                 create_checklist(project.id, request)
 
                 # Activity
-                desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
+                desc = f"Purchase order created with start date of {project.start_date} and mail is sent"
                 create_activity(sub.id, 'submission', request.user, desc, 'created')
 
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
