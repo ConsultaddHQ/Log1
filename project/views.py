@@ -797,15 +797,25 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
             support_qs = project.support.exists()
             project_support = ProjectSupport.objects.create(
-                project=project, support=support, start=start, end=end, feedback=request.data.get('feedback', None)
+                project=project, is_proxy_support=request.data.get('is_proxy_support', False),
+                support=support, start=start, end=end, feedback=request.data.get('feedback', None),
             )
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
             )
+
             if request.user.id == support.id:
-                desc = f"{request.user.employee_name} added himself as support person"
+                if project_support.is_proxy_support:
+                    desc = f"{request.user.employee_name} added himself as proxy person"
+                else:
+                    desc = f"{request.user.employee_name} added himself as support person"
+
             else:
-                desc = f"{request.user.employee_name} added {support.employee_name} as support person"
+                if project_support.is_proxy_support:
+                    desc = f"{request.user.employee_name} added {support.employee_name} as proxy person"
+                else:
+                    desc = f"{request.user.employee_name} added {support.employee_name} as support person"
+
             create_activity(project.id, 'projectsupport', request.user, desc, 'created')
 
             if not support_qs:
