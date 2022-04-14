@@ -161,6 +161,7 @@ class ProjectSupport(TimeStampedModel):
     feedback = models.TextField(_("Feedback"), null=True, blank=True)
     end = models.DateField(_('Support End Date'), blank=True, null=True)
     start = models.DateField(_('Support Start Date'), blank=True, null=True)
+    is_proxy_support = models.BooleanField(_('Is Proxy Support'), default=False)
     support = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='projects',
