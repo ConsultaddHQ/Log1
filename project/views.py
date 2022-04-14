@@ -803,7 +803,6 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             SupportStatus.objects.create(
                 is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
             )
-
             if request.user.id == support.id:
                 if project_support.is_proxy_support:
                     desc = f"{request.user.employee_name} added himself as proxy person"

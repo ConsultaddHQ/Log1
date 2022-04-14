@@ -384,11 +384,10 @@ class Interview(TimeStampedModel):
         ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
         ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
     )
-
     PASSED_CHOICES = (
-        ('coding_went_well', 'Coding Round Went well'),
         ('internal_hiring', 'Internal Hiring'),
         ('sql_knowledge', 'Have Good SQL knowledge'),
+        ('coding_went_well', 'Coding Round Went well'),
     )
 
     round = models.IntegerField(default=0)
