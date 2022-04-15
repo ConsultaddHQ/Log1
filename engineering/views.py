@@ -292,6 +292,22 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['put'], detail=True, url_path='support_required')
+    def support(self, request, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            project.support_required = request.data.get('is_required', True)
+            project.save()
+
+            # create_activity
+            support_required = "required" if project.support_required is True else "not required"
+            desc = f"{request.user.employee_name} marked project support as {support_required}"
+            create_activity(project.id, 'projectdescription', request.user, desc, 'update')
+            return Response({"message": f"project support marked as {support_required}"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /project/:project_id:/update/
 class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, UpdateModelMixin, RetrieveModelMixin):
@@ -956,7 +972,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 else:
                     test = test.filter(
                         Q(submission__client__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith = query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
                         Q(submission__consultant_marketing__consultant__name__istartswith=query)
                     )
 

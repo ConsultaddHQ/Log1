@@ -131,7 +131,8 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote')
+        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote',
+                  'support_required')
 
     @staticmethod
     def get_marketer(obj):

@@ -26,7 +26,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
                   'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote', 'support', 'employer', 'support_required')
+                  'is_remote', 'support', 'employer')
 
     @staticmethod
     def get_created(obj):
