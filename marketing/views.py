@@ -1958,7 +1958,7 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "No feedback given"}, status=400)
 
             # Activity
-            desc = f"{request.user.employee_name} completed test TST-{interview.id} and submitted engineer feedback"
+            desc = f"{request.user.employee_name} provided supervisor feedback for I-{interview.id}"
             create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
 
             return Response({"message": "Feedback submitted"}, status=201)
