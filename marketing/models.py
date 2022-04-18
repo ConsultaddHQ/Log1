@@ -293,6 +293,7 @@ class Test(TimeStampedModel):
         ('new', 'New'),
         ('passed', 'Passed'),
         ('failed', 'Failed'),
+        ('retest', 'Retest'),
         ('assigned', 'Assigned'),
         ('cancelled', 'Cancelled'),
         ('feedback_due', 'Feedback Due'),
@@ -387,9 +388,9 @@ class Interview(TimeStampedModel):
     PASSED_CHOICES = (
         ('call_went_well', 'Call went well'),
         ('coding_cleared', 'Coding cleared'),
+        ('supervisor_was_well_prepared', 'Supervisor was well prepared'),
         ('interviewers_were_easy_to_handle', 'Interviewers were easy to handle'),
         ('proper_notes_were_provided_by_the_marketer', 'Proper notes were provided by the marketer'),
-        ('supervisor_was_well_prepared', 'Supervisor was well prepared'),
     )
 
     round = models.IntegerField(default=0)

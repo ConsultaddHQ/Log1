@@ -927,29 +927,20 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         try:
             msg = {}
             data = request.data
-            frequency_arr = ['independent', 'twice_a_month']
             support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
             prev_support = support.statuses.filter(is_current=True).first()
+
+            if prev_support and prev_support.frequency != data['status']:
+                prev_support.is_current = False
+                prev_support.save()
+                SupportStatus.objects.create(
+                    is_current=True, support=support, frequency=data['status'], change_date=data['change_date']
+                )
+                msg = {"msg": "status"}
 
             serializer = ProjectSupportSerializer(support, data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-
-            if (prev_support and prev_support.frequency != data['status']) or (
-                    serializer.data['end'] and prev_support not in frequency_arr):
-
-                prev_support.is_current = False
-                prev_support.save()
-                SupportStatus.objects.create(
-                    is_current=True, support=support,
-                    frequency='independent' if serializer.data['end'] else data['status'],
-                    change_date=data.get('change_date', date.today()) if not serializer.data['end'] else
-                    serializer.data['end'],
-                )
-                msg = {"msg": "status"}
-                if data['status'] in frequency_arr and not data.get('end'):
-                    support.end = date.today()
-                    support.save()
 
             desc = f"{request.user.employee_name} updated support {msg.get('msg', 'details')} "
             create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
