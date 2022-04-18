@@ -763,6 +763,29 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @action(methods=['get'], detail=False, url_path='feedback_due')
+    def marketer_feedback_due(self, request):
+        try:
+            if 'marketer' not in request.user.roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            feedback_due_interview_list = Interview.objects.filter(status='feedback_due')
+            feedback_due_test_list = Test.objects.filter(status='feedback_due')
+            for feedback_due in feedback_due_interview_list:
+                if request.user == feedback_due.marketer and \
+                        int((datetime.now().date() - feedback_due.modified.date()).days) > 15:
+                    return Response({"data": {"flag": True}}, status=202)
+
+            for feedback_due in feedback_due_test_list:
+                if request.user == feedback_due.marketer and \
+                        int((datetime.now().date() - feedback_due.modified.date()).days) > 15:
+                    return Response({"data": {"flag": True}}, status=202)
+
+            return Response({"data": {"flag": False}}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['get'], detail=True, url_path="feedback_check")
     def feedback_check(self, request, pk):
         try:
