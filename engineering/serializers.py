@@ -85,12 +85,6 @@ class EngineeringSerializer(serializers.ModelSerializer):
             data = "No active support"
         return data
 
-    # if len(data) < 1:
-    #     if obj.support.all():
-    #         return "No active support"
-    #     else:
-    #         return data
-
     @staticmethod
     def get_support_status(obj):
         if obj.statuses.filter(status__istartswith='terminated').first():
