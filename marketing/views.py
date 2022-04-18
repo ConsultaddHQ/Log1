@@ -1953,23 +1953,10 @@ class InterviewViewSets(ModelViewSet):
             ques_answers = create_answer(request, interview, 'Interview')
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
-            # test.status = 'feedback_due'
-            # test.submitted_by = request.user
-            # test.submit_date = datetime.now()
-            # test.engineer_remarks = request.data.get('remarks')
-            # test.save()
 
-            # # Activity
-            # desc = f"{request.user.employee_name} completed test TST-{test.id} and submitted engineer feedback"
-            # create_activity(test.submission.id, 'submission', request.user, desc, 'created')
-
-            # # test submit mail
-            # res = "Development Server"
-            # if os.environ.get('ENV', 'local') == 'prod':
-            #     res, error = self.send_test_mail(test, ques_answers, 'submit', request)
-            #     if error == 'error':
-            #         write_info(message=res, function='create-send_test_mail', request=request)
-            #         return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+            # Activity
+            desc = f"{request.user.employee_name} completed test TST-{interview.id} and submitted engineer feedback"
+            create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
 
             return Response({"message": "Feedback submitted"}, status=201)
         except Exception as error:
