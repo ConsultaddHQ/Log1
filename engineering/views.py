@@ -56,9 +56,13 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
                 if 'assignment' in filters:
                     if filters['assignment'] == 'assigned':
-                        projects = projects.filter(support__isnull=False, created__gt="2021-10-01")
+                        projects = projects.filter(
+                            support_required=True, support__isnull=False, created__gt="2021-10-01"
+                        )
                     if filters['assignment'] == 'unassigned':
-                        projects = projects.filter(support__isnull=True, created__gt="2021-10-01")
+                        projects = projects.filter(
+                            support_required=True, support__isnull=True, created__gt="2021-10-01"
+                        )
 
             if filter_for == 'my':
                 projects = projects.filter(support__support=request.user)
@@ -76,24 +80,28 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "support_status": {
                     "training": {
                         "display_name": "Training",
-                        "count": projects.filter(start_date__gt=date.today(), support__statuses__is_current=True,
-                                                 support__statuses__frequency='more_than_2_days').count()
+                        "count": projects.filter(
+                            start_date__gt=date.today(), support__statuses__is_current=True,
+                            support__statuses__frequency='more_than_2_days', support_required=True,
+                        ).count()
                     },
                     "active": {
                         "display_name": "Active",
-                        "count": projects.filter(start_date__lte=date.today(), support__statuses__is_current=True,
-                                                 support__statuses__frequency='more_than_2_days').count()
+                        "count": projects.filter(
+                            start_date__lte=date.today(), support__statuses__is_current=True,
+                            support__statuses__frequency='more_than_2_days', support_required=True
+                        ).count()
                     },
                     "less_active": {
                         "display_name": "Less Active",
-                        "count": projects.filter(support__statuses__is_current=True,
-                                                 support__statuses__frequency='less_than_3_days').count()
+                        "count": projects.filter(support__statuses__frequency='less_than_3_days',
+                                                 support__statuses__is_current=True, support_required=True).count()
                     },
                     "independent": {
                         "display_name": "Independent",
                         "count": projects.filter(
-                            support__statuses__is_current=True,
-                            support__statuses__frequency__in=['independent', 'twice_a_month']
+                            support__statuses__is_current=True, support__statuses__frequency='less_than_3_days',
+                            support__statuses__frequency__in=['independent', 'twice_a_month'], support_required=True
                         ).count()
                     },
                 },
@@ -135,22 +143,28 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     "all": {
                         "display_name": "All",
                         "count": Project.objects.filter(
-                            statuses__is_current=True, statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
+                            statuses__is_current=True, support_required=True,
+                            statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
                         ).count(),
                     },
                     "assigned": {
                         "display_name": "Assigned",
-                        "count": projects.filter(support__isnull=False, created__gt="2021-10-01").count(),
+                        "count": projects.filter(
+                            support_required=True, support__isnull=False, created__gt="2021-10-01"
+                        ).count(),
                     },
                     "unassigned": {
                         "display_name": "Unassigned",
-                        "count": projects.filter(support__isnull=True, created__gt="2021-10-01").count(),
+                        "count": projects.filter(
+                            support_required=True, support__isnull=True, created__gt="2021-10-01"
+                        ).count(),
                     }
                 }
             }
 
             if filter_json:
                 if 'support_status' in filters:
+                    projects = projects.filter(support_required=True)
                     if filters['support_status'] == 'training':
                         projects = projects.filter(
                             start_date__gt=date.today(),
@@ -275,6 +289,22 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "guideline": project
             }
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='support_required')
+    def support(self, request, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            project.support_required = request.data.get('is_required', True)
+            project.save()
+
+            # create_activity
+            support_required = "required" if project.support_required is True else "not required"
+            desc = f"{request.user.employee_name} marked project support as {support_required}"
+            create_activity(project.id, 'projectdescription', request.user, desc, 'update')
+            return Response({"message": f"project support marked as {support_required}"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -943,7 +973,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 else:
                     test = test.filter(
                         Q(submission__client__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith = query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
                         Q(submission__consultant_marketing__consultant__name__istartswith=query)
                     )
 

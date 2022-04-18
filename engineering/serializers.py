@@ -28,7 +28,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
-                  'remark', 'assignment_status')
+                  'remark', 'assignment_status', 'support_required')
 
     @staticmethod
     def get_remark(obj):
@@ -127,7 +127,8 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote')
+        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote',
+                  'support_required')
 
     @staticmethod
     def get_marketer(obj):
