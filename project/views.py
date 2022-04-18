@@ -788,8 +788,11 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             support = get_object_or_404(User, id=request.data.get('support', None))
+
             end = request.data.get('end', None)
             start = request.data.get('start', None)
+            if not start:
+                return Response({"message": "Start date can not be empty"}, status=400)
 
             support_qs = project.support.exists()
             project_support = ProjectSupport.objects.create(
