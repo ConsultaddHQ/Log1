@@ -9,7 +9,7 @@ from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus
+    ProjectStatus, ConsultantLeave, Leave
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -344,3 +344,33 @@ class ProjectOrderSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_attachments(obj):
         return AttachmentSerializer(obj.project.attachments.all(), many=True).data
+
+
+class ConsultantLeaveSerializer(serializers.ModelSerializer):
+    leave_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConsultantLeave
+        fields = ('id', 'granted', 'balance', 'leave_type', 'year')
+
+    @staticmethod
+    def get_leave_type(obj):
+        return obj.leave_type.name
+
+
+class LeaveSerializer(serializers.ModelSerializer):
+    leave_type = serializers.SerializerMethodField()
+    attachment = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Leave
+        fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
+                  'description', 'attachment')
+
+    @staticmethod
+    def get_leave_type(obj):
+        return obj.leave_type.leave_type.name
+
+    @staticmethod
+    def get_attachment(obj):
+        return AttachmentSerializer(obj.attachment.all(), many=True).data

@@ -6,7 +6,7 @@ from employee.models import User
 from attachment.models import Attachment
 from marketing.models import Test, Interview
 from attachment.serializers import AttachmentGetSerializer
-from project.models import Project, SupportStatus, TimeSheet, ProjectSupport
+from project.models import Project, SupportStatus, TimeSheet, ProjectSupport, ConsultantLeave
 from engineering.models import ProjectDescription, ProjectUpdate, TrainingCheckList, TrainingAgenda
 
 
