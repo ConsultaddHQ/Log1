@@ -293,6 +293,7 @@ class Test(TimeStampedModel):
         ('new', 'New'),
         ('passed', 'Passed'),
         ('failed', 'Failed'),
+        ('retest', 'Retest'),
         ('assigned', 'Assigned'),
         ('cancelled', 'Cancelled'),
         ('feedback_due', 'Feedback Due'),
