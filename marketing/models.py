@@ -384,7 +384,6 @@ class Interview(TimeStampedModel):
         ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
         ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
     )
-
     PASSED_CHOICES = (
         ('call_went_well', 'Call went well'),
         ('coding_cleared', 'Coding cleared'),
