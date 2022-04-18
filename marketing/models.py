@@ -392,7 +392,6 @@ class Interview(TimeStampedModel):
         ('interviewers_were_easy_to_handle', 'Interviewers were easy to handle'),
         ('proper_notes_were_provided_by_the_marketer', 'Proper notes were provided by the marketer'),
     )
-
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
     guest_remark = models.TextField(_('Remark'), blank=True, null=True)

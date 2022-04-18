@@ -788,13 +788,9 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             support = get_object_or_404(User, id=request.data.get('support', None))
+
             end = request.data.get('end', None)
             start = request.data.get('start', None)
-            previous_support = ProjectSupport.objects.filter(project__id=kwargs.get('project_id'))
-
-            if request.data.get('is_proxy_support') == True and len(previous_support) == 0:
-                return Response({"message": "Proxy can't be added before support"}, status=400)
-
             if not start:
                 return Response({"message": "Start date can not be empty"}, status=400)
 
@@ -807,12 +803,12 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 SupportStatus.objects.create(
                     is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
                 )
+
             if request.user.id == support.id:
                 if project_support.is_proxy_support:
                     desc = f"{request.user.employee_name} added himself as proxy person"
                 else:
                     desc = f"{request.user.employee_name} added himself as support person"
-
             else:
                 if project_support.is_proxy_support:
                     desc = f"{request.user.employee_name} added {support.employee_name} as proxy person"
