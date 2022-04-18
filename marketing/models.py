@@ -384,13 +384,11 @@ class Interview(TimeStampedModel):
         ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
         ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
     )
-
     PASSED_CHOICES = (
         ('coding_went_well', 'Coding Round Went well'),
         ('internal_hiring', 'Internal Hiring'),
         ('sql_knowledge', 'Have Good SQL knowledge'),
     )
-
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
     guest_remark = models.TextField(_('Remark'), blank=True, null=True)

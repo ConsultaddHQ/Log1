@@ -229,6 +229,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
             "marketer_name": obj.marketer.employee_name,
             "vendor": submission.lead.vendor_company.name,
             "project": True if hasattr(submission, "project") else False,
+            "position_name": submission.lead.position.display_name if submission.lead.position else None,
         }
 
     @staticmethod
