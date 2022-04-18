@@ -28,7 +28,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
-                  'remark', 'assignment_status')
+                  'remark', 'assignment_status', 'support_required')
 
     @staticmethod
     def get_remark(obj):
@@ -81,12 +81,8 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 "email": support.support.email,
                 "name": support.support.employee_name,
             })
-        if len(data) < 1:
-            for support in obj.support.all():
-                data.append({
-                    "email": support.support.email,
-                    "name": support.support.employee_name,
-                })
+        if len(data) < 1 and obj.support.all():
+            data = "No active support"
         return data
 
     @staticmethod
@@ -131,7 +127,8 @@ class EngineeringDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote')
+        fields = ('id', 'consultant', 'start_date', 'submission', 'remote_consultant', 'marketer', 'is_remote',
+                  'support_required')
 
     @staticmethod
     def get_marketer(obj):

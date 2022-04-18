@@ -1093,6 +1093,9 @@ class InterviewViewSets(ModelViewSet):
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
+
                 if 'ctb' in filters and len(filters["ctb"]) > 0:
                     queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
 
@@ -1945,6 +1948,24 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
+    @action(methods=['post'], detail=True, url_path='supervisor_feedback')
+    def feedback(self, request, pk):
+        try:
+            interview = get_object_or_404(Interview, id=pk)
+
+            ques_answers = create_answer(request, interview, 'Interview')
+            if not ques_answers:
+                return Response({"message": "No feedback given"}, status=400)
+
+            # Activity
+            desc = f"{request.user.employee_name} provided supervisor feedback for I-{interview.id}"
+            create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
+
+            return Response({"message": "Feedback submitted"}, status=201)
+        except Exception as error:
+            write_info(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /test/
 class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
@@ -2512,36 +2533,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 engineer = User.objects.get(employee_id=emp_id)
                 test.engineer.add(engineer)
 
-            content_type = ContentType.objects.get(model='test')
-            payload = json.loads(request.data.get('feedback_form'))
-            for data in payload:
-                question = get_object_or_404(Question, id=data['question_id'])
-                if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
-                        and data.get('comment') is not None:
-                    value = f'{data.get("answer")}: {data.get("comment")}'
-                else:
-                    value = data.get("answer", None)
-
-                answer = Answer.objects.create(
-                    answer=value,
-                    question=question,
-                    object_id=test.id,
-                    submitted_by=request.user,
-                    content_type=content_type,
-                    parent_question_id=data.get('parent_question_id', None)
-                )
-                attachment_id = f"{question.id}-{answer.parent_question_id}" if answer.parent_question else question.id
-                if request.FILES.getlist(str(attachment_id)):
-                    for file in request.FILES.getlist(str(attachment_id)):
-                        file_data = {
-                            "file": file,
-                            "model": "answer",
-                            "object_id": answer.id,
-                            "type": "test_feedback",
-                            "creator": request.user,
-                        }
-                        create_attachment(file_data)
-
+            ques_answers = create_answer(request, test, 'test')
+            if not ques_answers:
+                return Response({"message": "No feedback given"}, status=400)
             test.status = 'feedback_due'
             test.submitted_by = request.user
             test.submit_date = datetime.now()
@@ -2552,19 +2546,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             desc = f"{request.user.employee_name} completed test TST-{test.id} and submitted engineer feedback"
             create_activity(test.submission.id, 'submission', request.user, desc, 'created')
 
-            data = []
-            ques_answers = Answer.objects.filter(object_id=test.id).reverse()
-            for ques_answer in ques_answers:
-                data.append({
-                    "id": ques_answer.id,
-                    "answer": ques_answer.answer,
-                    "question": ques_answer.question.title,
-                    "parent_question": ques_answer.parent_question.title if ques_answer.parent_question else None
-                })
             # test submit mail
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'submit', request)
+                res, error = self.send_test_mail(test, ques_answers, 'submit', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
