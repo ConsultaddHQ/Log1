@@ -769,16 +769,16 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            feedback_due_interview_list = Interview.objects.filter(status='feedback_due')
-            feedback_due_test_list = Test.objects.filter(status='feedback_due')
-            for feedback_due in feedback_due_interview_list:
-                if request.user == feedback_due.marketer and \
-                        int((datetime.now().date() - feedback_due.modified.date()).days) > 15:
+            test_lst = Test.objects.filter(status='feedback_due')
+            interview_lst = Interview.objects.filter(status='feedback_due')
+            for test in test_lst:
+                if request.user == test.marketer and \
+                        int((datetime.now().date() - test.modified.date()).days) > 15:
                     return Response({"data": {"flag": True}}, status=202)
 
-            for feedback_due in feedback_due_test_list:
-                if request.user == feedback_due.marketer and \
-                        int((datetime.now().date() - feedback_due.modified.date()).days) > 15:
+            for interview in interview_lst:
+                if request.user == interview.marketer and \
+                        int((datetime.now().date() - interview.modified.date()).days) > 15:
                     return Response({"data": {"flag": True}}, status=202)
 
             return Response({"data": {"flag": False}}, status=202)
