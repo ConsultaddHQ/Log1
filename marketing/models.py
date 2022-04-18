@@ -385,6 +385,12 @@ class Interview(TimeStampedModel):
         ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
         ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
     )
+    PASSED_CHOICES = (
+        ('internal_hiring', 'Internal Hiring'),
+        ('sql_knowledge', 'Have Good SQL knowledge'),
+        ('coding_went_well', 'Coding Round Went well'),
+    )
+
     round = models.IntegerField(default=0)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
     guest_remark = models.TextField(_('Remark'), blank=True, null=True)
@@ -404,6 +410,11 @@ class Interview(TimeStampedModel):
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
         max_length=50, choices=FAILURE_CHOICES),
+        null=True, blank=True
+    )
+    passed_reason = ArrayField(models.CharField(
+        _('Passed Reason'),
+        max_length=50, choices=PASSED_CHOICES),
         null=True, blank=True
     )
     supervisor = models.ForeignKey(

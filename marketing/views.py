@@ -1093,6 +1093,9 @@ class InterviewViewSets(ModelViewSet):
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
 
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
+
                 if 'ctb' in filters and len(filters["ctb"]) > 0:
                     queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
 
