@@ -386,9 +386,11 @@ class Interview(TimeStampedModel):
     )
 
     PASSED_CHOICES = (
-        ('coding_went_well', 'Coding Round Went well'),
-        ('internal_hiring', 'Internal Hiring'),
-        ('sql_knowledge', 'Have Good SQL knowledge'),
+        ('call_went_well', 'Call went well'),
+        ('coding_cleared', 'Coding cleared'),
+        ('interviewers_were_easy_to_handle', 'Interviewers were easy to handle'),
+        ('proper_notes_were_provided_by_the_marketer', 'Proper notes were provided by the marketer'),
+        ('supervisor_was_well_prepared', 'Supervisor was well prepared'),
     )
 
     round = models.IntegerField(default=0)

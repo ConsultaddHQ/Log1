@@ -789,9 +789,13 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             support_id = request.data.get('support', None)
             support = get_object_or_404(User, id=support_id)
-
             end = request.data.get('end', None)
             start = request.data.get('start', None)
+            previous_support = ProjectSupport.objects.filter(project__id=kwargs.get('project_id'))
+
+            if request.data.get('is_proxy_support') == True and len(previous_support) == 0:
+                return Response({"message": "Proxy can't be added before support"}, status=400)
+
             if not start:
                 return Response({"message": "Start date can not be empty"}, status=400)
 
@@ -940,7 +944,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 SupportStatus.objects.create(
                     is_current=True, support=support,
                     frequency='independent' if serializer.data['end'] else data['status'],
-                    change_date=data.get('change_date', date.today()) if not serializer.data['end'] else serializer.data['end'],
+                    change_date=data.get('change_date', date.today()) if not serializer.data['end'] else
+                    serializer.data['end'],
                 )
                 msg = {"msg": "status"}
                 if data['status'] in frequency_arr and not data.get('end'):
