@@ -787,8 +787,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
     def create(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
-            support_id = request.data.get('support', None)
-            support = get_object_or_404(User, id=support_id)
+            support = get_object_or_404(User, id=request.data.get('support', None))
             end = request.data.get('end', None)
             start = request.data.get('start', None)
             previous_support = ProjectSupport.objects.filter(project__id=kwargs.get('project_id'))
@@ -804,9 +803,10 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 project=project, is_proxy_support=request.data.get('is_proxy_support', False),
                 support=support, start=start, end=end, feedback=request.data.get('feedback', None),
             )
-            SupportStatus.objects.create(
-                is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
-            )
+            if not project_support.is_proxy_support:
+                SupportStatus.objects.create(
+                    is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
+                )
             if request.user.id == support.id:
                 if project_support.is_proxy_support:
                     desc = f"{request.user.employee_name} added himself as proxy person"
@@ -818,7 +818,6 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     desc = f"{request.user.employee_name} added {support.employee_name} as proxy person"
                 else:
                     desc = f"{request.user.employee_name} added {support.employee_name} as support person"
-
             create_activity(project.id, 'projectsupport', request.user, desc, 'created')
 
             if not support_qs:
