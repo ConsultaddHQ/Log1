@@ -81,12 +81,8 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 "email": support.support.email,
                 "name": support.support.employee_name,
             })
-        if len(data) < 1:
-            for support in obj.support.all():
-                data.append({
-                    "email": support.support.email,
-                    "name": support.support.employee_name,
-                })
+        if len(data) < 1 and obj.support.all():
+            data = "No active support"
         return data
 
     @staticmethod

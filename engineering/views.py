@@ -37,9 +37,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             filter_json = request.GET.get('filter_json', None)
             first, last = get_page_limits(request)
 
-            projects = Project.objects.filter(
-                statuses__is_current=True, statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
-            )
+            projects = Project.objects.filter(statuses__is_current=True)
             filters = {}
             if filter_json:
                 filters = json.loads(filter_json)
@@ -177,6 +175,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         )
 
             total = projects.count()
+            if filters.get('status', None) not in ['complete', 'cancelled', 'terminated']:
+                projects = projects.filter(statuses__status__in=['new', 'received', 'on_boarded', 'joined'])
+
             serializer = self.serializer_class(projects[first:last], many=True)
             return Response({"data": serializer.data, "total": total, "counts": counts}, status=200)
         except Exception as error:
