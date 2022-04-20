@@ -211,6 +211,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
     submission = serializers.SerializerMethodField()
     supervisor_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
+    supervisor_feedback = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
 
     class Meta:
@@ -252,6 +253,12 @@ class InterviewListSerializer(serializers.ModelSerializer):
         if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
             return False
         return True
+
+    @staticmethod
+    def get_supervisor_feedback(obj):
+        if obj.supervisor_feedback.all():
+            return True
+        return False
 
 
 class TestListSerializer(serializers.ModelSerializer):
@@ -417,6 +424,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     permission = serializers.SerializerMethodField()
     attachment_link = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
+    supervisor_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
@@ -440,6 +448,14 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
             return False
         return True
+
+    @staticmethod
+    def get_supervisor_feedback(obj):
+        if obj.supervisor_feedback.all():
+            answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by(
+                "question__position")
+            return QuestionAnswerSerializer(answers, many=True).data
+        return None
 
 
 class QuestionAnswerSerializer(serializers.ModelSerializer):
