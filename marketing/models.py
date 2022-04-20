@@ -14,6 +14,7 @@ from utils_app.models import TimeStampedModel, Choice
 
 QUESTION_TYPE = (
         ('text', 'Text'),
+        ('note', 'Note'),
         ('rate', 'Rate'),
         ('child', 'Child'),
         ('option', 'Option'),
@@ -234,7 +235,7 @@ class Question(TimeStampedModel):
     answer_type = models.CharField(_('Type'), max_length=20, choices=QUESTION_TYPE)
     description = models.TextField(_('Question Description'), null=True, blank=True)
     form_name = models.CharField(_('Form Name'), max_length=100, null=True, blank=True)
-    options = ArrayField(models.CharField(_('Choices'), max_length=30, blank=True), blank=True)
+    options = ArrayField(models.CharField(_('Choices'), max_length=80, blank=True), blank=True)
 
     def __str__(self):
         return f'{self.title} - {self.answer_type}'
@@ -393,6 +394,7 @@ class Interview(TimeStampedModel):
         ('proper_notes_were_provided_by_the_marketer', 'Proper notes were provided by the marketer'),
     )
     round = models.IntegerField(default=0)
+    supervisor_feedback = GenericRelation(Answer)
     feedback = models.TextField(_('Feedback'), null=True, blank=True)
     guest_remark = models.TextField(_('Remark'), blank=True, null=True)
     coding_present = models.BooleanField(_('Coding Present'), null=True)

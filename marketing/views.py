@@ -1976,7 +1976,7 @@ class InterviewViewSets(ModelViewSet):
         try:
             interview = get_object_or_404(Interview, id=pk)
 
-            ques_answers = create_answer(request, interview, 'Interview')
+            ques_answers = create_answer(request, interview, 'interview')
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
 
