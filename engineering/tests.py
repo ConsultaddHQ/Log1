@@ -94,7 +94,7 @@ class Setup:
                 is_current=True,
                 support=project_support,
                 change_date=date.today(),
-                frequency='more_than_2_days',
+                frequency='active',
             )
             desc = f"Admin Demo added himself as support person"
             create_activity(project.id, 'projectsupport', self.user, desc, 'created')

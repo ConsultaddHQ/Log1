@@ -3,6 +3,7 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
+from utils_app.models import City
 from attachment.models import Attachment
 from marketing.models import Test, Interview
 from attachment.serializers import AttachmentGetSerializer
@@ -96,25 +97,25 @@ class EngineeringSerializer(serializers.ModelSerializer):
             qs = support_qs.first().statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date and obj.start_date >= date.today() and support_status.frequency == 'more_than_2_days':
+                if obj.start_date and obj.start_date >= date.today() and support_status.frequency == 'active':
                     return "Training"
-                elif support_status.frequency == 'more_than_2_days' and obj.start_date <= date.today():
+                elif support_status.frequency == 'active' and obj.start_date <= date.today():
                     return "Active"
-                elif support_status.frequency == 'less_than_3_days':
+                elif support_status.frequency == 'less_active':
                     return "Less Active"
-                elif support_status.frequency in ('twice_a_month', 'independent'):
+                elif support_status.frequency == 'independent':
                     return "Independent"
         elif support:
             qs = support.latest('start').statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date and obj.start_date >= date.today():
+                if obj.start_date and obj.start_date >= date.today() and support_status.frequency == 'active':
                     return "Training"
-                elif support_status.frequency == 'more_than_2_days':
+                elif support_status.frequency == 'active':
                     return "Active"
-                elif support_status.frequency == 'less_than_3_days':
+                elif support_status.frequency == 'less_active':
                     return "Less Active"
-                elif support_status.frequency in ('twice_a_month', 'independent'):
+                elif support_status.frequency == 'independent':
                     return "Independent"
         return None
 
@@ -307,11 +308,11 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
         if obj.project.start_date and obj.project.start_date > date.today():
             return 'Training'
         elif status:
-            if status.frequency == 'more_than_2_days':
+            if status.frequency == 'active':
                 return 'Active'
-            elif status.frequency == 'less_than_3_days':
-                return 'Less_Active'
-            elif status.frequency in ('twice_a_month', 'independent'):
+            elif status.frequency == 'less_active':
+                return 'Less Active'
+            elif status.frequency == 'independent':
                 return 'Independent'
         else:
             return None
@@ -381,7 +382,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_project(obj):
         projects = obj.projects.filter(
-            statuses__is_current=True, statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
+            statuses__is_current=True, statuses__frequency__in=['active', 'less_active'],
         ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
         data = {
             "bandwidth": len(projects),

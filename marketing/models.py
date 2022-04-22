@@ -26,6 +26,7 @@ QUESTION_TYPE = (
         ('yes_remark', 'Yes Remark'),
         ('attachment', 'Attachment'),
         ('no_question', 'No Question'),
+        ('multi_select', 'Multi Select'),
         ('yes_question', 'Yes Question'),
         ('no_attachment', 'No Attachment'),
         ('yes_attachment', 'Yes Attachment'),
