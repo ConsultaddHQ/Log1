@@ -377,7 +377,7 @@ class LeaveSerializer(serializers.ModelSerializer):
             return 'Full'
         elif obj.total_hours == 4:
             return 'Half'
-        elif obj.total_hours > 8:
-            return 'Hourly'
         elif obj.total_hours < 8:
+            return 'Hourly'
+        elif obj.total_hours > 8:
             return 'Multi Day'

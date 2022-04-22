@@ -184,7 +184,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     elif filters['support_status'] == 'independent':
                         projects = projects.filter(
                             support__statuses__is_current=True,
-                            support__statuses__frequency__in=['independent', 'less_active'],
+                            support__statuses__frequency='independent'
                         )
 
             total = projects.count()
