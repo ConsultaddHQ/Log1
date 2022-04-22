@@ -1,4 +1,3 @@
-import os
 from datetime import date
 from django.db.models import Q
 from rest_framework import serializers
@@ -291,12 +290,8 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
         elif obj.project.start_date and obj.project.start_date > date.today():
             return 'training'
         elif status:
-            if status.frequency == 'more_than_2_days':
-                return 'active'
-            elif status.frequency == 'less_than_3_days':
-                return 'less_active'
-            elif status.frequency in ('twice_a_month', 'independent'):
-                return 'independent'
+            if status.frequency:
+                return status.frequency
         else:
             return None
 
@@ -355,17 +350,18 @@ class ConsultantLeaveSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_leave_type(obj):
-        return obj.leave_type.name
+        return obj.leave_type.display_name
 
 
 class LeaveSerializer(serializers.ModelSerializer):
     leave_type = serializers.SerializerMethodField()
     attachment = serializers.SerializerMethodField()
+    duration_type = serializers.SerializerMethodField()
 
     class Meta:
         model = Leave
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
-                  'description', 'attachment')
+                  'description', 'attachment', 'duration_type')
 
     @staticmethod
     def get_leave_type(obj):
@@ -374,3 +370,14 @@ class LeaveSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_attachment(obj):
         return AttachmentSerializer(obj.attachment.all(), many=True).data
+
+    @staticmethod
+    def get_duration_type(obj):
+        if obj.total_hours == 8:
+            return 'Full'
+        elif obj.total_hours == 4:
+            return 'Half'
+        elif obj.total_hours < 8:
+            return 'Hourly'
+        elif obj.total_hours > 8:
+            return 'Multi Day'

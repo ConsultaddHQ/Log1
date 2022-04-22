@@ -209,8 +209,8 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 class InterviewListSerializer(serializers.ModelSerializer):
     guest = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
-    supervisor_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
+    supervisor_detail = serializers.SerializerMethodField()
     supervisor_feedback = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
 
@@ -238,8 +238,18 @@ class InterviewListSerializer(serializers.ModelSerializer):
         return obj.consultant.name
 
     @staticmethod
-    def get_supervisor_name(obj):
-        return obj.supervisor.employee_name
+    def get_supervisor_detail(obj):
+        if obj.supervisor.employee_id == 9999:
+            data = {
+                "call_given_by": "consultant",
+                "supervisor_name": obj.submission.consultant.name
+            }
+        else:
+            data = {
+                "call_given_by": "interviewee",
+                "supervisor_name": obj.supervisor.employee_name
+            }
+        return data
 
     @staticmethod
     def get_guest(obj):
