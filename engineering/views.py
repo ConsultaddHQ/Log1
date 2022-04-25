@@ -873,12 +873,12 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     queryset = queryset.filter(project__submission__client__istartswith=query)
                 elif category == 'vendor_name':
                     queryset = queryset.filter(project__submission__lead__vendor_company__name__istartswith=query)
-            else:
-                queryset = queryset.filter(
-                    Q(project__consultant__name__istartswith=query) |
-                    Q(project__submission__client__istartswith=query) |
-                    Q(project__submission__lead__vendor_company__name__istartswith=query)
-                )
+                elif category == 'all':
+                    queryset = queryset.filter(
+                        Q(project__consultant__name__istartswith=query) |
+                        Q(project__submission__client__istartswith=query) |
+                        Q(project__submission__lead__vendor_company__name__istartswith=query)
+                    )
         return queryset
 
     def list(self, request, *args, **kwargs):
@@ -905,13 +905,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         engineer = engineer.filter(
                             projects__project__submission__lead__vendor_company__name__istartswith=query
                         )
-                else:
-                    engineer = engineer.filter(
-                        Q(employee_name__istartswith=query) |
-                        Q(projects__project__consultant__name__istartswith=query) |
-                        Q(projects__project__submission__client__istartswith=query) |
-                        Q(projects__project__submission__lead__vendor_company__name__istartswith=query)
-                    )
+                    elif category == 'all':
+                        engineer = engineer.filter(
+                            Q(employee_name__istartswith=query) |
+                            Q(projects__project__consultant__name__istartswith=query) |
+                            Q(projects__project__submission__client__istartswith=query) |
+                            Q(projects__project__submission__lead__vendor_company__name__istartswith=query)
+                        )
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
             counts = self.project_filter_counts(projects)
@@ -966,12 +966,12 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         test = test.filter(submission__client__istartswith=query)
                     elif category == 'vendor_name':
                         test = test.filter(submission__lead__vendor_company__name__istartswith=query)
-                else:
-                    test = test.filter(
-                        Q(submission__client__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith=query) |
-                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                    )
+                    elif category == 'all':
+                        test = test.filter(
+                            Q(submission__client__istartswith=query) |
+                            Q(submission__lead__vendor_company__name__istartswith=query) |
+                            Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                        )
 
             serializer = EngineerTestSerializer(test[first: last], many=True)
             return Response({"data": serializer.data, "count": test.count()}, status=200)
@@ -1006,12 +1006,12 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         interview = interview.filter(submission__client__istartswith=query)
                     elif category == 'vendor_name':
                         interview = interview.filter(submission__lead__vendor_company__name__istartswith=query)
-                else:
-                    interview = interview.filter(
-                        Q(submission__client__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith=query) |
-                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                    )
+                    elif category == 'all':
+                        interview = interview.filter(
+                            Q(submission__client__istartswith=query) |
+                            Q(submission__lead__vendor_company__name__istartswith=query) |
+                            Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                        )
 
             serializer = EngineerInterviewSerializer(interview[first: last], many=True)
             return Response({"data": serializer.data, "count": interview.count()}, status=200)

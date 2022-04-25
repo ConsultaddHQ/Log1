@@ -76,7 +76,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support(obj):
         data = []
-        for support in obj.support.filter(end=None):
+        for support in obj.support.filter(end=None, is_proxy_support=False):
             data.append({
                 "email": support.support.email,
                 "name": support.support.employee_name,
@@ -351,15 +351,18 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_duration(obj):
-        if obj.end:
-            duration = obj.end - obj.start
+        if date.today() > obj.start:
+            if obj.end:
+                duration = obj.end - obj.start
+            else:
+                duration = date.today() - obj.start
+            if duration.days < 7:
+                return f"0.0.{duration.days}"
+            months = int(duration.days) // 30
+            weeks = round(int(duration.days - months * 30) // 7, 0)
+            return months + weeks / 10
         else:
-            duration = date.today() - obj.start
-        if duration.days < 7:
-            return f"0.0.{duration.days}"
-        months = int(duration.days) // 30
-        weeks = round(int(duration.days - months * 30) // 7, 0)
-        return months + weeks / 10
+            return 0
 
 
 class EngineerReportSerializer(serializers.ModelSerializer):

@@ -1,5 +1,8 @@
 import os
+from pytz import timezone
 from datetime import datetime
+from geopy.geocoders import Nominatim
+from timezonefinder import TimezoneFinder
 
 from utils_app.models import CronJob, CronError
 from log1.utils import write_exception, write_info
@@ -40,3 +43,13 @@ def create_cron_object(name):
         return job
     except Exception as error:
         write_exception(message=error)
+
+
+def get_timezone(city_name):
+    obj = TimezoneFinder()
+    geo_locator = Nominatim(user_agent="geoapiExercises")
+    location = geo_locator.geocode(city_name)
+    result = obj.timezone_at(lat=location.latitude, lng=location.longitude)
+    today = datetime.now(tz=timezone(result))
+    return today.strftime("%Z")
+
