@@ -241,12 +241,12 @@ class InterviewListSerializer(serializers.ModelSerializer):
     def get_supervisor_detail(obj):
         if obj.supervisor.employee_id == 9999:
             data = {
-                "call_given_by": "consultant",
+                "call_given_by": "Consultant",
                 "supervisor_name": obj.submission.consultant.name
             }
         else:
             data = {
-                "call_given_by": "interviewee",
+                "call_given_by": "Interviewee",
                 "supervisor_name": obj.supervisor.employee_name
             }
         return data

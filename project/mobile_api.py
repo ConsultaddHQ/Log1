@@ -12,12 +12,13 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 
 from constance import config
+
 from employee.models import User
 from log1.utils import write_exception
+from attachment.models import Attachment
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
-from attachment.serializers import Attachment
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
@@ -667,7 +668,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                     object_id=leave.id,
                     content_type=content_type,
                     attachment_type='consultant_leave',
-                    attachment_file=request.FILES.get('attachments'),
+                    attachment_file=request.FILES.get('attachment'),
                 )
 
             return Response({"message": "leave applied successfully"}, status=201)

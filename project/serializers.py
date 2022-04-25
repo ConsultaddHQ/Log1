@@ -3,6 +3,7 @@ from django.db.models import Q
 from rest_framework import serializers
 
 from consultant.models import Consultant
+from utils_app.aws_utils import get_s3_object
 from employee.serializers import UserSerializer
 from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
@@ -369,7 +370,18 @@ class LeaveSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_attachment(obj):
-        return AttachmentSerializer(obj.attachment.all(), many=True).data
+        data = []
+        attachment = obj.attachment.first()
+        if attachment:
+            response, error = get_s3_object(attachment.attachment_file.name)
+            if error:
+                return []
+            extension = attachment.attachment_file.name.split(".")[-1]
+            data.append({
+                "id": attachment.id, "file_path": response, "extension": extension,
+                "created": attachment.created,"file_name": attachment.filename,
+            })
+        return data
 
     @staticmethod
     def get_duration_type(obj):
