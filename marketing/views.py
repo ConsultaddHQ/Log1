@@ -774,14 +774,14 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             for test in test_lst:
                 if request.user == test.marketer and \
                         int((datetime.now().date() - test.modified.date()).days) > 15:
-                    return Response({"data": {"flag": True}}, status=202)
+                    return Response({"marketer_feedback_due": True}, status=202)
 
             for interview in interview_lst:
                 if request.user == interview.marketer and \
                         int((datetime.now().date() - interview.modified.date()).days) > 15:
-                    return Response({"data": {"flag": True}}, status=202)
+                    return Response({"marketer_feedback_due": True}, status=202)
 
-            return Response({"data": {"flag": False}}, status=202)
+            return Response({"marketer_feedback_due": False}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1981,7 +1981,7 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "No feedback given"}, status=400)
 
             # Activity
-            desc = f"{request.user.employee_name} provided supervisor feedback for I-{interview.id}"
+            desc = f"{request.user.employee_name} provided supervisor feedback for Interview I-{interview.id}"
             create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
 
             return Response({"message": "Feedback submitted"}, status=201)

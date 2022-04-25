@@ -3,7 +3,6 @@ from datetime import date
 from rest_framework import serializers
 
 from employee.models import User
-from utils_app.models import City
 from attachment.models import Attachment
 from marketing.models import Test, Interview
 from attachment.serializers import AttachmentGetSerializer
@@ -97,26 +96,22 @@ class EngineeringSerializer(serializers.ModelSerializer):
             qs = support_qs.first().statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date and obj.start_date >= date.today() and support_status.frequency == 'active':
-                    return "Training"
+                if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
+                    return "training"
                 elif support_status.frequency == 'active' and obj.start_date <= date.today():
-                    return "Active"
-                elif support_status.frequency == 'less_active':
-                    return "Less Active"
-                elif support_status.frequency == 'independent':
-                    return "Independent"
+                    return "active"
+                else:
+                    return support_status.frequency
         elif support:
             qs = support.latest('start').statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date and obj.start_date >= date.today() and support_status.frequency == 'active':
-                    return "Training"
-                elif support_status.frequency == 'active':
-                    return "Active"
-                elif support_status.frequency == 'less_active':
-                    return "Less Active"
-                elif support_status.frequency == 'independent':
-                    return "Independent"
+                if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
+                    return "training"
+                elif support_status.frequency == 'active' and obj.start_date <= date.today():
+                    return "active"
+                else:
+                    return support_status.frequency
         return None
 
 
@@ -306,14 +301,9 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     def get_support_status(obj):
         status = obj.statuses.filter(is_current=True).first()
         if obj.project.start_date and obj.project.start_date > date.today():
-            return 'Training'
-        elif status:
-            if status.frequency == 'active':
-                return 'Active'
-            elif status.frequency == 'less_active':
-                return 'Less Active'
-            elif status.frequency == 'independent':
-                return 'Independent'
+            return 'training'
+        elif status and status.frequency:
+            return status.frequency
         else:
             return None
 
