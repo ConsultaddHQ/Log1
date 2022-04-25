@@ -76,7 +76,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support(obj):
         data = []
-        for support in obj.support.filter(end=None):
+        for support in obj.support.filter(end=None, is_proxy_support=False):
             data.append({
                 "email": support.support.email,
                 "name": support.support.employee_name,
@@ -96,26 +96,22 @@ class EngineeringSerializer(serializers.ModelSerializer):
             qs = support_qs.first().statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date and obj.start_date >= date.today() and support_status.frequency == 'more_than_2_days':
-                    return "Training"
-                elif support_status.frequency == 'more_than_2_days' and obj.start_date <= date.today():
-                    return "Active"
-                elif support_status.frequency == 'less_than_3_days':
-                    return "Less Active"
-                elif support_status.frequency in ('twice_a_month', 'independent'):
-                    return "Independent"
+                if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
+                    return "training"
+                elif support_status.frequency == 'active' and obj.start_date <= date.today():
+                    return "active"
+                else:
+                    return support_status.frequency
         elif support:
             qs = support.latest('start').statuses.filter(is_current=True)
             if qs:
                 support_status = qs.first()
-                if obj.start_date and obj.start_date >= date.today():
-                    return "Training"
-                elif support_status.frequency == 'more_than_2_days':
-                    return "Active"
-                elif support_status.frequency == 'less_than_3_days':
-                    return "Less Active"
-                elif support_status.frequency in ('twice_a_month', 'independent'):
-                    return "Independent"
+                if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
+                    return "training"
+                elif support_status.frequency == 'active' and obj.start_date <= date.today():
+                    return "active"
+                else:
+                    return support_status.frequency
         return None
 
 
@@ -305,14 +301,9 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     def get_support_status(obj):
         status = obj.statuses.filter(is_current=True).first()
         if obj.project.start_date and obj.project.start_date > date.today():
-            return 'Training'
-        elif status:
-            if status.frequency == 'more_than_2_days':
-                return 'Active'
-            elif status.frequency == 'less_than_3_days':
-                return 'Less_Active'
-            elif status.frequency in ('twice_a_month', 'independent'):
-                return 'Independent'
+            return 'training'
+        elif status and status.frequency:
+            return status.frequency
         else:
             return None
 
@@ -360,15 +351,18 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_duration(obj):
-        if obj.end:
-            duration = obj.end - obj.start
+        if date.today() > obj.start:
+            if obj.end:
+                duration = obj.end - obj.start
+            else:
+                duration = date.today() - obj.start
+            if duration.days < 7:
+                return f"0.0.{duration.days}"
+            months = int(duration.days) // 30
+            weeks = round(int(duration.days - months * 30) // 7, 0)
+            return months + weeks / 10
         else:
-            duration = date.today() - obj.start
-        if duration.days < 7:
-            return f"0.0.{duration.days}"
-        months = int(duration.days) // 30
-        weeks = round(int(duration.days - months * 30) // 7, 0)
-        return months + weeks / 10
+            return 0
 
 
 class EngineerReportSerializer(serializers.ModelSerializer):
@@ -381,7 +375,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_project(obj):
         projects = obj.projects.filter(
-            statuses__is_current=True, statuses__frequency__in=['more_than_2_days', 'less_than_3_days'],
+            statuses__is_current=True, statuses__frequency__in=['active', 'less_active'],
         ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
         data = {
             "bandwidth": len(projects),

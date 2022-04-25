@@ -925,19 +925,24 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
             prev_support = support.statuses.filter(is_current=True).first()
 
+            if support.is_proxy_support is True and support.support.id != data.get('support'):
+                support.support_id = data.get('support')
+                support.save()
+                msg = {'var1': 'person', 'var2': 'proxy'}
+
             if prev_support and prev_support.frequency != data['status']:
                 prev_support.is_current = False
                 prev_support.save()
                 SupportStatus.objects.create(
                     is_current=True, support=support, frequency=data['status'], change_date=data['change_date']
                 )
-                msg = {"msg": "status"}
+                msg = {"var1": "status"}
 
             serializer = ProjectSupportSerializer(support, data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
 
-            desc = f"{request.user.employee_name} updated support {msg.get('msg', 'details')} "
+            desc = f"{request.user.employee_name} updated {msg.get('var2', '')} support {msg.get('var1', 'details')} "
             create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
             return Response({"message": "Support detail is updated"}, status=202)
         except Exception as error:

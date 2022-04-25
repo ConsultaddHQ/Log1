@@ -569,14 +569,14 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             project = support.project
             if project.start_date and project.start_date > date.today():
                 training += 1
-            elif project.support.filter(end=None, statuses__frequency__exact='more_than_2_days',
+            elif project.support.filter(end=None, statuses__frequency__exact='active',
                                         statuses__is_current=True,
                                         project__start_date__lte=date.today()).first():
                 active += 1
-            elif project.support.filter(end=None, statuses__frequency__exact='less_than_3_days',
+            elif project.support.filter(end=None, statuses__frequency__exact='less_active',
                                         statuses__is_current=True).first():
                 less_active += 1
-            elif project.support.filter(end=None, statuses__frequency__in=('twice_a_month', 'independent'),
+            elif project.support.filter(end=None, statuses__frequency='independent',
                                         statuses__is_current=True).first():
                 independent += 1
         counts['total'] = total
@@ -631,14 +631,12 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
             ).order_by('-project__start_date', '-start')
             data = {
                 "total": supports,
-                "training": supports.filter(statuses__frequency__exact='more_than_2_days',
+                "training": supports.filter(statuses__frequency__exact='active',
                                             statuses__is_current=True, project__start_date__gt=date.today()),
-                "active": supports.filter(statuses__frequency__exact='more_than_2_days',
+                "active": supports.filter(statuses__frequency__exact='active',
                                           statuses__is_current=True, project__start_date__lte=date.today()),
-                "less_active": supports.filter(statuses__frequency__exact='less_than_3_days',
-                                               statuses__is_current=True),
-                "independent": supports.filter(statuses__frequency__in=('twice_a_month', 'independent'),
-                                               statuses__is_current=True),
+                "less_active": supports.filter(statuses__frequency__exact='less_active', statuses__is_current=True),
+                "independent": supports.filter(statuses__frequency='independent', statuses__is_current=True),
             }
             if filter_by_status != 'terminated':
                 supports = data[filter_by_status]

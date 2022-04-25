@@ -781,7 +781,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                         int((datetime.now().date() - interview.modified.date()).days) > 15:
                     return Response({"marketer_feedback_due": True}, status=202)
 
-            return Response({"marketer_feedback_due": True}, status=202)
+            return Response({"marketer_feedback_due": False}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1976,12 +1976,12 @@ class InterviewViewSets(ModelViewSet):
         try:
             interview = get_object_or_404(Interview, id=pk)
 
-            ques_answers = create_answer(request, interview, 'Interview')
+            ques_answers = create_answer(request, interview, 'interview')
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
 
             # Activity
-            desc = f"{request.user.employee_name} provided supervisor feedback for I-{interview.id}"
+            desc = f"{request.user.employee_name} provided supervisor feedback for Interview I-{interview.id}"
             create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
 
             return Response({"message": "Feedback submitted"}, status=201)
@@ -2007,6 +2007,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'new': queryset.filter(status='new').count(),
                 'failed': queryset.filter(status='failed').count(),
                 'passed': queryset.filter(status='passed').count(),
+                'retest': queryset.filter(status='retest').count(),
                 'assigned': queryset.filter(status='assigned').count(),
                 'cancelled': queryset.filter(status='cancelled').count(),
                 'feedback_due': queryset.filter(status='feedback_due').count(),
@@ -2503,43 +2504,45 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     "type": 'test_feedback',
                 }
                 create_attachment(file_data)
-            # App Notification
-            user_list = [user for user in test.engineer.all()]
-            user_list.append(test.submitted_by)
-            title = f"Feedback Added for Test :: {test.submission.consultant.name}"
 
-            notification_data = {
-                'title': title,
-                'category': 'alert',
-                'description': title,
-                'target_type': 'user',
-                'sender_user_type': 'user',
-                'parent_type': 'submission',
-                'sender_id': request.user.id,
-                'recipient_user_type': 'user',
-                'parent_id': test.submission.id,
-                'target_id': test.submitted_by.id,
-            }
-            create_notification(user_list, notification_data)
+            if test.status != 'retest':
+                # App Notification
+                user_list = [user for user in test.engineer.all()]
+                user_list.append(test.submitted_by)
+                title = f"Feedback Added for Test :: {test.submission.consultant.name}"
 
-            # Push Notification
-            message_body = {
-                "body": title,
-                "title": title,
-                "category": "alert",
-                "show_in_foreground": True,
-                "click_action": "https://app.log1.com",
-                "data": {
-                    'target': 'test',
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target_id': test.id,
-                    'timestamp': str(datetime.now()),
-                },
-            }
+                notification_data = {
+                    'title': title,
+                    'category': 'alert',
+                    'description': title,
+                    'target_type': 'user',
+                    'sender_user_type': 'user',
+                    'parent_type': 'submission',
+                    'sender_id': request.user.id,
+                    'recipient_user_type': 'user',
+                    'parent_id': test.submission.id,
+                    'target_id': test.submitted_by.id,
+                }
+                create_notification(user_list, notification_data)
 
-            object_ids = [user.id for user in user_list]
-            push_notification(object_ids, message_body)
+                # Push Notification
+                message_body = {
+                    "body": title,
+                    "title": title,
+                    "category": "alert",
+                    "show_in_foreground": True,
+                    "click_action": "https://app.log1.com",
+                    "data": {
+                        'target': 'test',
+                        'is_read': False,
+                        'is_deleted': False,
+                        'target_id': test.id,
+                        'timestamp': str(datetime.now()),
+                    },
+                }
+
+                object_ids = [user.id for user in user_list]
+                push_notification(object_ids, message_body)
 
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)

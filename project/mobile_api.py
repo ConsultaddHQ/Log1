@@ -12,12 +12,13 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 
 from constance import config
+
 from employee.models import User
 from log1.utils import write_exception
+from attachment.models import Attachment
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
-from attachment.serializers import Attachment
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
@@ -634,7 +635,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['POST'], detail=True, url_path='apply')
-    def apply(self, request, pk):
+    def apply(self, request, pk, *args, **kwargs):
         try:
             data = request.data
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
@@ -647,11 +648,11 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             )
 
             if data['duration_type'] == 'hourly':
-                leave.total_hours = data.get("hours")
+                leave.total_hours = float(data.get("hours"))
             elif data['duration_type'] == 'half':
-                leave.total_hours = data.get("hours", 4)
+                leave.total_hours = 4
             elif data['duration_type'] == 'full':
-                leave.total_hours = data.get("hours", 8)
+                leave.total_hours = 8
             else:
                 days = datetime.strptime(leave.to_date, "%Y-%m-%d") - datetime.strptime(leave.from_date, "%Y-%m-%d")
                 leave.total_hours = (days.days + 1)*8
@@ -661,15 +662,14 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             leave_type.save()
 
             content_type = ContentType.objects.get(model='leave')
-            if request.FILES.get('attachments', None):
-                for attachment in request.FILES.get('attachments'):
-                    Attachment.objects.create(
-                        creator_id=1,
-                        object_id=leave.id,
-                        content_type=content_type,
-                        attachment_file=attachment,
-                        attachment_type='consultant_leave',
-                    )
+            if request.FILES.get('attachment', None):
+                Attachment.objects.create(
+                    creator_id=1,
+                    object_id=leave.id,
+                    content_type=content_type,
+                    attachment_type='consultant_leave',
+                    attachment_file=request.FILES.get('attachment'),
+                )
 
             return Response({"message": "leave applied successfully"}, status=201)
         except Exception as error:
