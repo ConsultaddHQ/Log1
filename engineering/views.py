@@ -63,6 +63,10 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         projects = projects.filter(
                             support_required=True, support__isnull=True, created__gt="2021-10-01"
                         )
+                    if filters['assignment'] == 'old_projects':
+                        projects = projects.filter(created__lt="2021-10-01")
+                    if filters['assignment'] == 'support_not_required':
+                        projects = projects.filter(support_required=False)
 
             if filter_for == 'my':
                 projects = projects.filter(support__support=request.user)
@@ -157,6 +161,14 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         "count": projects.filter(
                             support_required=True, support__isnull=True, created__gt="2021-10-01"
                         ).count(),
+                    },
+                    "old_projects": {
+                        "display_name": "Old Projects",
+                        "count": projects.filter(created__lt="2021-10-01").count(),
+                    },
+                    "support_not_required": {
+                        "display_name": "Support Not Required",
+                        "count": projects.filter(support_required=False).count(),
                     }
                 }
             }
@@ -231,6 +243,8 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     {'name': 'all', 'display_name': 'All'},
                     {'name': 'assigned', 'display_name': 'Assigned'},
                     {'name': 'unassigned', 'display_name': 'Unassigned'},
+                    {'name': 'old_projects', 'display_name': 'Old Projects'},
+                    {'name': 'support_not_required', 'display_name': 'Support Not Required'},
                 ]
             }
             return Response({"data": data}, status=200)
