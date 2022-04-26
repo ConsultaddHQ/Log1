@@ -769,18 +769,14 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            test_lst = Test.objects.filter(status='feedback_due')
-            interview_lst = Interview.objects.filter(status='feedback_due')
-            for test in test_lst:
-                if request.user == test.marketer and \
-                        int((datetime.now().date() - test.modified.date()).days) > 15:
-                    return Response({"marketer_feedback_due": True}, status=202)
+            date_passed = date.today() - timedelta(days=15)
+            test_lst = Test.objects.filter(status='feedback_due', submission__created_by=request.user).exclude(
+                modified__range=[date_passed, date.today()])
+            interview_lst = Interview.objects.filter(status='feedback_due', submission__created_by=request.user)\
+                .exclude(modified__range=[date_passed, date.today()])
 
-            for interview in interview_lst:
-                if request.user == interview.marketer and \
-                        int((datetime.now().date() - interview.modified.date()).days) > 15:
-                    return Response({"marketer_feedback_due": True}, status=202)
-
+            if test_lst or interview_lst:
+                return Response({"marketer_feedback_due": True}, status=202)
             return Response({"marketer_feedback_due": False}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -1986,7 +1982,7 @@ class InterviewViewSets(ModelViewSet):
 
             return Response({"message": "Feedback submitted"}, status=201)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -2582,7 +2578,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             return Response({"message": "Feedback submitted", "mail": res}, status=201)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -2602,7 +2598,7 @@ class QuestionViewSets(ModelViewSet):
             serializer = QuestionSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -2641,7 +2637,7 @@ class QuestionViewSets(ModelViewSet):
 
             return Response({"message": "Question added to form"}, status=201)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='parent')
@@ -2664,5 +2660,5 @@ class QuestionViewSets(ModelViewSet):
                 return Response({"data": serializer.data}, status=200)
             return Response({"message": ERROR_MSG, "error": "Child question not found"}, status=404)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

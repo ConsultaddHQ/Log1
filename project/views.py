@@ -917,7 +917,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['put'], detail=True, url_path="details")
+    @action(methods=['put'], detail=True, url_path="update_details")
     def details(self, request, project_id, pk):
         try:
             msg = {}

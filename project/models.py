@@ -1,5 +1,3 @@
-from datetime import date
-
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -9,7 +7,7 @@ from marketing.models import Submission
 from consultant.models import Consultant
 from attachment.models import Attachment
 from employee.models import User, Tagging
-from utils_app.models import TimeStampedModel, Choice
+from utils_app.models import TimeStampedModel
 
 FEEDBACK_CHOICES = (
     ('cfr', 'CFR'),
@@ -273,47 +271,3 @@ class ConsultantFeedback(TimeStampedModel):
 
     def __str__(self):
         return f'{self.id}:{self.consultant.name}:{self.feedback_type}'
-
-
-class ConsultantLeave(TimeStampedModel):
-    year = models.IntegerField(_('Year'))
-    balance = models.FloatField(_('Balance Left'))
-    granted = models.IntegerField(_('Granted Leaves'))
-    is_expired = models.BooleanField(_('Leave Expired'), default=False)
-    leave_type = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name='type')
-    consultant = models.ForeignKey(
-        Consultant, on_delete=models.PROTECT,
-        related_name='leaves', verbose_name='Consultant'
-    )
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.created = timezone.now()
-        self.modified = timezone.now()
-        return super(ConsultantLeave, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.id}:{self.consultant.name}:{self.leave_type.name}'
-
-
-class Leave(TimeStampedModel):
-    attachment = GenericRelation(Attachment)
-    to_date = models.DateField(_("To Date"))
-    from_date = models.DateField(_("From Date"))
-    description = models.TextField(_('Description'), null=True, blank=True)
-    applied_on = models.DateField(_("Leave Apply Date"), default=date.today())
-    status = models.CharField(_('Status'), max_length=30, null=True, blank=True)
-    total_hours = models.FloatField(_('Total Hours'), max_length=30, null=True, blank=True)
-    leave_type = models.ForeignKey(
-        ConsultantLeave, on_delete=models.CASCADE,
-        related_name='leaves', verbose_name='Leave'
-    )
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.created = timezone.now()
-        self.modified = timezone.now()
-        return super(Leave, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return f'{self.leave_type.consultant.name}'

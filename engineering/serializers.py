@@ -76,13 +76,14 @@ class EngineeringSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support(obj):
         data = []
-        for support in obj.support.filter(end=None, is_proxy_support=False):
+        supports = obj.support.filter(end=None, is_proxy_support=False)
+        if not supports and obj.support.filter(is_proxy_support=False):
+            data = "No active support"
+        for support in supports:
             data.append({
                 "email": support.support.email,
                 "name": support.support.employee_name,
             })
-        if len(data) < 1 and obj.support.all():
-            data = "No active support"
         return data
 
     @staticmethod

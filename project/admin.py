@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from project.models import Project, ProjectSupport, SupportStatus, ProjectStatus, ProjectOrder, TimeSheet, \
-    PayrollSchedule, ConsultantFeedback, ConsultantLeave, Leave
+    PayrollSchedule, ConsultantFeedback
 
 
 @admin.register(Project)
@@ -83,20 +83,3 @@ class ConsultantFeedbackAdmin(ExportActionModelAdmin):
     list_filter = ('department', 'feedback_type', 'verdict')
     search_fields = ('id', 'consultant__name', 'consultant__email', 'feedback_type', 'rating', 'created')
     list_display = ('id', 'consultant', 'feedback_type', 'department', 'created_by', 'verdict', 'project')
-
-
-@admin.register(ConsultantLeave)
-class ConsultantLeaveAdmin(ExportActionModelAdmin):
-    actions = ["export_as_csv"]
-    list_filter = ('year', 'leave_type')
-    search_fields = ('id', 'consultant__name', 'year', 'leave_type__name')
-    list_display = ('id', 'leave_type', 'consultant', 'granted', 'balance', 'is_expired', 'year')
-
-
-@admin.register(Leave)
-class LeaveAdmin(ExportActionModelAdmin):
-    actions = ["export_as_csv"]
-    list_filter = ('status', 'leave_type')
-    search_fields = ('id', 'leave_type__consultant__name', 'leave_type__leave_type__name')
-    list_display = ('id', 'leave_type', 'to_date', 'from_date', 'applied_on', 'status', 'total_hours', 'description')
-
