@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -16,15 +16,13 @@ from constance import config
 from employee.models import User
 from log1.utils import write_exception
 from attachment.models import Attachment
-from consultant.models import Consultant
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
-from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave
-from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, LeaveSerializer
+from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus
+from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer
 
 
 # Route - /payroll/
@@ -80,11 +78,11 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
         try:
             if contact_type == 'finance':
                 to = ['finance@consultadd.com']
-                bcc = [config.APP_ADMIN, os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
+                bcc = [config.APP_ADMIN, os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
                 to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
-                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
+                bcc = [os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)
@@ -499,11 +497,11 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
         try:
             if contact_type == 'finance':
                 to = ['finance@consultadd.com']
-                bcc = [config.APP_ADMIN, os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
+                bcc = [config.APP_ADMIN, os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
             elif contact_type == 'support':
-                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
+                bcc = [os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)
@@ -609,91 +607,6 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     "created": attachment.created,
                     "file_name": attachment.filename,
                 })
-
-            return Response({"result": data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-
-# Route - /leave/
-class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
-    queryset = ConsultantLeave.objects.all()
-    serializer_class = ConsultantLeaveSerializer
-    permission_classes = (ConsultantIsAuthenticated,)
-    authentication_classes = (ConsultantTokenAuthentication,)
-
-    @action(methods=['GET'], detail=True, url_path='balance')
-    def balance(self, request, pk):
-        try:
-            year = date.today().year
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year, is_expired=False)
-            serial = ConsultantLeaveSerializer(leaves, many=True)
-            return Response({"result": serial.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    @action(methods=['POST'], detail=True, url_path='apply')
-    def apply(self, request, pk, *args, **kwargs):
-        try:
-            data = request.data
-            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
-            leave = Leave.objects.create(
-                leave_type=leave_type,
-                applied_on=date.today(),
-                to_date=data.get('to_date'),
-                from_date=data.get('from_date'),
-                description=data.get('description', None),
-            )
-
-            if data['duration_type'] == 'hourly':
-                leave.total_hours = float(data.get("hours"))
-            elif data['duration_type'] == 'half':
-                leave.total_hours = 4
-            elif data['duration_type'] == 'full':
-                leave.total_hours = 8
-            else:
-                days = datetime.strptime(leave.to_date, "%Y-%m-%d") - datetime.strptime(leave.from_date, "%Y-%m-%d")
-                leave.total_hours = (days.days + 1)*8
-            leave.status = 'availed'
-            leave.save()
-            leave_type.balance = leave_type.balance - leave.total_hours
-            leave_type.save()
-
-            content_type = ContentType.objects.get(model='leave')
-            if request.FILES.get('attachment', None):
-                Attachment.objects.create(
-                    creator_id=1,
-                    object_id=leave.id,
-                    content_type=content_type,
-                    attachment_type='consultant_leave',
-                    attachment_file=request.FILES.get('attachment'),
-                )
-
-            return Response({"message": "leave applied successfully"}, status=201)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    @action(methods=['GET'], detail=True, url_path='history')
-    def history(self, request, pk):
-        try:
-            consultant = get_object_or_404(Consultant, id=pk)
-            leaves = Leave.objects.filter(leave_type__consultant=consultant, leave_type__is_expired=False)
-            serial = LeaveSerializer(leaves, many=True)
-            return Response({"result": serial.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
-
-    @action(methods=['GET'], detail=True, url_path='type')
-    def type(self, request, pk):
-        try:
-            data = []
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, is_expired=False)
-            for leave in leaves:
-                data.append({"leave_type": leave.leave_type.name, "balance": leave.balance})
 
             return Response({"result": data}, status=200)
         except Exception as error:

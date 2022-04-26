@@ -78,7 +78,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
-            projects = projects.order_by('id').distinct('id')
+            projects = projects.order_by('-id').distinct('id')
 
             counts = {
                 "support_status": {
@@ -175,26 +175,29 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             if filter_json:
                 if 'support_status' in filters:
-                    projects = projects.filter(support_required=True)
                     if filters['support_status'] == 'training':
                         projects = projects.filter(
+                            support_required=True,
                             start_date__gt=date.today(),
                             support__statuses__is_current=True,
                             support__statuses__frequency='active',
                         )
                     elif filters['support_status'] == 'active':
                         projects = projects.filter(
+                            support_required=True,
                             start_date__lte=date.today(),
                             support__statuses__is_current=True,
                             support__statuses__frequency='active',
                         )
                     elif filters['support_status'] == 'less_active':
                         projects = projects.filter(
+                            support_required=True,
                             support__statuses__is_current=True,
                             support__statuses__frequency='less_active',
                         )
                     elif filters['support_status'] == 'independent':
                         projects = projects.filter(
+                            support_required=True,
                             support__statuses__is_current=True,
                             support__statuses__frequency='independent'
                         )
@@ -887,7 +890,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     queryset = queryset.filter(project__submission__client__istartswith=query)
                 elif category == 'vendor_name':
                     queryset = queryset.filter(project__submission__lead__vendor_company__name__istartswith=query)
-                elif category == 'all':
+                else:
                     queryset = queryset.filter(
                         Q(project__consultant__name__istartswith=query) |
                         Q(project__submission__client__istartswith=query) |
