@@ -1,12 +1,13 @@
 import json
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import ContentType
 
 from constance import config
 from employee.models import User
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
-from marketing.models import Submission, Interview
+from marketing.models import Submission, Interview, Question, Answer
 from utils_app.calendar import get_profile_picture
 from log1.utils import write_info, write_exception, post_msg_using_webhook
 
@@ -312,4 +313,48 @@ def test_received_notification(user, test, timezone):
         return "ok"
     except Exception as error:
         write_info(message=error, function='test_received_notification')
+        return str(error)
+
+
+def create_answer(request, obj, model):
+    try:
+        ques_answers = []
+        content_type = ContentType.objects.get(model=model)
+        payload = json.loads(request.data.get('feedback_form'))
+        for data in payload:
+            question = get_object_or_404(Question, id=data['question_id'])
+            if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
+                    and data.get('comment') is not None:
+                value = f'{data.get("answer")}: {data.get("comment")}'
+            else:
+                value = data.get("answer", None)
+
+            answer = Answer.objects.create(
+                answer=value,
+                question=question,
+                object_id=obj.id,
+                submitted_by=request.user,
+                content_type=content_type,
+                parent_question_id=data.get('parent_question_id', None)
+            )
+            attachment_id = f"{question.id}-{answer.parent_question_id}" if answer.parent_question else question.id
+            if request.FILES.getlist(str(attachment_id)):
+                for file in request.FILES.getlist(str(attachment_id)):
+                    file_data = {
+                        "file": file,
+                        "model": "answer",
+                        "object_id": answer.id,
+                        "type": "test_feedback",
+                        "creator": request.user,
+                    }
+                    create_attachment(file_data)
+            ques_answers.append({
+                "id": answer.id,
+                "answer": answer.answer,
+                "question": answer.question.title,
+                "parent_question": answer.parent_question.title if answer.parent_question else None
+            })
+        return ques_answers
+    except Exception as error:
+        write_info(message=error, function='create_answer')
         return str(error)

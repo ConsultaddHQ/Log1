@@ -361,7 +361,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     def directory(self, request):
         first, last = get_page_limits(request)
         try:
-            if request.user.is_superuser:
+            if 'superadmin' in request.user.roles:
                 query = request.GET.get('query', None)
                 users = User.objects.all().exclude(role__name='consultant')
                 if query:
