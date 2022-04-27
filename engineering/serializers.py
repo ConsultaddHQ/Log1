@@ -76,10 +76,10 @@ class EngineeringSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support(obj):
         data = []
-        supports = obj.support.filter(end=None, is_proxy_support=False)
-        if not supports and obj.support.filter(is_proxy_support=False):
+        supports = obj.support.filter(is_proxy_support=False)
+        if supports and not supports.filter(end=None):
             data = "No active support"
-        for support in supports:
+        for support in supports.filter(end=None):
             data.append({
                 "email": support.support.email,
                 "name": support.support.employee_name,
@@ -301,10 +301,11 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support_status(obj):
         status = obj.statuses.filter(is_current=True).first()
-        if obj.project.start_date and obj.project.start_date > date.today():
-            return 'training'
-        elif status and status.frequency:
-            return status.frequency
+        if status:
+            if obj.project.start_date and obj.project.start_date > date.today() and status.frequency == 'active':
+                return 'training'
+            else:
+                return status.frequency
         else:
             return None
 
