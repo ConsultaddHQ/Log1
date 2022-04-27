@@ -922,7 +922,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         engineer = engineer.filter(
                             projects__project__submission__lead__vendor_company__name__istartswith=query
                         )
-                    elif category == 'all':
+                    else:
                         engineer = engineer.filter(
                             Q(employee_name__istartswith=query) |
                             Q(projects__project__consultant__name__istartswith=query) |
@@ -983,7 +983,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         test = test.filter(submission__client__istartswith=query)
                     elif category == 'vendor_name':
                         test = test.filter(submission__lead__vendor_company__name__istartswith=query)
-                    elif category == 'all':
+                    else:
                         test = test.filter(
                             Q(submission__client__istartswith=query) |
                             Q(submission__lead__vendor_company__name__istartswith=query) |
@@ -1023,7 +1023,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         interview = interview.filter(submission__client__istartswith=query)
                     elif category == 'vendor_name':
                         interview = interview.filter(submission__lead__vendor_company__name__istartswith=query)
-                    elif category == 'all':
+                    else:
                         interview = interview.filter(
                             Q(submission__client__istartswith=query) |
                             Q(submission__lead__vendor_company__name__istartswith=query) |
