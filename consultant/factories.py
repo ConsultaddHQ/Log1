@@ -175,7 +175,7 @@ class Setup:
                 is_current=True,
                 support=project_support,
                 change_date=date.today(),
-                frequency='more_than_2_days',
+                frequency='active',
             )
             ConsultantFeedback.objects.create(
                 feedback_type="cfr",

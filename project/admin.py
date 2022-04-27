@@ -38,7 +38,7 @@ class ProjectSupportAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_display = ('id', 'project', 'support', 'start', 'end')
     search_fields = ('id', 'project__consultant__name', 'project__submission__client', 'support__employee_name',
-                     'project__submission__created_by__employee_name')
+                     'project__submission__created_by__employee_name', 'is_proxy_support')
 
 
 @admin.register(SupportStatus)

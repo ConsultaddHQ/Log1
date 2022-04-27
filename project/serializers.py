@@ -1,4 +1,3 @@
-import os
 from datetime import date
 from django.db.models import Q
 from rest_framework import serializers
@@ -291,12 +290,8 @@ class ProjectSupportDetailSerializer(serializers.ModelSerializer):
         elif obj.project.start_date and obj.project.start_date > date.today():
             return 'training'
         elif status:
-            if status.frequency == 'more_than_2_days':
-                return 'active'
-            elif status.frequency == 'less_than_3_days':
-                return 'less_active'
-            elif status.frequency in ('twice_a_month', 'independent'):
-                return 'independent'
+            if status.frequency:
+                return status.frequency
         else:
             return None
 
