@@ -78,7 +78,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
-            projects = projects.order_by('-id').distinct('id')
+            projects = projects.order_by('id').distinct('id')
 
             counts = {
                 "support_status": {
