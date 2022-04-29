@@ -15,29 +15,29 @@ class Command(BaseCommand):
             count = 0
             users, payload = [], {}
             ms = MicrosoftAccount()
-            with open('employee_data1.csv', newline='') as csv_file:
+            with open('employees.csv', newline='') as csv_file:
                 reader = csv.reader(csv_file, delimiter=',', quotechar='|')
                 next(reader)
                 for row in reader:
                     data = {
-                        "email": row[4],
+                        "email": row[2],
                         "user_id": None,
                         "password": None,
                         "member_id": None,
                         "licence_assigned": False,
                         "consultant_id": None,
                     }
-                    qs = Consultant.objects.filter(email=row[3].lower())
+                    qs = Consultant.objects.filter(email=row[1].lower())
                     if qs:
                         consultant = qs.first()
                         password = f"consultadd@1{consultant.id}23"
                         user = {
-                            "name": row[2],
-                            "email": row[4],
-                            "last_name": row[1],
+                            "name": row[0],
+                            "email": row[2],
                             "log1_email": row[3],
-                            "first_name": row[0],
                             "password": password,
+                            "first_name": row[0].split(' ')[0],
+                            "last_name": " ".join(row[0].split(' ')[1:]),
                         }
                         users.append(user)
                         data['password'] = password
@@ -47,6 +47,7 @@ class Command(BaseCommand):
                     user_id, msg = ms.create_account(user)
                     if msg == 'ok':
 
+                        data['user_id'] = user_id
                         # Assigning licence
                         if ms.assign_licence(user_id) == "ok":
                             data['licence_assigned'] = True
@@ -62,8 +63,8 @@ class Command(BaseCommand):
                             print(row[2], "Licence not assigned")
                     else:
                         print(row[2], user_id)
-                    if row[4] not in payload:
-                        payload[row[4]] = data
+                    if row[2] not in payload:
+                        payload[row[2]] = data
 
             fields = ['first_name', 'last_name', 'name', 'log1_email', 'email', 'password']
             with open('ms_creds.csv', 'w') as csvfile:

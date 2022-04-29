@@ -33,10 +33,11 @@ def create_remote_consultant(request):
         consultant = None
         if remote_consultant_id:
             if request.data.get("remote_consultant_type", None) == 'user':
-                user = User.objects.filter(id=remote_consultant_id)
-                if not user:
+                qs = User.objects.filter(id=remote_consultant_id)
+                if not qs:
                     write_exception(message=f"User not found with ID {remote_consultant_id}")
                     return None
+                user = qs.first()
                 consultant, _ = Consultant.objects.get_or_create(email=user.email)
                 consultant.remote_only = True
                 consultant.gender = user.gender

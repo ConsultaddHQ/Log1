@@ -14,7 +14,7 @@ class ProjectUpdateAdmin(ExportActionModelAdmin):
 class ProjectDescriptionAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     search_fields = ('id', 'project__consultant__name')
-    list_display = ('id', 'project', 'remark', 'description', 'update_by', 'technology')
+    list_display = ('id', 'project', 'remark', 'description', 'update_by', 'technology', 'timezone')
 
 
 @admin.register(TrainingAgenda)
