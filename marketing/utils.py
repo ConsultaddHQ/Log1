@@ -95,7 +95,11 @@ def submission_is_complete(obj):
 
 def get_interview_title(interview):
     try:
-        return f"""CTB - {interview.supervisor.employee_name} :: {interview.round}R :: 
+        is_consultant = interview.supervisor.employee_id == 9999 or False
+        call_supervisor = interview.consultant.name if is_consultant else interview.supervisor.employee_name
+
+        return f"""Call Supervisor - {call_supervisor}
+            {'(Consultant)' if is_consultant == True else ""} :: {interview.round}R :: 
             {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
             {interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} :: 
             {interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"""
