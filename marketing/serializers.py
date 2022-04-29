@@ -429,7 +429,7 @@ class SubmissionConProfile(serializers.ModelSerializer):
 
 
 class InterviewV2Serializer(serializers.ModelSerializer):
-    supervisor = UserDetailSerializer()
+    supervisor = serializers.SerializerMethodField()
     guest = UserDetailSerializer(many=True)
     permission = serializers.SerializerMethodField()
     attachment_link = serializers.SerializerMethodField()
@@ -466,6 +466,20 @@ class InterviewV2Serializer(serializers.ModelSerializer):
                 "question__position")
             return QuestionAnswerSerializer(answers, many=True).data
         return None
+
+    @staticmethod
+    def get_supervisor(obj):
+        if obj.supervisor.employee_id == 9999:
+            data = {
+                "call_given_by": "Consultant",
+                "supervisor_name": obj.submission.consultant.name
+            }
+        else:
+            data = {
+                "call_given_by": "Interviewee",
+                "supervisor_name": obj.supervisor.employee_name
+            }
+        return data
 
 
 class QuestionAnswerSerializer(serializers.ModelSerializer):
