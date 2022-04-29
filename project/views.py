@@ -791,14 +791,14 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             support_person = get_object_or_404(User, id=request.data.get('support', None))
             supports = project.support.filter(end=None, is_proxy_support=False)
 
-            if {'support_id': support_person.id} in supports.values('support_id'):
-                return Response({"message": "Support person is already active for this support"}, status=400)
-
             if is_proxy_support and supports.filter(support=support_person, statuses__frequency="active",
                                                     statuses__is_current=True):
                 return Response(
                     {"message": "Proxy support person should be different than active support person"}, status=400
                 )
+
+            if {'support_id': support_person.id} in supports.values('support_id'):
+                return Response({"message": "Support person is already active for this support"}, status=400)
 
             end = request.data.get('end', None)
             start = request.data.get('start', None)
