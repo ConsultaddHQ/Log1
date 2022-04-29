@@ -794,7 +794,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             if {'support_id': support_person.id} in supports.values('support_id'):
                 return Response({"message": "Support person is already active for this support"}, status=400)
 
-            if is_proxy_support and supports.filter(support=support_person, statuses__frequency="active", statuses__is_current=True):
+            if is_proxy_support and supports.filter(support=support_person, statuses__frequency="active",
+                                                    statuses__is_current=True):
                 return Response(
                     {"message": "Proxy support person should be different than active support person"}, status=400
                 )
