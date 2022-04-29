@@ -786,8 +786,18 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
     def create(self, request, *args, **kwargs):
         try:
+            is_proxy_support = request.data.get('is_proxy_support', False)
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
-            support = get_object_or_404(User, id=request.data.get('support', None))
+            support_person = get_object_or_404(User, id=request.data.get('support', None))
+            supports = project.support.filter(end=None, is_proxy_support=False)
+
+            if {'support_id': support_person.id} in supports.values('support_id'):
+                return Response({"message": "Support person is already active for this support"}, status=400)
+
+            if is_proxy_support and supports.filter(support=support_person, statuses__frequency="active", statuses__is_current=True):
+                return Response(
+                    {"message": "Proxy support person should be different than active support person"}, status=400
+                )
 
             end = request.data.get('end', None)
             start = request.data.get('start', None)
@@ -797,23 +807,23 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             support_qs = project.support.exists()
             project_support = ProjectSupport.objects.create(
                 project=project, is_proxy_support=request.data.get('is_proxy_support', False),
-                support=support, start=start, end=end, feedback=request.data.get('feedback', None),
+                support=support_person, start=start, end=end, feedback=request.data.get('feedback', None),
             )
             if not project_support.is_proxy_support:
                 SupportStatus.objects.create(
                     is_current=True, support=project_support, change_date=start, frequency=request.data.get('status'),
                 )
 
-            if request.user.id == support.id:
+            if request.user.id == support_person.id:
                 if project_support.is_proxy_support:
                     desc = f"{request.user.employee_name} added himself as proxy person"
                 else:
                     desc = f"{request.user.employee_name} added himself as support person"
             else:
                 if project_support.is_proxy_support:
-                    desc = f"{request.user.employee_name} added {support.employee_name} as proxy person"
+                    desc = f"{request.user.employee_name} added {support_person.employee_name} as proxy person"
                 else:
-                    desc = f"{request.user.employee_name} added {support.employee_name} as support person"
+                    desc = f"{request.user.employee_name} added {support_person.employee_name} as support person"
             create_activity(project.id, 'projectsupport', request.user, desc, 'created')
 
             if not support_qs:
@@ -926,6 +936,15 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             prev_support = support.statuses.filter(is_current=True).first()
 
             if support.is_proxy_support is True and support.support.id != data.get('support'):
+                supports = ProjectSupport.objects.filter(
+                    statuses__is_current=True, is_proxy_support=False,
+                    support_id=data.get('support'), statuses__frequency="active"
+                )
+                if supports:
+                    return Response(
+                        {"message": "Proxy support person should be different than active support person"}, status=400
+                    )
+
                 support.support_id = data.get('support')
                 support.save()
                 msg = {'var1': 'person', 'var2': 'proxy'}
