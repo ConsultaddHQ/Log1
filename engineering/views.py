@@ -834,6 +834,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def test_status_filter_count(queryset):
         return [
             {"name": "New", "count": queryset.filter(status='new').count()},
+            {"name": "Retest", "count": queryset.filter(status='retest').count()},
             {"name": "Passed", "count": queryset.filter(status='passed').count()},
             {"name": "Failed", "count": queryset.filter(status='failed').count()},
             {"name": "Assigned", "count": queryset.filter(status='assigned').count()},
