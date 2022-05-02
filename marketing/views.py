@@ -1985,6 +1985,36 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='reasons')
+    def feedback(self, request):
+        try:
+            passed_reasons = [
+                ('call_went_well', 'Call went well'),
+                ('coding_cleared', 'Coding cleared'),
+                ('supervisor_was_well_prepared', 'Supervisor was well prepared'),
+                ('interviewers_were_easy_to_handle', 'Interviewers were easy to handle'),
+                ('proper_notes_were_provided_by_the_marketer', 'Proper notes were provided by the marketer'),
+            ]
+            cancel_reasons = [
+                ('resume_error', 'Error In Resume'),
+                ('hired_else', 'Hired Someone Else'),
+                ('internal_hiring', 'Internal Hiring'),
+                ('system_updated', 'System Auto Update'),
+                ('caught_mimicking', 'Caught us Mimicking'),
+                ('insufficient_skills', 'Insufficient Skills'),
+                ('test_failed', 'Test Failed during Interview'),
+                ('feedback_not_received', 'Never Received Feedback'),
+                ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
+                ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
+                ('client_filled_role_in_fullTime_basis', 'Client Filled Role in FullTime Basis'),
+                ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
+            ]
+
+            return Response({"pass_reasons": passed_reasons, "cancel_reasons": cancel_reasons}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /test/
 class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
