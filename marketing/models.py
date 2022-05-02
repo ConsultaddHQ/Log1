@@ -385,6 +385,7 @@ class Interview(TimeStampedModel):
         ('feedback_not_received', 'Never Received Feedback'),
         ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
         ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
+        ('client_filled_role_in_fullTime_basis', 'Client Filled Role in FullTime Basis'),
         ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
     )
     PASSED_CHOICES = (
