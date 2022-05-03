@@ -940,6 +940,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             data = request.data
             support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
             prev_support = support.statuses.filter(is_current=True).first()
+
             if support.is_proxy_support is True and support.support.id != data.get('support'):
                 supports = ProjectSupport.objects.filter(
                     statuses__is_current=True, is_proxy_support=False,
