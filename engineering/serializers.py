@@ -61,8 +61,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
             if not description.technology or not description.timezone:
                 return False
             return True
-        else:
-            return False
+        return False
 
     @staticmethod
     def get_submission(obj):

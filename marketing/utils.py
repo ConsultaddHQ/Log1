@@ -352,7 +352,7 @@ def sup_feedback_notification(title, payload, user):
         post_msg_using_webhook(config.interview_feedback_url, data)
         return "ok"
     except Exception as error:
-        write_info(message=error, function='coder_request_notification')
+        write_info(message=error, function='sup_feedback_notification')
         return str(error)
 
 
