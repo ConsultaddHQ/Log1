@@ -22,13 +22,14 @@ class EngineeringSerializer(serializers.ModelSerializer):
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
     support_status = serializers.SerializerMethodField()
+    is_description = serializers.SerializerMethodField()
     project_status = serializers.SerializerMethodField()
     assignment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
-                  'remark', 'assignment_status', 'support_required')
+                  'remark', 'assignment_status', 'support_required', 'is_description')
 
     @staticmethod
     def get_remark(obj):
@@ -52,6 +53,16 @@ class EngineeringSerializer(serializers.ModelSerializer):
             return "Assigned"
         else:
             return "Unassigned"
+
+    @staticmethod
+    def get_is_description(obj):
+        description = obj.description
+        if description:
+            if not description.technology or not description.timezone or not description.description:
+                return False
+            return True
+        else:
+            return False
 
     @staticmethod
     def get_submission(obj):
@@ -325,11 +336,23 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_description(obj):
         if hasattr(obj.project, 'description'):
+            project_description = obj.project.description
+            if project_description.technology:
+                technology = project_description.technology
+            elif obj.project.submission.lead.position:
+                technology = obj.project.submission.lead.position.display_name
+            else:
+                technology = None
             return {
-                "timezone": obj.project.description.timezone,
-                "technology": obj.project.description.technology
+                "technology": technology,
+                "timezone": project_description.timezone
             }
-        return None
+        else:
+            return {
+                "timezone": None,
+                "technology": obj.project.submission.lead.position.display_name
+                if obj.project.submission.lead.position.display_name else None
+            }
 
     @staticmethod
     def get_modified_at(obj):

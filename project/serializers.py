@@ -244,6 +244,7 @@ class ProjectSupportCreateSerializer(serializers.ModelSerializer):
 class ProjectSupportSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
+    is_description = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
@@ -266,6 +267,16 @@ class ProjectSupportSerializer(serializers.ModelSerializer):
                 "change_date": status.first().change_date,
             }
         return None
+
+    @staticmethod
+    def get_is_description(obj):
+        description = obj.project.description
+        if description:
+            if not description.technology or not description.timezone or not description.description:
+                return False
+            return True
+        else:
+            return False
 
 
 class ProjectSupportDetailSerializer(serializers.ModelSerializer):
