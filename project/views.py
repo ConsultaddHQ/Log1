@@ -939,15 +939,11 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             msg = {}
             data = request.data
             support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
-            active_supports = ProjectSupport.objects.filter(
-                is_proxy_support=False, statuses__frequency="active", statuses__is_current=True, project_id=project_id
-            )
             prev_support = support.statuses.filter(is_current=True).first()
-            breakpoint()
-            if support.is_proxy_support is True and data.get('support') not in active_supports:
+            if support.is_proxy_support is True and support.support.id != data.get('support'):
                 supports = ProjectSupport.objects.filter(
                     statuses__is_current=True, is_proxy_support=False,
-                    support_id=data.get('support'), statuses__frequency="active"
+                    support_id=data.get('support'), statuses__frequency="active", project_id=project_id
                 )
                 if supports:
                     return Response(
