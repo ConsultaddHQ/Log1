@@ -22,14 +22,14 @@ class EngineeringSerializer(serializers.ModelSerializer):
     consultant = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
     support_status = serializers.SerializerMethodField()
-    is_description = serializers.SerializerMethodField()
     project_status = serializers.SerializerMethodField()
     assignment_status = serializers.SerializerMethodField()
+    is_project_description = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = ('id', 'consultant', 'support', 'start_date', 'submission', 'project_status', 'support_status',
-                  'remark', 'assignment_status', 'support_required', 'is_description')
+                  'remark', 'assignment_status', 'support_required', 'is_project_description')
 
     @staticmethod
     def get_remark(obj):
@@ -55,7 +55,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
             return "Unassigned"
 
     @staticmethod
-    def get_is_description(obj):
+    def get_is_project_description(obj):
         description = obj.description
         if description:
             if not description.technology or not description.timezone:

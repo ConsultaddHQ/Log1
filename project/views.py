@@ -779,7 +779,12 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
-            return Response({"data": serializer.data}, status=200)
+            if hasattr(project, 'description'):
+                description = project.description
+                is_description = False if not description.timezone or not description.technology else True
+            else:
+                is_description = False
+            return Response({"data": serializer.data, "is_project_description": is_description}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
