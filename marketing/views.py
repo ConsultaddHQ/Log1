@@ -2286,7 +2286,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 return Response({"error": 'This is not your submission'}, status=400)
             if submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
                 return Response(
-                    {"message": "Submit the feedback of previous test on this submission before creating a new test"}
+                    {"message": "Submit the feedback of previous test on this submission before creating a new test"},
+                    status=400
                 )
 
             is_video, is_offline, con_informed = False, False, False
