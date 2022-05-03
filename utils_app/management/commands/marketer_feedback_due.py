@@ -66,7 +66,7 @@ class Command(BaseCommand):
                             "title": "Marketers whose tests/interviews are in feedback due status",
                             "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
                         }
-                        res, msg = post_msg_using_webhook(config.engineering_url, data)
+                        res, msg = post_msg_using_webhook(config.marketing_report_url, data)
                         if msg == 'error':
                             print(res)
                             continue
@@ -82,7 +82,7 @@ class Command(BaseCommand):
                     "text": "No Pending test"
                 }
 
-            res, msg = post_msg_using_webhook(config.engineering_url, data)
+            res, msg = post_msg_using_webhook(config.marketing_report_url, data)
             if msg == 'error':
                 raise Exception(res)
         except Exception as error:
