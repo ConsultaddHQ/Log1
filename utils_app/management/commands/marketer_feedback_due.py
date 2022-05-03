@@ -63,7 +63,7 @@ class Command(BaseCommand):
                     index = index + 1
                     if index == 46:
                         data = {
-                            "title": "Marketers whose tests/interviews are in feedback due status",
+                            "title": "Marketers whose Tests/Interviews are in feedback due status",
                             "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
                         }
                         res, msg = post_msg_using_webhook(config.marketing_report_url, data)
@@ -73,12 +73,12 @@ class Command(BaseCommand):
                         text, index = column_names, 0
 
                 data = {
-                    "title": "Marketers whose tests/interviews are in feedback due status",
+                    "title": "Marketers whose Tests/Interviews are in feedback due status",
                     "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
                 }
             else:
                 data = {
-                    "title": "Marketers whose tests/interviews are in feedback due status",
+                    "title": "Marketers whose Tests/Interviews are in feedback due status",
                     "text": "No Pending test"
                 }
 

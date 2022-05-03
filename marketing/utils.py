@@ -340,8 +340,8 @@ def sup_feedback_notification(title, payload, user):
         }
         for ques_ans in payload:
             answer = ques_ans['answer']
-            if answer is True or answer is False:
-                answer = "Yes" if answer is True else "No"
+            if isinstance(answer, bool):
+                answer = "Yes" if answer else "No"
             elif '[' in answer:
                 answer = answer.replace(']', '').replace('[', '').replace('"', '')
             data['sections'][0]["facts"].append({
