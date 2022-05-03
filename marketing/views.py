@@ -2284,7 +2284,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
             if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
-            elif submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
+            if submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
                 return Response(
                     {"message": "Submit the feedback of previous test on this submission before creating a new test"}
                 )
