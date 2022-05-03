@@ -58,7 +58,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
     def get_is_description(obj):
         description = obj.description
         if description:
-            if not description.technology or not description.timezone or not description.description:
+            if not description.technology or not description.timezone:
                 return False
             return True
         else:
