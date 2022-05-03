@@ -320,6 +320,42 @@ def test_received_notification(user, test, timezone):
         return str(error)
 
 
+def sup_feedback_notification(title, payload, user):
+    try:
+        profile_path = get_profile_picture(user)
+        data = {
+            "@type": "MessageCard",
+            "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
+            "summary": f"Supervisor feedback for interview",
+            "sections": [
+                {
+                    "activityImage": profile_path,
+                    "activityTitle": "Supervisor Feedback",
+                    "activitySubtitle": f"***{title}***",
+                    "facts": [],
+                    "markdown": True
+                }
+            ]
+        }
+        for ques_ans in payload:
+            answer = ques_ans['answer']
+            if answer is True or answer is False:
+                answer = "Yes" if answer is True else "No"
+            elif '[' in answer:
+                answer = answer.replace(']', '').replace('[', '').replace('"', '')
+            data['sections'][0]["facts"].append({
+                "name": ques_ans['question'],
+                "value": answer
+            })
+
+        post_msg_using_webhook(config.interview_feedback_url, data)
+        return "ok"
+    except Exception as error:
+        write_info(message=error, function='coder_request_notification')
+        return str(error)
+
+
 def create_answer(request, obj, model):
     try:
         ques_answers = []

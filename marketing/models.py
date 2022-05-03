@@ -295,7 +295,6 @@ class Test(TimeStampedModel):
         ('new', 'New'),
         ('passed', 'Passed'),
         ('failed', 'Failed'),
-        ('retest', 'Retest'),
         ('assigned', 'Assigned'),
         ('cancelled', 'Cancelled'),
         ('feedback_due', 'Feedback Due'),
@@ -385,8 +384,8 @@ class Interview(TimeStampedModel):
         ('feedback_not_received', 'Never Received Feedback'),
         ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
         ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
-        ('client_filled_role_in_fullTime_basis', 'Client Filled Role in FullTime Basis'),
         ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
+        ('client_decided_to_fill_the_role_on_a_full-time_basis', 'Client Decided to Fill the Role on a Full-Time Basis'),
     )
     PASSED_CHOICES = (
         ('call_went_well', 'Call went well'),
@@ -414,7 +413,7 @@ class Interview(TimeStampedModel):
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
-        max_length=50, choices=FAILURE_CHOICES),
+        max_length=80, choices=FAILURE_CHOICES),
         null=True, blank=True
     )
     passed_reason = ArrayField(models.CharField(
