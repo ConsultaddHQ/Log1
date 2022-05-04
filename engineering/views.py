@@ -313,7 +313,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def support(self, request, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
-            project.support_required = request.data.get('is_required', True)
+            project.support_required = request.data.get('is_required')
             project.save()
 
             # create_activity
