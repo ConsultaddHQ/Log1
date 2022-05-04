@@ -779,7 +779,12 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             serializer = ProjectSupportSerializer(project.support.all().order_by('-created'), many=True)
-            return Response({"data": serializer.data}, status=200)
+            if hasattr(project, 'description'):
+                description = project.description
+                is_description = False if not description.timezone or not description.technology else True
+            else:
+                is_description = False
+            return Response({"data": serializer.data, "is_project_description": is_description}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -791,14 +796,14 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             support_person = get_object_or_404(User, id=request.data.get('support', None))
             supports = project.support.filter(end=None, is_proxy_support=False)
 
-            if {'support_id': support_person.id} in supports.values('support_id'):
-                return Response({"message": "Support person is already active for this support"}, status=400)
-
             if is_proxy_support and supports.filter(support=support_person, statuses__frequency="active",
-                                                    statuses__is_current=True):
+                                                    statuses__is_current=True, project=project):
                 return Response(
                     {"message": "Proxy support person should be different than active support person"}, status=400
                 )
+
+            if {'support_id': support_person.id} in supports.values('support_id'):
+                return Response({"message": "Support person is already active for this support"}, status=400)
 
             end = request.data.get('end', None)
             start = request.data.get('start', None)
@@ -939,7 +944,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             if support.is_proxy_support is True and support.support.id != data.get('support'):
                 supports = ProjectSupport.objects.filter(
                     statuses__is_current=True, is_proxy_support=False,
-                    support_id=data.get('support'), statuses__frequency="active"
+                    support_id=data.get('support'), statuses__frequency="active", project_id=project_id
                 )
                 if supports:
                     return Response(
