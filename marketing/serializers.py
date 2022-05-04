@@ -1,3 +1,4 @@
+from datetime import datetime
 from rest_framework import serializers
 
 from marketing.models import *
@@ -266,7 +267,10 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_supervisor_feedback(obj):
-        if obj.supervisor_feedback.all():
+        prv_date = datetime.fromisoformat("2022-05-05")
+        if obj.start_time.replace(tzinfo=None) < prv_date:
+            return True
+        elif obj.supervisor_feedback.all():
             return True
         return False
 
