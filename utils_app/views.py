@@ -27,7 +27,7 @@ class CityViewSet(ListModelMixin, GenericViewSet):
         try:
             query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
             city = City.objects.filter(name__istartswith=query)
-            data = city[:10].values('id', 'name', 'state', 'country')
+            data = city[:15].values('id', 'name', 'state', 'country')
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)

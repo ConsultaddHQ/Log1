@@ -763,6 +763,25 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @action(methods=['get'], detail=False, url_path='feedback_due')
+    def marketer_feedback_due(self, request):
+        try:
+            if 'marketer' not in request.user.roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            date_passed = date.today() - timedelta(days=15)
+            test_lst = Test.objects.filter(status='feedback_due', submission__created_by=request.user).exclude(
+                modified__range=[date_passed, date.today()])
+            interview_lst = Interview.objects.filter(status='feedback_due', submission__created_by=request.user)\
+                .exclude(modified__range=[date_passed, date.today()])
+
+            if test_lst or interview_lst:
+                return Response({"marketer_feedback_due": True}, status=202)
+            return Response({"marketer_feedback_due": False}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['get'], detail=True, url_path="feedback_check")
     def feedback_check(self, request, pk):
         try:
@@ -1092,6 +1111,9 @@ class InterviewViewSets(ModelViewSet):
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
 
                 if 'ctb' in filters and len(filters["ctb"]) > 0:
                     queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
@@ -1945,6 +1967,36 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
+    @action(methods=['post'], detail=True, url_path='supervisor_feedback')
+    def feedback(self, request, pk):
+        try:
+            interview = get_object_or_404(Interview, id=pk)
+
+            ques_answers = create_answer(request, interview, 'interview')
+            if not ques_answers:
+                return Response({"message": "No feedback given"}, status=400)
+
+            # Activity
+            desc = f"{request.user.employee_name} provided supervisor feedback for Interview I-{interview.id}"
+            create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
+
+            title = get_interview_title(interview)
+            sup_feedback_notification(title, ques_answers, request.user)
+            return Response({"message": "Feedback submitted"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='reasons')
+    def reason(self, request):
+        try:
+            passed_reasons = Interview.PASSED_CHOICES
+            failed_reasons = Interview.FAILURE_CHOICES
+            return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /test/
 class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin):
@@ -2065,10 +2117,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
                 else:
                     engineer = 'NA'
-                test_docs = test.attachments.filter(attachment_type='test_submit')
-                for doc in test_docs:
-                    response, error = download_s3_object(doc.attachment_file.name)
-                    path.append(response)
+                for answer in data:
+                    if answer['answer'] == 'submitted':
+                        ans = Answer.objects.get(id=answer['id'])
+                        test_docs = ans.attachments.filter(attachment_type='test_feedback')
+                        for doc in test_docs:
+                            response, error = download_s3_object(doc.attachment_file.name)
+                            path.append(response)
+
                 to = [created_by.email]
                 title = f"Test Completed"
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
@@ -2076,10 +2132,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 mail_data = {
                     'to': to, 'cc': cc, 'bcc': [],
                     'subject': subject, 'attachments': path,
-                    'template': '../templates/submit_test.html',
+                    'template': '../templates/submit_engineer_feedback.html',
                     'context': {
-                        'title': title, 'engineer': engineer,
-                        'remarks': data['remarks'] if data['remarks'] else 'NA'
+                        'engineer': engineer, 'title': title,
+                        'details': data, 'remarks': test.engineer_remarks,
                     },
                 }
                 res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
@@ -2208,6 +2264,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
             if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
+            if submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
+                return Response(
+                    {"message": "Submit the feedback of previous test on this submission before creating a new test"},
+                    status=400
+                )
 
             is_video, is_offline, con_informed = False, False, False
 
@@ -2455,6 +2516,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     "type": 'test_feedback',
                 }
                 create_attachment(file_data)
+
             # App Notification
             user_list = [user for user in test.engineer.all()]
             user_list.append(test.submitted_by)
@@ -2508,36 +2570,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 engineer = User.objects.get(employee_id=emp_id)
                 test.engineer.add(engineer)
 
-            content_type = ContentType.objects.get(model='test')
-            payload = json.loads(request.data.get('feedback_form'))
-            for data in payload:
-                question = get_object_or_404(Question, id=data['question_id'])
-                if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
-                        and data.get('comment') is not None:
-                    value = f'{data.get("answer")}: {data.get("comment")}'
-                else:
-                    value = data.get("answer", None)
-
-                answer = Answer.objects.create(
-                    answer=value,
-                    question=question,
-                    object_id=test.id,
-                    submitted_by=request.user,
-                    content_type=content_type,
-                    parent_question_id=data.get('parent_question_id', None)
-                )
-                attachment_id = f"{question.id}-{answer.parent_question_id}" if answer.parent_question else question.id
-                if request.FILES.getlist(str(attachment_id)):
-                    for file in request.FILES.getlist(str(attachment_id)):
-                        file_data = {
-                            "file": file,
-                            "model": "answer",
-                            "object_id": answer.id,
-                            "type": "test_feedback",
-                            "creator": request.user,
-                        }
-                        create_attachment(file_data)
-
+            ques_answers = create_answer(request, test, 'test')
+            if not ques_answers:
+                return Response({"message": "No feedback given"}, status=400)
             test.status = 'feedback_due'
             test.submitted_by = request.user
             test.submit_date = datetime.now()
@@ -2551,14 +2586,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # test submit mail
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, request.data, 'submit', request)
+                res, error = self.send_test_mail(test, ques_answers, 'submit', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
 
             return Response({"message": "Feedback submitted", "mail": res}, status=201)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
@@ -2578,7 +2613,7 @@ class QuestionViewSets(ModelViewSet):
             serializer = QuestionSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
@@ -2617,7 +2652,7 @@ class QuestionViewSets(ModelViewSet):
 
             return Response({"message": "Question added to form"}, status=201)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='parent')
@@ -2640,5 +2675,5 @@ class QuestionViewSets(ModelViewSet):
                 return Response({"data": serializer.data}, status=200)
             return Response({"message": ERROR_MSG, "error": "Child question not found"}, status=404)
         except Exception as error:
-            write_info(error, request)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

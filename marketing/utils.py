@@ -1,12 +1,13 @@
 import json
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import ContentType
 
 from constance import config
 from employee.models import User
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
-from marketing.models import Submission, Interview
+from marketing.models import Submission, Interview, Question, Answer
 from utils_app.calendar import get_profile_picture
 from log1.utils import write_info, write_exception, post_msg_using_webhook
 
@@ -94,7 +95,11 @@ def submission_is_complete(obj):
 
 def get_interview_title(interview):
     try:
-        return f"""CTB - {interview.supervisor.employee_name} :: {interview.round}R :: 
+        is_consultant = interview.supervisor.employee_id == 9999 or False
+        call_supervisor = interview.consultant.name if is_consultant else interview.supervisor.employee_name
+
+        return f"""Call Supervisor - {call_supervisor}
+            {'(Consultant)' if is_consultant == True else ""} :: {interview.round}R :: 
             {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
             {interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} :: 
             {interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"""
@@ -312,4 +317,84 @@ def test_received_notification(user, test, timezone):
         return "ok"
     except Exception as error:
         write_info(message=error, function='test_received_notification')
+        return str(error)
+
+
+def sup_feedback_notification(title, payload, user):
+    try:
+        profile_path = get_profile_picture(user)
+        data = {
+            "@type": "MessageCard",
+            "themeColor": "#0076D7",
+            "@context": "http://schema.org/extensions",
+            "summary": f"Supervisor feedback for interview",
+            "sections": [
+                {
+                    "activityImage": profile_path,
+                    "activityTitle": "Supervisor Feedback",
+                    "activitySubtitle": f"***{title}***",
+                    "facts": [],
+                    "markdown": True
+                }
+            ]
+        }
+        for ques_ans in payload:
+            answer = ques_ans['answer']
+            if isinstance(answer, bool):
+                answer = "Yes" if answer else "No"
+            elif '[' in answer:
+                answer = answer.replace(']', '').replace('[', '').replace('"', '')
+            data['sections'][0]["facts"].append({
+                "name": ques_ans['question'],
+                "value": answer
+            })
+
+        post_msg_using_webhook(config.interview_feedback_url, data)
+        return "ok"
+    except Exception as error:
+        write_info(message=error, function='sup_feedback_notification')
+        return str(error)
+
+
+def create_answer(request, obj, model):
+    try:
+        ques_answers = []
+        content_type = ContentType.objects.get(model=model)
+        payload = json.loads(request.data.get('feedback_form'))
+        for data in payload:
+            question = get_object_or_404(Question, id=data['question_id'])
+            if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
+                    and data.get('comment') is not None:
+                value = f'{data.get("answer")}: {data.get("comment")}'
+            else:
+                value = data.get("answer", None)
+
+            answer = Answer.objects.create(
+                answer=value,
+                question=question,
+                object_id=obj.id,
+                submitted_by=request.user,
+                content_type=content_type,
+                parent_question_id=data.get('parent_question_id', None)
+            )
+            attachment_id = f"{question.id}-{answer.parent_question_id}" if answer.parent_question else question.id
+            if request.FILES.getlist(str(attachment_id)):
+                for file in request.FILES.getlist(str(attachment_id)):
+                    file_data = {
+                        "file": file,
+                        "model": "answer",
+                        "object_id": answer.id,
+                        "type": "test_feedback",
+                        "creator": request.user,
+                    }
+                    create_attachment(file_data)
+            ques_answers.append({
+                "id": answer.id,
+                "answer": answer.answer,
+                "question": answer.question.title,
+                "parent_question": answer.parent_question.title if answer.parent_question else None
+            })
+        return ques_answers
+    except Exception as error:
+        write_info(message=error, function='create_answer')
         return str(error)

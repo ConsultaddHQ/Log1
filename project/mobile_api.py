@@ -12,11 +12,12 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 
 from constance import config
+
 from employee.models import User
 from log1.utils import write_exception
+from attachment.models import Attachment
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
-from attachment.serializers import Attachment
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
@@ -77,11 +78,11 @@ class TimeSheetV2ViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Upd
         try:
             if contact_type == 'finance':
                 to = ['finance@consultadd.com']
-                bcc = [config.APP_ADMIN, os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
+                bcc = [config.APP_ADMIN, os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
             elif contact_type == 'support':
                 to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
-                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
+                bcc = [os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)
@@ -496,11 +497,11 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
         try:
             if contact_type == 'finance':
                 to = ['finance@consultadd.com']
-                bcc = [config.APP_ADMIN, os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 subject = f'Timesheet app issue from {request.user.name} :: {str(datetime.now())}'
+                bcc = [config.APP_ADMIN, os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
             elif contact_type == 'support':
-                bcc = [os.environ.get('TIMESHEET_DEVELOPER_EMAIL')]
                 to = [config.APP_ADMIN, config.TIMESHEET_APP_ADMIN]
+                bcc = [os.environ.get('DEVELOPER_EMAIL'), os.environ.get('PROJECT_OWNER')]
                 subject = f'Bug Report from :: {request.user.email} :: {phone_type} :: {str(datetime.now())}'
             else:
                 return Response({"result": "Select correct option"}, status=400)

@@ -1,3 +1,4 @@
+from datetime import datetime
 from rest_framework import serializers
 
 from marketing.models import *
@@ -209,8 +210,9 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 class InterviewListSerializer(serializers.ModelSerializer):
     guest = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
-    supervisor_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
+    supervisor_detail = serializers.SerializerMethodField()
+    supervisor_feedback = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
 
     class Meta:
@@ -229,6 +231,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
             "marketer_name": obj.marketer.employee_name,
             "vendor": submission.lead.vendor_company.name,
             "project": True if hasattr(submission, "project") else False,
+            "position_name": submission.lead.position.display_name if submission.lead.position else None,
         }
 
     @staticmethod
@@ -236,8 +239,18 @@ class InterviewListSerializer(serializers.ModelSerializer):
         return obj.consultant.name
 
     @staticmethod
-    def get_supervisor_name(obj):
-        return obj.supervisor.employee_name
+    def get_supervisor_detail(obj):
+        if obj.supervisor.employee_id == 9999:
+            data = {
+                "call_given_by": "Consultant",
+                "supervisor_name": obj.submission.consultant.name
+            }
+        else:
+            data = {
+                "call_given_by": "Interviewee",
+                "supervisor_name": obj.supervisor.employee_name
+            }
+        return data
 
     @staticmethod
     def get_guest(obj):
@@ -251,6 +264,15 @@ class InterviewListSerializer(serializers.ModelSerializer):
         if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
             return False
         return True
+
+    @staticmethod
+    def get_supervisor_feedback(obj):
+        prv_date = datetime.strptime("2022-05-04", "%Y-%m-%d")
+        if obj.start_time.replace(tzinfo=None) < prv_date:
+            return True
+        elif obj.supervisor_feedback.all():
+            return True
+        return False
 
 
 class TestListSerializer(serializers.ModelSerializer):
@@ -411,11 +433,12 @@ class SubmissionConProfile(serializers.ModelSerializer):
 
 
 class InterviewV2Serializer(serializers.ModelSerializer):
-    supervisor = UserDetailSerializer()
+    supervisor = serializers.SerializerMethodField()
     guest = UserDetailSerializer(many=True)
     permission = serializers.SerializerMethodField()
     attachment_link = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
+    supervisor_feedback = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
@@ -439,6 +462,28 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
             return False
         return True
+
+    @staticmethod
+    def get_supervisor_feedback(obj):
+        if obj.supervisor_feedback.all():
+            answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by(
+                "question__position")
+            return QuestionAnswerSerializer(answers, many=True).data
+        return None
+
+    @staticmethod
+    def get_supervisor(obj):
+        if obj.supervisor.employee_id == 9999:
+            data = {
+                "call_given_by": "Consultant",
+                "supervisor_name": obj.submission.consultant.name
+            }
+        else:
+            data = {
+                "call_given_by": "Interviewee",
+                "supervisor_name": obj.supervisor.employee_name
+            }
+        return data
 
 
 class QuestionAnswerSerializer(serializers.ModelSerializer):
