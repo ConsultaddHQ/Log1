@@ -1,9 +1,9 @@
 import csv
-
 from django.contrib import admin
 from django.http import HttpResponse
+from import_export.admin import ExportActionModelAdmin
 
-from .models import City, ScrumMeeting
+from utils_app.models import City, ScrumMeeting, Choice, Field, ObjectGroup, CronJob, CronError
 
 
 class ExportCsvMixin:
@@ -24,15 +24,49 @@ class ExportCsvMixin:
 
 
 @admin.register(City)
-class CityAdmin(admin.ModelAdmin, ExportCsvMixin):
-    list_filter = ('state',)
+class CityAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     search_fields = ('name', 'state')
-    list_display = ('id', 'name', 'state')
+    list_filter = ('state', 'country')
+    list_display = ('id', 'name', 'state', 'country')
 
 
 @admin.register(ScrumMeeting)
-class ScrumMeetingAdmin(admin.ModelAdmin, ExportCsvMixin):
+class ScrumMeetingAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     search_fields = ('previous', 'held_on')
     list_display = ('id', 'held_on', 'previous')
+
+
+@admin.register(Choice)
+class ChoiceAdmin(ExportActionModelAdmin):
+    actions = ["export_as_csv"]
+    list_filter = ('field', 'content_type')
+    list_display = ('id', 'name', 'display_name', 'field', 'content_type')
+    search_fields = ('id', 'name', 'display_name', 'field', 'content_type__model')
+
+
+@admin.register(Field)
+class FieldAdmin(admin.ModelAdmin):
+    list_filter = ('model', 'app_label')
+    search_fields = ('name', 'app_label', 'model')
+    list_display = ('id', 'name', 'app_label', 'model')
+
+
+@admin.register(ObjectGroup)
+class ObjectGroupAdmin(admin.ModelAdmin):
+    search_fields = ('name', 'model', 'status')
+    list_display = ('id', 'name', 'model', 'status')
+
+
+@admin.register(CronJob)
+class CronJobAdmin(admin.ModelAdmin):
+    search_fields = ('name',)
+    list_display = ('id', 'name', 'enabled', 'schedule', 'created', 'modified')
+
+
+@admin.register(CronError)
+class CronErrorAdmin(admin.ModelAdmin):
+    list_filter = ('job__name',)
+    search_fields = ('job__name',)
+    list_display = ('id', 'job', 'description')

@@ -4,6 +4,8 @@
 *.xml
 .DS_Store
 .coverage
+.coveragerc
+/htmlcov
 .idea
 .env
 /static
@@ -12,3 +14,4 @@
 **/migrations/*
 **/media/*
 models
+/fixtures

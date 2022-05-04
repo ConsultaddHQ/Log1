@@ -8,10 +8,10 @@ from celery import Celery
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'log1.settings')
 
-app = Celery('log1')
-app.config_from_object('django.conf:settings', namespace='CELERY')
+APP = Celery('log1')
+APP.config_from_object('django.conf:settings', namespace='CELERY')
 
-app.autodiscover_tasks()
+APP.autodiscover_tasks()
 
 if __name__ == '__main__':
-    app.start()
+    APP.start()

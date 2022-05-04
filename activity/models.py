@@ -3,10 +3,9 @@ from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.fields import GenericRelation
 
-from utils_app.models import TimeStampedModel
-
-from employee.models import User
+from employee.models import User, Tagging
 
 
 class Activity(models.Model):
@@ -31,12 +30,9 @@ class Activity(models.Model):
     created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
 
     def __str__(self):
-        return f'{self.content_type.model.title()} {self.get_activity_type_display()} by {self.user.employee_name}'
+        return f'{str(self.content_type.model).title()} {self.get_activity_type_display()} by {self.user.employee_name}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         return super(Activity, self).save(*args, **kwargs)
@@ -45,7 +41,8 @@ class Activity(models.Model):
         verbose_name_plural = 'activities'
 
 
-class Comment(TimeStampedModel):
+class Comment(models.Model):
+    tagged_user = GenericRelation(Tagging)
     comment_text = models.TextField(_('Comment Text'))
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,
@@ -63,14 +60,40 @@ class Comment(TimeStampedModel):
     content_object = GenericForeignKey('content_type', 'object_id')
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
 
+    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
+
     def save(self, *args, **kwargs):
-        """
-            On save, update timestamps
-        """
         if not self.id:
             self.created = timezone.now()
-        self.modified = timezone.now()
         return super(Comment, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.user.employee_name
+
+
+class ConsultantComment(models.Model):
+    comment_text = models.TextField(_('Comment Text'))
+    parent_comment = models.ForeignKey(
+        "self", on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='child_comments',
+        help_text='Designates the id of comment on which child comment is made')
+
+    created_by_id = models.PositiveIntegerField(_('Id of Creator'), )
+    created_by_content_object = GenericForeignKey('created_by_content_type', 'created_by_id')
+    created_by_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='con_comments')
+
+    # Below the mandatory fields for generic relation
+    object_id = models.PositiveIntegerField(_('Object Id'), )
+    content_object = GenericForeignKey('content_type', 'object_id')
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+
+    created = models.DateTimeField(_('Created'), default=timezone.now, editable=False)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        return super(ConsultantComment, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return str(self.id)

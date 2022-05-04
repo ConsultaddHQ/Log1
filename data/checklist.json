@@ -1,0 +1,11 @@
+{
+  "checklist": [
+    "Go through JD/Resume/Call recordings (If exist)",
+    "VPN, VDI should be explained.",
+    "Ask them to create a new github account/ they can use the one they used for there training.",
+    "Shared Training Agenda",
+    "Have a ubuntu or mac OS ready",
+    "Share all the basic installations like DB, Package Manager (NPM, Pip, Yarn)",
+    "Resume Preparation (for client side)"
+  ]
+}

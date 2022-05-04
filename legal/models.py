@@ -3,10 +3,12 @@ from django.db import models
 from django.utils import timezone
 from django.dispatch import receiver
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.fields import GenericRelation
 
 from employee.models import User
 from consultant.models import Consultant
 from utils_app.models import TimeStampedModel
+from activity.models import Comment, ConsultantComment
 
 
 PETITION_TYPES = (
@@ -16,6 +18,7 @@ PETITION_TYPES = (
     ('h1b_extension', 'H1B Extension'),
     ('h1b_amendment', 'H1B Amendment'),
     ('h1b_cap_exempt', 'H1B Cap Exempt'),
+    ('h1b_ext_amend', 'H1B Extension with Amendment'),
 )
 
 PETITION_STATUSES = (
@@ -38,7 +41,7 @@ PETITION_STATUSES = (
 
 
 def attachment_upload(instance, filename):
-    """Stores the attachment in a "per module/appname/primary key" folder"""
+    """Stores the attachment in a "per module/app_name/primary key" folder"""
     if instance.petition:
         return f'attachments/visa_petition/{instance.petition.pk}/{filename}'
     return None
@@ -58,13 +61,17 @@ class Types(models.Model):
 
 
 class Petition(TimeStampedModel):
+    comments = GenericRelation(Comment, verbose_name="comments")
     is_active = models.BooleanField(_('Is Petition Active'), default=True)
+    is_withdrawn = models.BooleanField(_('Withdraw Petition'), default=False)
+    expiry_date = models.DateField(_('Expiry Date'), null=True, default=None)
     lca_no = models.CharField(_('LCA No.'), max_length=40, null=True, blank=True)
     employer = models.CharField(_('Employer'), max_length=20, default='Consultadd')
     status = models.CharField(_('Status'), choices=PETITION_STATUSES, max_length=20)
     uscis_no = models.CharField(_('USCIS No.'), max_length=40, null=True, blank=True)
     fedex_no = models.CharField(_('Fedex No.'), max_length=40, null=True, blank=True)
     premium_processing = models.BooleanField(_('Premium Processing'), default=None, null=True)
+    consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
     petition_type = models.CharField(_('Petition Type'), choices=PETITION_TYPES, max_length=20, blank=True, null=True)
     beneficiary_type = models.BooleanField(
         _('Beneficiary Type'), default=True,
@@ -90,13 +97,35 @@ class Petition(TimeStampedModel):
         return f'{self.beneficiary.name} :: {self.status}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
         return super(Petition, self).save(*args, **kwargs)
+
+
+class Reason(TimeStampedModel):
+    petition_status = models.CharField(_('Petition Status'), choices=PETITION_STATUSES, max_length=20)
+    reason = models.TextField(_('Reason for Status'), null=True, blank=True)
+    petition = models.ForeignKey(
+        Petition, on_delete=models.CASCADE,
+        related_name='reasons',
+        verbose_name='Petition',
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Created By',
+        related_name='reason',
+        default=None, null=True,
+    )
+
+    def __str__(self):
+        return f'{self.petition.id} :: {self.petition.status} :: {self.reason}'
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Reason, self).save(*args, **kwargs)
 
 
 class DocumentList(models.Model):
@@ -145,9 +174,6 @@ class Document(TimeStampedModel):
         return f'{self.petition.beneficiary.name} attached {self.doc_type}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

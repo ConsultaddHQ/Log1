@@ -1,75 +1,55 @@
-import json
-import requests
-from datetime import date, timedelta
+import os
+from pytz import timezone
+from datetime import datetime
+from geopy.geocoders import Nominatim
+from timezonefinder import TimezoneFinder
+
+from utils_app.models import CronJob, CronError
+from log1.utils import write_exception, write_info
+from utils_app.mailing import send_email_without_template
 
 
-def get_time_filter(queryset, filter_by):
-    if filter_by == 'today':
-        queryset = queryset.filter(created__date=date.today())
-
-    elif filter_by == 'last_day':
-        today = date.today()
-        day = date.today().weekday()
-        if day == 0:
-            last_day = today - timedelta(days=3)
+def delete_temp_file(paths):
+    for path in paths:
+        if os.path.exists(path):
+            os.remove(path)
         else:
-            last_day = today - timedelta(days=1)
-        queryset = queryset.filter(created__date=last_day)
-
-    elif filter_by == 'week':
-        today = date.today()
-        start_of_week = today - timedelta(today.weekday())
-        queryset = queryset.filter(created__gte=start_of_week)
-
-    elif filter_by == 'last_month':
-        last = date.today().replace(day=1) - timedelta(days=1)
-        first = last.replace(day=1)
-        queryset = queryset.filter(created__range=[first, last])
-
-    elif filter_by == 'this_month':
-        first = date.today().replace(day=1)
-        last = date.today()
-        queryset = queryset.filter(created__range=[first, last])
-
-    return queryset
+            write_info(message=f"{path} file does not exist", function='delete_temp_file')
 
 
-def get_time_filter_by_start(queryset, filter_by):
-    if filter_by == 'today':
-        queryset = queryset.filter(start_time__date=date.today())
-
-    elif filter_by == 'last_day':
-        today = date.today()
-        day = date.today().weekday()
-        if day == 0:
-            last_day = today - timedelta(days=3)
-        else:
-            last_day = today - timedelta(days=1)
-        queryset = queryset.filter(start_time__date=last_day)
-
-    elif filter_by == 'week':
-        today = date.today()
-        start_of_week = today - timedelta(today.weekday())
-        queryset = queryset.filter(start_time__gte=start_of_week)
-
-    elif filter_by == 'last_month':
-        last = date.today().replace(day=1) - timedelta(days=1)
-        first = last.replace(day=1)
-        queryset = queryset.filter(start_time__range=[first, last])
-
-    elif filter_by == 'this_month':
-        first = date.today().replace(day=1)
-        last = date.today()
-        queryset = queryset.filter(start_time__range=[first, last])
-
-    return queryset
-
-
-def post_msg_using_webhook(url, data):
+def create_cron_error(job, description):
     try:
-        headers = {'Content-Type': 'application/json'}
-        resp = requests.post(url, headers=headers, data=json.dumps(data))
-        return resp
+        CronError.objects.create(
+            description=description,
+            job=job
+        )
+        mail_data = {
+            'cc': [], 'bcc': [],
+            'to': ['sarang.m@consultadd.com'],
+            'body': f'Error :: {description}',
+            'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
+        }
+        if os.environ.get('ENV', 'local') == 'prod':
+            send_email_without_template(mail_data, 'admin@consultadd.com')
     except Exception as error:
-        print(error)
-        return None
+        write_exception(message=error)
+
+
+def create_cron_object(name):
+    try:
+        job, created = CronJob.objects.get_or_create(name=name)
+        job.modified = datetime.now()
+        job.save()
+        return job
+    except Exception as error:
+        write_exception(message=error)
+
+
+def get_timezone(city_name):
+    obj = TimezoneFinder()
+    geo_locator = Nominatim(user_agent="geoapiExercises")
+    location = geo_locator.geocode(city_name)
+    result = obj.timezone_at(lat=location.latitude, lng=location.longitude)
+    today = datetime.now(tz=timezone(result))
+    return today.strftime("%Z")
+

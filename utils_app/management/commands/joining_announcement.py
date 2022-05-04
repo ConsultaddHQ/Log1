@@ -3,43 +3,60 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.views import mattermost_webhook
+from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help Daily
-    help = "this command is for posting your payload to MatterMost app"
+    help = "This command is for posting Project joining"
 
     def handle(self, *args, **options):
-        month = date.today().month
-        year = date.today().year
+        job = create_cron_object(name='joining_announcement')
+        try:
+            month = date.today().month
+            year = date.today().year
 
-        terminated = ["completed", "resigned-rate", "resigned-location", "resigned-full_time", "resigned-technology",
-                      "client-fired-budget", "client-fired-performance", "client-fired-security", "terminated"]
+            terminated = ['terminated', 'terminated-resigned', 'terminated-fired', 'terminated-resigned_rate_issue',
+                          'terminated-resigned_technology_issue', 'terminated-fired_budget_issue',
+                          'terminated-fired_security_issue', 'terminated-resigned_location_issue',
+                          'terminated-fired_performance_issue', 'terminated-resigned_full_time_offer']
 
-        projects = Project.objects.filter(
-            created__year=year,
-            created__month=month,
-            statuses__created__year=year,
-            statuses__created__month=month
-        ).order_by('id').distinct('id')
+            projects = Project.objects.filter(
+                created__year=year,
+                created__month=month,
+                statuses__created__year=year,
+                statuses__created__month=month
+            ).order_by('id').distinct('id')
 
-        total_projects = projects.count()
+            total_projects = projects.count()
 
-        joined = projects.filter(statuses__status__iexact='joined').count()
+            joined = projects.filter(statuses__status__iexact='joined').count()
 
-        net_joined = joined - projects.filter(statuses__is_current=True, statuses__status__in=terminated).count()
+            net_joined = joined - projects.filter(statuses__is_current=True, statuses__status__in=terminated).count()
 
-        data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": f"""
-#### Monthly Project joining Report :memo: \n
-| Status      |      Count       | 
-|:------------|:-----------------|
-| Joined      | {joined}         |
-| Net Joined  | {net_joined}     |
-| Total Offer | {total_projects} |
-"""
-        }
-        mattermost_webhook(config.joined_url, data)
+            data = {
+                "title": "Monthly Project joining Report &#128221;",
+                "text": f"""<table border='2' style='border-collapse:collapse'>
+                                <tr>
+                                    <th style="padding:5px 8px 5px 8px;">Status</th>
+                                    <th style="padding:5px 8px 5px 8px;">Count</th>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 8px 5px 8px;">Joined</td>
+                                    <td style="padding:5px 8px 5px 8px; text-align: center;">{joined}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 8px 5px 8px;">Net Joined</td>
+                                    <td style="padding:5px 8px 5px 8px; text-align: center;">{net_joined}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:5px 8px 5px 8px;">Total Offer</td>
+                                    <td style="padding:5px 8px 5px 8px; text-align: center;">{total_projects}</td>
+                                </tr>
+                            </table>"""
+            }
+            res, msg = post_msg_using_webhook(config.joined_url, data)
+            if msg == 'error':
+                raise Exception(res)
+        except Exception as error:
+            create_cron_error(job, error)

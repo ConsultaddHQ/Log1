@@ -1,19 +1,20 @@
 import os
 import logging.config
-from dotenv import load_dotenv
-from environs import Env
 from collections import OrderedDict
 
-env = Env()
+from pathlib import Path
+from dotenv import load_dotenv
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 't=@n6ke#$-zmg*q!vy+mc25b2%sp+n%6tc%j0z#^p+j!e5e%$1'
 
-# Reading env file
-project_folder = os.path.expanduser(BASE_DIR)
-load_dotenv(os.path.join(project_folder, '.env'))
+env_path = Path(BASE_DIR, '.env')
+load_dotenv(dotenv_path=env_path)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = bool(os.environ.get('DEBUG', False))
+DEBUG = False
+if os.environ.get('DEBUG', False) == 'True':
+    DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -35,6 +36,7 @@ THIRD_PARTY_APPS = [
     'explorer',
     'constance',
     'corsheaders',
+    'import_export',
     'rest_framework_swagger',
     'constance.backends.database',
 ]
@@ -53,7 +55,9 @@ PROJECT_APPS = [
     'report.apps.ReportConfig',
     'legal.apps.LegalConfig',
     'notification.apps.NotificationConfig',
-    'impersonate.apps.ImpersonateConfig'
+    'impersonate.apps.ImpersonateConfig',
+    'messaging.apps.MessagingConfig',
+    'engineering.apps.EngineeringConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -69,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'log1.middleware.AddressLogMiddleware',
 ]
 
 ROOT_URLCONF = 'log1.urls'
@@ -85,6 +90,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'libraries': {
+                'staticfiles': 'django.templatetags.static',
+            }
         },
     },
 ]
@@ -96,9 +104,9 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': os.environ.get('DB_NAME', ''),
         'USER': os.environ.get('DB_USER', ''),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-        'HOST': os.environ.get('DB_HOST', 'localhost'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', 'consultadd'),
+        'PORT': os.environ.get('DB_PORT', ''),
+        'HOST': os.environ.get('DB_HOST', ''),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
     }
 }
 
@@ -110,31 +118,61 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'}
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
+    )
+}
 
 # django-cors-header Configuration
 CORS_ORIGIN_ALLOW_ALL = True
 
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
     'uuid',
+    'accept',
     'origin',
     'user-agent',
     'x-csrftoken',
+    'content-type',
+    'authorization',
+    'accept-encoding',
     'x-requested-with',
 ]
 
-# Send Grid Configuration
+# Swagger
+SWAGGER_SETTINGS = {
+    "exclude_namespaces": [],
+    "api_version": '2.0',
+    "api_path": "/",
+    "enabled_methods": [
+        'get',
+        'post',
+        'put',
+        'delete'
+    ],
+    'SECURITY_DEFINITIONS': {
+        "apiKeyAuth": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "Token Authentication"
+        }
+    },
 
+    "api_key": '',
+    "is_superuser": False,
+    'USE_SESSION_AUTH': True,
+    "is_authenticated": True,
+}
+
+# Send Grid Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_USE_TLS = True
 EMAIL_PORT = os.environ.get('EMAIL_PORT', 587)
 EMAIL_HOST = os.environ.get('EMAIL_HOST', None)
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', None)
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_API_KEY', None)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', None)
 
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'consultadd.com')
 
@@ -172,39 +210,54 @@ PUBLIC_MEDIA_LOCATION = 'media'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
 DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 
-
-MODELS_PATH = os.path.join(BASE_DIR, 'models')
-
 # Password Reset Token Expiry Time
 RESET_TOKEN_EXPIRY_TIME = 1
 
 # Logger Configuration
+LOGGING_CONFIG = None
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'file': {
             'format': '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-        }
+        },
+        'address_format': {
+            'format': '%(asctime)s %(levelname)-5s %(message)s'
+        },
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'formatter': 'file',
             'class': 'logging.StreamHandler',
-            'formatter': 'file'
         },
         'file': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
+            'level': 'ERROR',
+            'backupCount': 5,
+            'encoding': 'utf8',
             'formatter': 'file',
-            'maxBytes': 1024 * 1024 * 2,
-            'filename': os.path.join(BASE_DIR, 'logs/debug.log')
-        }
+            'maxBytes': 10485760,
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': f"{os.path.join(BASE_DIR, 'logs/error.log')}",
+        },
+        'access': {
+            'level': 'INFO',
+            'backupCount': 5,
+            'encoding': 'utf8',
+            'maxBytes': 10485760,
+            'formatter': 'address_format',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs/address.log'),
+        },
     },
     'loggers': {
-        'file': {
-            'level': 'DEBUG',
-            'handlers': ['console']
+        '': {
+            'level': 'ERROR',
+            'handlers': ['console', 'file']
+        },
+        'address': {
+            'level': 'INFO',
+            'handlers': ['access']
         }
     }
 })
@@ -221,38 +274,57 @@ NOTIFICATIONS_CHANNELS = {
 }
 
 # Constance Config
-
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
-    ('TUTORIAL_VIDEO', ('http://bit.ly/38VJ19o', 'Tutorial video Link')),
-    ('CONSULTANT_PASSWORD', ('Consultadd@12345', 'Consultant login password')),
-    ('ANDROID_APP_LINK', ('http://bit.ly/2TBgKRc', 'Andoird App Download Link')),
+    ('APP_URL', ('https://app.log1.com/', 'Log1 URL')),
+    ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
+    ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
+                          'Android App Download Link')),
 
-    ('LEGAL', ('legal@consultadd.com', 'Legal team email id')),
-    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'BBookingg Email id')),
-    ('FINANCE', ('finance@consultadd.com', 'Finance team email id')),
-    ('SUPERADMIN', ('sudeep.b@consultadd.com', "Sudeep's email id")),
-    ('RELATIONS', ('relations@consultadd.com', 'Relations team email id')),
-    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team email id')),
-    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team email id')),
+    ('LEGAL', ('legal@consultadd.com', 'Legal team Email ID')),
+    ('SUPERADMIN', ('sudeep.b@consultadd.com', 'Admin Email ID')),
+    ('BOOKING_ADMIN', ('bbookingg@gmail.com', 'Booking Email ID')),
+    ('FINANCE', ('finance@consultadd.com', 'Finance team Email ID')),
+    ('APP_ADMIN', ('sarang.m@consultadd.com', 'Log1 App Admin Email ID')),
+    ('RELATIONS', ('relations@consultadd.com', 'Relations team Email ID')),
+    ('RECRUITMENT', ('recruitment@consultadd.com', 'recruitment team Email ID')),
+    ('ENGINEERING', ('engineering@consultadd.com', 'Engineering team Email ID')),
+    ('TIMESHEET_APP_ADMIN', ('aditi.so@consultadd.com', 'Timesheet Admin Email ID')),
+    ('VENDOR_MANAGEMENT', ('vendormanagement@consultadd.com', 'Vendor Management Email ID')),
 
-    ('recruitment_url', ('https://mm.consultadd.com/hooks/t8tradc9gffuxngymzhhgyj3pa', "Recruitment Channel")),
-    ('pool_channel_url', ('https://mm.consultadd.com/hooks/sfhgeyr9gf8qde9hcq1ba561mh', "45dayslimit Channel")),
-    ('offer_url', ('https://mm.consultadd.com/hooks/oypapdoozfyf8csu3n88abegfe', "Offer Announcement Channel")),
-    ('loud_speakers_url', ('https://mm.consultadd.com/hooks/qsi5qnbznfnabpnk5c8fbjfgph', "Loudspeaker Channel")),
-    ('announcement_url', ('https://mm.consultadd.com/hooks/696csrwmgifhbmzywr88jch71w', "Announcement Channel")),
-    ('joined_url', ('https://mm.consultadd.com/hooks/ixfc4oeeofb53d149dc3cq5ddy', "Joining Announcement Channel")),
-    ('marketing_report_url', ('https://mm.consultadd.com/hooks/8iedae1ytffjmxpkd6cgry5hth', "Marketing Report Channel")),
-    ('general_url', ('https://mm.consultadd.com/hooks/sih91mde8inq5roz3fejoefs5c', "General Channel")),
-    ('offer_failure_url', ('https://mm.consultadd.com/hooks/3mtmostff3fx8pfyyf1odph93h', "Offer Failure Channel")),
-    ('interviewfeedback_url', ('https://mm.consultadd.com/hooks/e15z9x3xspgsbcxei84tqf919r', "InterviewFeedback Channel")),
+    ('general_url', ('URL', 'General Channel')),
+    ('test_team_url', ('URL', 'Test Team channel')),
+    ('products_dev', ('URL', 'Products Dev Channel')),
+    ('engineering_url', ('URL', 'Engineering channel')),
+    ('recruitment_url', ('URL', 'Recruitment Channel')),
+    ('pool_channel_url', ('URL', '45dayslimit Channel')),
+    ('offer_url', ('URL', 'Offer Announcement Channel')),
+    ('loud_speakers_url', ('URL', 'Loudspeaker Channel')),
+    ('announcement_url', ('URL', 'Announcement Channel')),
+    ('marketing_report_url', ('URL', 'Marketing Report')),
+    ('joined_url', ('URL', 'Joining Announcement Channel')),
+    ('offer_failure_url', ('URL', 'Offer Failure Channel')),
+    ('interview_feedback_url', ('URL', 'Interview Feedback')),
+    ('exit_interview_url', ('URL', 'Exit Interview Channel')),
+    ('project_termination_url', ('URL', 'Project Terminations')),
+    ('candidate_feedback_url', ('URL', 'Candidate Feedback Channel')),
+    ('new_recruit_on_bench', ('URL', 'New Recruit On Bench Channel')),
+    ('pre_joining_feedback_url', ('URL', 'Pre Joining Feedback Channel')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
-    'constants': ('CONSULTANT_PASSWORD', 'ANDROID_APP_LINK', 'TUTORIAL_VIDEO'),
-    'Email Ids': ('LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN'),
-    'Web-Hooks': ('offer_url', 'announcement_url', 'recruitment_url', 'pool_channel_url',
-                  'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
-                  'interviewfeedback_url'),
+    'constants': (
+        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'
+    ),
+    'Email Ids': (
+        'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
+        'VENDOR_MANAGEMENT', 'TIMESHEET_APP_ADMIN'
+    ),
+    'Web-Hooks': (
+        'engineering_url', 'test_team_url', 'offer_url', 'announcement_url', 'recruitment_url',
+        'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
+        'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
+        'products_dev', 'new_recruit_on_bench', 'pre_joining_feedback_url', 'candidate_feedback_url',
+    ),
 }

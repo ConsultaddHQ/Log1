@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
-from .crypto import concatenate, KeyGenerator, split
+from api_key.crypto import concatenate, KeyGenerator, split
 
 
 class BaseAPIKeyManager(models.Manager):

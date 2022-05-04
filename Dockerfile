@@ -1,24 +1,42 @@
-# pull official base image
-FROM python:3.7
+FROM python:3.9.6-alpine
 
-# set work directory
-WORKDIR /usr/src/log1
+# Set work directory
+RUN mkdir -p /home/app
 
-# set environment variables
+# create the app user
+RUN addgroup -S app && adduser -S app -G app
+
+# create the appropriate directories
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/web
+RUN mkdir $APP_HOME
+WORKDIR $APP_HOME
+
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# install psycopg2 dependencies
-# RUN apt update && apt add postgresql-dev gcc python3-dev musl-dev
+# Install psycopg2 dependencies
+RUN apk update && apk add libpq postgresql-dev gcc python3-dev musl-dev
 
-# install dependencies
-COPY ./requirements.txt /usr/src/log1/requirements.txt
+# Install dependencies
+COPY ./requirements.txt $APP_HOME/requirements.txt
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# copy project
-COPY . /usr/src/log1/
+# copy entrypoint.prod.sh
+COPY ./entrypoint.sh .
+RUN sed -i 's/\r$//g'  $APP_HOME/entrypoint.sh
+RUN chmod +x  $APP_HOME/entrypoint.sh
 
-# Docker entry point
-COPY entrypoint.sh /entrypoint.sh
-ENTRYPOINT ["/usr/src/log1/entrypoint.sh"]
+# copy project
+COPY . $APP_HOME
+
+# chown all the files to the app user
+RUN chown -R app:app $APP_HOME
+
+# change to the app user
+USER app
+
+# run entrypoint.prod.sh
+ENTRYPOINT ["/home/app/web/entrypoint.sh"]

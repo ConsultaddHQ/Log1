@@ -1,13 +1,14 @@
 from django.contrib import admin
+from import_export.admin import ExportActionModelAdmin
 
-from utils_app.admin import ExportCsvMixin
-from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer
+from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
+    Test, Answer, Question, ChildQuestion
 
 
 @admin.register(VendorCompany)
-class VendorCompanyAdmin(admin.ModelAdmin, ExportCsvMixin):
+class VendorCompanyAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_filter = ('created_by', 'name')
+    list_filter = ('created_by',)
     search_fields = ('id', 'name', 'created_by')
     list_display = ('id', 'name', 'created_by', 'vendor_display')
 
@@ -20,18 +21,17 @@ class VendorCompanyAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(VendorContact)
-class VendorContactAdmin(admin.ModelAdmin, ExportCsvMixin):
+class VendorContactAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_filter = ('company__name',)
     list_display = ('id', 'name', 'email', 'number', 'company', 'created_by')
     search_fields = ('id', 'name', 'email', 'company__name', 'created_by__email', 'created_by__employee_name')
 
 
 @admin.register(Lead)
-class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
+class LeadAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    search_fields = ('id', 'job_title', 'status', 'owner__employee_name', 'vendor_company__name', 'primary_skill')
-    list_display = ('id', 'job_title', 'city', 'primary_skill', 'status', 'owner', 'vendor_company', 'sub_display')
+    list_display = ('id', 'job_title', 'city', 'position', 'status', 'owner', 'vendor_company', 'sub_display')
+    search_fields = ('id', 'job_title', 'status', 'owner__employee_name', 'vendor_company__name', 'position__name')
 
     def sub_display(self, obj):
         return ", ".join([
@@ -42,13 +42,14 @@ class LeadAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(Submission)
-class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
+class SubmissionAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_filter = ('status',)
+    list_filter = ('status', 'is_complete')
     search_fields = ('id', 'consultant_marketing__consultant__name', 'created_by__employee_name', 'email', 'client',
                      'consultant_marketing__consultant__email', 'consultant_marketing__consultant__name')
     list_display = ('id', 'consultant_marketing', 'client', 'rate', 'created_by', 'lead_owner_display', 'lead',
-                    'status', 'is_active', 'employer', 'screening_display', 'vendor_contact', 'visa_type',
+                    'status', 'is_active', 'is_complete', 'employer', 'screening_display', 'vendor_contact',
+                    'visa_type',
                     'visa_start', 'visa_end', 'linkedin', 'date_of_birth', 'current_city', 'created', 'modified')
 
     def screening_display(self, obj):
@@ -67,7 +68,7 @@ class SubmissionAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(VendorLayer)
-class VendorLayerAdmin(admin.ModelAdmin, ExportCsvMixin):
+class VendorLayerAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('vendor_company__name',)
     search_fields = ('vendor_company__name',)
@@ -75,18 +76,19 @@ class VendorLayerAdmin(admin.ModelAdmin, ExportCsvMixin):
 
 
 @admin.register(Interview)
-class InterviewAdmin(admin.ModelAdmin, ExportCsvMixin):
+class InterviewAdmin(ExportActionModelAdmin):
     actions = ['export_as_csv', 'make_status_feedback_due']
-    list_filter = ('status', 'interview_mode', 'screening_type')
+    list_filter = ('status', 'interview_mode', 'screening_type', 'coding_present', 'guest_type')
     search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'supervisor__employee_name',
                      'calendar_id', 'submission__created_by__employee_name')
     list_display = ('id', 'round', 'supervisor', 'status', 'screening_type', 'start_time', 'end_time', 'submission',
-                    'interview_mode', 'feedback', 'calendar_id', 'guest_display')
+                    'guest_type', 'tech_stack', 'coding_present', 'interview_mode', 'feedback', 'calendar_id', 'guest_display')
 
     def guest_display(self, obj):
         return ", ".join([
             user.employee_name for user in obj.guest.all()
         ])
+
     guest_display.short_description = "Guest"
 
     def make_status_feedback_due(self, request, queryset):
@@ -98,3 +100,37 @@ class InterviewAdmin(admin.ModelAdmin, ExportCsvMixin):
         self.message_user(request, "%s successfully marked as Cancelled." % message_bit)
 
     make_status_feedback_due.short_description = "Mark selected Interview's status as Cancelled"
+
+
+@admin.register(Test)
+class TestAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_filter = ('status', 'is_offline', 'is_video')
+    search_fields = ('id', 'submission__consultant_marketing__consultant__name', 'submitted_by__employee_name',
+                     'submission__created_by__employee_name', 'is_offline')
+    list_display = ('id', 'submission', 'status', 'skills', 'is_video', 'is_offline', 'deadline', 'submit_date',
+                    'submitted_by', 'feedback', 'cancel_reason')
+
+
+@admin.register(Question)
+class QuestionsAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    search_fields = ('id', 'title')
+    list_filter = ('answer_type', 'category', 'form_name', 'is_active')
+    list_display = ('id', 'title', 'form_name', 'answer_type', 'options', 'category', 'position', 'is_active',
+                    'is_required')
+
+
+@admin.register(ChildQuestion)
+class ChildQuestionAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_display = ('id', 'parent_question')
+    search_fields = ('id', 'parent_question_title')
+
+
+@admin.register(Answer)
+class AnswerAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    list_filter = ('object_id', 'content_type')
+    search_fields = ('id', 'question__title', 'submitted_by__employee_name')
+    list_display = ('id', 'answer', 'submitted_by', 'question', 'object_id', 'content_type', 'parent_question')

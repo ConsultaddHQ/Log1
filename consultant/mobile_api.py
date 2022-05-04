@@ -1,26 +1,29 @@
-import logging
+import os
 from datetime import timedelta
+from django.db.models import F
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
+from rest_framework import exceptions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status, exceptions
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 
+from constance import config
 from project.models import Project
-from consultant.serializers import *
-from consultant.auth import consultant_authenticate
+from utils_app.mailing import send_email
+from log1.utils import write_exception, write_info
 from consultant.permissions import ConsultantIsAuthenticated
-from employee.models import get_password_reset_token_expiry_time
+from consultant.serializers import ConsultantLoginSerializer
+from employee.models import clear_expired, get_token_expiry_time
 from employee.serializers import EmailSerializer, PasswordTokenSerializer
-from consultant.authentication import ConsultantTokenAuthentication, get_consultant
+from consultant.authentication import consultant_authenticate, ConsultantTokenAuthentication
+from consultant.models import Consultant, ConsultantToken, ConsultantResetPasswordToken, FCMDevice
 
-logger = logging.getLogger(__name__)
 
-
-# API for Mobile App
+# Route - /consultant_auth/
 class ConsultantAuthViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
@@ -30,38 +33,59 @@ class ConsultantAuthViewSet(GenericViewSet):
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
-            User Register
-            :param request, email, password, employee_id, name, phone, gender, team, role
+            Consultant Register
+            :param request, email, name, company, website, designation
         """
         try:
-            email = request.data.get('email')
-            password = request.data.get('password').strip()
+            name = request.data.get('name')
+            company = request.data.get('company')
+            website = request.data.get('website')
+            email = request.data.get('email').strip()
+            designation = request.data.get('designation')
+            customer_mail_data = {
+                'to': [email],
+                'cc': [],
+                'bcc': [config.TIMESHEET_APP_ADMIN],
+                'subject': 'Signup on Consultadd Time Track App',
+                'template': '../templates/con_signup_mail.html',
+                'context': {
+                    'name': name
+                },
+            }
 
-            queryset = Consultant.objects.filter(email__exact=email)
-            if queryset:
-                consultant = queryset.first()
-                consultant.set_password(password)
-                consultant.is_active = True
-                consultant.save()
+            send_email(customer_mail_data, "log1@consultadd.com")
 
-                return Response({"result": "Success"}, status=status.HTTP_201_CREATED)
-            else:
-                return Response({"error": "Consultant Does not exist"}, status=status.HTTP_400_BAD_REQUEST)
+            mail_data = {
+                'to': [config.TIMESHEET_APP_ADMIN],
+                'cc': [],
+                'bcc': [],
+                'subject': f'{name} Signed up on Consultadd Time Track App',
+                'template': '../templates/signup_mail.html',
+                'context': {
+                    'name': name,
+                    'email': email,
+                    'website': website,
+                    'company': company,
+                    'designation': designation,
+                },
+            }
+            send_email(mail_data, "log1@consultadd.com")
+            return Response({"result": "mail sent"}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
         """
             Normal Login
-            :param request, email, password
+            :param request, email, password, uuid, fcm_token, device_type
         """
-        email = request.data.get('email').lower()
+        email = request.data.get('email').lower().strip()
         if email:
-            consultant = get_object_or_404(Consultant, email=email)
+            consultant = get_object_or_404(Consultant, email__iexact=email)
         else:
-            return Response({"error": "Email is Empty"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Email is Empty"}, status=400)
         consultant = consultant_authenticate(email=consultant.email, password=request.data.get('password').strip())
         if consultant:
             uuid = request.data.get('uuid', '')
@@ -81,7 +105,6 @@ class ConsultantAuthViewSet(GenericViewSet):
                     statuses__is_current=True
                 ).annotate(
                     client=F('submission__client'),
-                    employer=F('submission__employer')
                 ).order_by('-id').values('id', 'start_date', 'client', 'employer')
                 data = {
                     'token': token.key,
@@ -92,83 +115,76 @@ class ConsultantAuthViewSet(GenericViewSet):
                     'is_active': consultant.is_active,
                     'first_login': consultant.first_login,
                 }
-                return Response({"result": data}, status=status.HTTP_202_ACCEPTED)
+                return Response({"result": data}, status=202)
             except Exception as error:
-                logger.error(error)
-                return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
-        logger.error("Incorrect Email Id OR Password")
-        return Response({"error": "Incorrect Email Id OR Password"}, status=status.HTTP_400_BAD_REQUEST)
+                write_exception(error, request)
+                return Response({"error": str(error)}, status=400)
+        write_info(message=email, function='ConsultantAuthViewSet_login', request=request)
+        return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
 
-# API for Mobile App
+# Route - /consultant_app/
 class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @action(methods=['post'], detail=False, url_path='set_password')
-    def set_consultant_password(self, request):
-        try:
-            if request.user.is_superuser:
-                consultant = get_object_or_404(Consultant, id=request.data['consultant_id'])
-                consultant.set_password(request.data['new_password'])
-                consultant.save()
-                return Response({'result': {'message': 'Password Changed Successfully'}}, status=status.HTTP_200_OK)
-            else:
-                return Response({'result': {'message': 'Unauthorized Access'}}, status=status.HTTP_401_UNAUTHORIZED)
-        except Exception as error:
-            return Response({'error': str(error)}, status=status.HTTP_400_BAD_REQUEST)
-
     def list(self, request, *args, **kwargs):
-        queryset = Consultant.objects.all()
-        serializer = self.serializer_class(queryset, many=True)
-        return Response({"results": serializer.data}, status=status.HTTP_200_OK)
+        try:
+            queryset = Consultant.objects.all()
+            serializer = self.serializer_class(queryset, many=True)
+            return Response({"results": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
-        first_login = request.query_params.get('first_login', None)
-        new_password = request.data.get('new_password', None)
-        consultant = get_consultant(request)
-        if first_login and new_password:
-            if consultant.check_password(new_password):
-                return Response({"error": "Please use new password", "error_in": "new"},
-                                status=status.HTTP_400_BAD_REQUEST)
-            consultant.set_password(new_password)
-            consultant.first_login = False
-        else:
-            current_password = request.data.get('current_password', None)
-            if current_password and consultant.check_password(current_password):
+        try:
+            first_login = request.GET.get('first_login', None)
+            new_password = request.data.get('new_password', None)
+            consultant = request.user
+            if first_login and new_password:
                 if consultant.check_password(new_password):
                     return Response({"error": "Please use new password", "error_in": "new"},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                                    status=400)
                 consultant.set_password(new_password)
+                consultant.first_login = False
             else:
-                return Response({"error": "Wrong Current Password", "error_in": "current"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        consultant.save()
-        return Response({"result": "Password Updated"}, status=status.HTTP_200_OK)
+                current_password = request.data.get('current_password', None)
+                if current_password and consultant.check_password(current_password):
+                    if consultant.check_password(new_password):
+                        return Response({"error": "Please use new password", "error_in": "new"},
+                                        status=400)
+                    consultant.set_password(new_password)
+                else:
+                    return Response({"error": "Wrong Current Password", "error_in": "current"},
+                                    status=400)
+            consultant.save()
+            return Response({"result": "Password Updated"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=False, url_path='logout')
     def logout(self, request):
-        """
-            Logout for authenticated user
-        """
-        uuid = request.META.get('HTTP_UUID', b'')
-        token = get_object_or_404(ConsultantToken, key=request.auth, uuid=uuid)
-        fcm_token = FCMDevice.objects.filter(content_type__model='consultanttoken', object_id=token.key)
-        token.delete()
-        fcm_token.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            uuid = request.META.get('HTTP_UUID', b'')
+            token = get_object_or_404(ConsultantToken, key=request.auth, uuid=uuid)
+            token.delete()
+            return Response(status=204)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
 
-# API for Mobile App
+# Route - /consultant_password/
 class ConsultantResetPasswordViewSet(GenericViewSet):
     permission_classes = ()
     authentication_classes = ()
-    queryset = Consultant.objects.all()
     serializer_class = EmailSerializer
-    pass_serializer_class = PasswordTokenSerializer
+    queryset = Consultant.objects.all()
 
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
@@ -176,7 +192,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
 
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+        password_reset_token_validation_time = get_token_expiry_time()
 
         now_minus_expiry_time = timezone.now() - timedelta(hours=password_reset_token_validation_time)
 
@@ -191,7 +207,6 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
 
         # No active user found, raise a validation error
         if not active_user_found:
-            logger.info("User is not active")
             raise exceptions.ValidationError({
                 'email': [
                     "There is no active user associated with this e-mail address or the password can not be changed"],
@@ -210,7 +225,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 if os.environ.get('ENV', 'local') == 'prod':
                     to = [consultant.email]
                 else:
-                    to = ['aditi.so@consultadd.in', 'sarang.m@consultadd.in', 'anikesh.consultadd@gmail.com']
+                    to = ['sarang.m@consultadd.com']
                 mail_data = {
                     'to': to,
                     'cc': [],
@@ -224,29 +239,29 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 }
                 res, error = consultant.send_mail(mail_data)
                 if error == 'error':
-                    logger.error(res)
-                    return Response({'error': str(res)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
+                    write_info(message=res, function='token_request')
+                    return Response({'error': str(res)}, status=400)
+        return Response({'status': 'OK'}, status=200)
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
-        serializer = self.pass_serializer_class(data=request.data)
+        serializer = PasswordTokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         password = serializer.validated_data['password']
         token = serializer.validated_data['token']
 
-        password_reset_token_validation_time = get_password_reset_token_expiry_time()
+        password_reset_token_validation_time = get_token_expiry_time()
 
         reset_password_token = ConsultantResetPasswordToken.objects.filter(key=token).first()
 
         if reset_password_token is None:
-            return Response({'status': 'incorrect token'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'incorrect token'}, status=404)
 
         expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
 
         if timezone.now() > expiry_date:
             reset_password_token.delete()
-            return Response({'status': 'token expired'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'token expired'}, status=404)
 
         reset_password_token.consultant.set_password(password)
         reset_password_token.consultant.save()
@@ -254,4 +269,4 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
         # Delete all password reset tokens for this user
         ConsultantResetPasswordToken.objects.filter(consultant=reset_password_token.consultant).delete()
 
-        return Response({'status': 'OK'}, status=status.HTTP_200_OK)
+        return Response({'status': 'OK'}, status=200)

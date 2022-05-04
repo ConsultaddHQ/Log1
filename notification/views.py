@@ -1,63 +1,54 @@
-import os
-import logging
-from pyfcm import FCMNotification
+from datetime import datetime
+
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
 from django.contrib.contenttypes.models import ContentType
 
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.mixins import ListModelMixin, UpdateModelMixin, CreateModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
-from notification.serializers import *
+from notification.utils import push_notification
+from notification.models import FCMDevice, Notification
 from consultant.permissions import ConsultantIsAuthenticated
+from log1.utils import get_page_limits, write_exception, ERROR_MSG
 from consultant.authentication import ConsultantTokenAuthentication
-
-logger = logging.getLogger(__name__)
-
-push_service = FCMNotification(api_key=os.environ.get('FCM_SERVER_KEY'))
+from notification.serializers import NotificationSerializer, NotificationListSerializer, FCMDeviceSerializer
 
 
-def create_notification(user_list, data):
-    try:
-        recipient_content_type = ContentType.objects.get(model=data['recipient_user_type'])
-        sender_content_type = ContentType.objects.get(model=data['sender_user_type'])
-        target_content_type = ContentType.objects.get(model=data['target_type'])
-        for user in user_list:
-            Notification.objects.create(
-                title=data["title"],
-                recipient_object_id=user.id,
-                description=data["description"],
-                category=data["category"].lower(),
-                sender_object_id=data["sender_id"],
-                target_object_id=data["target_id"],
-                sender_content_type=sender_content_type,
-                target_content_type=target_content_type,
-                recipient_content_type=recipient_content_type,
+class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
+    queryset = FCMDevice.objects.all()
+    serializer_class = FCMDeviceSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            fcm_token = request.data.get('fcm_token', None)
+            if not fcm_token:
+                return Response({"message": "Token not found"}, status=400)
+            fcm = FCMDevice.objects.filter(device_id=fcm_token)
+            if fcm:
+                return Response({"message": "Token already exist"}, status=404)
+            content_type = ContentType.objects.get(model='user')
+            FCMDevice.objects.get_or_create(
+                type='web',
+                device_id=fcm_token,
+                object_id=request.user.id,
+                content_type=content_type,
             )
-        return False
-    except Exception as error:
-        return error
+            return Response({"message": "Token Created"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-def push_notification(registration_ids, message_body):
-    try:
-        push_service.notify_multiple_devices(
-            registration_ids=registration_ids,
-            message_title=message_body['title'],
-            message_body=message_body['body'],
-            data_message=message_body,
-        )
-        return False
-    except Exception as error:
-        return error
-
-
-class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
+# Route - /emp_notify/
+class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     queryset = Notification.objects.all()
     authentication_classes = (TokenAuthentication,)
@@ -65,41 +56,80 @@ class EmployeeNotificationViewSet(ListModelMixin, UpdateModelMixin, GenericViewS
 
     @never_cache
     def list(self, request, *args, **kwargs):
-        page = int(request.query_params.get("page", 1))
-        page_size = int(request.query_params.get("page_size", 10))
-        last, first = page * page_size, page * page_size - page_size
+        first, last = get_page_limits(request)
         try:
-            data = Notification.objects.active(request.user, 'user')[first:last].values(
-                'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model', 'target_object_id'
-            )
-            total = Notification.objects.unread(request.user, 'user').count()
-            return Response({"results": data, "total": total}, status=status.HTTP_200_OK)
+            model = request.GET.get('model', None)
+            queryset = Notification.objects.active(request.user, 'user')
+            if model:
+                queryset = queryset.filter(
+                    Q(parent_content_type__model=model) |
+                    Q(target_content_type__model=model)
+                )
+            serializer = NotificationListSerializer(queryset[first:last], many=True)
+            unread = Notification.objects.unread(request.user, 'user').count()
+            return Response({"data": serializer.data, "total": queryset.count(), "unread": unread}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_path='mark_as_read')
-    def mark_as_read(self, request, *args, **kwargs):
+    def mark_as_read(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_as_read()
             notification.save()
-            return Response({"result": 'read'}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": 'read'}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='mark_all_read')
     def mark_all_read(self, request):
         try:
             Notification.objects.mark_all_as_read(request.user, 'user')
-            return Response({"result": "success"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": "read"}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_name='count')
+    def count(self, request):
+        try:
+            queryset = Notification.objects.unread(request.user, 'user')
+            total = queryset.count()
+            return Response({"count": total}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_name='push_notification')
+    def push_notification(self, request):
+        consultant_id = request.GET.get('consultant_id')
+        try:
+            message_body = {
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com",
+                "title": "Test Feedback creation alert",
+                "body": "Feedback is added by Admin on Consultant Name",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'consultant',
+                    'sub_target': 'feedback',
+                    'target_id': consultant_id,
+                    'timestamp': str(datetime.now()),
+                },
+            }
+            push_notification([request.user.id], message_body)
+            return Response({"message": "done"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateModelMixin, GenericViewSet):
+# Mobile App Route - /con_notify/
+class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = (ConsultantIsAuthenticated,)
@@ -107,104 +137,88 @@ class ConsultantNotificationViewSet(ListModelMixin, CreateModelMixin, UpdateMode
 
     @never_cache
     def list(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
         try:
             queryset = Notification.objects.active(request.user, 'consultant')
             total = queryset.count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'title', 'deleted', 'unread', 'timestamp', 'category', 'target_object_id')
-            return Response({"results": data, "total": total}, status=status.HTTP_200_OK)
+            return Response({"results": data, "total": total}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='count')
     def count(self, request):
         try:
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = queryset.count()
-            return Response({"count": total}, status=status.HTTP_200_OK)
+            return Response({"count": total}, status=200)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_delete')
-    def mark_as_delete(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+    def mark_as_delete(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_as_deleted()
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = Notification.objects.unread(request.user, 'consultant').count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
             )
-            return Response({"result": data, "total": total}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": data, "total": total}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_not_delete')
-    def mark_not_delete(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+    def mark_not_delete(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_not_deleted()
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = Notification.objects.unread(request.user, 'consultant').count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
             )
-            return Response({"result": data, "total": total}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": data, "total": total}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='mark_all_delete')
     def mark_all_delete(self, request):
         try:
             Notification.objects.mark_all_as_deleted(request.user, 'consultant')
-            return Response({"result": "deleted"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": "deleted"}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=True, url_name='mark_as_read')
-    def mark_as_read(self, request, *args, **kwargs):
-        # page = int(request.query_params.get("page", 1))
-        # page_size = int(request.query_params.get("page_size", 10))
-        # last, first = page * page_size, page * page_size - page_size
+    def mark_as_read(self, request, pk):
         try:
-            notification = get_object_or_404(Notification, id=kwargs.get('pk'))
+            notification = get_object_or_404(Notification, id=pk)
             notification.mark_as_read()
             queryset = Notification.objects.unread(request.user, 'consultant')
             total = Notification.objects.unread(request.user, 'consultant').count()
-            # data = queryset[first:last].values(
             data = queryset.values(
                 'id', 'description', 'deleted', 'unread', 'timestamp', 'target_content_type__model',
                 'target_object_id'
             )
-            return Response({"result": data, "total": total}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": data, "total": total}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_name='mark_all_read')
     def mark_all_read(self, request):
         try:
             Notification.objects.mark_all_as_read(request.user, 'consultant')
-            return Response({"result": "read"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"result": "read"}, status=202)
         except Exception as error:
-            logger.error(error)
-            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)

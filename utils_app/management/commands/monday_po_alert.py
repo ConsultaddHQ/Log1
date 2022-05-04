@@ -3,64 +3,100 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from utils_app.views import mattermost_webhook
+from log1.utils import post_msg_using_webhook
+from utils_app.utils import create_cron_error, create_cron_object
 
 
 class Command(BaseCommand):
-    # Show this when the user types help
-    help = "this command is for posting your payload to MatterMost app"
+    help = "This command is for posting Projects joining in this week"
 
     def handle(self, *args, **options):
-        end = date.today() - timedelta(days=1)
-        start = date.today() - timedelta(days=7)
+        job = create_cron_object(name='monday_po_alert')
+        try:
+            end = date.today() - timedelta(days=1)
+            start = date.today() - timedelta(days=7)
 
-        text = f"""
-#### Project Joined Last Week :memo: \n
-| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer | City |
-|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|:-----|
-"""
+            text = f"<tr>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Consultant</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Team</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Client</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Vendor</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Marketer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Start Date</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Employer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>City</th>" \
+                   f"</tr>"
 
-        joined_last_week = Project.objects.filter(
-            statuses__status__iexact='joined',
-            start_date__range=[start, end],
-            statuses__is_current=True,
-        )
-        for project in joined_last_week:
-            submission = project.submission
-            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} | {project.city} |\n"
+            joined_last_week = Project.objects.filter(
+                statuses__status__iexact='joined',
+                start_date__range=[start, end],
+                statuses__is_current=True,
+            )
+            for project in joined_last_week:
+                submission = project.submission
+                text += f"<tr>" \
+                        f"<td style='padding:px 8px 0px 8px;'> {project.consultant.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.team.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.client} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.lead.vendor_company.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.employee_name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {project.start_date.strftime('%m/%d/%Y')} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.employer} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {project.city} </td>" \
+                        f"</tr>\n"
 
-        data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": text
-        }
+            data = {
+                "title": "Project Joined Last Week &#128221;",
+                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+            }
+            post_msg_using_webhook(config.joined_url, data)
 
-        mattermost_webhook(config.joined_url, data)
+            text = f"<tr>" \
+                   f"<th style='padding:2px 8px 0px 8px;'>Consultant</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Team</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Client</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Vendor</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Marketer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Start Date</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>Employer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;'>City</th>" \
+                   f"</tr>"
+            start = date.today()
+            end = date.today() + timedelta(days=5)
 
-        text = f"""
-#### Project Joining in this Week :memo: \n
-| Consultant | Team | Client | Vendor | Marketer | Start Date | Employer | City |
-|:-----------|:-----|:-------|:-------|:---------|:-----------|:---------|:-----|
-"""
-        start = date.today()
-        end = date.today() + timedelta(days=5)
-        cancelled = ["cancel-dual-offer", "cancel-client-cancelled", "contract-conflicts", "candidate-absconded",
-                     "candidate-denied-jd", "candidate-denied-rate", "candidate-denied-location"]
+            cancelled = ['cancelled-dual_offer', 'cancelled', 'cancelled-client_cancelled',
+                         'cancelled-contract_conflicts',
+                         'cancelled-candidate_denied', 'cancelled-candidate_absconded', 'cancelled-candidate_denied_jd',
+                         'cancelled-candidate_denied_rate', 'cancelled-candidate_denied_location']
 
-        joining_this_week = Project.objects.filter(start_date__range=[start, end]).exclude(
-            statuses__status__in=cancelled,
-            statuses__is_current=True,
-        )
+            joining_this_week = Project.objects.filter(start_date__range=[start, end]).exclude(
+                statuses__status__in=cancelled,
+                statuses__is_current=True,
+            )
 
-        for project in joining_this_week:
-            submission = project.submission
-            text += f"| {project.consultant.name} | {submission.created_by.team.name} | {submission.client} | {submission.lead.vendor_company.name} | {submission.created_by.employee_name} | {project.start_date} | {submission.employer} | {project.city} |\n"
+            for project in joining_this_week:
+                submission = project.submission
+                text += f"<tr>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {project.consultant.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.team.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.client} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.lead.vendor_company.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.employee_name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {project.start_date.strftime('%m/%d/%Y')} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {submission.employer} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;'> {project.city} </td>" \
+                        f"</tr>\n"
 
-        data = {
-            "response_type": "in_channel",
-            "username": "Log1 Updates",
-            "text": text
-        }
+            data = {
+                "title": "Project Joining in this Week &#128221;",
+                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+            }
+            res, msg = post_msg_using_webhook(config.joined_url, data)
+            if msg == 'error':
+                create_cron_error(job, res)
+            res, msg = post_msg_using_webhook(config.general_url, data)
+            if msg == 'error':
+                create_cron_error(job, res)
 
-        mattermost_webhook(config.joined_url, data)
-        mattermost_webhook(config.general_url, data)
+        except Exception as error:
+            create_cron_error(job, error)

@@ -1,0 +1,69 @@
+Pre-Requisites
+
+Have consultants contact details
+
+Go through JD/Resume/Call recordings (If exist)
+
+Check consultants Location/time-zone
+
+
+
+CASE1: First Interaction (The day when project is assigned: #30-45 Mins TBD as below)
+
+Start the interaction with greetings and your introduction, give details about your exp, the technology you have worked with number of projects you have done till date, your introduction should build up confidence of consultant in you that you are the person who can help him cross the seven seas.
+
+Your first introduction should send a message that
+
+you are good with the technology
+
+you have enough exp
+
+you are strict towards the deadlines of the assignments you give
+
+You expect 100% attendance to all the sessions
+
+Importance of the project, how it is important to you
+
+Make him/her understand that failing to meet your expectation can lead to project failure
+
+
+
+Know your consultant
+
+Ask about qualification and any experience consultant has, any prior projects if they have done
+
+Training he/she has went through, how well she/he did the training, any assignments/projects they have done based on the offer they have
+
+Ask questions based on training which he/she attended from consultant (15 mins screening kind of to understand how good they are)
+
+Explain about the kind of role which consultant will be playing on the project, talk about techs, responsibilities, etc.
+
+Make him/her understand how you will be utilizing the time before joining and make it clear how important it is to attend all sessions and to complete all assignments.
+
+Ask consultant to go through the recordings and resume, next day consultant should come with the list of these items divided into what he they are aware of and what they are not.
+
+All terms, technologies and tools mentioned in Resume must be discussed in brief
+
+All terms, technologies and tools mentioned in Job Description must be discussed in detail.
+
+Consultant must listen to recording and make list of items as mentioned above
+
+Ask consultant to do this machine setup
+
+Have a ubuntu or mac OS (Operating System) ready
+
+Share all the basic installations like DB, NPM, pip, etc. whatever needed as per JD and req of the project.
+
+Ask them to be ready with and free tiar accounts if needed of AWS, GCP or any other platform if needed
+
+Ask them to create a new GitHub account/ they can use the one they used for their training.
+
+Share the basic course of using git, git branching, which they need to go through on day 1.
+
+As a support person make sure you do this:
+
+Share some assignments which you feel the consultant should be able to do based on what he agreed on he knows well and can do on his/her own.
+
+As a support person you need to prepare a session plan for all days before joining for the consultant, make a list of all points from recording and JD and divide that into the days you have before joining.
+
+Based on your discussion on point “1” share the feedback with marketing and retention if you feel the consultant has no understanding /no knowledge of training he/she has done and cannot handle the project at all. (You can also do it next day based on the assignments submitted)

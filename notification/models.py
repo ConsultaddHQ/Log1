@@ -1,28 +1,13 @@
-import logging
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
-CATEGORY_CHOICES = (
-    ('info', 'Info'),
-    ('alert', 'Alert'),
-    ('pending', 'Pending'),
-    ('rejected', 'Rejected'),
-)
-
-DEVICE_TYPES = (
-    (u'ios', u'ios'),
-    (u'web', u'web'),
-    (u'android', u'android'),
-)
-
-logger = logging.getLogger(__name__)
-
 
 class NotificationQuerySet(models.query.QuerySet):
     """ Notification QuerySet """
+
     def unread(self, user, user_type):
         """Return only unread items in the current queryset"""
         return self.filter(
@@ -56,6 +41,11 @@ class NotificationQuerySet(models.query.QuerySet):
 
 
 class FCMDevice(models.Model):
+    DEVICE_TYPES = (
+        (u'ios', u'ios'),
+        (u'web', u'web'),
+        (u'android', u'android'),
+    )
     active = models.BooleanField(_("Is active"), default=True)
     type = models.CharField(choices=DEVICE_TYPES, max_length=10, blank=True, null=True)
     name = models.CharField(_("Name of Device"), max_length=255, blank=True, null=True)
@@ -72,6 +62,12 @@ class FCMDevice(models.Model):
 
 
 class Notification(models.Model):
+    CATEGORY_CHOICES = (
+        ('info', 'Info'),
+        ('alert', 'Alert'),
+        ('pending', 'Pending'),
+        ('rejected', 'Rejected'),
+    )
     description = models.TextField(blank=True, null=True)
     deleted = models.BooleanField(default=False, db_index=True)
     emailed = models.BooleanField(default=False, db_index=True)
@@ -82,8 +78,7 @@ class Notification(models.Model):
 
     recipient_object_id = models.PositiveIntegerField()
     recipient_content_type = models.ForeignKey(
-        ContentType,
-        null=True,
+        ContentType, null=True,
         on_delete=models.SET_NULL,
         related_name='recipient_notification'
     )
@@ -91,8 +86,7 @@ class Notification(models.Model):
 
     sender_object_id = models.PositiveIntegerField()
     sender_content_type = models.ForeignKey(
-        ContentType,
-        null=True,
+        ContentType, null=True,
         on_delete=models.SET_NULL,
         related_name='sender_notification'
     )
@@ -100,12 +94,19 @@ class Notification(models.Model):
 
     target_object_id = models.PositiveIntegerField()
     target_content_type = models.ForeignKey(
-        ContentType,
-        blank=True, null=True,
-        on_delete=models.SET_NULL,
-        related_name='target_notification'
+        ContentType, null=True,
+        related_name='target_notification',
+        blank=True, on_delete=models.SET_NULL,
     )
     target_content_object = GenericForeignKey('target_content_type', 'target_object_id')
+
+    parent_object_id = models.PositiveIntegerField(null=True, blank=True)
+    parent_content_type = models.ForeignKey(
+        ContentType, null=True,
+        related_name='parent_notification',
+        blank=True, on_delete=models.SET_NULL,
+    )
+    parent_content_object = GenericForeignKey('parent_content_type', 'parent_object_id')
 
     objects = NotificationQuerySet.as_manager()
 
@@ -120,10 +121,6 @@ class Notification(models.Model):
         return u'%(title)s %(timesince)s ago' % ctx
 
     def timesince(self, now=None):
-        """
-        Shortcut for the ``django.utils.timesince.timesince`` function of the
-        current timestamp.
-        """
         from django.utils.timesince import timesince as timesince_
         return timesince_(self.timestamp, now)
 

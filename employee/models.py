@@ -1,27 +1,18 @@
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import BaseUserManager
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.auth.models import AbstractUser, PermissionsMixin
 
-from api_key.models import APIKey
+from log1.utils import write_exception
 from utils_app.mailing import send_email
-from employee.token import get_token_generator
 from utils_app.models import TimeStampedModel
-
-
-GENDER_CHOICE = (
-    ('male', 'Male'),
-    ('female', 'Female')
-)
-
-ASSET_TYPES = (
-    ('email', 'Email'),
-    ('social', 'Social'),
-    ('number', 'Number'),
-    ('job_board', 'Job Board')
-)
+from employee.token import get_token_generator
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
@@ -29,23 +20,29 @@ TOKEN_GENERATOR_CLASS = get_token_generator()
 class UserManager(BaseUserManager):
     use_in_migrations = True
 
-    def create_user(self, employee_id, email, name, team=None, gender=None, phone=None, password=None):
+    def create_user(self, employee_id, email, name, team=None, gender=None, phone=None, password=None, roles=[]):
         """
             Create and save a user with the given Employee_id, email, name, and password.
         """
         if not email:
             raise ValueError('Users must have an email address')
         email = self.normalize_email(email)
+        if isinstance(team, str):
+            team = get_object_or_404(Team, team)
         user = self.model(
-            employee_id=int(employee_id),
-            username=int(employee_id),
-            email=email,
             team=team,
-            employee_name=name,
+            email=email,
+            phone=phone,
             gender=gender,
+            employee_name=name,
+            username=int(employee_id),
+            employee_id=int(employee_id),
         )
 
-        user.phone = phone
+        for role in roles:
+            r = Role.objects.get(name=role)
+            user.role.add(r)
+
         user.set_password(password)
         user.is_active = True
         user.save()
@@ -57,7 +54,7 @@ class UserManager(BaseUserManager):
         """
         user = self.create_user(
             employee_id,
-            "admin@log1.com",
+            "admin@consultadd.com",
             "Admin",
             password=password
         )
@@ -87,18 +84,24 @@ class User(AbstractUser, PermissionsMixin):
     """
     Custom employee realization based on Django AbstractUser and PermissionMixin.
     """
+    GENDER_CHOICE = (
+        ('male', 'Male'),
+        ('female', 'Female')
+    )
     email = models.EmailField(_('Email'))
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    account_login = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
     role = models.ManyToManyField(Role, related_name='roles')
     employee_id = models.IntegerField(_('Employee ID'), unique=True)
-    employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
+    employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name='employees', null=True, blank=True)
+    technology = ArrayField(models.CharField(_('Technologies'), max_length=30, blank=True), blank=True, null=True)
 
     objects = UserManager()
 
@@ -125,12 +128,14 @@ class User(AbstractUser, PermissionsMixin):
                 return consultant.first()
         return None
 
-    @staticmethod
-    def send_mail(mail_data):
+    def send_mail(self, mail_data):
         try:
-            res = send_email(mail_data, "admin@log1.com")
+            res, msg = send_email(mail_data, "admin@consultadd.com")
+            if not msg:
+                return res, "error"
             return res, "ok"
         except Exception as error:
+            write_exception(message=error)
             return error, "error"
 
     def save(self, *args, **kwargs):
@@ -164,7 +169,7 @@ class ResetPasswordToken(models.Model):
         return f'{self.user}-{self.key}'
 
 
-def get_password_reset_token_expiry_time():
+def get_token_expiry_time():
     return getattr(settings, 'RESET_TOKEN_EXPIRY_TIME', 24)
 
 
@@ -173,15 +178,21 @@ def clear_expired(expiry_time):
 
 
 class Asset(TimeStampedModel):
+    ASSET_TYPES = (
+        ('email', 'Email'),
+        ('social', 'Social'),
+        ('number', 'Number'),
+        ('job_board', 'Job Board')
+    )
     username = models.CharField(_('Username'), max_length=50)
     provider = models.CharField(_('Provider'), max_length=30)
     password = models.CharField(_('Password'), max_length=50)
-    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
     is_deleted = models.BooleanField(_('Is Deleted'), default=False)
-    alter_email = models.EmailField(_('Alternate Email'), max_length=50, null=True, blank=True)
+    email = models.EmailField(_('Email'), max_length=50, null=True, blank=True)
     number = models.CharField(_('Number'), max_length=50, null=True, blank=True)
     tech = models.CharField(_('Technology'), max_length=40, null=True, blank=True)
     remarks = models.CharField(_('Remarks'), max_length=300, null=True, blank=True)
+    alter_email = models.EmailField(_('Alternate Email'), max_length=50, null=True, blank=True)
     alter_number = models.CharField(_('Alternate Number'), max_length=40, null=True, blank=True)
     asset_type = models.CharField(_('Asset Type'), choices=ASSET_TYPES, max_length=20, null=True, blank=True)
     owner = models.ForeignKey(
@@ -196,9 +207,6 @@ class Asset(TimeStampedModel):
     )
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
@@ -206,3 +214,56 @@ class Asset(TimeStampedModel):
 
     def __str__(self):
         return self.owner.employee_name
+
+
+class Tagging(models.Model):
+    object_id = models.PositiveIntegerField()
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE,
+        verbose_name='Model Name'
+    )
+    tagged_user = models.ManyToManyField(
+        User, blank=True,
+        related_name='tagged_user',
+        verbose_name='Tagged Users'
+    )
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    def save(self, *args, **kwargs):
+        return super(Tagging, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.object_id}-{self.content_type}'
+
+
+def tag_users(data):
+    try:
+        content_type = ContentType.objects.get(model=data['model'])
+        tag = Tagging.objects.create(
+            content_type=content_type,
+            object_id=data['object_id'],
+        )
+        for user_id in data['tags']:
+            user = get_object_or_404(User, id=user_id)
+            tag.tagged_user.add(user)
+        return True
+    except Exception as error:
+        write_exception(message=error)
+        return False
+
+
+class Handover(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='handover_to')
+    handover_to = models.ForeignKey(User, on_delete=models.CASCADE, related_name='handovers', blank=True, null=True)
+
+    class Meta:
+        ordering = ('-user__employee_name',)
+
+    def __str__(self):
+        return f"{self.user} --> {self.handover_to}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(Handover, self).save(*args, **kwargs)

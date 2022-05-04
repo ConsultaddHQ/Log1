@@ -1,5 +1,4 @@
 import os
-import logging
 from django.db import models
 from django.utils import timezone
 from django.dispatch import receiver
@@ -8,32 +7,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
 from employee.models import User
+from log1.utils import write_exception
 from utils_app.models import TimeStampedModel
-
-logger = logging.getLogger(__name__)
-
-ATTACHMENT_TYPE = (
-    ('ssn', 'SSN'),
-    ('other', 'Other'),
-    ('resume', 'Resume'),
-    ('visa', 'Visa Docs'),
-    ('msa', 'MSA/Agreement'),
-    ('misc', 'Miscellaneous'),
-    ('timesheet', 'Timesheet'),
-    ('work_order', 'Work Order'),
-    ('academic', 'Academic Docs'),
-    ('photo_id', 'Miscellaneous'),
-    ('results', 'Assessment Results'),
-    ('msa_signed', 'MSA/Agreement Signed'),
-    ('recordings', 'Interview Recordings'),
-    ('work_order_signed', 'Work Order Signed'),
-    ('work_order_msa', 'Work Order and MSA/Agreement'),
-    ('work_order_msa_signed', 'Work Order and MSA/Agreement Signed'),
-)
 
 
 def attachment_upload(instance, filename):
-    """Stores the attachment in a "per module/appname/primary key" folder"""
     if instance.content_object:
         return 'attachments/{app}_{model}/{pk}/{filename}'.format(
             app=instance.content_object._meta.app_label,
@@ -48,6 +26,7 @@ def create_attachment(data):
     try:
         content_type = ContentType.objects.get(model=data['model'])
         Attachment.objects.create(
+            is_active=True,
             creator=data['creator'],
             content_type=content_type,
             object_id=data['object_id'],
@@ -56,7 +35,7 @@ def create_attachment(data):
         )
         return True
     except Exception as error:
-        logger.error(error)
+        write_exception(message=error)
         return False
 
 
@@ -67,9 +46,31 @@ class AttachmentManager(models.Manager):
 
 
 class Attachment(TimeStampedModel):
-    objects = AttachmentManager()
-
+    ATTACHMENT_TYPE = (
+        ('ssn', 'SSN'),
+        ('other', 'Other'),
+        ('resume', 'Resume'),
+        ('visa', 'Visa Docs'),
+        ('test', 'Test Docs'),
+        ('msa', 'MSA/Agreement'),
+        ('misc', 'Miscellaneous'),
+        ('timesheet', 'Timesheet'),
+        ('work_order', 'Work Order'),
+        ('academic', 'Academic Docs'),
+        ('photo_id', 'Miscellaneous'),
+        ('results', 'Assessment Results'),
+        ('project_update', 'Project Update'),
+        ('msa_signed', 'MSA/Agreement Signed'),
+        ('recordings', 'Interview Recordings'),
+        ('test_submit', "Test Submission Docs"),
+        ('test_feedback', "Test Feedback Docs"),
+        ('project_resource', "Project Resource"),
+        ('work_order_signed', 'Work Order Signed'),
+        ('work_order_msa', 'Work Order and MSA/Agreement'),
+        ('work_order_msa_signed', 'Work Order and MSA/Agreement Signed'),
+    )
     object_id = models.PositiveIntegerField()
+    is_active = models.BooleanField(_('Is active'), default=True)
     attachment_file = models.FileField(_('attachment'), upload_to=attachment_upload)
     attachment_type = models.CharField(choices=ATTACHMENT_TYPE, blank=True, null=True, max_length=50)
     content_type = models.ForeignKey(
@@ -82,10 +83,12 @@ class Attachment(TimeStampedModel):
     )
     content_object = GenericForeignKey('content_type', 'object_id')
 
+    objects = AttachmentManager()
+
     class Meta:
+        ordering = ['-created']
         verbose_name = _("attachment")
         verbose_name_plural = _("attachments")
-        ordering = ['-created']
         permissions = (
             ('delete_foreign_attachments', _('Can delete foreign attachments')),
         )
@@ -94,9 +97,6 @@ class Attachment(TimeStampedModel):
         return f'{self.creator.employee_name} attached {self.attachment_file.name}'
 
     def save(self, *args, **kwargs):
-        """
-            On save timestamps
-        """
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()

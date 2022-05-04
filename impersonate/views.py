@@ -1,16 +1,17 @@
-from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, ListModelMixin
 
-from employee.models import User
-from employee.serializers import UserSerializerLogin
+from log1.utils import write_exception
+from employee.models import User, Handover
+from employee.serializers import Token, UserSerializerLogin, HandoverSerializer, HandoverUserSerializer
 
 
+# Route - /impersonate/
 class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
-    # check if user is a superuser and has rights to impersonate
     queryset = User.objects.all()
     serializer_class = UserSerializerLogin
     permission_classes = (IsAuthenticated,)
@@ -18,17 +19,34 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
 
     def create(self, request, *args, **kwargs):
         try:
+            user_id = request.data.get('id')
+            if not User.objects.filter(id=user_id).exists():
+                return Response({"message": "User does not exist"}, status=404)
+
             if request.user.is_superuser:
-                employee_id = request.data['employee_id']
-                # check if requested impersonated user exists
-                user_exists = User.objects.filter(employee_id=employee_id)
-                if user_exists:
-                    user = user_exists.first()
-                    serializer = self.serializer_class(user)
-                    return Response({"result": serializer.data}, status=status.HTTP_201_CREATED)
-                else:
-                    return Response({"error": {'message': 'User not Exist'}}, status=status.HTTP_400_BAD_REQUEST)
+                token, created = Token.objects.get_or_create(user_id=user_id)
+                return Response({"data": {"token": token.key}, "message": "User is impersonated"}, status=201)
             else:
-                return Response({"error": {'message': 'Unauthorised Access'}}, status=status.HTTP_401_UNAUTHORIZED)
+                handovers = Handover.objects.filter(handover_to=request.user)
+                if handovers.filter(user_id=user_id).exists():
+                    token, created = Token.objects.get_or_create(user_id=user_id)
+                    return Response({"data": {"token": token.key}, "message": "User is impersonated"}, status=201)
+                else:
+                    return Response({"message": "You don't have permission to impersonate this User"}, status=403)
         except Exception as error:
-            return Response({"error": {'success': False, 'message': str(error)}}, status=status.HTTP_400_BAD_REQUEST)
+            write_exception(error, request)
+            return Response({"message": {'success': False, 'message': str(error)}}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='users')
+    def users(self, request):
+        try:
+            if request.user.is_superuser:
+                users = User.objects.exclude(role__name='consultant')
+                serializer = HandoverUserSerializer(users, many=True)
+            else:
+                handovers = Handover.objects.filter(handover_to=request.user)
+                serializer = HandoverSerializer(handovers, many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
