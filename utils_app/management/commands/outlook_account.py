@@ -34,7 +34,7 @@ class Command(BaseCommand):
                         user = {
                             "name": row[0],
                             "email": row[2],
-                            "log1_email": row[3],
+                            "log1_email": row[1],
                             "password": password,
                             "first_name": row[0].split(' ')[0],
                             "last_name": " ".join(row[0].split(' ')[1:]),
