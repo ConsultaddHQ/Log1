@@ -769,11 +769,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            date_passed = date.today() - timedelta(days=15)
+            pending_before = date.today() - timedelta(days=15)
             test_lst = Test.objects.filter(status='feedback_due', submission__created_by=request.user).exclude(
-                modified__range=[date_passed, date.today()])
+                modified__gte=pending_before)
             interview_lst = Interview.objects.filter(status='feedback_due', submission__created_by=request.user)\
-                .exclude(modified__range=[date_passed, date.today()])
+                .exclude(modified__gte=pending_before)
 
             if test_lst or interview_lst:
                 return Response({"marketer_feedback_due": True}, status=202)

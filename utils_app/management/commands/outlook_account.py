@@ -13,9 +13,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             count = 0
-            users, payload = [], {}
+            users, payload = [], []
             ms = MicrosoftAccount()
-            with open('employees.csv', newline='') as csv_file:
+            with open('Candidate_details.csv', newline='') as csv_file:
                 reader = csv.reader(csv_file, delimiter=',', quotechar='|')
                 next(reader)
                 for row in reader:
@@ -27,7 +27,7 @@ class Command(BaseCommand):
                         "licence_assigned": False,
                         "consultant_id": None,
                     }
-                    qs = Consultant.objects.filter(email=row[1].lower())
+                    qs = Consultant.objects.filter(email=row[3].lower())
                     if qs:
                         consultant = qs.first()
                         password = f"consultadd@1{consultant.id}23"
@@ -43,6 +43,7 @@ class Command(BaseCommand):
                         data['password'] = password
                         data['consultant_id'] = consultant.id
 
+                        print(data)
                     # Creating Account
                     user_id, msg = ms.create_account(user)
                     if msg == 'ok':
@@ -63,8 +64,8 @@ class Command(BaseCommand):
                             print(row[2], "Licence not assigned")
                     else:
                         print(row[2], user_id)
-                    if row[2] not in payload:
-                        payload[row[2]] = data
+                    if row[4] not in payload:
+                        payload[row[4]] = data
 
             fields = ['first_name', 'last_name', 'name', 'log1_email', 'email', 'password']
             with open('ms_creds.csv', 'w') as csvfile:
