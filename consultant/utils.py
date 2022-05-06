@@ -605,6 +605,7 @@ def queryset_filter_by_status(queryset, sub_status, offer_candidates=None):
 
 
 def status_filter_obj(consultants, open_candidates, offer_candidates):
+    consultants = consultants.distinct()
     return {
         "all": consultants,
         "terminated": consultants.filter(status='terminated'),
