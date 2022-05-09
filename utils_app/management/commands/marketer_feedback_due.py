@@ -13,9 +13,9 @@ class Command(BaseCommand):
         try:
             payload = {}
             pending_before = date.today() - timedelta(days=15)
-            test_lst = Test.objects.filter(status='feedback_due', modified__gte="2022-04-01").exclude(
+            test_lst = Test.objects.filter(status='feedback_due', modified__gte="2022-01-01").exclude(
                 modified__gte=pending_before)
-            interview_lst = Interview.objects.filter(status='feedback_due', modified__gte="2022-04-01").exclude(
+            interview_lst = Interview.objects.filter(status='feedback_due', modified__gte="2022-01-01").exclude(
                 modified__gte=pending_before)
             for test in test_lst:
                 count = 1
