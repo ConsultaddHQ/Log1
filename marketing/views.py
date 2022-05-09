@@ -2120,7 +2120,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 for answer in data:
                     if answer['answer'] == 'submitted':
                         ans = Answer.objects.get(id=answer['id'])
-                        test_docs = ans.attachments.filter(attachment_type='test_feedback')
+                        test_docs = ans.attachment.filter(attachment_type='test_feedback')
                         for doc in test_docs:
                             response, error = download_s3_object(doc.attachment_file.name)
                             path.append(response)

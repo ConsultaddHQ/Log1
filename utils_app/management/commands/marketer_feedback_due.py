@@ -12,11 +12,11 @@ class Command(BaseCommand):
         job = create_cron_object(name='test/interview_in_feedback_due')
         try:
             payload = {}
-            date_passed = date.today() - timedelta(days=15)
-            test_lst = Test.objects.filter(status='feedback_due').exclude(
-                modified__range=[date_passed, date.today()])
-            interview_lst = Interview.objects.filter(status='feedback_due').exclude(
-                modified__range=[date_passed, date.today()])
+            pending_before = date.today() - timedelta(days=15)
+            test_lst = Test.objects.filter(status='feedback_due', modified__gte="2022-04-01").exclude(
+                modified__gte=pending_before)
+            interview_lst = Interview.objects.filter(status='feedback_due', modified__gte="2022-04-01").exclude(
+                modified__gte=pending_before)
             for test in test_lst:
                 count = 1
                 if test.marketer.employee_name in payload.keys():
