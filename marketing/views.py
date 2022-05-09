@@ -770,10 +770,12 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             pending_before = date.today() - timedelta(days=15)
-            test_lst = Test.objects.filter(status='feedback_due', submission__created_by=request.user).exclude(
-                modified__gte=pending_before)
-            interview_lst = Interview.objects.filter(status='feedback_due', submission__created_by=request.user)\
-                .exclude(modified__gte=pending_before)
+            test_lst = Test.objects.filter(
+                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+            ).exclude(modified__gte=pending_before)
+            interview_lst = Interview.objects.filter(
+                status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
+            ).exclude(modified__gte=pending_before)
 
             if test_lst or interview_lst:
                 return Response({"marketer_feedback_due": True}, status=202)
@@ -1479,7 +1481,9 @@ class InterviewViewSets(ModelViewSet):
                         "title": f"""{interview_status_emoji} Interview Feedback """,
                         "text": f"""*{title} ({interview_status})* <br>""" + interview.feedback,
                     }
-                    post_msg_using_webhook(config.interview_feedback_url, data)
+                    resp = sup_feedback_notification(title, interview.id, request.user)
+                    if resp is 'ok':
+                        post_msg_using_webhook(config.interview_feedback_url, data)
 
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -1980,8 +1984,6 @@ class InterviewViewSets(ModelViewSet):
             desc = f"{request.user.employee_name} provided supervisor feedback for Interview I-{interview.id}"
             create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
 
-            title = get_interview_title(interview)
-            sup_feedback_notification(title, ques_answers, request.user)
             return Response({"message": "Feedback submitted"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -2120,7 +2122,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 for answer in data:
                     if answer['answer'] == 'submitted':
                         ans = Answer.objects.get(id=answer['id'])
-                        test_docs = ans.attachments.filter(attachment_type='test_feedback')
+                        test_docs = ans.attachment.filter(attachment_type='test_feedback')
                         for doc in test_docs:
                             response, error = download_s3_object(doc.attachment_file.name)
                             path.append(response)

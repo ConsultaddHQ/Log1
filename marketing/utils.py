@@ -320,7 +320,7 @@ def test_received_notification(user, test, timezone):
         return str(error)
 
 
-def sup_feedback_notification(title, payload, user):
+def sup_feedback_notification(title, interview_id, user):
     try:
         profile_path = get_profile_picture(user)
         data = {
@@ -338,6 +338,17 @@ def sup_feedback_notification(title, payload, user):
                 }
             ]
         }
+        payload = []
+        ques_answers = Answer.objects.filter(
+            object_id=interview_id, content_type__model='interview').order_by('question_id').distinct('question_id')
+        for answer in ques_answers:
+            payload.append({
+                "id": answer.id,
+                "answer": answer.answer,
+                "question": answer.question.title,
+                "parent_question": answer.parent_question.title if answer.parent_question else None
+            })
+
         for ques_ans in payload:
             answer = ques_ans['answer']
             if isinstance(answer, bool):
