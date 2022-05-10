@@ -56,11 +56,10 @@ class EngineeringSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_is_project_description(obj):
-        description = obj.description
-        if description:
-            if not description.technology or not description.timezone:
-                return False
-            return True
+        if hasattr(obj, 'description'):
+            if obj.description.technology and obj.description.timezone:
+                return True
+            return False
         return False
 
     @staticmethod
