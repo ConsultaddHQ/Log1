@@ -348,8 +348,6 @@ def sup_feedback_notification(title, obj, user):
                 answer = "No"
             elif '[' in answer:
                 answer = answer.replace(']', '').replace('[', '').replace('"', '')
-            else:
-                answer = None
             data['sections'][0]["facts"].append({
                 "name": ques_ans.question.title,
                 "value": answer
