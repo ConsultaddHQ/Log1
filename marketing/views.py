@@ -1481,9 +1481,9 @@ class InterviewViewSets(ModelViewSet):
                         "title": f"""{interview_status_emoji} Interview Feedback """,
                         "text": f"""*{title} ({interview_status})* <br>""" + interview.feedback,
                     }
-                    resp = sup_feedback_notification(title, interview.id, request.user)
-                    if resp is 'ok':
-                        post_msg_using_webhook(config.interview_feedback_url, data)
+                    if interview.supervisor_feedback.all():
+                        sup_feedback_notification(title, interview, request.user)
+                    post_msg_using_webhook(config.interview_feedback_url, data)
 
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
