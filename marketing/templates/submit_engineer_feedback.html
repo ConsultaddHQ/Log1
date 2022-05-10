@@ -583,7 +583,7 @@
                                 {% endif %}
                             {% else %}
                             {% if project.answer.0|length == 1 %}
-                                {{project.answer.title()}}
+                                {{project.answer | capfirst}}
                             {% else %}
                                 {% for answer in project.answer %}
                                     {{answer}},
