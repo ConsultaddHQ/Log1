@@ -320,9 +320,10 @@ def test_received_notification(user, test, timezone):
         return str(error)
 
 
-def sup_feedback_notification(title, obj, user):
+def sup_feedback_notification(title, obj):
     try:
-        profile_path = get_profile_picture(user)
+        supervisor = obj.supervisor
+        profile_path = get_profile_picture(supervisor) if supervisor else None
         data = {
             "@type": "MessageCard",
             "themeColor": "#0076D7",
@@ -339,7 +340,7 @@ def sup_feedback_notification(title, obj, user):
             ]
         }
 
-        ques_answers = obj.supervisor_feedback.order_by('question_id', 'question__position').distinct('question_id')
+        ques_answers = obj.supervisor_feedback.order_by('question_id').distinct('question_id')
         for ques_ans in ques_answers:
             answer = ques_ans.answer
             if answer == 'True':
@@ -348,8 +349,6 @@ def sup_feedback_notification(title, obj, user):
                 answer = "No"
             elif '[' in answer:
                 answer = answer.replace(']', '').replace('[', '').replace('"', '')
-            else:
-                answer = None
             data['sections'][0]["facts"].append({
                 "name": ques_ans.question.title,
                 "value": answer
