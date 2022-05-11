@@ -1482,7 +1482,7 @@ class InterviewViewSets(ModelViewSet):
                         "text": f"""*{title} ({interview_status})* <br>""" + interview.feedback,
                     }
                     if interview.supervisor_feedback.all():
-                        sup_feedback_notification(title, interview, request.user)
+                        sup_feedback_notification(title, interview)
                     post_msg_using_webhook(config.interview_feedback_url, data)
 
                 # Activity

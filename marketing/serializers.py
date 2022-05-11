@@ -270,7 +270,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
         prv_date = datetime.strptime("2022-05-04", "%Y-%m-%d")
         if obj.start_time.replace(tzinfo=None) < prv_date:
             return True
-        elif obj.supervisor_feedback.all():
+        elif obj.supervisor_feedback.all() or obj.supervisor.employee_id == 9999:
             return True
         return False
 
