@@ -597,35 +597,36 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
 
-            # Team submissions for Scrum master and Proxy Scrum Master
-            if 'admin' in roles or 'proxy' in roles:
-                consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
-                                 list(ConsultantMarketing.objects.filter(
-                                     in_pool=True, status='open').values_list('consultant_id'))
-                queryset = queryset.filter(
-                    Q(created_by__team=team) |
-                    Q(consultant_marketing__teams=team) |
-                    Q(consultant_marketing__consultant__in=consultant_ids) |
-                    Q(consultant_marketing__consultant__pocs__poc=request.user,
-                      consultant_marketing__consultant__pocs__poc_type='recruiter')
-                )
-
-            # Submissions of a marketer and pool consultant submissions (except those are on project)
-            elif 'marketer' in roles:
-                consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id')) + \
-                                 list(ConsultantMarketing.objects.filter(
-                                     in_pool=True, status='open').values_list('consultant_id'))
-                if 'recruiter' in roles or 'retention_manager' in roles:
+            if 'superadmin' not in roles:
+                # Team submissions for Scrum master and Proxy Scrum Master
+                if 'admin' in roles or 'proxy' in roles:
+                    consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
+                                     list(ConsultantMarketing.objects.filter(
+                                         in_pool=True, status='open').values_list('consultant_id'))
                     queryset = queryset.filter(
-                        Q(created_by=request.user) |
+                        Q(created_by__team=team) |
+                        Q(consultant_marketing__teams=team) |
                         Q(consultant_marketing__consultant__in=consultant_ids) |
-                        Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
+                        Q(consultant_marketing__consultant__pocs__poc=request.user,
+                          consultant_marketing__consultant__pocs__poc_type='recruiter')
                     )
-                else:
-                    queryset = queryset.filter(
-                        Q(created_by=request.user) |
-                        Q(consultant_marketing__consultant__in=consultant_ids)
-                    )
+
+                # Submissions of a marketer and pool consultant submissions (except those are on project)
+                elif 'marketer' in roles:
+                    consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id')) + \
+                                     list(ConsultantMarketing.objects.filter(
+                                         in_pool=True, status='open').values_list('consultant_id'))
+                    if 'recruiter' in roles or 'retention_manager' in roles:
+                        queryset = queryset.filter(
+                            Q(created_by=request.user) |
+                            Q(consultant_marketing__consultant__in=consultant_ids) |
+                            Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
+                        )
+                    else:
+                        queryset = queryset.filter(
+                            Q(created_by=request.user) |
+                            Q(consultant_marketing__consultant__in=consultant_ids)
+                        )
 
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
@@ -2196,7 +2197,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     queryset = queryset.filter(submission__created_by__team=request.user.team)
 
             # Test List according to role
-            if 'admin' in roles and 'engineer' in roles:
+            if ('admin' in roles and 'engineer' in roles) or 'superadmin' in roles:
                 pass
             elif 'admin' in roles or 'proxy' in roles:
                 queryset = queryset.filter(
@@ -2579,6 +2580,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.submitted_by = request.user
             test.submit_date = datetime.now()
             test.engineer_remarks = request.data.get('remarks')
+            if not test.engineer_feedback.all():
+                return Response({"message": "Please submit engineer's feedback again"}, status=400)
             test.save()
 
             # Activity
