@@ -230,28 +230,29 @@ class ConsultantViewSets(ModelViewSet):
             consultants = Consultant.objects.all()
             roles = request.user.roles
 
-            if 'admin' in roles or 'proxy' in roles:
-                consultants = consultants.filter(
-                    Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
-                    Q(marketing__marketer=request.user, marketing__status='open') |
-                    Q(marketing__in_pool=True, marketing__status='open') |
-                    Q(pocs__poc=request.user)
-                )
+            if 'superadmin' not in roles:
+                if 'admin' in roles or 'proxy' in roles:
+                    consultants = consultants.filter(
+                        Q(marketing__teams=request.user.team, marketing__in_pool=False, marketing__status='open') |
+                        Q(marketing__marketer=request.user, marketing__status='open') |
+                        Q(marketing__in_pool=True, marketing__status='open') |
+                        Q(pocs__poc=request.user)
+                    )
 
-            elif 'marketer' in request.user.roles:
-                recruits = Consultant.objects.none()
+                elif 'marketer' in request.user.roles:
+                    recruits = Consultant.objects.none()
+                    if 'recruiter' in roles:
+                        recruits = consultants.filter(pocs__poc=request.user)
+                    consultants = consultants.filter(
+                        Q(marketing__marketer=request.user) |
+                        Q(marketing__primary_marketer=request.user) |
+                        Q(marketing__in_pool=True, marketing__status='open')
+                    )
+                    consultants = (consultants | recruits).distinct()
+
                 if 'recruiter' in roles:
                     recruits = consultants.filter(pocs__poc=request.user)
-                consultants = consultants.filter(
-                    Q(marketing__marketer=request.user) |
-                    Q(marketing__primary_marketer=request.user) |
-                    Q(marketing__in_pool=True, marketing__status='open')
-                )
-                consultants = (consultants | recruits).distinct()
-
-            if 'recruiter' in roles:
-                recruits = consultants.filter(pocs__poc=request.user)
-                consultants = (consultants | recruits).distinct()
+                    consultants = (consultants | recruits).distinct()
 
             if query:
                 consultants = consultants.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
