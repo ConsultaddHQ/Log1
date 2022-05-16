@@ -1,6 +1,7 @@
 from itertools import chain
 from datetime import timedelta, datetime
 
+from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
@@ -16,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+from api_key.models import APIKey
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
@@ -150,6 +152,18 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            user = get_object_or_404(User, id=kwargs.get('pk'))
+            serializer = UserSerializer(user, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            serializer = self.serializer_class(user)
+            return Response({"result": serializer.data, "message": "User Updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -799,64 +813,116 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
 
 
 # Route - /login/
-class LoginViewSet(GenericViewSet, CreateModelMixin):
+class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
     serializer_class = UserSerializer
     queryset = User.objects.all()
-    authentication_classes = (HasAPIKey,)
 
     def create(self, request, *args, **kwargs):
         result = {}
         try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
 
-            data = {
-                "role": request.data.get('role'),
-                "name": request.data.get('name'),
-                "team": request.data.get('team'),
-                "email": request.data.get('email'),
-                "phone": request.data.get('phone', None),
-                "gender": request.data.get('gender').lower(),
-                "password": request.data.get('password').strip(),
-                "employee_id": int(request.data.get('employee_id')),
-                "roles": request.data.get('roles', [])
-            }
+            team = request.data.get('team', None)
+            if isinstance(team, str):
+                team = get_object_or_404(Team, name=team)
+            user = User.objects.create_user(
+                employee_id=int(request.data.get('employee_id')),
+                email=request.data.get('email'),
+                name=request.data.get('name'),
+                team=team,
+                gender=request.data.get('gender').lower(),
+                phone=request.data.get('phone', None),
+                password=request.data.get('password').strip(),
+            )
+            for role in request.data.get("role", []):
+                user_role = get_object_or_404(Role, name=role)
+                user.role.add(user_role)
+            if request.data.get('keep_active'):
+                user.is_active = True
+                user.save()
 
-            # Log1 login
-
-            user = User.objects.create_user(**data)
-
-            result["Log1"] = f'{user.id} Created'
-            return Response({"message": result}, status=201)
+            return Response({"message": "User Created in Log1", "user_id": user.id}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": result, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='bulk_create')
-    def create_bulk(self, request, *args, **kwargs):
+    def create_bulk(self, request):
         result = {}
         try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
 
+            roles, record_list = [], []
             records = request.data.get('data')
-            roles = [record.get('roles', []) for record in records]
-            users = [User(
-                team=record.get('team'),
-                email=record.get('email'),
-                phone=record.get('phone'),
-                gender=record.get('gender'),
-                employee_name=record.get('name'),
-                username=int(record.get('employee_id')),
-                employee_id=int(record.get('employee_id')),
-            ) for record in records]
-            for user, role in zip(users, roles):
+            for record in records:
+                record["log1"] = record['log1'] if record.get('log1') else False
+                if isinstance(record.get('team'), str):
+                    record['team'] = Team.objects.filter(name=record.get('team')).first()
+                else:
+                    record['team'] = None
+                roles.append(record.get('roles', []))
+                record_list.append(User(
+                    team=record.get('team'),
+                    email=record.get('email'),
+                    phone=record.get('phone'),
+                    employee_name=record.get('name'),
+                    gender=record.get('gender', 'male'),
+                    is_active=record.get('log1', False),
+                    username=int(record.get('employee_id')),
+                    employee_id=int(record.get('employee_id')),
+                    password=make_password(record.get('password')),
+                ))
+            for user, role in zip(record_list, roles):
                 for role_name in role:
-                    role_object = Role.objects.get(name=role_name)
+                    role_object = Role.objects.filter(name=role_name).first()
                     user.role.add(role_object)
 
-            users = User.objects.bulk_create(users)
+            users = User.objects.bulk_create(record_list)
             users = [user.employee_id for user in users]
-            result["response"] = f"{len(users)} users  Created"
             result["users"] = users
+            result["msg"] = f"{len(users)} users  Created"
 
-            return Response({"message": result}, status=201)
+            return Response({"result": result}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": result, "error": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+            user = get_object_or_404(User, id=kwargs.get('pk'))
+            if user:
+                user.delete()
+                return Response({"message": "User Removed"}, status=204)
+            return Response({"message": "User not found"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['delete'], detail=False, url_path='bulk_delete')
+    def delete_bulk(self, request,):
+        try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+
+            users = User.objects.filter(employee_id__in=request.data.get('users', [])).delete()
+            data = {"msg": f"{len(users)} users  removed from beats"}
+            return Response({"result": data}, status=204)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
