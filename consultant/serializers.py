@@ -242,6 +242,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
     rate = serializers.ReadOnlyField()
     status = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
+    retention = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
     visa_type = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
@@ -249,7 +250,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit',
+        fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'retention','rate', 'work_auth', 'exit',
                   'rate_revision', 'visa_type')
 
     @staticmethod
@@ -273,6 +274,13 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_recruiter(obj):
         queryset = obj.pocs.filter(end=None, poc_type='recruiter')
+        if queryset:
+            return queryset.first().poc.employee_name
+        return None
+
+    @staticmethod
+    def get_retention(obj):
+        queryset = obj.pocs.filter(end=None, poc_type='retention')
         if queryset:
             return queryset.first().poc.employee_name
         return None
