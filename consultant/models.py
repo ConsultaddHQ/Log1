@@ -122,7 +122,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         return None
 
     @property
-    def relation(self):
+    def retention(self):
         queryset = self.pocs.filter(poc_type='retention', end=None)
         if queryset:
             return queryset.first().poc
