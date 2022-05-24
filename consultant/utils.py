@@ -668,12 +668,14 @@ def candidate_filter(request):
                 consultants = consultants.filter(**day_filter)
 
             if 'recruiter' in filters:
-                consultants = consultants.filter(pocs__poc_id=filters['recruiter'],
-                                                 pocs__poc_type='recruiter', pocs__end=None)
+                consultants = consultants.filter(
+                    pocs__poc_id=filters['recruiter'], pocs__poc_type='recruiter', pocs__end=None
+                )
 
             if 'retention' in filters:
-                consultants = consultants.filter(pocs__poc_id=filters['retention'],
-                                                 pocs__poc_type='retention', pocs__end=None)
+                consultants = consultants.filter(
+                    pocs__poc_id=filters['retention'], pocs__poc_type='retention', pocs__end=None
+                )
 
             if 'team' in filters and len(filters['team']) > 0:
                 consultants = consultants.filter(
