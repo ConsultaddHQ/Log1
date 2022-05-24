@@ -825,6 +825,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 return Response({"message": "Api Key not found"}, status=401)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"message": "Unauthorized"}, status=401)
+
             team = request.data.get('team', None)
             if isinstance(team, str):
                 team = get_object_or_404(Team, name=team)
@@ -853,7 +854,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             return Response({"message": result, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='bulk_create')
-    def create_bulk(self, request, *args, **kwargs):
+    def create_bulk(self, request):
         result = {}
         try:
             api_key = request.data.get('log1_api_key', None)
@@ -861,29 +862,33 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 return Response({"message": "Api Key not found"}, status=401)
             if not APIKey.objects.is_valid(api_key):
                 return Response({"message": "Unauthorized"}, status=401)
-            roles = []
+
+            roles, record_list = [], []
             records = request.data.get('data')
             for record in records:
+                record["log1"] = record['log1'] if record.get('log1') else False
                 if isinstance(record.get('team'), str):
                     record['team'] = Team.objects.filter(name=record.get('team')).first()
+                else:
+                    record['team'] = None
                 roles.append(record.get('roles', []))
-            users = [User(
-                team=record.get('team'),
-                email=record.get('email'),
-                phone=record.get('phone'),
-                employee_name=record.get('name'),
-                gender=record.get('gender', 'male'),
-                username=int(record.get('employee_id')),
-                is_active=record.get('log1', False),
-                employee_id=int(record.get('employee_id')),
-                password=make_password(record.get('password')),
-            ) for record in records]
-            for user, role in zip(users, roles):
+                record_list.append(User(
+                    team=record.get('team'),
+                    email=record.get('email'),
+                    phone=record.get('phone'),
+                    employee_name=record.get('name'),
+                    gender=record.get('gender', 'male'),
+                    is_active=record.get('log1', False),
+                    username=int(record.get('employee_id')),
+                    employee_id=int(record.get('employee_id')),
+                    password=make_password(record.get('password')),
+                ))
+            for user, role in zip(record_list, roles):
                 for role_name in role:
                     role_object = Role.objects.filter(name=role_name).first()
                     user.role.add(role_object)
 
-            users = User.objects.bulk_create(users)
+            users = User.objects.bulk_create(record_list)
             users = [user.employee_id for user in users]
             result["users"] = users
             result["msg"] = f"{len(users)} users  Created"
@@ -910,7 +915,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=False, url_path='bulk_delete')
-    def delete_bulk(self, request, *args, **kwargs):
+    def delete_bulk(self, request,):
         try:
             api_key = request.data.get('log1_api_key', None)
             if not api_key:
