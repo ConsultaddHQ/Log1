@@ -663,16 +663,17 @@ def candidate_filter(request):
 
             if 'gender' in filters:
                 consultants = consultants.filter(gender=filters['gender'])
-
             if 'days_on_bench' in filters:
                 day_filter = marketing_days_filter(filters['days_on_bench'])
                 consultants = consultants.filter(**day_filter)
 
             if 'recruiter' in filters:
-                consultants = consultants.filter(pocs__poc=filters['recruiter'], pocs__poc_type='recruiter')
+                consultants = consultants.filter(pocs__poc_id=filters['recruiter'],
+                                                 pocs__poc_type='recruiter', pocs__end=None)
 
             if 'retention' in filters:
-                consultants = consultants.filter(pocs__poc=filters['retention'], pocs__poc_type='retention')
+                consultants = consultants.filter(pocs__poc_id=filters['retention'],
+                                                 pocs__poc_type='retention', pocs__end=None)
 
             if 'team' in filters and len(filters['team']) > 0:
                 consultants = consultants.filter(
