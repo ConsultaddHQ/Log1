@@ -1316,21 +1316,13 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 previous_work_auth = instance.first()
                 previous_work_auth.is_current = False
                 previous_work_auth.save()
-            if request.data['visa_type'] == 'gc':
-                work_auth = WorkAuth.objects.create(
-                    is_current=True,
-                    visa_type=request.data['visa_type'],
-                    visa_start=request.data['visa_start'],
-                    consultant_id=request.data['consultant'],
-                )
-            else:
-                work_auth = WorkAuth.objects.create(
-                    is_current=True,
-                    visa_end=request.data['visa_end'],
-                    visa_type=request.data['visa_type'],
-                    visa_start=request.data['visa_start'],
-                    consultant_id=request.data['consultant'],
-                )
+            work_auth = WorkAuth.objects.create(
+                is_current=True,
+                visa_type=request.data['visa_type'],
+                visa_start=request.data['visa_start'],
+                consultant_id=request.data['consultant'],
+                visa_end=request.data['visa_end'] if request.data['visa_type'] != 'gc' else None,
+            )
             profiles = work_auth.consultant.profiles.filter(title__iexact='Original')
             if profiles:
                 profile = profiles.first()

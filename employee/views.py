@@ -1,5 +1,6 @@
 from itertools import chain
 from datetime import timedelta, datetime
+import json
 
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
@@ -870,8 +871,8 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 if isinstance(record.get('team'), str):
                     record['team'] = Team.objects.filter(name=record.get('team')).first()
                 else:
-                    record['team'] = None
-                roles.append(record.get('roles', []))
+                    record['team'] = get_object_or_404(Team, name='Consultadd')
+                roles.append(record.get('roles', ['marketer']))
                 record_list.append(User(
                     team=record.get('team'),
                     email=record.get('email'),
@@ -881,14 +882,14 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                     is_active=record.get('log1', False),
                     username=int(record.get('employee_id')),
                     employee_id=int(record.get('employee_id')),
-                    password=make_password(record.get('password')),
+                    password=make_password(record.get('password', 'consultadd')),
                 ))
+
+            users = User.objects.bulk_create(record_list)
             for user, role in zip(record_list, roles):
                 for role_name in role:
                     role_object = Role.objects.filter(name=role_name).first()
                     user.role.add(role_object)
-
-            users = User.objects.bulk_create(record_list)
             users = [user.employee_id for user in users]
             result["users"] = users
             result["msg"] = f"{len(users)} users  Created"
@@ -915,7 +916,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['delete'], detail=False, url_path='bulk_delete')
-    def delete_bulk(self, request,):
+    def delete_bulk(self, request, ):
         try:
             api_key = request.data.get('log1_api_key', None)
             if not api_key:
@@ -926,6 +927,41 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             users = User.objects.filter(employee_id__in=request.data.get('users', [])).delete()
             data = {"msg": f"{len(users)} users  removed from beats"}
             return Response({"result": data}, status=204)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='update_user')
+    def update_user(self, request, pk):
+        try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+
+            user = User.objects.filter(employee_id=pk).first()
+            user_previous_data = User.objects.filter(employee_id=pk).values()
+
+            if not user:
+                return Response({"message": "User not exists"}, status=400)
+
+            user_roles = request.data.get('role', [])
+            user_previous_role = user.role.all()
+            if user_roles and user_roles != user_previous_role:
+                user.role.remove(*user_previous_role)
+                for role in user_roles:
+                    user_role = Role.objects.filter(name=role).first()
+                    user.role.add(user_role)
+            user.email = request.data.get('email', user.email)
+            user.phone = request.data.get('number', user.phone)
+            user.gender = request.data.get('gender', user.gender)
+            user.team_id = request.data.get('team', user.team.id)
+            user.is_active = request.data.get('is_active', user.is_active)
+            user.employee_name = request.data.get('name', user.employee_name)
+            user.save()
+            return Response({'data': user_previous_data, 'role': user_previous_role.values(),
+                             "result": "User updated on log1 successfully"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
