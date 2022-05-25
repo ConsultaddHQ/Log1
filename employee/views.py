@@ -1,6 +1,5 @@
 from itertools import chain
 from datetime import timedelta, datetime
-import json
 
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
@@ -22,7 +21,6 @@ from api_key.models import APIKey
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
-from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
