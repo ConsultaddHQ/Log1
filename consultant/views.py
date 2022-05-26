@@ -306,6 +306,7 @@ class ConsultantViewSets(ModelViewSet):
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
+                internal_employee=request.data.get('internal_employee', False)
             )
 
             # Creating Consultant Original Profile Consultant
@@ -382,6 +383,7 @@ class ConsultantViewSets(ModelViewSet):
                 "phone_no": "Phone No",
                 "current_city": "Current City",
                 "date_of_birth": "Date of Birth",
+                "internal_employee": "Internal Employee"
             }
             changed_fields = []
             for field in request.data.keys():

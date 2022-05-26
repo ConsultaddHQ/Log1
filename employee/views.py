@@ -951,7 +951,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user.email = request.data.get('email', user.email)
             user.phone = request.data.get('number', user.phone)
             user.gender = request.data.get('gender', user.gender)
-            user.team_id = request.data.get('team', user.team.id)
+            user.team_id = request.data.get('team', user.team_id)
             user.is_active = request.data.get('is_active', user.is_active)
             user.employee_name = request.data.get('name', user.employee_name)
             user.save()

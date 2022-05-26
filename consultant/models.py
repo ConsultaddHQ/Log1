@@ -54,6 +54,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     first_login = models.BooleanField(default=True)
     remote_only = models.BooleanField(default=False)
     email = models.EmailField(_('Email ID'), unique=True)
+    internal_employee = models.BooleanField(default=False)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")
     attachments = GenericRelation(Attachment, verbose_name="Documents")
