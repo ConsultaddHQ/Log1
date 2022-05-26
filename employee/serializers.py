@@ -156,3 +156,12 @@ class HandoverSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_name(obj):
         return obj.user.employee_name
+
+
+class UserTeamRoleSerializer(serializers.ModelSerializer):
+    team = TeamSerializer()
+    role = RoleSerializer(many=True)
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_id', 'team', 'role', 'is_active')
