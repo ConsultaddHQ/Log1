@@ -25,7 +25,7 @@ from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
-    AssetSerializer, UserDirectorySerializer, HandoverSerializer
+    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserTeamRoleSerializer
 
 
 # Route - /auth/
@@ -957,6 +957,22 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user.save()
             return Response({'data': user_previous_data, 'role': user_previous_role.values(),
                              "result": "User updated on log1 successfully"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='user_list')
+    def user_list(self, request):
+        try:
+            api_key = request.data.get('log1_api_key', None)
+            if not api_key:
+                return Response({"message": "Api Key not found"}, status=401)
+            if not APIKey.objects.is_valid(api_key):
+                return Response({"message": "Unauthorized"}, status=401)
+
+            users = User.objects.all()
+            serializer = UserTeamRoleSerializer(users, many=True)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
