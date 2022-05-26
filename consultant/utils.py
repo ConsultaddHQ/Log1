@@ -510,7 +510,9 @@ def create_consultant(request, creator_id):
                 skype=request.data.get('skype'),
                 gender=request.data.get('gender'),
                 date_of_birth=request.data.get('dob'),
-                current_city=request.data.get('current_location')
+                current_city=request.data.get('current_location'),
+                marital_status=request.data.get('marital_status', 'unmarried'),
+                internal_employee=request.data.get('internal_employee', False),
             )
             consultant_id = consultant.id
 

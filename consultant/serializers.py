@@ -224,7 +224,7 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'status', 'profiles', 'marketing_id', 'internal_employee')
+        fields = ('id', 'name', 'email', 'status', 'profiles', 'marketing_id', 'internal_employee', 'marital_status')
 
     @staticmethod
     def get_profiles(obj):
@@ -352,7 +352,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
                   'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'retention', 'rate',
                   'support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer',
-                  'internal_employee')
+                  'internal_employee', 'marital_status')
 
     @staticmethod
     def get_work_auth(obj):

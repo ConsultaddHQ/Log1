@@ -49,6 +49,10 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         ('on_project', 'On Project'),
         ('terminated', 'Terminated')
     )
+    MARITAL_STATUS = (
+        ('unmarried', 'Unmarried'),
+        ('married', 'Married')
+    )
     is_w2 = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     first_login = models.BooleanField(default=True)
@@ -67,6 +71,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     phone_no = models.CharField(_('Phone Number'), max_length=300, null=True, blank=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
     consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
+    marital_status = models.CharField(_('Marital Status'), max_length=30, choices=MARITAL_STATUS, default='unmarried')
     gender = models.CharField(
         _('Gender'), max_length=10,
         choices=GENDER_CHOICE,
