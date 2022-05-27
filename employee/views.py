@@ -836,12 +836,11 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 gender=request.data.get('gender').lower(),
                 phone=request.data.get('phone', None),
                 password=request.data.get('password').strip(),
+                is_active=True if request.data.get('keep_active', False) else False
             )
             for role in request.data.get("role", []):
                 user_role = get_object_or_404(Role, name=role)
                 user.role.add(user_role)
-            if request.data.get('keep_active'):
-                user.is_active = True
                 user.save()
 
             return Response({"message": "User Created in Log1", "user_id": user.id}, status=201)
