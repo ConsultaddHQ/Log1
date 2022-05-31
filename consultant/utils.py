@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from constance import config
 from activity.models import Activity
+from utils_app.utils import get_timezone
 from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
@@ -515,6 +516,9 @@ def create_consultant(request, creator_id):
                 internal_employee=request.data.get('internal_employee', False),
             )
             consultant_id = consultant.id
+            if consultant.current_city:
+                consultant.timezone = get_timezone(consultant.current_city)
+                consultant.save()
 
             # Adding Recruiter of Consultant
             recruiter_employee_id = request.data.get('recruiter')

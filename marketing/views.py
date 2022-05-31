@@ -1939,22 +1939,17 @@ class InterviewViewSets(ModelViewSet):
             queryset = Interview.objects.filter(id=pk, guest__in=[request.user])
             if not queryset:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
-
-            remark = ""
             interview = queryset.first()
-            for i in request.data.get('answers', []):
-                remark += f"(Q) : {i['question']} -> (ANS) : {i['answer']} "
 
-            remark += f"REMARK : {request.data.get('guest_remark')}"
-            interview.guest_remark = remark
-            interview.coding_present = request.data.get('coding_present', None)
-            interview.save()
+            ques_answers = create_answer(request, interview, 'interview')
+            if not ques_answers:
+                return Response({"message": "No feedback given"}, status=400)
 
             # Activity
-            desc = f"{request.user.employee_name} added coding feedback"
-            create_activity(interview.id, 'submission', request.user, desc, 'updated')
+            desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"
+            create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
 
-            return Response({"data": "Feedback updated"}, status=202)
+            return Response({"message": "Coding Feedback Submitted"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
