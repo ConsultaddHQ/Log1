@@ -16,6 +16,7 @@ from consultant.serializers import *
 from employee.models import tag_users
 from project.utils import fetch_scrum_masters
 
+from utils_app.utils import get_timezone
 from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
@@ -308,6 +309,9 @@ class ConsultantViewSets(ModelViewSet):
                 work_type=request.data.get('work_type', 'full_time'),
                 internal_employee=request.data.get('internal_employee', False)
             )
+            if consultant.current_city:
+                consultant.timezone = get_timezone(consultant.current_city)
+                consultant.save()
 
             # Creating Consultant Original Profile Consultant
             ConsultantProfile.objects.create(

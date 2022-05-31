@@ -68,6 +68,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     domain = models.CharField(_('Domain'), max_length=20, null=True, blank=True)
     skills = models.CharField(_('Skills'), max_length=100, null=True, blank=True)
     skype = models.CharField(_('Skype Id'), max_length=100, null=True, blank=True)
+    timezone = models.CharField(_('Timezone'), max_length=20, blank=True, null=True)
     phone_no = models.CharField(_('Phone Number'), max_length=300, null=True, blank=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
     consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
