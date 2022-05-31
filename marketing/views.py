@@ -2037,6 +2037,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @staticmethod
     def send_test_mail(test, data, test_status, request):
         try:
+
             consultant = test.submission.consultant
             queryset = User.objects.filter(
                 team=test.submission.created_by.team, role__name__in=['admin', 'proxy'], is_active=True
@@ -2115,10 +2116,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
                 else:
                     engineer = 'NA'
-                for answer in data:
+                for answer in data['ques_answers']:
                     if answer['answer'] == 'submitted':
                         ans = Answer.objects.get(id=answer['id'])
                         test_docs = ans.attachment.filter(attachment_type='test_feedback')
+                        answer['answer'] = len(test_docs)
                         for doc in test_docs:
                             response, error = download_s3_object(doc.attachment_file.name)
                             path.append(response)
@@ -2127,13 +2129,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 title = f"Test Completed"
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
                 subject = f'Test Completed :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills}'
+                single_question, parent_question = structure_mail_data(data['ques_answers'])
                 mail_data = {
                     'to': to, 'cc': cc, 'bcc': [],
                     'subject': subject, 'attachments': path,
                     'template': '../templates/submit_engineer_feedback.html',
                     'context': {
+                        'parent_question': parent_question,
                         'engineer': engineer, 'title': title,
-                        'details': data, 'remarks': test.engineer_remarks,
+                        'rate_performance': data['rate_performance'],
+                        'single_question': single_question, 'remarks': test.engineer_remarks,
                     },
                 }
                 res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
@@ -2562,6 +2567,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @action(methods=['post'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
+
             test = get_object_or_404(Test, id=pk)
             engineers = json.loads(request.data.get('associates', '[]'))
             for emp_id in engineers:
@@ -2583,10 +2589,19 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             desc = f"{request.user.employee_name} completed test TST-{test.id} and submitted engineer feedback"
             create_activity(test.submission.id, 'submission', request.user, desc, 'created')
 
+            rate_performance = {}
+            for question in ques_answers:
+                if question['question'] == 'Rate your performance':
+                    rate_performance = question
+                    ques_answers.remove(question)
+            data = {
+                'ques_answers': ques_answers,
+                'rate_performance': rate_performance,
+            }
             # test submit mail
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, ques_answers, 'submit', request)
+                res, error = self.send_test_mail(test, data, 'submit', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)

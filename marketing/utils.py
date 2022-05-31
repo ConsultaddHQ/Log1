@@ -361,6 +361,22 @@ def sup_feedback_notification(title, obj):
         return str(error)
 
 
+def structure_mail_data(data):
+    single_questions = []
+    parent_questions = []
+    parent_questions_data = {}
+    for item in data:
+        if item['parent_question']:
+            if item['parent_question'] not in parent_questions:
+                parent_questions.append(item['parent_question'])
+                parent_questions_data[item['parent_question']] = [item]
+            else:
+                parent_questions_data[item['parent_question']].append(item)
+        else:
+            single_questions.append(item)
+    return single_questions, parent_questions_data
+
+
 def create_answer(request, obj, model):
     try:
         ques_answers = []
@@ -371,6 +387,9 @@ def create_answer(request, obj, model):
             if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
                     and data.get('comment') is not None:
                 value = f'{data.get("answer")}: {data.get("comment")}'
+            elif question.answer_type == 'multi_select':
+                all_data = json.loads(data.get("answer", '[]'))
+                value = ", ".join(item for item in all_data)
             else:
                 value = data.get("answer", None)
 
@@ -395,9 +414,10 @@ def create_answer(request, obj, model):
                     create_attachment(file_data)
             ques_answers.append({
                 "id": answer.id,
-                "answer": answer.answer,
+                "answer": data.get("answer"),
+                "comment": data.get("comment"),
                 "question": answer.question.title,
-                "parent_question": answer.parent_question.title if answer.parent_question else None
+                "parent_question": answer.parent_question.title if answer.parent_question else None,
             })
         return ques_answers
     except Exception as error:
