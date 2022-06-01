@@ -199,12 +199,19 @@ def coder_request_notification(user, interview, title):
                             "name": f"Time",
                             "value": f"{interview.start_time.strftime('%I:%M %p EST')} - "
                                      f"{interview.end_time.strftime('%I:%M %p EST')}"
-                        }
+                        },
                     ],
                     "markdown": True
                 }
             ]
         }
+        if interview.coding_info:
+            data["sections"][0]["facts"].append(
+                {
+                    "name": f"Coding Info",
+                    "value": interview.coding_info
+                },
+            )
         post_msg_using_webhook(config.engineering_url, data)
         return "ok"
     except Exception as error:

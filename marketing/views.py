@@ -1940,6 +1940,9 @@ class InterviewViewSets(ModelViewSet):
             if not queryset:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             interview = queryset.first()
+            interview.coding_present = request.data.get('coding_present', True)
+            interview.guest_remark = request.data.get('feedback', None)
+            interview.save()
 
             ques_answers = create_answer(request, interview, 'interview')
             if not ques_answers:
@@ -2037,7 +2040,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @staticmethod
     def send_test_mail(test, data, test_status, request):
         try:
-
             consultant = test.submission.consultant
             queryset = User.objects.filter(
                 team=test.submission.created_by.team, role__name__in=['admin', 'proxy'], is_active=True
