@@ -49,7 +49,8 @@ class ConsultantPetitionLoginSerializer(UserSerializer):
             return {
                 "id": petition.id,
                 "status": petition.status,
-                "assigned_to": UserSerializer(petition.assigned_to).data
+                "assigned_to": UserSerializer(petition.assigned_to).data,
+                "petition_type": petition.petition_type,
             }
         return None
 

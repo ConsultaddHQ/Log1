@@ -216,7 +216,7 @@ class PetitionViewSets(ModelViewSet):
             for doc in documents:
                 Document.objects.create(
                     file=doc.file,
-                    verified=True,
+                    verified=None,
                     creator=request.user,
                     doc_type_id=doc.doc_type_id,
                     petition_id=petition.id,

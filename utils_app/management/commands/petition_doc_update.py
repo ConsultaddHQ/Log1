@@ -22,7 +22,7 @@ class Command(BaseCommand):
                             if doc not in current_documents:
                                 Document.objects.create(
                                     file=doc.file,
-                                    verified=True,
+                                    verified=None,
                                     creator=doc.creator,
                                     doc_type_id=doc.doc_type_id,
                                     petition_id=petition.id,
