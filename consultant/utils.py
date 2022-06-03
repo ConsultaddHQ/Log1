@@ -669,6 +669,7 @@ def candidate_filter(request):
 
             if 'gender' in filters:
                 consultants = consultants.filter(gender=filters['gender'])
+
             if 'days_on_bench' in filters:
                 day_filter = marketing_days_filter(filters['days_on_bench'])
                 consultants = consultants.filter(**day_filter)
