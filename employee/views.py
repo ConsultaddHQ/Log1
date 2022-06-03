@@ -959,19 +959,3 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['get'], detail=False, url_path='user_list')
-    def user_list(self, request):
-        try:
-            api_key = request.data.get('log1_api_key', None)
-            if not api_key:
-                return Response({"message": "Api Key not found"}, status=401)
-            if not APIKey.objects.is_valid(api_key):
-                return Response({"message": "Unauthorized"}, status=401)
-
-            users = User.objects.all()
-            serializer = UserTeamRoleSerializer(users, many=True)
-            return Response({"data": serializer.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
