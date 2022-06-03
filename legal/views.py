@@ -162,8 +162,8 @@ class PetitionViewSets(ModelViewSet):
     def documents(self, request):
         try:
             data = dict()
-            consultant_id = request.GET.get('consultant')
             petition_id = request.GET.get('petition')
+            consultant_id = request.GET.get('consultant')
             petition_ids = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
             doc_types = DocumentList.objects.filter(
                 petition_id__in=petition_ids

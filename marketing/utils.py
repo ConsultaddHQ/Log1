@@ -430,3 +430,208 @@ def create_answer(request, obj, model):
     except Exception as error:
         write_info(message=error, function='create_answer')
         return str(error)
+
+
+def get_element(element_type, data):
+    row_set = {
+        "type": "Column",
+        "width": 50,
+        "items": [
+            {
+                "type": "TextBlock",
+                "text": data.get('question'),
+                "wrap": True,
+                "weight": "Bolder"
+            }
+        ]
+    }
+    element = {
+        "type": "TextBlock", "text": "", "wrap": True, "spacing": "None"
+    }
+    column_set = {
+        "type": "ColumnSet",
+        "columns": []
+    }
+    empty_container = {"type": "Container", "items": []}
+    container = {
+        "type": "Container",
+        "items": [
+            {
+                "size": "Large",
+                "color": "Dark",
+                "weight": "Bolder",
+                "spacing": "Large",
+                "type": "TextBlock",
+                "text": data.get('name', None)
+            }
+        ],
+        "style": "accent",
+        "spacing": "Large"
+    }
+
+    if type(data.get('answer')) is list:
+        for i in data['answer']:
+            element['text'] = i
+            row_set["items"].append(element)
+    elif data.get('answer', None):
+        element['text'] = data.get('answer')
+        row_set["items"].append(element)
+    else:
+        element['text'] = "NA"
+        row_set["items"].append(element)
+
+    if element_type == "row_set":
+        return row_set
+    elif element_type == "container":
+        return container
+    elif element_type == "empty_container":
+        return empty_container
+    elif element_type == "column_set":
+        if data:
+            column_set["columns"].append(row_set)
+        return column_set
+    return None
+
+
+def interview_card_data(obj):
+    try:
+        interview_data = []
+        container_names = {}
+        container_position = 2
+        coding_feedback_data = []
+        supervisor_feedback_data = []
+        interview_info = [
+            {
+                "question": "Interview ID",
+                "answer": f"I-{obj.id}"
+            },
+            {
+                "question": "Round",
+                "answer": f"{obj.round if obj.round else 'NA'}"
+            },
+            {
+                "question": "Mode",
+                "answer": obj.interview_mode
+            },
+            {
+                "question": "Screening Type",
+                "answer": obj.screening_type
+            },
+            {
+                "question": "Date",
+                "answer": obj.start_time.date().strftime("%m/%d/%Y")
+            },
+            {
+                "question": "Time",
+                "answer": obj.start_time.time().strftime("%H:%M")
+            },
+            {
+                "question": "Marketer",
+                "answer": obj.marketer.employee_name
+            },
+            {
+                "question": "Recruiter",
+                "answer": obj.consultant.recruiter.employee_name
+            },
+            {
+                "question": "Client",
+                "answer": obj.submission.client
+            },
+            {
+                "question": "Team",
+                "answer": obj.submission.created_by.team.name
+            },
+        ]
+        interview_data.append(interview_info)
+
+        coding_feedback = obj.supervisor_feedback.filter(question__form_name='coding').order_by('question__position')
+        if coding_feedback:
+            for feedback in coding_feedback:
+                coding_feedback = {
+                    "answer": feedback.answer,
+                    "question": feedback.question.title,
+                    "answer_type": feedback.question.answer_type
+                }
+                coding_feedback_data.append(coding_feedback)
+            guest = [i.employee_name for i in obj.guest.all()]
+            coding_feedback_data.insert(0, {"question": "coder's name", "answer": guest if guest else "NA"})
+            coding_feedback_data.append(
+                {"question": "feedback", "answer": obj.guest_remark if obj.guest_remark else "NA"})
+            interview_data.append(coding_feedback_data)
+            container_names[container_position] = "Coder's Feedback"
+            container_position += 2
+
+        supervisor_feedback = obj.supervisor_feedback.filter(
+            question__form_name='interview').order_by('question__position')
+        if supervisor_feedback:
+            for feedback in supervisor_feedback:
+                sup_feedback = {
+                    "question": feedback.question.title,
+                    "answer": feedback.answer,
+                    "answer_type": feedback.question.answer_type
+                }
+                supervisor_feedback_data.append(sup_feedback)
+            supervisor_feedback_data.insert(
+                0, {"question": "Supervisor Name", "answer": obj.supervisor.employee_name}
+            )
+            interview_data.append(supervisor_feedback_data)
+            container_names[container_position] = "Supervisor's Feedback"
+            container_position += 2
+
+        marketer_feedback_data = [
+            {"question": "Status", "answer": obj.status, "answer_type": "long_text"},
+            {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
+        ]
+        interview_data.append(marketer_feedback_data)
+        container_names[container_position] = "Marketer's Feedback"
+
+        return interview_data, container_names
+    except Exception as error:
+        write_exception(error)
+
+
+def interview_feedback_card(obj):
+    try:
+        container = 0
+        interview_data, container_names = interview_card_data(obj)
+        card_data = {
+            "title": "Interview Feedback",
+            "type": "message",
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "contentUrl": None,
+                    "content": {
+                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                        "type": "AdaptiveCard",
+                        "version": "1.5",
+                        "body": []
+                    }
+                }
+            ]
+        }
+        body = card_data['attachments'][0]['content']["body"]
+
+        for data_set in interview_data:
+            column_no = 3 if container == 0 else 2
+            row = 0
+            if container != 0 and container % 2 == 0:
+                body.insert(container - 1, get_element('container', {"name": container_names[container]}))
+            body.insert(container, get_element('empty_container', {}))
+
+            for data, count in zip(data_set, range(0, len(data_set))):
+                if type(data.get('answer')) is str:
+                    data['answer'] = data.get('answer').replace('[', '').replace(']', '').replace('"', '')\
+                        .replace('\n', '')
+                if data.get('answer_type') == 'long_text':
+                    body[container]["items"].append(get_element("column_set", data))
+                    row += 1
+                elif count % column_no != 0:
+                    body[container]["items"][row]["columns"].append(get_element("row_set", data))
+                else:
+                    body[container]["items"].append(get_element("column_set", data))
+                    row += 1 if count != 0 else row
+            container += 2
+        return card_data
+    except Exception as error:
+        write_exception(error)
