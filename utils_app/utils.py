@@ -56,4 +56,3 @@ def get_timezone(city_name):
     except Exception as error:
         write_exception(message=error)
         return None
-
