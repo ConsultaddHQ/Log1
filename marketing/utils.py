@@ -394,16 +394,13 @@ def create_answer(request, obj, model):
             if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
                     and data.get('comment') is not None:
                 value = f'{data.get("answer")}: {data.get("comment")}'
-            elif question.answer_type == 'multi_select':
-                all_data = json.loads(data.get("answer", '[]'))
-                value = ", ".join(item for item in all_data)
             else:
                 value = data.get("answer", None)
 
             answer = Answer.objects.create(
                 answer=value,
-                question=question,
                 object_id=obj.id,
+                question=question,
                 submitted_by=request.user,
                 content_type=content_type,
                 parent_question_id=data.get('parent_question_id', None)
