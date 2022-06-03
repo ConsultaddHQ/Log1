@@ -39,9 +39,9 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
-        first, last = get_page_limits(request)
         try:
             query = request.GET.get("query", "").lstrip().replace(':amp:', '&')
+            first, last = get_page_limits(request) if query else (0, 20)
             queryset = VendorCompany.objects.filter(name__icontains=query).order_by(Lower('name'))
             total = queryset.count()
             data = queryset[first:last].values('id', 'name', 'created_by')
