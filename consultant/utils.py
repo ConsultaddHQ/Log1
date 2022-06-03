@@ -368,7 +368,7 @@ def fetch_consultant_count(team):
     return total_count, team_count
 
 
-def new_recruit_notification(consultant, source, cfr):
+def new_recruit_notification(consultant, source, cfr, feedback):
     try:
         visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
         recruiter_gender = '&#129490;'
@@ -401,6 +401,7 @@ def new_recruit_notification(consultant, source, cfr):
                  🇺🇸  Current Location :  {consultant.current_city} <br>
                 &#x1F4BC; Team :  {recruiter_team} <br>
                 &#129490; CFR :  {cfr} <br>
+                ✨ Feedback :  {feedback}<br>
                 <br> Recruit Count of {recruiter_team} for this month - {team_count}
                 <br> Total Recruit Count of this month - {total_count}"""
         }
@@ -556,7 +557,9 @@ def create_consultant(request, creator_id):
             )
 
             add_other_details(request, consultant)
-            new_recruit_notification(consultant, request.data.get('source'), request.data.get('cfr'))
+            new_recruit_notification(
+                consultant, request.data.get('source'), request.data.get('cfr'), request.data.get('feedback')
+            )
             return consultant, "ok"
     except Exception as error:
         write_exception(error, request)
