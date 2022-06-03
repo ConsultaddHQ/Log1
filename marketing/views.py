@@ -1482,9 +1482,8 @@ class InterviewViewSets(ModelViewSet):
                         "title": f"""{interview_status_emoji} Interview Feedback """,
                         "text": f"""*{title} ({interview_status})* <br>""" + interview.feedback,
                     }
-                    if interview.supervisor_feedback.all():
-                        sup_feedback_notification(title, interview)
-                    post_msg_using_webhook(config.interview_feedback_url, data)
+                    card_json = interview_feedback_card(interview)
+                    post_msg_using_webhook(config.interview_feedback_url, card_json)
 
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -1939,22 +1938,20 @@ class InterviewViewSets(ModelViewSet):
             queryset = Interview.objects.filter(id=pk, guest__in=[request.user])
             if not queryset:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
-
-            remark = ""
             interview = queryset.first()
-            for i in request.data.get('answers', []):
-                remark += f"(Q) : {i['question']} -> (ANS) : {i['answer']} "
-
-            remark += f"REMARK : {request.data.get('guest_remark')}"
-            interview.guest_remark = remark
-            interview.coding_present = request.data.get('coding_present', None)
+            interview.coding_present = True if request.data.get('coding_present') == 'true' else False
+            interview.guest_remark = request.data.get('feedback', None)
             interview.save()
 
-            # Activity
-            desc = f"{request.user.employee_name} added coding feedback"
-            create_activity(interview.id, 'submission', request.user, desc, 'updated')
+            ques_answers = create_answer(request, interview, 'interview')
+            if not ques_answers:
+                return Response({"message": "No feedback given"}, status=400)
 
-            return Response({"data": "Feedback updated"}, status=202)
+            # Activity
+            desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"
+            create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+
+            return Response({"message": "Coding Feedback Submitted"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
@@ -2120,10 +2117,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     engineer = ", ".join(engineer.employee_name for engineer in test.engineer.all())
                 else:
                     engineer = 'NA'
-                for answer in data:
+                for answer in data['ques_answers']:
                     if answer['answer'] == 'submitted':
                         ans = Answer.objects.get(id=answer['id'])
                         test_docs = ans.attachment.filter(attachment_type='test_feedback')
+                        answer['answer'] = len(test_docs)
                         for doc in test_docs:
                             response, error = download_s3_object(doc.attachment_file.name)
                             path.append(response)
@@ -2132,13 +2130,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 title = f"Test Completed"
                 cc = scrum_masters + [config.ENGINEERING] + engineers_email
                 subject = f'Test Completed :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills}'
+                single_question, parent_question = structure_mail_data(data['ques_answers'])
                 mail_data = {
                     'to': to, 'cc': cc, 'bcc': [],
                     'subject': subject, 'attachments': path,
                     'template': '../templates/submit_engineer_feedback.html',
                     'context': {
+                        'parent_question': parent_question,
                         'engineer': engineer, 'title': title,
-                        'details': data, 'remarks': test.engineer_remarks,
+                        'rate_performance': data['rate_performance'],
+                        'single_question': single_question, 'remarks': test.engineer_remarks,
                     },
                 }
                 res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
@@ -2567,6 +2568,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @action(methods=['post'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
+
             test = get_object_or_404(Test, id=pk)
             engineers = json.loads(request.data.get('associates', '[]'))
             for emp_id in engineers:
@@ -2588,10 +2590,19 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             desc = f"{request.user.employee_name} completed test TST-{test.id} and submitted engineer feedback"
             create_activity(test.submission.id, 'submission', request.user, desc, 'created')
 
+            rate_performance = {}
+            for question in ques_answers:
+                if question['question'] == 'Rate your performance':
+                    rate_performance = question
+                    ques_answers.remove(question)
+            data = {
+                'ques_answers': ques_answers,
+                'rate_performance': rate_performance,
+            }
             # test submit mail
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, ques_answers, 'submit', request)
+                res, error = self.send_test_mail(test, data, 'submit', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)

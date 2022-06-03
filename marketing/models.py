@@ -401,6 +401,7 @@ class Interview(TimeStampedModel):
     coding_present = models.BooleanField(_('Coding Present'), null=True)
     end_time = models.DateTimeField(_('End Date'), null=True, blank=True)
     notes = models.TextField(_('Interview Notes'), null=True, blank=True)
+    coding_info = models.TextField(_('Coding Info'), null=True, blank=True)
     description = models.TextField(_('Description'), null=True, blank=True)
     guest_type = models.CharField(_('Guest Type'), max_length=50, null=True)
     start_time = models.DateTimeField(_('Start Date'), null=True, blank=True)
