@@ -72,7 +72,11 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     phone_no = models.CharField(_('Phone Number'), max_length=300, null=True, blank=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
     consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
-    marital_status = models.CharField(_('Marital Status'), max_length=30, choices=MARITAL_STATUS, default='unmarried')
+    marital_status = models.CharField(
+        _('Marital Status'), max_length=30,
+        choices=MARITAL_STATUS,
+        null=True, blank=True
+    )
     gender = models.CharField(
         _('Gender'), max_length=10,
         choices=GENDER_CHOICE,

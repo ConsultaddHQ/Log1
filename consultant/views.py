@@ -307,7 +307,7 @@ class ConsultantViewSets(ModelViewSet):
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
-                marital_status=request.data.get('marital_status', 'unmarried'),
+                marital_status=request.data.get('marital_status', None),
                 internal_employee=request.data.get('internal_employee', False)
             )
             if consultant.current_city:
@@ -1334,7 +1334,6 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 profile = profiles.first()
                 if request.data['visa_type'] != 'gc':
                     profile.visa_end = work_auth.visa_end
-
                 profile.visa_type = work_auth.visa_type
                 profile.visa_start = work_auth.visa_start
                 profile.save()
