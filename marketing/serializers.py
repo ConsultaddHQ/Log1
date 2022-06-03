@@ -466,7 +466,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_supervisor_feedback(obj):
-        if obj.supervisor_feedback.all():
+        if obj.supervisor_feedback.filter(question__form_name='interview'):
             answers = Answer.objects.filter(object_id=obj.id).exclude(question__category='child').order_by(
                 "question__position")
             return QuestionAnswerSerializer(answers, many=True).data
