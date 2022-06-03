@@ -374,11 +374,12 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_duration(obj):
-        if date.today() > obj.start:
+        start_date = obj.project.support.all().order_by('start').first().start
+        if date.today() > start_date:
             if obj.end:
-                duration = obj.end - obj.start
+                duration = obj.end - start_date
             else:
-                duration = date.today() - obj.start
+                duration = date.today() - start_date
             if duration.days < 7:
                 return f"0.0.{duration.days}"
             months = int(duration.days) // 30
@@ -398,7 +399,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_project(obj):
         projects = obj.projects.filter(
-            statuses__is_current=True, statuses__frequency__in=['active', 'less_active'],
+            statuses__is_current=True, statuses__frequency__in=['active', 'less_active'], end=None,
         ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
         data = {
             "bandwidth": len(projects),
