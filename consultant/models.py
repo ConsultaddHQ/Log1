@@ -49,11 +49,16 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
         ('on_project', 'On Project'),
         ('terminated', 'Terminated')
     )
+    MARITAL_STATUS = (
+        ('unmarried', 'Unmarried'),
+        ('married', 'Married')
+    )
     is_w2 = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     first_login = models.BooleanField(default=True)
     remote_only = models.BooleanField(default=False)
     email = models.EmailField(_('Email ID'), unique=True)
+    internal_employee = models.BooleanField(default=False)
     name = models.CharField(_('Full Name'), max_length=100)
     comments = GenericRelation(Comment, verbose_name="comments")
     attachments = GenericRelation(Attachment, verbose_name="Documents")
@@ -63,9 +68,15 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     domain = models.CharField(_('Domain'), max_length=20, null=True, blank=True)
     skills = models.CharField(_('Skills'), max_length=100, null=True, blank=True)
     skype = models.CharField(_('Skype Id'), max_length=100, null=True, blank=True)
+    timezone = models.CharField(_('Timezone'), max_length=20, blank=True, null=True)
     phone_no = models.CharField(_('Phone Number'), max_length=300, null=True, blank=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
     consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
+    marital_status = models.CharField(
+        _('Marital Status'), max_length=30,
+        choices=MARITAL_STATUS,
+        null=True, blank=True
+    )
     gender = models.CharField(
         _('Gender'), max_length=10,
         choices=GENDER_CHOICE,
