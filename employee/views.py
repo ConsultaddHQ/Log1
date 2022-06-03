@@ -25,7 +25,7 @@ from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
-    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserTeamRoleSerializer
+    AssetSerializer, UserDirectorySerializer, HandoverSerializer
 
 
 # Route - /auth/
