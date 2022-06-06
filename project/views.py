@@ -30,7 +30,7 @@ from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_li
 from notification.utils import push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status, create_checklist
+    fetch_project_status, create_checklist, diff_month_days
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
@@ -245,7 +245,7 @@ class ProjectViewSets(ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def po_end_mail(project, scrum_master_email, po_type, request):
+    def po_end_mail(project, scrum_master_email, po_type, request, status="NA"):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -312,6 +312,9 @@ class ProjectViewSets(ModelViewSet):
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                     'consultant_email': consultant.email, 'client_name': submission.client,
                     'vendor_company': submission.lead.vendor_company.name, 'po_type': po_type,
+                    'feedback': project.feedback if project.feedback else "Not updated on Log1",
+                    'employer': project.submission.employer, 'location': project.city, 'status': status,
+                    'project_duration': f"{diff_month_days(project.start_date, project.end_date)} months",
                 }
             }
             res2, msg2 = send_email(mail_data_eng, marketer.email, request=request)
@@ -592,8 +595,8 @@ class ProjectViewSets(ModelViewSet):
                     project.consultant.save()
                     project.support.update(end=datetime.now())
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
-                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     po_status = project_status_obj.get_status_display()
+                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request, po_status)
                     util.send_termination_notification(po_status)
 
                 # Project Completed

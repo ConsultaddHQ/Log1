@@ -551,9 +551,9 @@ def interview_card_data(obj):
                 }
                 coding_feedback_data.append(coding_feedback)
             guest = [i.employee_name for i in obj.guest.all()]
-            coding_feedback_data.insert(0, {"question": "coder's name", "answer": guest if guest else "NA"})
+            coding_feedback_data.insert(0, {"question": "Coder's name", "answer": guest if guest else "NA"})
             coding_feedback_data.append(
-                {"question": "feedback", "answer": obj.guest_remark if obj.guest_remark else "NA"})
+                {"question": "Feedback", "answer": obj.guest_remark if obj.guest_remark else "NA"})
             interview_data.append(coding_feedback_data)
             container_names[container_position] = "Coder's Feedback"
             container_position += 2
@@ -574,9 +574,12 @@ def interview_card_data(obj):
             interview_data.append(supervisor_feedback_data)
             container_names[container_position] = "Supervisor's Feedback"
             container_position += 2
-
+        status = "NA"
+        for i in obj.STATUS_CHOICES:
+            if i[0] == obj.status:
+                status = i[1]
         marketer_feedback_data = [
-            {"question": "Status", "answer": obj.status, "answer_type": "long_text"},
+            {"question": "Status", "answer": status, "answer_type": "long_text"},
             {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
         ]
         interview_data.append(marketer_feedback_data)
