@@ -108,7 +108,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 support_status = qs.first()
                 if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
                     return "training"
-                elif support_status.frequency == 'active' and obj.start_date <= date.today():
+                elif obj.start_date and support_status.frequency == 'active' and obj.start_date <= date.today():
                     return "active"
                 else:
                     return support_status.frequency
@@ -118,7 +118,7 @@ class EngineeringSerializer(serializers.ModelSerializer):
                 support_status = qs.first()
                 if obj.start_date and obj.start_date > date.today() and support_status.frequency == 'active':
                     return "training"
-                elif support_status.frequency == 'active' and obj.start_date <= date.today():
+                elif obj.start_date and support_status.frequency == 'active' and obj.start_date <= date.today():
                     return "active"
                 else:
                     return support_status.frequency
@@ -300,12 +300,12 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     description = serializers.SerializerMethodField()
     modified_at = serializers.SerializerMethodField()
     support_status = serializers.SerializerMethodField()
-    support_duration = serializers.SerializerMethodField()
+    support_info = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectSupport
         fields = ('id', 'created', 'start', 'end', 'feedback', 'support_status', 'consultant', 'project', 'description',
-                  'support_duration', 'modified_at')
+                  'support_info', 'modified_at')
 
     @staticmethod
     def get_support_status(obj):
@@ -373,20 +373,21 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
         }
 
     @staticmethod
-    def get_support_duration(obj):
+    def get_support_info(obj):
         start_date = obj.project.support.all().order_by('start').first().start
         if date.today() > start_date:
             if obj.end:
-                duration = obj.end - start_date
+                diff = obj.end - start_date
             else:
-                duration = date.today() - start_date
-            if duration.days < 7:
-                return f"0.0.{duration.days}"
-            months = int(duration.days) // 30
-            weeks = round(int(duration.days - months * 30) // 7, 0)
-            return months + weeks / 10
+                diff = date.today() - start_date
+            if diff.days < 7:
+                return f"0.0.{diff.days}"
+            months = int(diff.days) // 30
+            weeks = round(int(diff.days - months * 30) // 7, 0)
+            duration = months + weeks / 10
         else:
-            return 0
+            duration = 0
+        return {"duration": duration, "start": start_date}
 
 
 class EngineerReportSerializer(serializers.ModelSerializer):
