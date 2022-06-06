@@ -25,7 +25,7 @@ def create_cron_error(job, description):
         )
         mail_data = {
             'cc': [], 'bcc': [],
-            'to': ['sarang.m@consultadd.com'],
+            'to': ['sarang.m@consultadd.com', 'shreyas.k@consultadd.com', 'suman.m@consultadd.com'],
             'body': f'Error :: {description}',
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
