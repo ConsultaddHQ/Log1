@@ -63,14 +63,16 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
                 for v in queryset:
                     vendor = v.name.strip().replace(' ', '').lower()
                     if name == vendor:
-                        return Response({"data": "Company already exist"}, status=400)
+                        return Response({"message": "Company already exist"}, status=400)
                     if name + 's' == vendor:
-                        return Response({"data": "Company name already exist with s at the end"}, status=400)
+                        return Response({"message": "Company name already exist with s at the end"}, status=400)
                     if name == vendor + 's':
-                        return Response({"data": "Company name already exist without s at the end"}, status=400)
+                        return Response({"message": "Company name already exist without s at the end"}, status=400)
                 created_by = str(request.user.employee_id) + " - " + request.user.employee_name
                 company = VendorCompany.objects.create(name=request.data.get('name', None), created_by=created_by)
-                return Response({"data": VendorCompanySerializer(company).data}, status=201)
+                return Response(
+                    {"data": VendorCompanySerializer(company).data, "message": "Vendor Company added"}, status=201
+                )
             return Response({"message": "Enter company name"}, status=400)
         except Exception as error:
             write_exception(error, request)
@@ -1466,22 +1468,12 @@ class InterviewViewSets(ModelViewSet):
                 desc = f"Round {interview.round} status is changed from {prev_status} to "
                 if interview.status not in ['cancelled']:
                     if interview.status == 'next_round':
-                        interview_status = "Next Round"
-                        interview_status_emoji = "&#128077;"
                         desc += "Next round"
                     elif interview.status == 'offer':
-                        interview_status = "Offer"
-                        interview_status_emoji = "&#9996; "
                         desc = "Offer"
                     else:
-                        interview_status = "Failed"
-                        interview_status_emoji = "&#128078;"
                         desc = "Failed"
 
-                    data = {
-                        "title": f"""{interview_status_emoji} Interview Feedback """,
-                        "text": f"""*{title} ({interview_status})* <br>""" + interview.feedback,
-                    }
                     card_json = interview_feedback_card(interview)
                     post_msg_using_webhook(config.interview_feedback_url, card_json)
 
