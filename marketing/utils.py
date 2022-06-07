@@ -490,6 +490,23 @@ def get_element(element_type, data):
     return None
 
 
+def get_display_choice(data, data_type):
+    try:
+        if data_type == 'interview_mode':
+            for mode in Interview.INTERVIEW_MODE:
+                if data == mode[0]:
+                    return mode[1]
+            return None
+        if data_type == 'screening_type':
+            for mode in Interview.TYPE_CHOICES:
+                if data == mode[0]:
+                    return mode[1]
+            return None
+    except Exception as error:
+        write_info(message=error, function="get_display_choice")
+        return str(error)
+
+
 def interview_card_data(obj):
     try:
         interview_data = []
@@ -508,11 +525,11 @@ def interview_card_data(obj):
             },
             {
                 "question": "Mode",
-                "answer": obj.interview_mode
+                "answer": get_display_choice(obj.interview_mode, 'interview_mode'),
             },
             {
                 "question": "Screening Type",
-                "answer": obj.screening_type
+                "answer": get_display_choice(obj.screening_type, 'screening_type')
             },
             {
                 "question": "Date",
@@ -568,11 +585,8 @@ def interview_card_data(obj):
                     "answer_type": feedback.question.answer_type
                 }
                 supervisor_feedback_data.append(sup_feedback)
-            supervisor_feedback_data.insert(
-                0, {"question": "Supervisor Name", "answer": obj.supervisor.employee_name}
-            )
             interview_data.append(supervisor_feedback_data)
-            container_names[container_position] = "Supervisor's Feedback"
+            container_names[container_position] = f"{obj.supervisor.employee_name}'s Feedback"
             container_position += 2
         status = "NA"
         for i in obj.STATUS_CHOICES:
@@ -583,7 +597,7 @@ def interview_card_data(obj):
             {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
         ]
         interview_data.append(marketer_feedback_data)
-        container_names[container_position] = "Marketer's Feedback"
+        container_names[container_position] = f"{obj.marketer.employee_name}'s Feedback"
 
         return interview_data, container_names
     except Exception as error:
