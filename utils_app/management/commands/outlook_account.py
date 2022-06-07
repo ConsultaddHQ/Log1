@@ -13,14 +13,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             count = 0
-            users, payload = [], {}
+            users, payload = [], []
             ms = MicrosoftAccount()
             with open('Candidate_details.csv', newline='') as csv_file:
                 reader = csv.reader(csv_file, delimiter=',', quotechar='|')
                 next(reader)
                 for row in reader:
                     data = {
-                        "email": row[4],
+                        "email": row[2],
                         "user_id": None,
                         "password": None,
                         "member_id": None,
