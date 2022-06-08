@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from constance import config
 from activity.models import Activity
+from utils_app.utils import get_timezone
 from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
@@ -511,9 +512,14 @@ def create_consultant(request, creator_id):
                 skype=request.data.get('skype'),
                 gender=request.data.get('gender'),
                 date_of_birth=request.data.get('dob'),
-                current_city=request.data.get('current_location')
+                current_city=request.data.get('current_location'),
+                marital_status=request.data.get('marital_status', 'unmarried'),
+                internal_employee=request.data.get('internal_employee', False),
             )
             consultant_id = consultant.id
+            if consultant.current_city:
+                consultant.timezone = get_timezone(consultant.current_city)
+                consultant.save()
 
             # Adding Recruiter of Consultant
             recruiter_employee_id = request.data.get('recruiter')
@@ -672,7 +678,14 @@ def candidate_filter(request):
                 consultants = consultants.filter(**day_filter)
 
             if 'recruiter' in filters:
-                consultants = consultants.filter(pocs__poc=filters['recruiter'])
+                consultants = consultants.filter(
+                    pocs__poc_id=filters['recruiter'], pocs__poc_type='recruiter', pocs__end=None
+                )
+
+            if 'retention' in filters:
+                consultants = consultants.filter(
+                    pocs__poc_id=filters['retention'], pocs__poc_type='retention', pocs__end=None
+                )
 
             if 'team' in filters and len(filters['team']) > 0:
                 consultants = consultants.filter(

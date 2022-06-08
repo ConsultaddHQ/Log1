@@ -49,7 +49,8 @@ class ConsultantPetitionLoginSerializer(UserSerializer):
             return {
                 "id": petition.id,
                 "status": petition.status,
-                "assigned_to": UserSerializer(petition.assigned_to).data
+                "petition_type": petition.petition_type,
+                "assigned_to": UserSerializer(petition.assigned_to).data,
             }
         return None
 
@@ -224,7 +225,8 @@ class ConsultantSubmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'status', 'profiles', 'marketing_id')
+        fields = ('id', 'name', 'email', 'status', 'profiles', 'marketing_id', 'internal_employee', 'marital_status',
+                  'timezone')
 
     @staticmethod
     def get_profiles(obj):
@@ -242,6 +244,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
     rate = serializers.ReadOnlyField()
     status = serializers.SerializerMethodField()
     recruiter = serializers.SerializerMethodField()
+    retention = serializers.SerializerMethodField()
     work_auth = serializers.SerializerMethodField()
     visa_type = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
@@ -249,7 +252,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'rate', 'work_auth', 'exit',
+        fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'retention', 'rate', 'work_auth', 'exit',
                   'rate_revision', 'visa_type')
 
     @staticmethod
@@ -273,6 +276,13 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_recruiter(obj):
         queryset = obj.pocs.filter(end=None, poc_type='recruiter')
+        if queryset:
+            return queryset.first().poc.employee_name
+        return None
+
+    @staticmethod
+    def get_retention(obj):
+        queryset = obj.pocs.filter(end=None, poc_type='retention')
         if queryset:
             return queryset.first().poc.employee_name
         return None
@@ -337,13 +347,15 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     terminate = serializers.SerializerMethodField()
     marketing = serializers.SerializerMethodField()
     experience = serializers.SerializerMethodField()
+    active_marketer = serializers.SerializerMethodField()
     payroll_employer = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
                   'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'retention', 'rate',
-                  'support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer')
+                  'support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer',
+                  'internal_employee', 'marital_status', 'active_marketer', 'timezone')
 
     @staticmethod
     def get_work_auth(obj):
@@ -381,37 +393,44 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return None
 
     @staticmethod
-    def get_recruiter(obj):
-        queryset = obj.pocs.filter(end=None, poc_type='recruiter')
+    def user_data(obj, user_obj):
+        data = {
+            "id": obj.id,
+            'user_id': user_obj.id,
+            'email': user_obj.email,
+            'phone': user_obj.phone,
+            'employee_name': user_obj.employee_name,
+        }
+        return data
+
+    def get_recruiter(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='recruiter').first()
         if queryset:
-            poc = queryset.first().poc
-            data = {
-                "id": queryset.first().id,
-                'user_id': poc.id,
-                'email': poc.email,
-                'phone': poc.phone,
-                'employee_name': poc.employee_name,
-            }
-            return data
+            poc = queryset.poc
+            return self.user_data(queryset, poc)
         return None
 
-    @staticmethod
-    def get_retention(obj):
-        queryset = obj.pocs.filter(end=None, poc_type='retention')
+    def get_active_marketer(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='marketer').first()
         if queryset:
-            poc = queryset.first().poc
-            data = {
-                "id": queryset.first().id,
-                'user_id': poc.id,
-                'email': poc.email,
-                'phone': poc.phone,
-                'employee_name': poc.employee_name,
-            }
-            return data
+            poc = queryset.poc
+            return self.user_data(queryset, poc)
+        else:
+            marketing = obj.marketing.filter(status='open').first()
+            if marketing:
+                primary_marketer = marketing.primary_marketer
+                return self.user_data(marketing, primary_marketer)
+            else:
+                return None
+
+    def get_retention(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='retention').first()
+        if queryset:
+            poc = queryset.poc
+            return self.user_data(queryset, poc)
         return None
 
-    @staticmethod
-    def get_support(obj):
+    def get_support(self, obj):
         projects = Project.objects.filter(submission__consultant_marketing__consultant=obj)
         if projects:
             active_po = projects.filter(statuses__status='joined', statuses__is_current=True)
@@ -424,14 +443,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             if queryset:
                 queryset = queryset.latest('start')
                 poc = queryset.support
-                data = {
-                    "id": queryset.id,
-                    'user_id': poc.id,
-                    'email': poc.email,
-                    'phone': poc.phone,
-                    'employee_name': poc.employee_name,
-                }
-                return data
+                return self.user_data(queryset, poc)
             return None
         return None
 

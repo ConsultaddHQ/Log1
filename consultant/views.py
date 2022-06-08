@@ -16,6 +16,7 @@ from consultant.serializers import *
 from employee.models import tag_users
 from project.utils import fetch_scrum_masters
 
+from utils_app.utils import get_timezone
 from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
 from activity.serializers import Activity, ActivitySerializer
@@ -306,7 +307,12 @@ class ConsultantViewSets(ModelViewSet):
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
+                marital_status=request.data.get('marital_status', None),
+                internal_employee=request.data.get('internal_employee', False)
             )
+            if consultant.current_city:
+                consultant.timezone = get_timezone(consultant.current_city)
+                consultant.save()
 
             # Creating Consultant Original Profile Consultant
             ConsultantProfile.objects.create(
@@ -382,6 +388,8 @@ class ConsultantViewSets(ModelViewSet):
                 "phone_no": "Phone No",
                 "current_city": "Current City",
                 "date_of_birth": "Date of Birth",
+                "marital_status": "Marital Status",
+                "internal_employee": "Internal Employee"
             }
             changed_fields = []
             for field in request.data.keys():
@@ -1316,15 +1324,16 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 previous_work_auth.save()
             work_auth = WorkAuth.objects.create(
                 is_current=True,
-                visa_end=request.data['visa_end'],
                 visa_type=request.data['visa_type'],
                 visa_start=request.data['visa_start'],
                 consultant_id=request.data['consultant'],
+                visa_end=request.data['visa_end'] if request.data['visa_type'] != 'gc' else None,
             )
             profiles = work_auth.consultant.profiles.filter(title__iexact='Original')
             if profiles:
                 profile = profiles.first()
-                profile.visa_end = work_auth.visa_end
+                if request.data['visa_type'] != 'gc':
+                    profile.visa_end = work_auth.visa_end
                 profile.visa_type = work_auth.visa_type
                 profile.visa_start = work_auth.visa_start
                 profile.save()
