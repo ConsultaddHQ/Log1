@@ -25,7 +25,7 @@ def create_cron_error(job, description):
         )
         mail_data = {
             'cc': [], 'bcc': [],
-            'to': ['sarang.m@consultadd.com'],
+            'to': ['sarang.m@consultadd.com', 'shreyas.k@consultadd.com', 'suman.m@consultadd.com'],
             'body': f'Error :: {description}',
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
@@ -46,10 +46,13 @@ def create_cron_object(name):
 
 
 def get_timezone(city_name):
-    obj = TimezoneFinder()
-    geo_locator = Nominatim(user_agent="geoapiExercises")
-    location = geo_locator.geocode(city_name)
-    result = obj.timezone_at(lat=location.latitude, lng=location.longitude)
-    today = datetime.now(tz=timezone(result))
-    return today.strftime("%Z")
-
+    try:
+        obj = TimezoneFinder()
+        geo_locator = Nominatim(user_agent="geoapiExercises")
+        location = geo_locator.geocode(city_name)
+        result = obj.timezone_at(lat=location.latitude, lng=location.longitude)
+        today = datetime.now(tz=timezone(result))
+        return today.strftime("%Z")
+    except Exception as error:
+        write_exception(message=error)
+        return None

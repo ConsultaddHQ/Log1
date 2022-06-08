@@ -162,6 +162,7 @@ class PetitionViewSets(ModelViewSet):
     def documents(self, request):
         try:
             data = dict()
+            petition_id = request.GET.get('petition')
             consultant_id = request.GET.get('consultant')
             petition_ids = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
             doc_types = DocumentList.objects.filter(
@@ -171,7 +172,7 @@ class PetitionViewSets(ModelViewSet):
             for category in categories:
                 data[category.category] = []
             for i in doc_types:
-                documents = Document.objects.filter(petition_id__in=petition_ids, doc_type=i.doc_type)
+                documents = Document.objects.filter(petition_id=petition_id, doc_type=i.doc_type)
                 if documents:
                     document = documents.first()
                     remark = document.remark
@@ -199,6 +200,9 @@ class PetitionViewSets(ModelViewSet):
     @action(methods=['post'], detail=False, url_path='extension')
     def extension(self, request):
         try:
+            consultant = get_object_or_404(Consultant, id=request.data['consultant'])
+            petition_id = consultant.petitions.first().id
+            documents = Document.objects.filter(petition=petition_id).exclude(doc_type__category='Petition Document')
             petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
@@ -209,6 +213,14 @@ class PetitionViewSets(ModelViewSet):
                 petition_type=request.data['petition_type'],
                 beneficiary_type=request.data['beneficiary_type'],
             )
+            for doc in documents:
+                Document.objects.create(
+                    file=doc.file,
+                    verified=None,
+                    creator=request.user,
+                    doc_type_id=doc.doc_type_id,
+                    petition_id=petition.id,
+                )
 
             for i in Types.objects.filter(category="Petition Document"):
                 DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
@@ -251,9 +263,7 @@ class PetitionViewSets(ModelViewSet):
     @action(methods=['post'], detail=False, url_path='upload_doc')
     def upload_doc(self, request):
         try:
-            consultant_id = request.GET.get('consultant')
-            consultant = get_object_or_404(Consultant, id=consultant_id)
-            petition_id = consultant.petitions.last().id
+            petition_id = request.GET.get('petition')
             file_type = request.data.get('file_type')
             for file in request.FILES.getlist('file'):
                 Document.objects.create(
@@ -584,7 +594,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
         try:
             petition_id = request.data.get('petition')
             petition = get_object_or_404(Petition, id=petition_id)
-            petition_id = petition.beneficiary.petitions.last().id
+            petition_id = petition.beneficiary.petitions.first().id
             file_type = request.data.get('file_type')
             for file in request.FILES.getlist('file'):
                 Document.objects.create(
@@ -742,8 +752,9 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             petition = Petition.objects.filter(beneficiary=request.user, is_active=True)
             if not petition:
                 return Response({"error": "Petition not found"}, status=400)
+            petition_ids = Petition.objects.filter(beneficiary_id=request.user).values('id')
             petition_id = petition.first().id
-            doc_types = DocumentList.objects.filter(to_show=True, petition_id=petition_id)
+            doc_types = DocumentList.objects.filter(to_show=True, petition_id__in=petition_ids)
             categories = Types.objects.all().order_by('category').distinct('category')
             for category in categories:
                 data[category.category] = []

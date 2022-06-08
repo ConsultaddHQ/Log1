@@ -13,30 +13,29 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             count = 0
-            users, payload = [], {}
+            users, payload = [], []
             ms = MicrosoftAccount()
             with open('Candidate_details.csv', newline='') as csv_file:
                 reader = csv.reader(csv_file, delimiter=',', quotechar='|')
                 next(reader)
                 for row in reader:
                     data = {
-                        "email": row[4],
+                        "email": row[2],
                         "user_id": None,
                         "password": None,
                         "member_id": None,
                         "licence_assigned": False,
                         "consultant_id": None,
                     }
-                    qs = Consultant.objects.filter(email=row[3].lower())
+                    qs = Consultant.objects.filter(email__iexact=row[3].lower())
                     if qs:
                         consultant = qs.first()
                         password = f"consultadd@1{consultant.id}23"
                         user = {
-                            "name": row[0],
-                            "email": row[4],
                             "last_name": row[2],
-                            "log1_email": row[3],
                             "first_name": row[1],
+                            "log1_email": row[3],
+                            "password": password,
                         }
                         users.append(user)
                         data['password'] = password
@@ -63,13 +62,14 @@ class Command(BaseCommand):
                     if row[4] not in payload:
                         payload[row[4]] = data
 
-            fields = ['first_name', 'last_name', 'name', 'log1_email', 'email', 'password']
-            with open('ms_creds.csv', 'w') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fields)
-                writer.writeheader()
-                writer.writerows(users)
-            with open('ms_database.json', 'w') as file:
-                file.write(json.dumps(payload))
+            if users:
+                fields = ['first_name', 'last_name', 'name', 'log1_email', 'email', 'password']
+                with open('ms_creds.csv', 'w') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=fields)
+                    writer.writeheader()
+                    writer.writerows(users)
+                with open('ms_database.json', 'w') as file:
+                    file.write(json.dumps(payload))
             print(count)
         except Exception as error:
             print(error)
