@@ -468,8 +468,7 @@ def get_element(element_type, data):
 
     if type(data.get('answer')) is list:
         for i in data['answer']:
-            element['text'] = i
-            row_set["items"].append(element)
+            row_set["items"].append({"type": "TextBlock", "text": i, "wrap": True, "spacing": "None"})
     elif data.get('answer', None):
         element['text'] = data.get('answer')
         row_set["items"].append(element)
@@ -558,8 +557,9 @@ def interview_card_data(obj):
         ]
         interview_data.append(interview_info)
 
-        coding_feedback = obj.supervisor_feedback.filter(question__form_name='coding').order_by('question__position')
-        if coding_feedback:
+        coding_feedback = obj.supervisor_feedback.filter(
+            question__form_name='coding').order_by('question_id').distinct('question_id')
+        if coding_feedback or obj.coding_presnet is not None:
             for feedback in coding_feedback:
                 coding_feedback = {
                     "answer": feedback.answer,
@@ -569,14 +569,19 @@ def interview_card_data(obj):
                 coding_feedback_data.append(coding_feedback)
             guest = [i.employee_name for i in obj.guest.all()]
             coding_feedback_data.insert(0, {"question": "Coder's name", "answer": guest if guest else "NA"})
+            coding_feedback_data.insert(
+                1, {"question": "Coding Present", "answer": "Yes" if obj.coding_present else "No"}
+            )
             coding_feedback_data.append(
-                {"question": "Feedback", "answer": obj.guest_remark if obj.guest_remark else "NA"})
+                {"question": "Feedback", "answer_type": "long_text",
+                 "answer": obj.guest_remark if obj.guest_remark else "NA"}
+            )
             interview_data.append(coding_feedback_data)
             container_names[container_position] = "Coder's Feedback"
             container_position += 2
 
         supervisor_feedback = obj.supervisor_feedback.filter(
-            question__form_name='interview').order_by('question__position')
+            question__form_name='interview').order_by('question_id').distinct('question_id')
         if supervisor_feedback:
             for feedback in supervisor_feedback:
                 sup_feedback = {
@@ -585,8 +590,11 @@ def interview_card_data(obj):
                     "answer_type": feedback.question.answer_type
                 }
                 supervisor_feedback_data.append(sup_feedback)
+            supervisor_feedback_data.insert(
+                0, {"question": "Supervisor Name", "answer": obj.supervisor.employee_name}
+            )
             interview_data.append(supervisor_feedback_data)
-            container_names[container_position] = f"{obj.supervisor.employee_name}'s Feedback"
+            container_names[container_position] = "Supervisor's Feedback"
             container_position += 2
         status = "NA"
         for i in obj.STATUS_CHOICES:
@@ -597,7 +605,7 @@ def interview_card_data(obj):
             {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
         ]
         interview_data.append(marketer_feedback_data)
-        container_names[container_position] = f"{obj.marketer.employee_name}'s Feedback"
+        container_names[container_position] = "Marketer's Feedback"
 
         return interview_data, container_names
     except Exception as error:
