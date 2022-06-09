@@ -559,7 +559,7 @@ def interview_card_data(obj):
 
         coding_feedback = obj.supervisor_feedback.filter(
             question__form_name='coding').order_by('question_id').distinct('question_id')
-        if coding_feedback or obj.coding_presnet is not None:
+        if coding_feedback or obj.coding_present is not None:
             for feedback in coding_feedback:
                 coding_feedback = {
                     "answer": feedback.answer,
