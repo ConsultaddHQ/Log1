@@ -41,7 +41,6 @@ class Command(BaseCommand):
                         data['password'] = password
                         data['consultant_id'] = consultant.id
 
-                        print(data)
                     # Creating Account
                     user_id, msg = ms.create_account(user)
                     data['user_id'] = user_id
