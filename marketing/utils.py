@@ -466,6 +466,13 @@ def get_element(element_type, data):
         "spacing": "Large"
     }
 
+    if data.get('answer') in ['Yes', 'yes']:
+        data['answer'] = "✓ Yes"
+        element['color'] = "Good"
+    elif data.get('answer') == 'No':
+        data['answer'] = "❌ No"
+        element['color'] = "Attention"
+
     if type(data.get('answer')) is list:
         for i in data['answer']:
             row_set["items"].append({"type": "TextBlock", "text": i, "wrap": True, "spacing": "None"})
@@ -510,7 +517,7 @@ def interview_card_data(obj):
     try:
         interview_data = []
         container_names = {}
-        container_position = 2
+        container_position = 0
         coding_feedback_data = []
         supervisor_feedback_data = []
         interview_info = [
@@ -556,6 +563,15 @@ def interview_card_data(obj):
             },
         ]
         interview_data.append(interview_info)
+        emoji = ''
+        if obj.status == 'next_round':
+            emoji = '👍'
+        elif obj.status == 'failed':
+            emoji = '👎'
+        if obj.status == 'offer':
+            emoji = '✌️'
+        container_names[container_position] = f"{emoji} Interview Feedback"
+        container_position += 2
 
         coding_feedback = obj.supervisor_feedback.filter(
             question__form_name='coding').order_by('question_id').distinct('question_id')
@@ -577,11 +593,11 @@ def interview_card_data(obj):
                  "answer": obj.guest_remark if obj.guest_remark else "NA"}
             )
             interview_data.append(coding_feedback_data)
-            container_names[container_position] = "Coder's Feedback"
+            container_names[container_position] = "🔹 Coder's Feedback"
             container_position += 2
 
         supervisor_feedback = obj.supervisor_feedback.filter(
-            question__form_name='interview').order_by('question_id').distinct('question_id')
+            question__form_name='interview').order_by('question__position')
         if supervisor_feedback:
             for feedback in supervisor_feedback:
                 sup_feedback = {
@@ -594,7 +610,7 @@ def interview_card_data(obj):
                 0, {"question": "Supervisor Name", "answer": obj.supervisor.employee_name}
             )
             interview_data.append(supervisor_feedback_data)
-            container_names[container_position] = "Supervisor's Feedback"
+            container_names[container_position] = "🔹 Supervisor's Feedback"
             container_position += 2
         status = "NA"
         for i in obj.STATUS_CHOICES:
@@ -605,7 +621,7 @@ def interview_card_data(obj):
             {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
         ]
         interview_data.append(marketer_feedback_data)
-        container_names[container_position] = "Marketer's Feedback"
+        container_names[container_position] = "🔹 Marketer's Feedback"
 
         return interview_data, container_names
     except Exception as error:
@@ -635,10 +651,11 @@ def interview_feedback_card(obj):
         body = card_data['attachments'][0]['content']["body"]
 
         for data_set in interview_data:
-            column_no = 3 if container == 0 else 2
+            column_no = 3 if container < 2 else 2
             row = 0
-            if container != 0 and container % 2 == 0:
-                body.insert(container - 1, get_element('container', {"name": container_names[container]}))
+            if container % 2 == 0:
+                body.insert(container, get_element('container', {"name": container_names[container]}))
+                container = container + 1
             body.insert(container, get_element('empty_container', {}))
 
             for data, count in zip(data_set, range(0, len(data_set))):
@@ -653,7 +670,7 @@ def interview_feedback_card(obj):
                 else:
                     body[container]["items"].append(get_element("column_set", data))
                     row += 1 if count != 0 else row
-            container += 2
+            container += 1
         return card_data
     except Exception as error:
         write_exception(error)
