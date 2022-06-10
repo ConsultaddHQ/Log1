@@ -417,7 +417,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return self.user_data(queryset, poc)
         else:
             marketing = obj.marketing.filter(status='open').first()
-            if marketing:
+            if marketing and marketing.primary_marketer:
                 primary_marketer = marketing.primary_marketer
                 return self.user_data(marketing, primary_marketer)
             else:
