@@ -217,7 +217,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        exclude = ('notes', 'calendar_id', 'guest_remark', 'description', 'call_details', 'attachment_link',
+        exclude = ('notes', 'calendar_id', 'description', 'call_details', 'attachment_link',
                    'failure_reason', 'supervisor')
 
     @staticmethod
@@ -271,15 +271,6 @@ class InterviewListSerializer(serializers.ModelSerializer):
         if obj.start_time.replace(tzinfo=None) < prv_date:
             return True
         elif obj.supervisor_feedback.filter(question__form_name='interview') or obj.supervisor.employee_id == 9999:
-            return True
-        return False
-
-    @staticmethod
-    def get_coding_feedback(obj):
-        prv_date = datetime.strptime("2022-06-04", "%Y-%m-%d")
-        if obj.start_time.replace(tzinfo=None) < prv_date:
-            return True
-        elif obj.supervisor_feedback.filter(question__form_name='coding'):
             return True
         return False
 
