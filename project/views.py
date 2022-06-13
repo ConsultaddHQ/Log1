@@ -245,7 +245,7 @@ class ProjectViewSets(ModelViewSet):
             return error, "error"
 
     @staticmethod
-    def po_end_mail(project, scrum_master_email, po_type, request, status="NA"):
+    def po_end_mail(project, scrum_master_email, po_type, request):
         submission = project.submission
         marketer = submission.created_by
         consultant = project.submission.consultant
@@ -309,11 +309,11 @@ class ProjectViewSets(ModelViewSet):
                            f" {submission.vendor.name}",
                 'context': {
                     'consultant_name': consultant.name, 'end': project_end_date,
+                    'employer': project.submission.employer, 'location': project.city,
                     'reason': project.statuses.get(is_current=True).get_status_display(),
                     'consultant_email': consultant.email, 'client_name': submission.client,
                     'vendor_company': submission.lead.vendor_company.name, 'po_type': po_type,
                     'feedback': project.feedback if project.feedback else "Not updated on Log1",
-                    'employer': project.submission.employer, 'location': project.city, 'status': status,
                     'project_duration': f"{diff_month_days(project.start_date, project.end_date)} months",
                 }
             }
@@ -596,7 +596,7 @@ class ProjectViewSets(ModelViewSet):
                     project.support.update(end=datetime.now())
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
                     po_status = project_status_obj.get_status_display()
-                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request, po_status)
+                    resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
                     util.send_termination_notification(po_status)
 
                 # Project Completed
