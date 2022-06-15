@@ -429,7 +429,13 @@ def create_answer(request, obj, model):
         return str(error)
 
 
-def get_element(element_type, data):
+def get_element(element_type, data={}):
+    blank_set = {
+        "type": "Column", "width": 50, "items": []
+    }
+    element = {
+        "type": "TextBlock", "text": "", "wrap": True, "spacing": "None"
+    }
     row_set = {
         "type": "Column",
         "width": 50,
@@ -441,9 +447,6 @@ def get_element(element_type, data):
                 "weight": "Bolder"
             }
         ]
-    }
-    element = {
-        "type": "TextBlock", "text": "", "wrap": True, "spacing": "None"
     }
     column_set = {
         "type": "ColumnSet",
@@ -483,6 +486,8 @@ def get_element(element_type, data):
         element['text'] = "NA"
         row_set["items"].append(element)
 
+    if element_type == "blank_set":
+        return blank_set
     if element_type == "row_set":
         return row_set
     elif element_type == "container":
@@ -526,6 +531,14 @@ def interview_card_data(obj):
                 "answer": f"I-{obj.id}"
             },
             {
+                "question": "Consultant Name",
+                "answer": obj.consultant.name
+            },
+            {
+                "question": "Client",
+                "answer": obj.submission.client
+            },
+            {
                 "question": "Round",
                 "answer": f"{obj.round if obj.round else 'NA'}"
             },
@@ -538,14 +551,6 @@ def interview_card_data(obj):
                 "answer": get_display_choice(obj.screening_type, 'screening_type')
             },
             {
-                "question": "Date",
-                "answer": obj.start_time.date().strftime("%m/%d/%Y")
-            },
-            {
-                "question": "Time",
-                "answer": obj.start_time.time().strftime("%H:%M")
-            },
-            {
                 "question": "Marketer",
                 "answer": obj.marketer.employee_name
             },
@@ -554,12 +559,16 @@ def interview_card_data(obj):
                 "answer": obj.consultant.recruiter.employee_name
             },
             {
-                "question": "Client",
-                "answer": obj.submission.client
-            },
-            {
                 "question": "Team",
                 "answer": obj.submission.created_by.team.name
+            },
+            {
+                "question": "Date",
+                "answer": obj.start_time.date().strftime("%m/%d/%Y")
+            },
+            {
+                "question": "Time",
+                "answer": obj.start_time.time().strftime("%H:%M")
             },
         ]
         interview_data.append(interview_info)
@@ -621,7 +630,7 @@ def interview_card_data(obj):
             {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
         ]
         interview_data.append(marketer_feedback_data)
-        container_names[container_position] = "🔹 Marketer's Feedback"
+        container_names[container_position] = "🔹 Vendor/Client's Feedback"
 
         return interview_data, container_names
     except Exception as error:
@@ -651,7 +660,7 @@ def interview_feedback_card(obj):
         body = card_data['attachments'][0]['content']["body"]
 
         for data_set in interview_data:
-            column_no = 3 if container < 2 else 2
+            column_length = 3 if container < 2 else 2
             row = 0
             if container % 2 == 0:
                 body.insert(container, get_element('container', {"name": container_names[container]}))
@@ -665,11 +674,13 @@ def interview_feedback_card(obj):
                 if data.get('answer_type') == 'long_text':
                     body[container]["items"].append(get_element("column_set", data))
                     row += 1
-                elif count % column_no != 0:
+                elif count % column_length != 0:
                     body[container]["items"][row]["columns"].append(get_element("row_set", data))
                 else:
                     body[container]["items"].append(get_element("column_set", data))
                     row += 1 if count != 0 else row
+                if len(data_set) % column_length != 0 and count+1 == len(data_set):
+                    body[container]["items"][row]["columns"].append(get_element("blank_set"))
             container += 1
         return card_data
     except Exception as error:
