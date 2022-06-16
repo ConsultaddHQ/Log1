@@ -679,7 +679,7 @@ def interview_feedback_card(obj):
                 else:
                     body[container]["items"].append(get_element("column_set", data))
                     row += 1 if count != 0 else row
-                if len(data_set) % column_length != 0 and count+1 == len(data_set):
+                if len(data_set) % column_length != 0 and count+1 == len(data_set) and data.get('answer_type') != 'long_text':
                     body[container]["items"][row]["columns"].append(get_element("blank_set"))
             container += 1
         return card_data
