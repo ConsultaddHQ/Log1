@@ -534,6 +534,12 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
                     }
                     for question_answer in child_ques_answers:
                         child_data['child'].append(QuestionAnswerSerializer(question_answer).data)
+                        if question_answer.question.child_question.first():
+                            child_answer = Answer.objects.filter(
+                                object_id=obj.object_id, parent_question=question_answer.question
+                            ).order_by('question__position')
+                            for answers in child_answer:
+                                child_data['child'].append(QuestionAnswerSerializer(answers).data)
                     data["child"].append(child_data)
         return data
 
