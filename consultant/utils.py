@@ -109,10 +109,36 @@ def send_exit_interview_detail(terminate, request):
         else:
             termination_date = "NA"
         data = {
-            "title": f"Exit interview for {terminate.consultant.name}",
-            "text": f"**Reason for leaving** : {reason}<br>"
-                    f"**Termination Date** : {termination_date}<br>"
-                    f"**Exit Interview Details** : {exit_details} <br>"
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"Exit interview for {terminate.consultant.name}"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Reason for leaving* : {reason} \n "
+                                f"*Termination Date* : {termination_date} \n "
+                                f"*Exit Interview Details* : {exit_details} \n "
+                    }
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": " "
+                        }
+                    ]
+                }
+            ]
         }
         post_msg_using_webhook(config.exit_interview_url, data)
         user_list = []
@@ -371,13 +397,13 @@ def fetch_consultant_count(team):
 def new_recruit_notification(consultant, source, cfr, feedback):
     try:
         visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
-        recruiter_gender = '&#129490;'
+        recruiter_gender = ':man::skin-tone-2:'
         qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
         if qs:
             recruiter = qs.first().poc
             recruiter_team = recruiter.team
             if recruiter.gender == 'female':
-                recruiter_gender = '&#128103;'
+                recruiter_gender = ':red_haired_woman::skin-tone-2:'
 
         total_count, team_count = fetch_consultant_count(recruiter_team)
         qs = WorkAuth.objects.filter(consultant=consultant)
@@ -387,23 +413,50 @@ def new_recruit_notification(consultant, source, cfr, feedback):
         if qs:
             rate = qs.first().rate
 
-        consultant_gender = '&#128105;' if consultant.gender == 'female' else '&#128104;'
+        consultant_gender = ':red_haired_woman::skin-tone-2:' if consultant.gender == 'female' else ':man::skin-tone-2:'
         data = {
-            "title": "New Recruit on Bench  &#129304;&#128516;&#129304;",
-            "text": f""" **Consultant** <br>
-                {consultant_gender} Name :  {consultant.name} <br>
-                {consultant_gender} Email :  {consultant.email} <br>
-                {recruiter_gender} Recruiter :  {recruiter.employee_name} <br>
-                 ✨ Profile :  {consultant.skills} <br>
-                🇺🇸 Visa :  {visa}<br>
-                ✨ Source :  {source}<br>
-                &#128181; Rate : {rate} <br>
-                 🇺🇸  Current Location :  {consultant.current_city} <br>
-                &#x1F4BC; Team :  {recruiter_team} <br>
-                &#129490; CFR :  {cfr} <br>
-                ✨ Feedback :  {feedback}<br>
-                <br> Recruit Count of {recruiter_team} for this month - {team_count}
-                <br> Total Recruit Count of this month - {total_count}"""
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "New Recruit on Bench :the_horns::smile::the_horns:"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text":
+                            f"*Consultant*\n"
+                            f"{consultant_gender} *Name* :  {consultant.name}\n"
+                            f"{consultant_gender} *Email* :  {consultant.email}\n"
+                            f"{recruiter_gender} *Recruiter* :  {recruiter.employee_name}\n"
+                            f"✨ *Profile* :  {consultant.skills} \n"
+                            f"🇺🇸 *Visa* :  {visa}\n"
+                            f"✨ *Source* :  {source}\n"
+                            f"✨ *Rate* : {rate} \n"
+                            f"🇺🇸  *Current Location* :  {consultant.current_city} \n"
+                            f"✨ *Team* :  {recruiter_team} \n"
+                            f"✨ *CFR* :  {cfr} \n"
+                            f"✨ *Feedback* :  {feedback}\n"
+                            f"\n Recruit Count of {recruiter_team} for this month - {team_count}"
+                            f"\n Total Recruit Count of this month - {total_count}"
+                    },
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": " "
+                        }
+                    ]
+                }
+            ]
         }
         # Sending message on Messaging Tool
         post_msg_using_webhook(config.new_recruit_on_bench, data)
@@ -753,19 +806,36 @@ def pre_joining_feedback_notification(feedback, request):
     try:
         project = feedback.project
         title = project.submission.lead.job_title
-        profile_path = get_profile_picture(request.user)
         data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"Pre-Joining-Call feedback",
-            "sections": [
+            "blocks": [
                 {
-                    "activityTitle": f"{project.consultant.name} :: {title} :: {project.submission.client}",
-                    "activitySubtitle": f"***Pre joining feedback by {request.user.employee_name}***",
-                    "activityText": feedback.description,
-                    "activityImage": profile_path,
-                    "markdown": True
+                    "type": "header",
+                    "text":
+                        {
+                            "emoji": True,
+                            "type": "plain_text",
+                            "text": f"*{project.consultant.name} :: {title} :: {project.submission.client}*"
+                        }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "plain_text",
+                        "text": feedback.description,
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": " "
+                        }
+                    ]
                 }
             ]
         }
@@ -779,20 +849,37 @@ def pre_joining_feedback_notification(feedback, request):
 def engineering_feedback_notification(feedback, request):
     try:
         project = feedback.project
-        profile_path = get_profile_picture(request.user)
         data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"***Engineering Issue***",
-            "sections": [
+            "blocks": [
                 {
-                    "activityTitle": f"***{project.consultant.name}*** :: ***{project.submission.lead.job_title}*** "
-                                     f":: ***{project.submission.client}***",
-                    "activitySubtitle": f"***Engineering Issue feedback by {request.user.employee_name}***",
-                    "activityText": feedback.description,
-                    "activityImage": profile_path,
-                    "markdown": True
+                    "type": "header",
+                    "text":
+                        {
+                            "emoji": True,
+                            "type": "plain_text",
+                            "text": f"*{project.consultant.name} :: {project.submission.lead.job_title}*"
+                                    f":: *{project.submission.client}*",
+                        }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": feedback.description,
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": " "
+                        }
+                    ]
                 }
             ]
         }

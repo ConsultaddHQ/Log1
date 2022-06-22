@@ -8,7 +8,6 @@ from employee.models import User
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
-from utils_app.calendar import get_profile_picture
 from consultant.utils import send_notification_for_user
 from engineering.models import TrainingCheckList, ProjectDescription
 from log1.utils import post_msg_using_webhook, password_generator, write_exception
@@ -147,8 +146,8 @@ class ProjectUtil:
         else:
             self.employer = self.project.submission.employer
 
-        self.activity_text = f"Project by ***{self.project.marketer_name}*** from " \
-                             f"***{self.project.created_by.team.name}***"
+        self.activity_text = f"Project by *{self.project.marketer_name}* from " \
+                             f"*{self.project.created_by.team.name}*"
 
     def fetch_project_count(self, project_status):
         try:
@@ -176,65 +175,134 @@ class ProjectUtil:
                 recruiter_name = self.consultant.recruiter.employee_name
 
             if self.project.is_remote or self.project.submission.lead.is_w2:
-                activity_title = f"***{self.project.consultant.name.strip()}*** joined ***Remote*** project at " \
-                                 f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***"
+                activity_title = f"*{self.project.consultant.name.strip()}* joined *Remote* project at " \
+                                 f"*{self.project.submission.client}* on *{self.project_start}* as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*"
             else:
-                activity_title = f"***{self.consultant.name.strip()}*** joined project at " \
-                                 f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***"
+                activity_title = f"*{self.consultant.name.strip()}* joined project at " \
+                                 f"*{self.project.submission.client}* on *{self.project_start}* as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*"
 
-            profile_path = get_profile_picture(self.user)
             data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Project Joined",
-                    "activitySubtitle": activity_title,
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {
-                            "name": f"Submitted On",
-                            "value": self.consultant.name.strip()
-                        },
-                        {
-                            "name": f"Employer",
-                            "value": self.employer
-                        },
-                        {
-                            "name": f"Recruiter",
-                            "value": recruiter_name
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Project Joined",
+                            "emoji": True
                         }
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [{
-                    "@type": "ActionCard",
-                    "name": f"{team_name} - {team}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"{team_name} - {team}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@type": "ActionCard",
-                    "name": f"Total - {total}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"Total - {total}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@context": "http://schema.org",
-                    "@type": "ViewAction",
-                    "name": "View in Log1",
-                    "target": [
-                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                    ]
-                }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"{activity_title}\n{self.activity_text}"
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " "
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Submitted On*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": f"{datetime.strptime(str(self.project.submission.created), '%Y-%m-%d').strftime('%a, %d %B %Y')}",
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Employer*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.employer,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Recruiter*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": recruiter_name,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": f"{team_name} - {team}"
+                                },
+                                "style": "primary",
+                                "value": "click_me_123",
+                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                            },
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": f"Total - {total}"
+                                },
+                                "style": "primary",
+                                "value": "click_me_123",
+                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                            },
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "View in Log1",
+                                    "emoji": True
+                                },
+                                "style": "primary",
+                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
+                                "value": "click_me_123",
+                                "action_id": "actionId-0"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " ",
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    }
                 ]
             }
             # Sending message on Messaging Tool
@@ -257,54 +325,172 @@ class ProjectUtil:
             supervisors = "\n".join([f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
                                      for interview in interviews if interview.supervisor])
 
-            profile_path = get_profile_picture(self.user)
             data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Offer",
-                    "activitySubtitle": f"***Paper work*** received from ***{self.project.submission.client}*** for "
-                                        f"***{self.consultant.name}***",
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {"name": "Employer", "value": self.employer},
-                        {"name": "Start Date", "value": self.project_start},
-                        {"name": "Location", "value": self.project.city},
-                        {"name": "Role", "value": self.project.submission.lead.job_title},
-                        {"name": "Recruiter", "value": recruiter_name},
-                        {"name": "Supervisors", "value": supervisors},
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [{
-                    "@type": "ActionCard",
-                    "name": f"{self.employer} - {team}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"{self.employer} - {team}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@type": "ActionCard",
-                    "name": f"Total - {total}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"Total - {total}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@context": "http://schema.org",
-                    "@type": "ViewAction",
-                    "name": "View in Log1",
-                    "target": [
-                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                    ]
-                }
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Offer",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Paper work* received from *{self.project.submission.client}* for "
+                                    f"*{self.consultant.name}*\n{self.activity_text}"
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " "
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Employer*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.employer,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Start Date*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.project_start,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Location*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.project.city,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Role*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.project.submission.lead.job_title,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Recruiter*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": recruiter_name,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Supervisors*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": supervisors,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": f"{self.employer} - {team}"
+                                },
+                                "style": "primary",
+                                "value": "click_me_123",
+                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                            },
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": f"Total - {total}"
+                                },
+                                "style": "primary",
+                                "value": "click_me_123",
+                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
+                            },
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "View in Log1",
+                                    "emoji": True
+                                },
+                                "style": "primary",
+                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
+                                "value": "click_me_123",
+                                "action_id": "actionId-0"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " ",
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    }
                 ]
             }
+
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.offer_url, data)
 
@@ -322,38 +508,149 @@ class ProjectUtil:
 
             months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
-            activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***, terminated from " \
-                                 f"***{self.project.submission.client}*** with the end date of ***{self.project_end}***"
-            profile_path = get_profile_picture(self.user)
+            activity_sub_title = f"*{self.consultant.name.strip()}'s* project as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*, terminated from " \
+                                 f"*{self.project.submission.client}* with the end date of *{self.project_end}*"
             data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Project Termination Feedback",
-                    "activitySubtitle": activity_sub_title,
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {"name": f"Project duration", "value": f"{months} months"},
-                        {"name": f"Employer", "value": self.employer},
-                        {"name": f"Location", "value": self.project.city},
-                        {"name": f"Recruiter", "value": recruiter_name},
-                        {"name": f"Status", "value": status},
-                        {"name": f"Feedback", "value": reason},
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [{
-                    "@context": "http://schema.org",
-                    "@type": "ViewAction",
-                    "name": "View in Log1",
-                    "target": [
-                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                    ]
-                }]
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Project Termination Feedback",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"{activity_sub_title}\n{self.activity_text}"
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " "
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Project duration*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": f"{months} months",
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Employer*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.employer,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Location*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.project.city,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Recruiter*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": recruiter_name,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Status*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": status,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Feedback*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": reason,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "View in Log1",
+                                    "emoji": True
+                                },
+                                "style": "primary",
+                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
+                                "action_id": "actionId-0"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " ",
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    }
+                ]
             }
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.project_termination_url, data)
@@ -372,37 +669,133 @@ class ProjectUtil:
 
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
 
-            activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***, cancelled at " \
-                                 f"***{self.project.submission.client.strip()}***"
-            profile_path = get_profile_picture(self.user)
+            activity_sub_title = f"*{self.consultant.name.strip()}'s* project as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*, cancelled at " \
+                                 f"*{self.project.submission.client.strip()}*"
             data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Offer Cancellation Feedback",
-                    "activitySubtitle": activity_sub_title,
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {"name": f"Employer", "value": self.employer},
-                        {"name": f"Location", "value": self.project.city},
-                        {"name": f"Recruiter", "value": recruiter_name},
-                        {"name": f"Status", "value": status},
-                        {"name": f"Feedback", "value": reason},
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [
+                "blocks": [
                     {
-                        "@context": "http://schema.org",
-                        "@type": "ViewAction",
-                        "name": "View in Log1",
-                        "target": [
-                            f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Offer cancellation feedback",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"{activity_sub_title}\n{self.activity_text}"
+                        }
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " "
+                            }
                         ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Employer*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.employer,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Location*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": self.project.city,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Recruiter*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": recruiter_name,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Status*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": status,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Feedback*"
+                            },
+                            {
+                                "type": "plain_text",
+                                "text": reason,
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "View in Log1",
+                                    "emoji": True
+                                },
+                                "style": "primary",
+                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
+                                "action_id": "actionId-0"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": " ",
+                                "emoji": True
+                            }
+                        ]
+                    },
+                    {
+                        "type": "divider"
                     }
                 ]
             }

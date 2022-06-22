@@ -1223,16 +1223,17 @@ class InterviewViewSets(ModelViewSet):
                 except Exception as error:
                     return Response({"message": "Calendar booking failed", "error": str(error)}, status=400)
 
-                # Teams message for Interview
+                # Slack message for Interview
                 if date.today() == interview.start_time.date():
-                    data = {
-                        "text": f" *{title}* ",
-                        "title": "&#128220; New Interview Scheduled",
+                    payload = {
+                        "title": ":scroll: New Interview Scheduled",
+                        "body": title
                     }
+                    data = get_message_card(payload)
                     post_msg_using_webhook(config.announcement_url, data)
 
                 if interview.guest_type in ['coder', 'assistance']:
-                    coder_request_notification(request.user, interview, "Coding request")
+                    coder_request_notification(interview, "Coding request")
 
                 data = queryset.annotate(
                     rank=F('submission__rank'),
@@ -1341,10 +1342,10 @@ class InterviewViewSets(ModelViewSet):
 
                 if interview.guest_type in ['coder', 'assistance'] and (
                         pre_guest_type == 'not_required' or pre_guest_type is None):
-                    coder_request_notification(request.user, interview, "Coding request")
+                    coder_request_notification(interview, "Coding request")
 
                 if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
-                    coder_request_notification(request.user, interview, "Coding not required for this Interview")
+                    coder_request_notification(interview, "Coding not required for this Interview")
                     interview.guest.clear()
 
                 # Activity
@@ -1582,10 +1583,11 @@ class InterviewViewSets(ModelViewSet):
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
                 if date.today() <= interview.start_time.date():
-                    data = {
-                        "text": title,
-                        "title": "&#9201; Interview Rescheduled",
+                    payload = {
+                        "body": title,
+                        "title": ":stopwatch: Interview Rescheduled",
                     }
+                    data = get_message_card(payload)
                     post_msg_using_webhook(config.announcement_url, data)
 
                 if prev_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
@@ -1594,15 +1596,15 @@ class InterviewViewSets(ModelViewSet):
 
                     if today.date() < interview.start_time.date():
                         title = "Coding request, Interview Rescheduled"
-                        coder_request_notification(request.user, interview, title)
+                        coder_request_notification(interview, title)
 
                     if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
                         title = "Coding request, Interview Rescheduled"
-                        coder_request_notification(request.user, interview, title)
+                        coder_request_notification(interview, title)
 
                     if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
                         title = "Coding request"
-                        coder_request_notification(request.user, interview, title)
+                        coder_request_notification(interview, title)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1661,7 +1663,7 @@ class InterviewViewSets(ModelViewSet):
 
             if interview.guest_type in ['coder', 'assistance']:
                 title = "Interview cancelled, coding is not required"
-                coder_request_notification(request.user, interview, title)
+                coder_request_notification(interview, title)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
@@ -1866,10 +1868,10 @@ class InterviewViewSets(ModelViewSet):
                 today = datetime.now().astimezone(est)
 
                 if today.date() < interview.start_time.date():
-                    coder_assigned_notification(request.user, interview)
+                    coder_assigned_notification(interview)
 
                 if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
-                    coder_assigned_notification(request.user, interview)
+                    coder_assigned_notification(interview)
 
                 title = get_interview_title(interview)
                 _, attendees = get_users_and_attendees(request, interview)
@@ -2320,7 +2322,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
                 res, error = self.send_test_mail(test, data, 'new', request)
-                test_received_notification(request.user, test, data['con_timezone'])
+                test_received_notification(test, data['con_timezone'])
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
@@ -2433,10 +2435,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 consultant_name = submission.consultant.name
                 assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
                 text = f"Test Assigned to :- {assigned} <br>"
-                data = {
-                    "title": f"&#128203; Test Assigned :: {consultant_name} :: {submission.client} :: {skills} <br>",
-                    "text": text
+                payload = {
+                    "title": text,
+                    "body": f"&#128203; Test Assigned :: {consultant_name} :: {submission.client} :: {skills}"
                 }
+                data = get_message_card(payload)
                 post_msg_using_webhook(config.engineering_url, data)
 
             serializer = TestCreateSerializer(test)
