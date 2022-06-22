@@ -18,7 +18,7 @@ from marketing.utils import *
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
-from utils_app.calendar import Calendar
+from utils_app.calendar import Calendar, GoogleCalendar
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
@@ -1212,8 +1212,12 @@ class InterviewViewSets(ModelViewSet):
 
                 # Booking MS calendar
                 try:
-                    calendar = Calendar(request=request)
-                    cal_res, msg = calendar.book_ms_calendar(event)
+                    # calendar = Calendar(request=request)
+                    # cal_res, msg = calendar.book_ms_calendar(event)
+                    # Booking Google calendar
+                    calendar = GoogleCalendar()
+                    cal_res, msg = calendar.book_calendar(event)
+
                     if msg == 'error':
                         return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
@@ -1321,9 +1325,11 @@ class InterviewViewSets(ModelViewSet):
 
                     # Updating calendar Booking
                     calendar_id = interview.calendar_id
-                    calendar = Calendar(request=request)
+                    calendar = GoogleCalendar()
+
                     if not calendar_id:
-                        res, msg = calendar.book_ms_calendar(event)
+                        # res, msg = calendar.book_ms_calendar(event)
+                        res, msg = calendar.book_calendar(event)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": res}, status=400)
 
@@ -1331,7 +1337,7 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'booked'
                         interview.save()
                     else:
-                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        res, msg = calendar.update_calendar(calendar_id, event)
                         if msg == 'booked':
                             interview.calendar_id = res['id']
                             booking_res = 'updated'
@@ -1387,8 +1393,8 @@ class InterviewViewSets(ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        calendar = Calendar(request=request)
-                        calendar.delete_ms_calendar(interview.calendar_id)
+                        calendar = GoogleCalendar()
+                        calendar.delete_calendar_booking(interview.calendar_id)
                 except Exception as error:
                     write_exception(f"Booking deletion failed: {error}", request)
                     return Response({"data": "Calendar booking deletion failed", "error": str(error)}, status=400)
@@ -1551,10 +1557,10 @@ class InterviewViewSets(ModelViewSet):
 
                 # Updating calendar Booking
                 calendar_id = interview.calendar_id
-                calendar = Calendar(request=request)
+                calendar = GoogleCalendar()
                 if not calendar_id:
                     try:
-                        cal_res, msg = calendar.book_ms_calendar(event)
+                        cal_res, msg = calendar.book_calendar(event)
                         if msg == "error":
                             return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
@@ -1565,7 +1571,7 @@ class InterviewViewSets(ModelViewSet):
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                 else:
                     try:
-                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        res, msg = calendar.update_calendar(calendar_id, event)
                         booking_res = 'updated'
                         if msg == 'booked':
                             interview.calendar_id = res['id']
@@ -1636,8 +1642,8 @@ class InterviewViewSets(ModelViewSet):
             interview = qs.first()
             try:
                 if interview.calendar_id:
-                    calendar = Calendar(request=request)
-                    calendar.delete_ms_calendar(interview.calendar_id)
+                    calendar = GoogleCalendar()
+                    calendar.delete_calendar_booking(interview.calendar_id)
             except Exception as error:
                 write_exception(f"Booking cancellation failed: {error}", request)
                 return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
@@ -1896,9 +1902,9 @@ class InterviewViewSets(ModelViewSet):
                 booking_res = 'Development Server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     calendar_id = interview.calendar_id
-                    calendar = Calendar(request=request)
+                    calendar = GoogleCalendar()
                     if not calendar_id:
-                        res, msg = calendar.book_ms_calendar(event)
+                        res, msg = calendar.book_calendar(event)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": res}, status=400)
                         booking_res = 'booked'
@@ -1906,7 +1912,7 @@ class InterviewViewSets(ModelViewSet):
                         interview.save()
                     else:
                         booking_res = 'updated'
-                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        res, msg = calendar.update_calendar(calendar_id, event)
                         if msg == 'booked':
                             booking_res = 'booked'
                             interview.calendar_id = res['id']
