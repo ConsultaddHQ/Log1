@@ -209,10 +209,10 @@ def terminate_consultant(terminate, request):
         terminate.save()
 
         # Email for Exit Process Cancelled
-        if os.environ.get('ENV', 'local') == 'prod':
-            res, error = send_exit_process_mail(terminate, 'complete', request)
-            if error == 'error':
-                write_info(message=error, function='terminate_consultant')
+        # if os.environ.get('ENV', 'local') == 'prod':
+        res, error = send_exit_process_mail(terminate, 'complete', request)
+        if error == 'error':
+            write_info(message=error, function='terminate_consultant')
 
         # App Notification
         recruiter = consultant.recruiter
@@ -277,8 +277,12 @@ def send_exit_process_mail(terminate, exit_status, request):
         else:
             poc = consultant.recruiter
 
-        to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
-        cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
+        if os.environ.get('ENV', 'local') == 'prod':
+            to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
+            cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
+        else:
+            cc, bcc = [], []
+            to = ['suman.buie.cpp@gmail.com', 'shreyaskhede26@gmail.com', 'log1.consultadd@gmail.com']
 
         scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'], is_active=True)
         for user in scrum_masters:

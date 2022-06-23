@@ -2320,12 +2320,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             # Test email to engineering team
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'new', request)
-                test_received_notification(test, data['con_timezone'])
-                if error == 'error':
-                    write_info(message=res, function='create-send_test_mail', request=request)
-                    return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
+            # if os.environ.get('ENV', 'local') == 'prod':
+            res, error = self.send_test_mail(test, data, 'new', request)
+            test_received_notification(test, data['con_timezone'])
+            if error == 'error':
+                write_info(message=res, function='create-send_test_mail', request=request)
+                return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
         except Exception as error:
@@ -2482,11 +2482,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 create_attachment(file_data)
             # test submit mail
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'submit', request)
-                if error == 'error':
-                    write_info(message=res, function='create-send_test_mail', request=request)
-                    return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+            # if os.environ.get('ENV', 'local') == 'prod':
+            res, error = self.send_test_mail(test, data, 'submit', request)
+            if error == 'error':
+                write_info(message=res, function='create-send_test_mail', request=request)
+                return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test submitted"}, status=202)
         except Exception as error:
@@ -2596,11 +2596,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             # test submit mail
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'submit', request)
-                if error == 'error':
-                    write_info(message=res, function='create-send_test_mail', request=request)
-                    return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+            # if os.environ.get('ENV', 'local') == 'prod':
+            res, error = self.send_test_mail(test, data, 'submit', request)
+            if error == 'error':
+                write_info(message=res, function='create-send_test_mail', request=request)
+                return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
 
             return Response({"message": "Feedback submitted", "mail": res}, status=201)
         except Exception as error:
