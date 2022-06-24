@@ -1195,7 +1195,7 @@ class InterviewViewSets(ModelViewSet):
                 # Ranking Interview
                 if interview.round == 1:
                     interview = self.rank_interviews(interview, 'create')
-
+                    
                 # Calendar attendees and User for sending notification
                 title = get_interview_title(interview)
                 user_list, attendees = get_users_and_attendees(request, interview)

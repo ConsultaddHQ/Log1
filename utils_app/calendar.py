@@ -75,7 +75,7 @@ class GoogleCalendar:
         description = self.calendar_description(data)
         if os.environ.get('ENV', 'local') != 'prod':
             data['attendees'] = [{'email': 'suman.buie.cpp@gmail'}, {'email': 'shreyaskhede26@gmail.com'},
-                                 {'email': 'log1.consultadd@gmail.com'}]
+                                 {'email': 'log1.consultadd@gmail.com'},{'email':'eduone7@gmail.com'}]
         return {
             'summary': data["summary"],
             'description': description,
