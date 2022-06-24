@@ -58,7 +58,7 @@ class Command(BaseCommand):
             if os.environ.get('ENV', 'local') == 'prod':
                 to = ['finance@consultadd.com', 'sarang.m@consultadd.com']
             else:
-                to = ['sarang.m@consultadd.com']
+                to = ['suman.buie.cpp@gmail.com', 'shreyaskhede26@gmail.com', 'log1.consultadd@gmail.com','eduone7@gmail.com']
             mail_data = {
                 'to': to, 'cc': [], 'bcc': [],
                 'subject': f"Consultant Rate Revision Due",
