@@ -9,6 +9,7 @@ from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from marketing.models import Submission, Interview, Question, Answer
 from log1.utils import write_info, write_exception, post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
 
 
 def vendor_account_manager(vendor_company):
@@ -97,11 +98,12 @@ def get_interview_title(interview):
         is_consultant = interview.supervisor.employee_id == 9999 or False
         call_supervisor = interview.consultant.name if is_consultant else interview.supervisor.employee_name
 
-        return f"Call Supervisor - {call_supervisor} {'(Consultant)' if is_consultant == True else ''} " \
-               f":: {interview.round}R :: {interview.get_screening_type_display()} :: " \
-               f"{interview.get_interview_mode_display()} ::"f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} " \
-               f":: {interview.submission.client} ::"f"{interview.consultant.name} :: {interview.marketer.employee_name} " \
-               f"::  {interview.submission.employer}"
+        return f"Call Supervisor - {call_supervisor} " \
+               f"{'(Consultant)' if is_consultant == True else ''} :: {interview.round}R :: " \
+               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::"\
+               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::"\
+               f"{interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"
+
     except Exception as error:
         write_exception(message=error)
         return False
@@ -165,247 +167,20 @@ def create_submission(request, lead_id):
         return error, "error"
 
 
-def coder_request_notification(interview, title):
+def coder_request_notification(interview, title, request):
     try:
-        data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": title,
-                        "emoji": True
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"I-{interview.id} : Interview from *{interview.submission.client}* for "
-                                f"*{interview.submission.consultant.name}* \n"
-                                f"Requested by *{interview.submission.created_by.employee_name}* from "
-                                f"*{interview.submission.created_by.team.name}*",
-                    },
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Technology*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": str(interview.tech_stack),
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Supervisor*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": str(interview.supervisor.employee_name),
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Date*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": str(interview.start_time.strftime('%a, %d %B')),
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Time*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": f"{interview.start_time.strftime('%I:%M %p EST')} - "
-                                    f"{interview.end_time.strftime('%I:%M %p EST')}",
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "plain_text",
-                            "text": " ",
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "divider"
-                }
-            ]
+        payload = {
+            "title": title,
+            "interview": interview
         }
-        if interview.coding_info:
-            data_len = len(data['blocks'])
-            data['blocks'].insert(data_len - 2, {
-                "type": "section",
-                "fields": [
-                    {
-                        "type": "mrkdwn",
-                        "text": "*Coder's Info*"
-                    },
-                    {
-                        "type": "plain_text",
-                        "text": interview.coding_info,
-                        "emoji": True
-                    }
-                ]
-            },
-                                  )
-        post_msg_using_webhook(config.engineering_url, data)
+        MessageCard.coder_request_card(payload, request)
         return "ok"
     except Exception as error:
-        write_info(message=error, function='coder_request_notification')
-        return str(error)
+        write_exception(error, request)
+        return error, "error"
 
 
-def coder_assigned_notification(interview):
-    try:
-        coding_experts = ", ".join(interview.guest.all().values_list('employee_name', flat=True))
-        data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Coding Assignment",
-                        "emoji": True
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"I-{interview.id} : Interview from *{interview.submission.client}* for "
-                                f"*{interview.submission.consultant.name}* \n"
-                                f"Requested by *{interview.submission.created_by.employee_name}* from "
-                                f"*{interview.submission.created_by.team.name}*",
-                    },
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Technology*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": str(interview.tech_stack),
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Supervisor*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": str(interview.supervisor.employee_name),
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Date*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": str(interview.start_time.strftime('%a, %d %B')),
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Time*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": f"{interview.start_time.strftime('%I:%M %p EST')} - "
-                                    f"{interview.end_time.strftime('%I:%M %p EST')}",
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Coding expert*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": coding_experts,
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "plain_text",
-                            "text": " ",
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "divider"
-                }
-            ]
-        }
-        post_msg_using_webhook(config.engineering_url, data)
-        return "ok"
-    except Exception as error:
-        write_info(message=error, function='coder_request_notification')
-        return str(error)
-
-
-def test_received_notification(test, timezone):
+def test_received_notification(test, timezone, request):
     try:
         skills = ", ".join(skill.title() for skill in test.skills)
         if test.is_offline:
@@ -418,7 +193,7 @@ def test_received_notification(test, timezone):
         if type(test.deadline) == str:
             deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B %Y')
         else:
-            deadline = test.deadline.strftime('%a, %d %B %Y')
+            deadline = test.deadline.strftime('%a, %d %B %Y') if test.deadline else "NA"
 
         client = test.submission.client
         subtitle = f"*TST-{test.id}*: Received a *{test_data} {skills}* test from Unknown client for " \
@@ -429,74 +204,13 @@ def test_received_notification(test, timezone):
                            f"*{test.submission.client.strip()}* for *{test.submission.consultant.name}* "
 
         activity_text = f"Requested by *{test.marketer.employee_name}* from *{test.marketer.team.name}*"
-        data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Test Received",
-                        "emoji": True
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"{subtitle}\n{activity_text}"
-                    },
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Timezone*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": timezone,
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Deadline*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": deadline,
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "plain_text",
-                            "text": " ",
-                            "emoji": True
-                        }
-                    ]
-                },
-                {
-                    "type": "divider"
-                }
-            ]
+        payload = {
+            "subtitle": subtitle, "activity_text": activity_text, "timezone": timezone, "deadline": deadline
         }
-
-        post_msg_using_webhook(config.engineering_url, data)
+        MessageCard.test_received_card(payload, request)
         return "ok"
     except Exception as error:
-        write_info(message=error, function='test_received_notification')
+        write_exception(error, request)
         return str(error)
 
 
@@ -561,66 +275,7 @@ def create_answer(request, obj, model):
         return str(error)
 
 
-def get_element(element_type, data=None):
-    if data is None:
-        data = {}
-    divider_set = {
-        "type": "divider"
-    }
-    header_set = {
-        "type": "header",
-        "text":
-            {
-                "type": "plain_text",
-                "text": data.get('title', None),
-                "emoji": True
-            }
-    }
-    column_set = {
-        "type": "section",
-        "fields": [
-            {
-                "type": "mrkdwn",
-                "text": f"*{data.get('question', None)}*\n{data.get('answer', None)}"
-            }
-        ]
-    }
-    section_set = {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": f"*{data.get('question', None)}*\n{data.get('answer', None)}"
-        }
-    }
-    element_set = {
-        "type": "mrkdwn",
-        "text": f"*{data.get('question')}*\n{data.get('answer')}"
-    }
-    context_set = {
-        "type": "context",
-        "elements": [
-            {
-                "type": "mrkdwn",
-                "text": " "
-            }
-        ]
-    }
-    if element_type == "element_set":
-        return element_set
-    elif element_type == "column_set":
-        return column_set
-    elif element_type == "section_set":
-        return section_set
-    elif element_type == "header_set":
-        return header_set
-    elif element_type == "divider_set":
-        return divider_set
-    elif element_type == "context_set":
-        return context_set
-    return None
-
-
-def get_display_choice(data, data_type):
+def get_display_choice(data, data_type, request):
     try:
         if data_type == 'interview_mode':
             for mode in Interview.INTERVIEW_MODE:
@@ -633,11 +288,11 @@ def get_display_choice(data, data_type):
                     return mode[1]
             return None
     except Exception as error:
-        write_info(message=error, function="get_display_choice")
+        write_exception(error, request)
         return str(error)
 
 
-def interview_card_data(obj):
+def interview_card_data(obj, request):
     try:
         interview_data = []
         container_names = []
@@ -657,16 +312,20 @@ def interview_card_data(obj):
                 "answer": obj.submission.client
             },
             {
+                "question": "Technology",
+                "answer": obj.submission.lead.job_title if obj.submission.lead.job_title else "NA"
+            },
+            {
                 "question": "Round",
                 "answer": f"{obj.round if obj.round else 'NA'}"
             },
             {
                 "question": "Mode",
-                "answer": get_display_choice(obj.interview_mode, 'interview_mode'),
+                "answer": get_display_choice(obj.interview_mode, 'interview_mode', request),
             },
             {
                 "question": "Screening Type",
-                "answer": get_display_choice(obj.screening_type, 'screening_type')
+                "answer": get_display_choice(obj.screening_type, 'screening_type', request)
             },
             {
                 "question": "Marketer",
@@ -752,69 +411,18 @@ def interview_card_data(obj):
 
         return interview_data, container_names
     except Exception as error:
-        write_exception(error)
+        write_exception(error, request)
 
 
-def interview_feedback_card(obj):
+def interview_feedback_card(obj, request):
     try:
-        header_position = 0
-        interview_data, header_names = interview_card_data(obj)
-        card_data = {
-            "blocks": []
-        }
-        body = card_data['blocks']
-        for data_set, header_name in zip(interview_data, header_names):
-            column_length = 2
-            body.append(get_element('header_set', {"title": header_name}))
-            for data, count in zip(data_set, range(0, len(data_set))):
-                if type(data.get('answer')) is str:
-                    data['answer'] = data.get('answer').replace('[', '').replace(']', '').replace('"', '') \
-                        .replace('\n', '')
-                if data.get('answer_type') == 'long_text':
-                    body.append(get_element("section_set", data))
-                    count -= 1
-                elif count % column_length != 0:
-                    body[-1]['fields'].append(get_element("element_set", data))
-                else:
-                    body.append(get_element("column_set", data))
-            body.append(get_element('divider_set'))
-            header_position += 1
-        card_data['blocks'].append(get_element('context_set'))
+        interview_data, header_names = interview_card_data(obj, request)
+        card_data = MessageCard.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
         return card_data
     except Exception as error:
-        write_exception(error)
+        write_exception(error, request)
 
 
 def get_message_card(payload):
-    data = {
-        "blocks": [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": payload.get("title"),
-                    "emoji": True
-                }
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "plain_text",
-                    "text": payload.get("body")
-                }
-            },
-            {
-                "type": "divider"
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": " "
-                    }
-                ]
-            }
-        ]
-    }
+    data = MessageCard.get_simple_card(payload)
     return data

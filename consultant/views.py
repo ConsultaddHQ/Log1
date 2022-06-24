@@ -1642,10 +1642,10 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 setattr(feedback, 'department', 'engineering')
                 feedback.save()
                 if feedback.feedback_type == 'engineering_issue':
-                    engineering_feedback_notification(feedback, request)
+                    MessageCard.feedback_card(feedback, request)
 
             elif feedback.feedback_type == 'pre_joining':
-                pre_joining_feedback_notification(feedback, request)
+                MessageCard.feedback_card(feedback, request)
 
             consultant = feedback.consultant
             emp_name = request.user.employee_name

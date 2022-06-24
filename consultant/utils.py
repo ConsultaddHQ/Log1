@@ -15,11 +15,11 @@ from utils_app.utils import get_timezone
 from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
-from utils_app.calendar import get_profile_picture
 from activity.serializers import ActivitySerializer
+from utils_app.slack_notification import MessageCard
 from utils_app.aws_utils import download_s3_object_beats
 from notification.utils import create_notification, push_notification
-from log1.utils import post_msg_using_webhook, html_to_text, write_exception, write_info
+from log1.utils import html_to_text, write_exception, write_info
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth
 
@@ -108,39 +108,14 @@ def send_exit_interview_detail(terminate, request):
             termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
         else:
             termination_date = "NA"
-        data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": f"Exit interview for {terminate.consultant.name}"
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*Reason for leaving* : {reason} \n "
-                                f"*Termination Date* : {termination_date} \n "
-                                f"*Exit Interview Details* : {exit_details} \n "
-                    }
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": " "
-                        }
-                    ]
-                }
-            ]
+        payload = {
+            "reason": reason,
+            "exit_details": exit_details,
+            "termination_date": termination_date,
+            "consultant": terminate.consultant.name
         }
-        post_msg_using_webhook(config.exit_interview_url, data)
+        MessageCard.exit_interview_card(payload, request)
+
         user_list = []
         tags = request.data.get('tagged_user', [])
         if len(tags) > 0:
@@ -189,7 +164,7 @@ def send_exit_interview_detail(terminate, request):
 
         return None
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
         return error
 
 
@@ -398,8 +373,11 @@ def fetch_consultant_count(team):
     return total_count, team_count
 
 
-def new_recruit_notification(consultant, source, cfr, feedback):
+def new_recruit_notification(consultant, request):
     try:
+        cfr = request.data.get('cfr', "NA")
+        source = request.data.get('source', "NA")
+        feedback = request.data.get('feedback', "NA")
         visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
         recruiter_gender = ':man::skin-tone-2:'
         qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
@@ -418,55 +396,21 @@ def new_recruit_notification(consultant, source, cfr, feedback):
             rate = qs.first().rate
 
         consultant_gender = ':red_haired_woman::skin-tone-2:' if consultant.gender == 'female' else ':man::skin-tone-2:'
-        data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "New Recruit on Bench :the_horns::smile::the_horns:"
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text":
-                            f"*Consultant*\n"
-                            f"{consultant_gender} *Name* :  {consultant.name}\n"
-                            f"{consultant_gender} *Email* :  {consultant.email}\n"
-                            f"{recruiter_gender} *Recruiter* :  {recruiter.employee_name}\n"
-                            f"✨ *Profile* :  {consultant.skills} \n"
-                            f"🇺🇸 *Visa* :  {visa}\n"
-                            f"✨ *Source* :  {source}\n"
-                            f"✨ *Rate* : {rate} \n"
-                            f"🇺🇸  *Current Location* :  {consultant.current_city} \n"
-                            f"✨ *Team* :  {recruiter_team} \n"
-                            f"✨ *CFR* :  {cfr} \n"
-                            f"✨ *Feedback* :  {feedback}\n"
-                            f"\n Recruit Count of {recruiter_team} for this month - {team_count}"
-                            f"\n Total Recruit Count of this month - {total_count}"
-                    },
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": " "
-                        }
-                    ]
-                }
-            ]
+        payload = {
+            "cfr": cfr,
+            "visa": visa,
+            "rate": rate,
+            "source": source,
+            "feedback": feedback,
+            "team_count": team_count,
+            "total_count": total_count,
+            "gender": consultant_gender,
+            "recruiter_team": recruiter_team,
+            "recruiter_gender": recruiter_gender,
         }
-        # Sending message on Messaging Tool
-        post_msg_using_webhook(config.new_recruit_on_bench, data)
-
+        MessageCard.new_recruit_card(consultant, payload, request)
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
 
 
 def add_other_details(request, consultant):
@@ -614,9 +558,7 @@ def create_consultant(request, creator_id):
             )
 
             add_other_details(request, consultant)
-            new_recruit_notification(
-                consultant, request.data.get('source'), request.data.get('cfr'), request.data.get('feedback')
-            )
+            new_recruit_notification(consultant, request)
             return consultant, "ok"
     except Exception as error:
         write_exception(error, request)
@@ -804,94 +746,6 @@ def candidate_filter(request):
     except Exception as error:
         write_exception(error, request)
         return str(error), "error"
-
-
-def pre_joining_feedback_notification(feedback, request):
-    try:
-        project = feedback.project
-        title = project.submission.lead.job_title
-        data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text":
-                        {
-                            "emoji": True,
-                            "type": "plain_text",
-                            "text": f"*{project.consultant.name} :: {title} :: {project.submission.client}*"
-                        }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "plain_text",
-                        "text": feedback.description,
-                        "emoji": True
-                    }
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": " "
-                        }
-                    ]
-                }
-            ]
-        }
-        post_msg_using_webhook(config.pre_joining_feedback_url, data)
-        return "ok"
-    except Exception as error:
-        write_exception(message=error, request=request)
-        return str(error)
-
-
-def engineering_feedback_notification(feedback, request):
-    try:
-        project = feedback.project
-        data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text":
-                        {
-                            "emoji": True,
-                            "type": "plain_text",
-                            "text": f"*{project.consultant.name} :: {project.submission.lead.job_title}*"
-                                    f":: *{project.submission.client}*",
-                        }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": feedback.description,
-                        "emoji": True
-                    }
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": " "
-                        }
-                    ]
-                }
-            ]
-        }
-        post_msg_using_webhook(config.candidate_feedback_url, data)
-        return "ok"
-    except Exception as error:
-        write_exception(message=error, request=request)
-        return str(error)
 
 
 def create_and_send_notification(consultant, feedback, title, user_list, request):

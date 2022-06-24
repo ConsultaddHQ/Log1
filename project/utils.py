@@ -8,9 +8,10 @@ from employee.models import User
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
+from utils_app.slack_notification import MessageCard
 from consultant.utils import send_notification_for_user
+from log1.utils import password_generator, write_exception
 from engineering.models import TrainingCheckList, ProjectDescription
-from log1.utils import post_msg_using_webhook, password_generator, write_exception
 
 
 def set_consultant_password(consultant):
@@ -183,130 +184,13 @@ class ProjectUtil:
                                  f"*{self.project.submission.client}* on *{self.project_start}* as a " \
                                  f"*{self.project.submission.lead.job_title.strip()}*"
 
-            data = {
-                "blocks": [
-                    {
-                        "type": "header",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Project Joined",
-                            "emoji": True
-                        }
-                    },
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"{activity_title}\n{self.activity_text}"
-                        }
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " "
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Submitted On*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": f"{datetime.strptime(str(self.project.submission.created), '%Y-%m-%d').strftime('%a, %d %B %Y')}",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Employer*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.employer,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Recruiter*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": recruiter_name,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "actions",
-                        "elements": [
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": f"{team_name} - {team}"
-                                },
-                                "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": f"Total - {total}"
-                                },
-                                "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "View in Log1",
-                                    "emoji": True
-                                },
-                                "style": "primary",
-                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
-                                "value": "click_me_123",
-                                "action_id": "actionId-0"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
-                    }
-                ]
+            payload = {
+                "submission_id": self.project.submission.id, "project_id": self.project.id,
+                "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
+                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team_name, "team": team,
+                "submitted_on": datetime.strptime(str(self.project.submission.created), '%Y-%m-%d').strftime('%a, %d %B %Y'),
             }
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.joined_url, data)
+            MessageCard.consultant_joined_message_card(payload, self.request)
 
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
@@ -325,174 +209,14 @@ class ProjectUtil:
             supervisors = "\n".join([f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
                                      for interview in interviews if interview.supervisor])
 
-            data = {
-                "blocks": [
-                    {
-                        "type": "header",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Offer",
-                            "emoji": True
-                        }
-                    },
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"*Paper work* received from *{self.project.submission.client}* for "
-                                    f"*{self.consultant.name}*\n{self.activity_text}"
-                        }
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " "
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Employer*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.employer,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Start Date*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.project_start,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Location*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.project.city,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Role*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.project.submission.lead.job_title,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Recruiter*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": recruiter_name,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Supervisors*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": supervisors,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "actions",
-                        "elements": [
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": f"{self.employer} - {team}"
-                                },
-                                "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": f"Total - {total}"
-                                },
-                                "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "View in Log1",
-                                    "emoji": True
-                                },
-                                "style": "primary",
-                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
-                                "value": "click_me_123",
-                                "action_id": "actionId-0"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
-                    }
-                ]
+            payload = {
+                "submission_id": self.project.submission.id, "project_id": self.project.id,
+                "client": self.project.submission.client, "consultant": self.consultant.name,
+                "activity_text": self.activity_text, "total": total, "employer": self.employer,
+                "recruiter_name": recruiter_name, "team": team, "project_start": self.project_start,
+                "city": self.project.city, "supervisors": supervisors, "job_title": self.project.submission.lead.job_title,
             }
-
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.offer_url, data)
+            MessageCard.po_receive_message_card(payload, self.request)
 
             title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, "project")
@@ -511,149 +235,14 @@ class ProjectUtil:
             activity_sub_title = f"*{self.consultant.name.strip()}'s* project as a " \
                                  f"*{self.project.submission.lead.job_title.strip()}*, terminated from " \
                                  f"*{self.project.submission.client}* with the end date of *{self.project_end}*"
-            data = {
-                "blocks": [
-                    {
-                        "type": "header",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Project Termination Feedback",
-                            "emoji": True
-                        }
-                    },
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"{activity_sub_title}\n{self.activity_text}"
-                        }
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " "
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Project duration*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": f"{months} months",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Employer*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.employer,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Location*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.project.city,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Recruiter*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": recruiter_name,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Status*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": status,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Feedback*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": reason,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "actions",
-                        "elements": [
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "View in Log1",
-                                    "emoji": True
-                                },
-                                "style": "primary",
-                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
-                                "action_id": "actionId-0"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
-                    }
-                ]
+
+            payload = {
+                "recruiter_name": recruiter_name, "status": status, "reason": reason,
+                "sub_title": activity_sub_title, "activity_text": self.activity_text,
+                "months": months, "employer": self.employer, "city": self.project.city,
+                "submission_id": self.project.submission.id, "project_id": self.project.id,
             }
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.project_termination_url, data)
+            MessageCard.po_termination_message_card(payload, self.request)
 
             title = f"Project Terminated :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
@@ -672,135 +261,12 @@ class ProjectUtil:
             activity_sub_title = f"*{self.consultant.name.strip()}'s* project as a " \
                                  f"*{self.project.submission.lead.job_title.strip()}*, cancelled at " \
                                  f"*{self.project.submission.client.strip()}*"
-            data = {
-                "blocks": [
-                    {
-                        "type": "header",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Offer cancellation feedback",
-                            "emoji": True
-                        }
-                    },
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"{activity_sub_title}\n{self.activity_text}"
-                        }
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " "
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Employer*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.employer,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Location*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": self.project.city,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Recruiter*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": recruiter_name,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Status*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": status,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Feedback*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": reason,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "actions",
-                        "elements": [
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "View in Log1",
-                                    "emoji": True
-                                },
-                                "style": "primary",
-                                "url": f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}",
-                                "action_id": "actionId-0"
-                            }
-                        ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
-                    }
-                ]
+            payload = {
+                "activity_text": self.activity_text, "submission_id": self.project.submission.id,
+                "employer": self.employer, "city": self.project.city, "recruiter_name": recruiter_name,
+                "status": status, "reason": reason, "sub_title": activity_sub_title, "project_id": self.project.id,
             }
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.offer_failure_url, data)
+            MessageCard.po_cancellation_message_card(payload, self.request)
 
             title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
             send_notification_for_user(self.project.consultant, self.user, title, 'project')
