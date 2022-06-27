@@ -1332,8 +1332,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             profiles = work_auth.consultant.profiles.filter(title__iexact='Original')
             if profiles:
                 profile = profiles.first()
-                if request.data['visa_type'] != 'gc':
-                    profile.visa_end = work_auth.visa_end
+                profile.visa_end = work_auth.visa_end
                 profile.visa_type = work_auth.visa_type
                 profile.visa_start = work_auth.visa_start
                 profile.save()
