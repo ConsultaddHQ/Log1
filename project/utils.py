@@ -8,7 +8,8 @@ from employee.models import User
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
-from utils_app.slack_notification import MessageCard
+from utils_app.slack_notification import MessageCard as slack
+from utils_app.teams_notification import MessageCard as teams
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
 from engineering.models import TrainingCheckList, ProjectDescription
@@ -190,7 +191,7 @@ class ProjectUtil:
                 "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team_name, "team": team,
                 "submitted_on": datetime.strptime(str(self.project.submission.created), '%Y-%m-%d').strftime('%a, %d %B %Y'),
             }
-            MessageCard.consultant_joined_message_card(payload, self.request)
+            # MessageCard.consultant_joined_message_card(payload, self.request)
 
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
@@ -216,7 +217,8 @@ class ProjectUtil:
                 "recruiter_name": recruiter_name, "team": team, "project_start": self.project_start,
                 "city": self.project.city, "supervisors": supervisors, "job_title": self.project.submission.lead.job_title,
             }
-            MessageCard.po_receive_message_card(payload, self.request)
+            slack.po_receive_message_card(payload, self.request)
+            teams.po_receive_message_card(payload, self.request)
 
             title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, "project")
@@ -242,7 +244,8 @@ class ProjectUtil:
                 "months": months, "employer": self.employer, "city": self.project.city,
                 "submission_id": self.project.submission.id, "project_id": self.project.id,
             }
-            MessageCard.po_termination_message_card(payload, self.request)
+            slack.po_termination_message_card(payload, self.request)
+            teams.po_termination_message_card(payload, self.request)
 
             title = f"Project Terminated :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
@@ -266,7 +269,7 @@ class ProjectUtil:
                 "employer": self.employer, "city": self.project.city, "recruiter_name": recruiter_name,
                 "status": status, "reason": reason, "sub_title": activity_sub_title, "project_id": self.project.id,
             }
-            MessageCard.po_cancellation_message_card(payload, self.request)
+            # MessageCard.po_cancellation_message_card(payload, self.request)
 
             title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
             send_notification_for_user(self.project.consultant, self.user, title, 'project')

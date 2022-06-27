@@ -23,7 +23,8 @@ from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
 from activity.serializers import ActivitySerializer
-from utils_app.slack_notification import MessageCard
+from utils_app.slack_notification import MessageCard as slack
+from utils_app.teams_notification import MessageCard as teams
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from consultant.models import Consultant, ConsultantMarketing
@@ -1230,8 +1231,8 @@ class InterviewViewSets(ModelViewSet):
                         "title": ":scroll: New Interview Scheduled",
                         "body": title
                     }
-                    data = MessageCard.get_simple_card(payload)
-                    post_msg_using_webhook(config.slack_announcement_url, data)
+                    # data = MessageCard.get_simple_card(payload)
+                    # post_msg_using_webhook(config.slack_announcement_url, data)
 
                 if interview.guest_type in ['coder', 'assistance']:
                     coder_request_notification(interview, "Coding request", request)
@@ -1588,8 +1589,8 @@ class InterviewViewSets(ModelViewSet):
                         "body": title,
                         "title": ":stopwatch: Interview Rescheduled",
                     }
-                    data = MessageCard.get_simple_card(payload)
-                    post_msg_using_webhook(config.slack_announcement_url, data)
+                    # data = MessageCard.get_simple_card(payload)
+                    # post_msg_using_webhook(config.slack_announcement_url, data)
 
                 if prev_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
                     est = pytz.timezone('US/Eastern')
@@ -1869,10 +1870,12 @@ class InterviewViewSets(ModelViewSet):
                 today = datetime.now().astimezone(est)
 
                 if today.date() < interview.start_time.date():
-                    MessageCard.coder_assigned_card(interview, request)
+                    teams.coder_assigned_card(interview, request)
+                    slack.coder_assigned_card(interview, request)
 
                 if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
-                    MessageCard.coder_assigned_card(interview, request)
+                    teams.coder_assigned_card(interview, request)
+                    slack.coder_assigned_card(interview, request)
 
                 title = get_interview_title(interview)
                 _, attendees = get_users_and_attendees(request, interview)
@@ -2440,8 +2443,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     "title": text,
                     "body": f"&#128203; Test Assigned :: {consultant_name} :: {submission.client} :: {skills}"
                 }
-                data = MessageCard.get_simple_card(payload)
-                post_msg_using_webhook(config.slack_engineering_url, data)
+                # data = MessageCard.get_simple_card(payload)
+                # post_msg_using_webhook(config.slack_engineering_url, data)
 
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test assigned"}, status=202)

@@ -16,7 +16,8 @@ from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
-from utils_app.slack_notification import MessageCard
+from utils_app.slack_notification import MessageCard as slack
+from utils_app.teams_notification import MessageCard as teams
 from utils_app.aws_utils import download_s3_object_beats
 from notification.utils import create_notification, push_notification
 from log1.utils import html_to_text, write_exception, write_info
@@ -114,7 +115,7 @@ def send_exit_interview_detail(terminate, request):
             "termination_date": termination_date,
             "consultant": terminate.consultant.name
         }
-        MessageCard.exit_interview_card(payload, request)
+        # MessageCard.exit_interview_card(payload, request)
 
         user_list = []
         tags = request.data.get('tagged_user', [])
@@ -408,7 +409,8 @@ def new_recruit_notification(consultant, request):
             "recruiter_team": recruiter_team,
             "recruiter_gender": recruiter_gender,
         }
-        MessageCard.new_recruit_card(consultant, payload, request)
+        slack.new_recruit_card(consultant, payload, request)
+        teams.new_recruit_card(consultant, payload, request)
     except Exception as error:
         write_exception(message=error, request=request)
 
