@@ -691,3 +691,8 @@ class MessageCard:
         except Exception as error:
             write_exception(message=error, request=request)
             return str(error)
+
+    @staticmethod
+    def data_report(data, url):
+        res, msg = post_msg_using_webhook(url, data["data"])
+        return res, msg

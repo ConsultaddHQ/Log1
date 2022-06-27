@@ -1,6 +1,8 @@
 import os
 
+import boto3
 from constance import config
+from utils_app.utils import create_table_image
 from log1.utils import write_exception, post_msg_using_webhook
 
 
@@ -354,7 +356,7 @@ class MessageCard:
                         }
                     ]
                 },
-                                        )
+                                      )
             post_msg_using_webhook(config.slack_engineering_url, data)
             return "ok"
         except Exception as error:
@@ -1186,3 +1188,52 @@ class MessageCard:
         except Exception as error:
             write_exception(message=error, request=request)
             return str(error)
+
+    @staticmethod
+    def data_report(data, url):
+        title = data.get('title')
+        image_name = create_table_image(data['data']['text'], data.get('report_name'))
+        file = open(image_name, 'rb')
+        session = boto3.Session()
+        s3 = session.client(
+            "s3", aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+        )
+        file.seek(0)
+        s3.put_object(Body=file, Bucket='bugtracking', Key=f'{file.name}')
+        image_url = f"https://bugtracking.s3.ap-south-1.amazonaws.com/{file.name}"
+
+        card_data = {
+            "blocks": [
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"*{title}*",
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "divider"
+                },
+                {
+                    "type": "image",
+                    "image_url": image_url,
+                    "alt_text": "report_data"
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": " "
+                        }
+                    ]
+                }
+            ]
+        }
+        res, msg = post_msg_using_webhook(url, card_data)
+        return res, msg

@@ -56,7 +56,7 @@ class Command(BaseCommand):
                 ]
             }
                 if feedback.feedback_type == 'engineering_issue':
-                    post_msg_using_webhook(config.candidate_feedback_url, data)
+                    post_msg_using_webhook(config.slack_candidate_feedback_url, data)
 
         except Exception as error:
             create_cron_error(job, error)

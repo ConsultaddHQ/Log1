@@ -2,7 +2,8 @@ from django.core.management import BaseCommand
 
 from constance import config
 from consultant.models import Consultant
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
+from utils_app.slack_notification import MessageCard
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -26,32 +27,36 @@ class Command(BaseCommand):
 
             data = {
                 "title": "Consultant Bench Status &#128221;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>
+                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>
                                 <tr>
-                                    <th style="padding:5px 8px 5px 8px;">Status</th>
-                                    <th style="padding:5px 8px 5px 8px;">Count</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Status</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Count</th>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Bench</td>
-                                    <td style="padding:5px 8px 5px 8px; text-align: center;">{on_bench_con}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Bench</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{on_bench_con}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">In Pool</td>
-                                    <td style="padding:5px 8px 5px 8px; text-align: center;">{in_pool_con}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">In Pool</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{in_pool_con}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;"> On Boarded </td>
-                                    <td style="padding:5px 8px 5px 8px; text-align: center;">{on_boarded}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> On Boarded </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{on_boarded}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Joined</td>
-                                    <td style="padding:5px 8px 5px 8px; text-align: center;">{joined}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Joined</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{joined}</td>
                                 </tr>
                             </table>"""
             }
 
-            res, msg = post_msg_using_webhook(config.recruitment_url, data)
-            if msg == 'error':
-                raise Exception(res)
+            payload = {
+                "data": data, "report_name": "consultant_bench",
+                "title": f"{data.get('title')} :MEMO:",
+            }
+            # res, msg = MessageCard.data_report(payload, config.slack_recruitment_url)
+            # if msg == 'error':
+            #     raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)
