@@ -419,8 +419,8 @@ def interview_card_data(obj, request):
 def interview_feedback_card(obj, request):
     try:
         interview_data, header_names = interview_card_data(obj, request)
-        card_data = slack.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
-        card_data = teams.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
-        return card_data
+        slack_card_data = slack.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
+        teams_card_data = teams.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
+        return slack_card_data, teams_card_data
     except Exception as error:
         write_exception(error, request)

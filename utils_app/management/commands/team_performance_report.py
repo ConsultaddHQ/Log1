@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 from constance import config
 from employee.models import Team
 from project.models import Project
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
 from marketing.models import Submission, Interview
 from utils_app.utils import create_cron_error, create_cron_object
 
@@ -30,15 +30,15 @@ class Command(BaseCommand):
                                     'terminated-resigned_full_time_offer']
 
             text = f""" <tr>
-                            <td style="padding:5px 8px 5px 8px;">Team</td>
-                            <td style="padding:5px 8px 5px 8px;">Submissions</td>
-                            <td style="padding:5px 8px 5px 8px;">Interviews</td>
-                            <td style="padding:5px 8px 5px 8px;">Offers</td>
-                            <td style="padding:5px 8px 5px 8px;">Joined</td>
-                            <td style="padding:5px 8px 5px 8px;">Cancelled</td>
-                            <td style="padding:5px 8px 5px 8px;">Completed</td>
-                            <td style="padding:5px 8px 5px 8px;">PO Received</td>
-                            <td style="padding:5px 8px 5px 8px;">Offer Not Joined</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Team</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Submissions</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Interviews</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Offers</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Joined</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Cancelled</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Completed</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">PO Received</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Offer Not Joined</td>
                         </tr>"""
             total_submission, total_interview, total_joined, total_cancelled = 0, 0, 0, 0
             total_complete, total_on_roll, total_offer_not_joined, total_offer = 0, 0, 0, 0
@@ -87,36 +87,39 @@ class Command(BaseCommand):
                 total_offer_not_joined += offers_not_joined
 
                 text += f"""<tr>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{team.name.title()}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{submission_count}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{interview_count}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{offer_count}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{joined_count}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{cancelled_count}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{completed_count}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{on_roll_count}</td>
-                                <td style="padding:5px 8px 5px 8px; text-align: center;">{offers_not_joined}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{team.name.title()}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{submission_count}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{interview_count}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{offer_count}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{joined_count}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{cancelled_count}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{completed_count}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{on_roll_count}</td>
+                                <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{offers_not_joined}</td>
                             </tr>\n"""
 
             text += f"""<tr>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;"> Total </td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_submission}</td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_interview}</td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_offer}</td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_joined}</td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_cancelled}</td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_complete}</td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_on_roll}</td>
-                            <td style="padding:5px 8px 5px 8px; text-align: center;">{total_offer_not_joined}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;"> Total </td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_submission}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_interview}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_offer}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_joined}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_cancelled}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_complete}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_on_roll}</td>
+                            <td style="padding:5px 8px 5px 8px;font-size: 2.5em; text-align: center;">{total_offer_not_joined}</td>
                         </tr>\n"""
 
             data = {
                 "title": "Project Details &#128221;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
             }
 
-            res, msg = post_msg_using_webhook(config.marketing_report_url, data)
-            if msg == 'error':
-                raise Exception(res)
+            payload = {
+                "data": data, "title": data.get('title'), "report_name": job.name,
+            }
+            # res, msg = MessageCard.data_report(payload, config.marketing_report_url)
+            # if msg == 'error':
+            #     raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)

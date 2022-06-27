@@ -7,6 +7,17 @@ from timezonefinder import TimezoneFinder
 from utils_app.models import CronJob, CronError
 from log1.utils import write_exception, write_info
 from utils_app.mailing import send_email_without_template
+from html2image import Html2Image
+
+
+def create_table_image(data, filename=None):
+    try:
+        hti = Html2Image()
+        filename = f"{filename}_{datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}"
+        hti.screenshot(html_str=data, save_as=f'{filename}.png')
+        return f'{filename}.png'
+    except Exception as error:
+        write_exception(message=error)
 
 
 def delete_temp_file(paths):
