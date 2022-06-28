@@ -7,9 +7,10 @@ from constance import config
 from employee.models import User
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
+from log1.utils import write_info, write_exception
+from utils_app.slack_notification import MessageCard as slack
+from utils_app.teams_notification import MessageCard as teams
 from marketing.models import Submission, Interview, Question, Answer
-from utils_app.calendar import get_profile_picture
-from log1.utils import write_info, write_exception, post_msg_using_webhook
 
 
 def vendor_account_manager(vendor_company):
@@ -98,11 +99,12 @@ def get_interview_title(interview):
         is_consultant = interview.supervisor.employee_id == 9999 or False
         call_supervisor = interview.consultant.name if is_consultant else interview.supervisor.employee_name
 
-        return f"""Call Supervisor - {call_supervisor}
-            {'(Consultant)' if is_consultant == True else ""} :: {interview.round}R :: 
-            {interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} :: 
-            {interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} :: 
-            {interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"""
+        return f"Call Supervisor - {call_supervisor} " \
+               f"{'(Consultant)' if is_consultant == True else ''} :: {interview.round}R :: " \
+               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::"\
+               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::"\
+               f"{interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"
+
     except Exception as error:
         write_exception(message=error)
         return False
@@ -166,114 +168,23 @@ def create_submission(request, lead_id):
         return error, "error"
 
 
-def coder_request_notification(user, interview, title):
+def coder_request_notification(interview, title, request):
     try:
-        profile_path = get_profile_picture(user)
-        data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"Coding assignment",
-            "sections": [
-                {
-                    "activityTitle": title,
-                    "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
-                                        f"***{interview.submission.consultant.name}*** ",
-                    "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
-                                    f"***{interview.submission.created_by.team.name}***",
-                    "activityImage": profile_path,
-                    "facts": [
-                        {
-                            "name": f"Technology",
-                            "value": f"{interview.tech_stack}"
-                        },
-                        {
-                            "name": f"Supervisor",
-                            "value": f"{interview.supervisor.employee_name}"
-                        },
-                        {
-                            "name": f"Date",
-                            "value": f"{interview.start_time.strftime('%a, %d %B %Y')}"
-                        },
-                        {
-                            "name": f"Time",
-                            "value": f"{interview.start_time.strftime('%I:%M %p EST')} - "
-                                     f"{interview.end_time.strftime('%I:%M %p EST')}"
-                        },
-                    ],
-                    "markdown": True
-                }
-            ]
+        payload = {
+            "title": title,
+            "interview": interview
         }
-        if interview.coding_info:
-            data["sections"][0]["facts"].append(
-                {
-                    "name": f"Coding Info",
-                    "value": interview.coding_info
-                },
-            )
-        post_msg_using_webhook(config.engineering_url, data)
+        slack.coder_request_card(payload, request)
+        teams.coder_request_card(payload, request)
         return "ok"
     except Exception as error:
-        write_info(message=error, function='coder_request_notification')
-        return str(error)
+        write_exception(error, request)
+        return error, "error"
 
 
-def coder_assigned_notification(user, interview):
-    try:
-        profile_path = get_profile_picture(user)
-        coding_experts = ", ".join(interview.guest.all().values_list('employee_name', flat=True))
-        data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"Coding expert request for Interview ",
-            "sections": [
-                {
-                    "activityTitle": "Coding assignment",
-                    "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
-                                        f" ***{interview.submission.consultant.name}*** ",
-                    "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
-                                    f"***{interview.submission.created_by.team.name}***",
-                    "activityImage": profile_path,
-                    "facts": [
-                        {
-                            "name": "Technology",
-                            "value": str(interview.tech_stack)
-                        },
-                        {
-                            "name": "Supervisor",
-                            "value": str(interview.supervisor.employee_name)
-                        },
-                        {
-                            "name": "Date",
-                            "value": str(interview.start_time.strftime('%a, %d %B'))
-                        },
-                        {
-                            "name": "Time",
-                            "value": f"{interview.start_time.strftime('%I:%M %p EST')} - "
-                                     f"{interview.end_time.strftime('%I:%M %p EST')}"
-                        },
-                        {
-                            "name": "Coding Expert",
-                            "value": coding_experts
-                        }
-                    ],
-                    "markdown": True
-                }
-            ]
-        }
-        post_msg_using_webhook(config.engineering_url, data)
-        return "ok"
-    except Exception as error:
-        write_info(message=error, function='coder_request_notification')
-        return str(error)
-
-
-def test_received_notification(user, test, timezone):
+def test_received_notification(test, timezone, request):
     try:
         skills = ", ".join(skill.title() for skill in test.skills)
-        profile_path = get_profile_picture(user)
         if test.is_offline:
             test_data = "Offline"
         elif test.is_video:
@@ -284,87 +195,24 @@ def test_received_notification(user, test, timezone):
         if type(test.deadline) == str:
             deadline = datetime.strptime(str(test.deadline), '%Y-%m-%d').strftime('%a, %d %B %Y')
         else:
-            deadline = test.deadline.strftime('%a, %d %B %Y')
+            deadline = test.deadline.strftime('%a, %d %B %Y') if test.deadline else "NA"
 
         client = test.submission.client
-        subtitle = f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from Unknown client for " \
-                   f" ***{test.submission.consultant.name}*** "
+        subtitle = f"*TST-{test.id}*: Received a *{test_data} {skills}* test from Unknown client for " \
+                   f" *{test.submission.consultant.name}* "
         if client:
             if len(client) > 1:
-                subtitle = f"***TST-{test.id}***: Received a ***{test_data} {skills}*** test from " \
-                           f"***{test.submission.client.strip()}*** for ***{test.submission.consultant.name}*** "
+                subtitle = f"*TST-{test.id}*: Received a *{test_data} {skills}* test from " \
+                           f"*{test.submission.client.strip()}* for *{test.submission.consultant.name}* "
 
-        activity_text = f"Requested by ***{test.marketer.employee_name}*** from ***{test.marketer.team.name}***"
-        data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"Coding expert request for Interview ",
-            "sections": [
-                {
-                    "activitySubtitle": subtitle,
-                    "activityImage": profile_path,
-                    "activityText": activity_text,
-                    "activityTitle": "Test Received",
-                    "facts": [
-                        {
-                            "name": "Timezone",
-                            "value": timezone
-                        },
-                        {
-                            "name": "Deadline",
-                            "value": deadline
-                        }
-                    ],
-                    "markdown": True
-                }
-            ]
+        activity_text = f"Requested by *{test.marketer.employee_name}* from *{test.marketer.team.name}*"
+        payload = {
+            "subtitle": subtitle, "activity_text": activity_text, "timezone": timezone, "deadline": deadline
         }
-        post_msg_using_webhook(config.engineering_url, data)
+        # MessageCard.test_received_card(payload, request)
         return "ok"
     except Exception as error:
-        write_info(message=error, function='test_received_notification')
-        return str(error)
-
-
-def sup_feedback_notification(title, obj):
-    try:
-        supervisor = obj.supervisor
-        profile_path = get_profile_picture(supervisor) if supervisor else None
-        data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"Supervisor feedback for interview",
-            "sections": [
-                {
-                    "activityImage": profile_path,
-                    "activityTitle": "Supervisor Feedback",
-                    "activitySubtitle": f"***{title}***",
-                    "facts": [],
-                    "markdown": True
-                }
-            ]
-        }
-
-        ques_answers = obj.supervisor_feedback.order_by('question_id').distinct('question_id')
-        for ques_ans in ques_answers:
-            answer = ques_ans.answer
-            if answer == 'True':
-                answer = "Yes"
-            elif answer == 'False':
-                answer = "No"
-            elif '[' in answer:
-                answer = answer.replace(']', '').replace('[', '').replace('"', '')
-            data['sections'][0]["facts"].append({
-                "name": ques_ans.question.title,
-                "value": answer
-            })
-
-        post_msg_using_webhook(config.interview_feedback_url, data)
-        return "ok"
-    except Exception as error:
-        write_info(message=error, function='sup_feedback_notification')
+        write_exception(error, request)
         return str(error)
 
 
@@ -429,79 +277,7 @@ def create_answer(request, obj, model):
         return str(error)
 
 
-def get_element(element_type, data={}):
-    blank_set = {
-        "type": "Column", "width": 50, "items": []
-    }
-    element = {
-        "type": "TextBlock", "text": "", "wrap": True, "spacing": "None"
-    }
-    row_set = {
-        "type": "Column",
-        "width": 50,
-        "items": [
-            {
-                "type": "TextBlock",
-                "text": data.get('question'),
-                "wrap": True,
-                "weight": "Bolder"
-            }
-        ]
-    }
-    column_set = {
-        "type": "ColumnSet",
-        "columns": []
-    }
-    empty_container = {"type": "Container", "items": []}
-    container = {
-        "type": "Container",
-        "items": [
-            {
-                "size": "Large",
-                "color": "Dark",
-                "weight": "Bolder",
-                "spacing": "Large",
-                "type": "TextBlock",
-                "text": data.get('name', None)
-            }
-        ],
-        "style": "accent",
-        "spacing": "Large"
-    }
-
-    if data.get('answer') in ['Yes', 'yes']:
-        data['answer'] = "✓ Yes"
-        element['color'] = "Good"
-    elif data.get('answer') == 'No':
-        data['answer'] = "❌ No"
-        element['color'] = "Attention"
-
-    if type(data.get('answer')) is list:
-        for i in data['answer']:
-            row_set["items"].append({"type": "TextBlock", "text": i, "wrap": True, "spacing": "None"})
-    elif data.get('answer', None):
-        element['text'] = data.get('answer')
-        row_set["items"].append(element)
-    else:
-        element['text'] = "NA"
-        row_set["items"].append(element)
-
-    if element_type == "blank_set":
-        return blank_set
-    if element_type == "row_set":
-        return row_set
-    elif element_type == "container":
-        return container
-    elif element_type == "empty_container":
-        return empty_container
-    elif element_type == "column_set":
-        if data:
-            column_set["columns"].append(row_set)
-        return column_set
-    return None
-
-
-def get_display_choice(data, data_type):
+def get_display_choice(data, data_type, request):
     try:
         if data_type == 'interview_mode':
             for mode in Interview.INTERVIEW_MODE:
@@ -514,15 +290,14 @@ def get_display_choice(data, data_type):
                     return mode[1]
             return None
     except Exception as error:
-        write_info(message=error, function="get_display_choice")
+        write_exception(error, request)
         return str(error)
 
 
-def interview_card_data(obj):
+def interview_card_data(obj, request):
     try:
         interview_data = []
-        container_names = {}
-        container_position = 0
+        container_names = []
         coding_feedback_data = []
         supervisor_feedback_data = []
         interview_info = [
@@ -539,16 +314,20 @@ def interview_card_data(obj):
                 "answer": obj.submission.client
             },
             {
+                "question": "Technology",
+                "answer": obj.submission.lead.job_title if obj.submission.lead.job_title else "NA"
+            },
+            {
                 "question": "Round",
                 "answer": f"{obj.round if obj.round else 'NA'}"
             },
             {
                 "question": "Mode",
-                "answer": get_display_choice(obj.interview_mode, 'interview_mode'),
+                "answer": get_display_choice(obj.interview_mode, 'interview_mode', request),
             },
             {
                 "question": "Screening Type",
-                "answer": get_display_choice(obj.screening_type, 'screening_type')
+                "answer": get_display_choice(obj.screening_type, 'screening_type', request)
             },
             {
                 "question": "Marketer",
@@ -574,25 +353,25 @@ def interview_card_data(obj):
         interview_data.append(interview_info)
         emoji = ''
         if obj.status == 'next_round':
-            emoji = '👍'
+            emoji = ':+1:'
         elif obj.status == 'failed':
-            emoji = '👎'
+            emoji = ':-1:'
         if obj.status == 'offer':
-            emoji = '✌️'
-        container_names[container_position] = f"{emoji} Interview Feedback"
-        container_position += 2
+            emoji = ':v:'
+        container_names.append(f"{emoji} Interview Feedback")
 
         coding_feedback = obj.supervisor_feedback.filter(
             question__form_name='coding').order_by('question_id').distinct('question_id')
         if coding_feedback or obj.coding_present is not None:
             for feedback in coding_feedback:
                 coding_feedback = {
-                    "answer": feedback.answer,
+                    "answer": feedback.answer
+                    if feedback.question.answer_type != 'multi_select' else "\n".join(feedback.answer.split(", ")),
                     "question": feedback.question.title,
                     "answer_type": feedback.question.answer_type
                 }
                 coding_feedback_data.append(coding_feedback)
-            guest = [i.employee_name for i in obj.guest.all()]
+            guest = "\n".join([i.employee_name for i in obj.guest.all()])
             coding_feedback_data.insert(0, {"question": "Coder's name", "answer": guest if guest else "NA"})
             coding_feedback_data.insert(
                 1, {"question": "Coding Present", "answer": "Yes" if obj.coding_present else "No"}
@@ -602,8 +381,7 @@ def interview_card_data(obj):
                  "answer": obj.guest_remark if obj.guest_remark else "NA"}
             )
             interview_data.append(coding_feedback_data)
-            container_names[container_position] = "🔹 Coder's Feedback"
-            container_position += 2
+            container_names.append(":computer: Coder's Feedback")
 
         supervisor_feedback = obj.supervisor_feedback.filter(
             question__form_name='interview').order_by('question__position')
@@ -611,7 +389,8 @@ def interview_card_data(obj):
             for feedback in supervisor_feedback:
                 sup_feedback = {
                     "question": feedback.question.title,
-                    "answer": feedback.answer,
+                    "answer": feedback.answer
+                    if feedback.question.answer_type != 'multi_select' else "\n".join(feedback.answer.split(", ")),
                     "answer_type": feedback.question.answer_type
                 }
                 supervisor_feedback_data.append(sup_feedback)
@@ -619,8 +398,8 @@ def interview_card_data(obj):
                 0, {"question": "Supervisor Name", "answer": obj.supervisor.employee_name}
             )
             interview_data.append(supervisor_feedback_data)
-            container_names[container_position] = "🔹 Supervisor's Feedback"
-            container_position += 2
+            container_names.append(":telephone_receiver: Supervisor's Feedback")
+
         status = "NA"
         for i in obj.STATUS_CHOICES:
             if i[0] == obj.status:
@@ -630,58 +409,18 @@ def interview_card_data(obj):
             {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
         ]
         interview_data.append(marketer_feedback_data)
-        container_names[container_position] = "🔹 Vendor/Client's Feedback"
+        container_names.append(":lower_left_fountain_pen: Vendor/Client's Feedback")
 
         return interview_data, container_names
     except Exception as error:
-        write_exception(error)
+        write_exception(error, request)
 
 
-def interview_feedback_card(obj):
+def interview_feedback_card(obj, request):
     try:
-        container = 0
-        interview_data, container_names = interview_card_data(obj)
-        card_data = {
-            "title": "Interview Feedback",
-            "type": "message",
-            "attachments": [
-                {
-                    "contentType": "application/vnd.microsoft.card.adaptive",
-                    "contentUrl": None,
-                    "content": {
-                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                        "type": "AdaptiveCard",
-                        "version": "1.5",
-                        "body": []
-                    }
-                }
-            ]
-        }
-        body = card_data['attachments'][0]['content']["body"]
-
-        for data_set in interview_data:
-            column_length = 3 if container < 2 else 2
-            row = 0
-            if container % 2 == 0:
-                body.insert(container, get_element('container', {"name": container_names[container]}))
-                container = container + 1
-            body.insert(container, get_element('empty_container', {}))
-
-            for data, count in zip(data_set, range(0, len(data_set))):
-                if type(data.get('answer')) is str:
-                    data['answer'] = data.get('answer').replace('[', '').replace(']', '').replace('"', '')\
-                        .replace('\n', '')
-                if data.get('answer_type') == 'long_text':
-                    body[container]["items"].append(get_element("column_set", data))
-                    row += 1
-                elif count % column_length != 0:
-                    body[container]["items"][row]["columns"].append(get_element("row_set", data))
-                else:
-                    body[container]["items"].append(get_element("column_set", data))
-                    row += 1 if count != 0 else row
-                if len(data_set) % column_length != 0 and count+1 == len(data_set) and data.get('answer_type') != 'long_text':
-                    body[container]["items"][row]["columns"].append(get_element("blank_set"))
-            container += 1
-        return card_data
+        interview_data, header_names = interview_card_data(obj, request)
+        slack_card_data = slack.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
+        teams_card_data = teams.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
+        return slack_card_data, teams_card_data
     except Exception as error:
-        write_exception(error)
+        write_exception(error, request)

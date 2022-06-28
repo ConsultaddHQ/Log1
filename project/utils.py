@@ -8,10 +8,11 @@ from employee.models import User
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from project.models import Project, TimeSheet
-from utils_app.calendar import get_profile_picture
+from utils_app.slack_notification import MessageCard as slack
+from utils_app.teams_notification import MessageCard as teams
 from consultant.utils import send_notification_for_user
+from log1.utils import password_generator, write_exception
 from engineering.models import TrainingCheckList, ProjectDescription
-from log1.utils import post_msg_using_webhook, password_generator, write_exception
 
 
 def set_consultant_password(consultant):
@@ -147,8 +148,8 @@ class ProjectUtil:
         else:
             self.employer = self.project.submission.employer
 
-        self.activity_text = f"Project by ***{self.project.marketer_name}*** from " \
-                             f"***{self.project.created_by.team.name}***"
+        self.activity_text = f"Project by *{self.project.marketer_name}* from " \
+                             f"*{self.project.created_by.team.name}*"
 
     def fetch_project_count(self, project_status):
         try:
@@ -176,69 +177,21 @@ class ProjectUtil:
                 recruiter_name = self.consultant.recruiter.employee_name
 
             if self.project.is_remote or self.project.submission.lead.is_w2:
-                activity_title = f"***{self.project.consultant.name.strip()}*** joined ***Remote*** project at " \
-                                 f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***"
+                activity_title = f"*{self.project.consultant.name.strip()}* joined *Remote* project at " \
+                                 f"*{self.project.submission.client}* on *{self.project_start}* as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*"
             else:
-                activity_title = f"***{self.consultant.name.strip()}*** joined project at " \
-                                 f"***{self.project.submission.client}*** on ***{self.project_start}*** as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***"
+                activity_title = f"*{self.consultant.name.strip()}* joined project at " \
+                                 f"*{self.project.submission.client}* on *{self.project_start}* as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*"
 
-            profile_path = get_profile_picture(self.user)
-            data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Project Joined",
-                    "activitySubtitle": activity_title,
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {
-                            "name": f"Submitted On",
-                            "value": self.consultant.name.strip()
-                        },
-                        {
-                            "name": f"Employer",
-                            "value": self.employer
-                        },
-                        {
-                            "name": f"Recruiter",
-                            "value": recruiter_name
-                        }
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [{
-                    "@type": "ActionCard",
-                    "name": f"{team_name} - {team}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"{team_name} - {team}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@type": "ActionCard",
-                    "name": f"Total - {total}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"Total - {total}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@context": "http://schema.org",
-                    "@type": "ViewAction",
-                    "name": "View in Log1",
-                    "target": [
-                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                    ]
-                }
-                ]
+            payload = {
+                "submission_id": self.project.submission.id, "project_id": self.project.id,
+                "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
+                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team_name, "team": team,
+                "submitted_on": datetime.strptime(str(self.project.submission.created), '%Y-%m-%d').strftime('%a, %d %B %Y'),
             }
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.joined_url, data)
+            # MessageCard.consultant_joined_message_card(payload, self.request)
 
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
@@ -257,56 +210,15 @@ class ProjectUtil:
             supervisors = "\n".join([f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
                                      for interview in interviews if interview.supervisor])
 
-            profile_path = get_profile_picture(self.user)
-            data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Offer",
-                    "activitySubtitle": f"***Paper work*** received from ***{self.project.submission.client}*** for "
-                                        f"***{self.consultant.name}***",
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {"name": "Employer", "value": self.employer},
-                        {"name": "Start Date", "value": self.project_start},
-                        {"name": "Location", "value": self.project.city},
-                        {"name": "Role", "value": self.project.submission.lead.job_title},
-                        {"name": "Recruiter", "value": recruiter_name},
-                        {"name": "Supervisors", "value": supervisors},
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [{
-                    "@type": "ActionCard",
-                    "name": f"{self.employer} - {team}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"{self.employer} - {team}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@type": "ActionCard",
-                    "name": f"Total - {total}",
-                    "actions": [{
-                        "@type": "HttpPOST",
-                        "name": f"Total - {total}",
-                        "target": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                    }]
-                }, {
-                    "@context": "http://schema.org",
-                    "@type": "ViewAction",
-                    "name": "View in Log1",
-                    "target": [
-                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                    ]
-                }
-                ]
+            payload = {
+                "submission_id": self.project.submission.id, "project_id": self.project.id,
+                "client": self.project.submission.client, "consultant": self.consultant.name,
+                "activity_text": self.activity_text, "total": total, "employer": self.employer,
+                "recruiter_name": recruiter_name, "team": team, "project_start": self.project_start,
+                "city": self.project.city, "supervisors": supervisors, "job_title": self.project.submission.lead.job_title,
             }
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.offer_url, data)
+            slack.po_receive_message_card(payload, self.request)
+            teams.po_receive_message_card(payload, self.request)
 
             title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, "project")
@@ -322,41 +234,18 @@ class ProjectUtil:
 
             months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
-            activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***, terminated from " \
-                                 f"***{self.project.submission.client}*** with the end date of ***{self.project_end}***"
-            profile_path = get_profile_picture(self.user)
-            data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Project Termination Feedback",
-                    "activitySubtitle": activity_sub_title,
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {"name": f"Project duration", "value": f"{months} months"},
-                        {"name": f"Employer", "value": self.employer},
-                        {"name": f"Location", "value": self.project.city},
-                        {"name": f"Recruiter", "value": recruiter_name},
-                        {"name": f"Status", "value": status},
-                        {"name": f"Feedback", "value": reason},
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [{
-                    "@context": "http://schema.org",
-                    "@type": "ViewAction",
-                    "name": "View in Log1",
-                    "target": [
-                        f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                    ]
-                }]
+            activity_sub_title = f"*{self.consultant.name.strip()}'s* project as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*, terminated from " \
+                                 f"*{self.project.submission.client}* with the end date of *{self.project_end}*"
+
+            payload = {
+                "recruiter_name": recruiter_name, "status": status, "reason": reason,
+                "sub_title": activity_sub_title, "activity_text": self.activity_text,
+                "months": months, "employer": self.employer, "city": self.project.city,
+                "submission_id": self.project.submission.id, "project_id": self.project.id,
             }
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.project_termination_url, data)
+            slack.po_termination_message_card(payload, self.request)
+            teams.po_termination_message_card(payload, self.request)
 
             title = f"Project Terminated :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
@@ -372,42 +261,15 @@ class ProjectUtil:
 
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"
 
-            activity_sub_title = f"***{self.consultant.name.strip()}'s*** project as a " \
-                                 f"***{self.project.submission.lead.job_title.strip()}***, cancelled at " \
-                                 f"***{self.project.submission.client.strip()}***"
-            profile_path = get_profile_picture(self.user)
-            data = {
-                "@type": "MessageCard",
-                "@context": "http://schema.org/extensions",
-                "themeColor": "#0076D7",
-                "summary": "Project Joined",
-                "sections": [{
-                    "activityTitle": "Offer Cancellation Feedback",
-                    "activitySubtitle": activity_sub_title,
-                    "activityText": self.activity_text,
-                    "activityImage": profile_path,
-                    "facts": [
-                        {"name": f"Employer", "value": self.employer},
-                        {"name": f"Location", "value": self.project.city},
-                        {"name": f"Recruiter", "value": recruiter_name},
-                        {"name": f"Status", "value": status},
-                        {"name": f"Feedback", "value": reason},
-                    ],
-                    "markdown": True
-                }],
-                "potentialAction": [
-                    {
-                        "@context": "http://schema.org",
-                        "@type": "ViewAction",
-                        "name": "View in Log1",
-                        "target": [
-                            f"https://app.log1.com/#/details/{self.project.submission.id}/project?id={self.project.id}"
-                        ]
-                    }
-                ]
+            activity_sub_title = f"*{self.consultant.name.strip()}'s* project as a " \
+                                 f"*{self.project.submission.lead.job_title.strip()}*, cancelled at " \
+                                 f"*{self.project.submission.client.strip()}*"
+            payload = {
+                "activity_text": self.activity_text, "submission_id": self.project.submission.id,
+                "employer": self.employer, "city": self.project.city, "recruiter_name": recruiter_name,
+                "status": status, "reason": reason, "sub_title": activity_sub_title, "project_id": self.project.id,
             }
-            # Sending message on Messaging Tool
-            post_msg_using_webhook(config.offer_failure_url, data)
+            # MessageCard.po_cancellation_message_card(payload, self.request)
 
             title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
             send_notification_for_user(self.project.consultant, self.user, title, 'project')
