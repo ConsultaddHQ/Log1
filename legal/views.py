@@ -93,7 +93,7 @@ class PetitionViewSets(ModelViewSet):
                         "name": consultant.name,
                         "email": consultant.email,
                         "status": consultant.status,
-                        "is_active": consultant.is_active
+                        "is_active": consultant.is_active,
                     },
                     'id': petition.id,
                     'status': petition.status,

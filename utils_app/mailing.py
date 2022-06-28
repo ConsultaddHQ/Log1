@@ -14,7 +14,7 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
         bcc = mail_data["bcc"]
     else:
         cc, bcc = [], []
-        to = ['sarang.m@consultadd.com']
+        to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
 
     if reply_to is None:
         reply_to = []
@@ -50,7 +50,7 @@ def send_email_without_template(mail_data, from_email, request=None):
             bcc = mail_data["bcc"]
         else:
             cc, bcc = [], []
-            to = ['sarang.m@consultadd.com']
+            to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
 
         msg = EmailMultiAlternatives(
             to=to, cc=cc, bcc=bcc,
@@ -76,7 +76,7 @@ def send_email_attachment_multiple(mail_data, from_email, reply_to=None, request
         bcc = mail_data["bcc"]
     else:
         cc, bcc = [], []
-        to = ['sarang.m@consultadd.com']
+        to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
 
     if reply_to is None:
         reply_to = []
