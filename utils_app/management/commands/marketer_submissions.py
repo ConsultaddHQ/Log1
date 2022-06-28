@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 from constance import config
 from employee.models import User
 from marketing.models import Submission
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -18,9 +18,9 @@ class Command(BaseCommand):
             end = date.today() - timedelta(days=1)
 
             text = '<tr>' \
-                   '<th style="padding:5px 8px 5px 8px;">Marketer</th>' \
-                   '<th style="padding:5px 8px 5px 8px;">Team</th>' \
-                   '<th style="padding:5px 8px 5px 8px;">Submission Count</th>' \
+                   '<th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Marketer</th>' \
+                   '<th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Team</th>' \
+                   '<th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Submission Count</th>' \
                    '</tr>'
             marketers = User.objects.filter(
                 is_active=True, role__name='marketer', team__dept="Marketing"
@@ -33,8 +33,8 @@ class Command(BaseCommand):
                                                                   is_complete=True).count()
                     if submissions_count <= 5:
                         text += f"""<tr>
-                                        <td style="padding:5px 8px 5px 8px;">{user.employee_name}</td>
-                                        <td style="padding:5px 8px 5px 8px;">{user.team.name}</td>
+                                        <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">{user.employee_name}</td>
+                                        <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">{user.team.name}</td>
                                         <td style="text-align: center;padding:5px 8px 5px 8px;">{submissions_count}</td>
                                     <tr>\n"""
 
@@ -44,11 +44,15 @@ class Command(BaseCommand):
                             <table border='2' style='border-collapse:collapse'>{text}</table>"""
                 }
 
-                post_msg_using_webhook(config.marketing_report_url, data)
+                payload = {
+                    "data": data, "title": data.get('title'),
+                    "report_name": "marketer_submission",
+                }
+                # MessageCard.data_report(payload, config.slack_marketing_report_url)
                 text = '<tr>' \
-                       '<th style="padding:5px 8px 5px 8px;">Marketer</th>' \
-                       '<th style="padding:5px 8px 5px 8px;">Team</th>' \
-                       '<th style="padding:5px 8px 5px 8px;">Submission Count</th>' \
+                       '<th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Marketer</th>' \
+                       '<th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Team</th>' \
+                       '<th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Submission Count</th>' \
                        '</tr>'
 
                 total -= 50

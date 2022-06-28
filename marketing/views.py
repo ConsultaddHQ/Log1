@@ -25,6 +25,8 @@ from utils_app.utils import delete_temp_file
 from activity.serializers import ActivitySerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
+from utils_app.slack_notification import MessageCard as slack
+from utils_app.teams_notification import MessageCard as teams
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
@@ -1195,7 +1197,6 @@ class InterviewViewSets(ModelViewSet):
                 # Ranking Interview
                 if interview.round == 1:
                     interview = self.rank_interviews(interview, 'create')
-
                 # Calendar attendees and User for sending notification
                 title = get_interview_title(interview)
                 user_list, attendees = get_users_and_attendees(request, interview)
@@ -1214,6 +1215,10 @@ class InterviewViewSets(ModelViewSet):
                 try:
                     calendar = Calendar(request=request)
                     cal_res, msg = calendar.book_ms_calendar(event)
+                    # Booking Google calendar
+                    # calendar = GoogleCalendar()
+                    # cal_res, msg = calendar.book_calendar(event)
+
                     if msg == 'error':
                         return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
@@ -1223,16 +1228,17 @@ class InterviewViewSets(ModelViewSet):
                 except Exception as error:
                     return Response({"message": "Calendar booking failed", "error": str(error)}, status=400)
 
-                # Teams message for Interview
+                # Slack message for Interview
                 if date.today() == interview.start_time.date():
-                    data = {
-                        "text": f" *{title}* ",
-                        "title": "&#128220; New Interview Scheduled",
+                    payload = {
+                        "title": ":scroll: New Interview Scheduled",
+                        "body": title
                     }
-                    post_msg_using_webhook(config.announcement_url, data)
+                    # data = MessageCard.get_simple_card(payload)
+                    # post_msg_using_webhook(config.slack_announcement_url, data)
 
                 if interview.guest_type in ['coder', 'assistance']:
-                    coder_request_notification(request.user, interview, "Coding request")
+                    coder_request_notification(interview, "Coding request", request)
 
                 data = queryset.annotate(
                     rank=F('submission__rank'),
@@ -1321,9 +1327,12 @@ class InterviewViewSets(ModelViewSet):
 
                     # Updating calendar Booking
                     calendar_id = interview.calendar_id
+                    # calendar = GoogleCalendar()
                     calendar = Calendar(request=request)
+
                     if not calendar_id:
                         res, msg = calendar.book_ms_calendar(event)
+                        # res, msg = calendar.book_calendar(event)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": res}, status=400)
 
@@ -1331,6 +1340,7 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'booked'
                         interview.save()
                     else:
+                        # res, msg = calendar.update_calendar(calendar_id, event)
                         res, msg = calendar.update_ms_calendar(calendar_id, event)
                         if msg == 'booked':
                             interview.calendar_id = res['id']
@@ -1341,10 +1351,10 @@ class InterviewViewSets(ModelViewSet):
 
                 if interview.guest_type in ['coder', 'assistance'] and (
                         pre_guest_type == 'not_required' or pre_guest_type is None):
-                    coder_request_notification(request.user, interview, "Coding request")
+                    coder_request_notification(interview, "Coding request", request)
 
                 if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
-                    coder_request_notification(request.user, interview, "Coding not required for this Interview")
+                    coder_request_notification(interview, "Coding not required for this Interview", request)
                     interview.guest.clear()
 
                 # Activity
@@ -1474,8 +1484,9 @@ class InterviewViewSets(ModelViewSet):
                     else:
                         desc = "Failed"
 
-                    card_json = interview_feedback_card(interview)
-                    post_msg_using_webhook(config.interview_feedback_url, card_json)
+                    slack_card_json, teams_card_json = interview_feedback_card(interview, request)
+                    post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
+                    post_msg_using_webhook(config.interview_feedback_url, teams_card_json)
 
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -1582,11 +1593,12 @@ class InterviewViewSets(ModelViewSet):
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
 
                 if date.today() <= interview.start_time.date():
-                    data = {
-                        "text": title,
-                        "title": "&#9201; Interview Rescheduled",
+                    payload = {
+                        "body": title,
+                        "title": ":stopwatch: Interview Rescheduled",
                     }
-                    post_msg_using_webhook(config.announcement_url, data)
+                    # data = MessageCard.get_simple_card(payload)
+                    # post_msg_using_webhook(config.slack_announcement_url, data)
 
                 if prev_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
                     est = pytz.timezone('US/Eastern')
@@ -1594,15 +1606,15 @@ class InterviewViewSets(ModelViewSet):
 
                     if today.date() < interview.start_time.date():
                         title = "Coding request, Interview Rescheduled"
-                        coder_request_notification(request.user, interview, title)
+                        coder_request_notification(interview, title, request)
 
                     if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
                         title = "Coding request, Interview Rescheduled"
-                        coder_request_notification(request.user, interview, title)
+                        coder_request_notification(interview, title, request)
 
                     if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
                         title = "Coding request"
-                        coder_request_notification(request.user, interview, title)
+                        coder_request_notification(interview, title, request)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1661,7 +1673,7 @@ class InterviewViewSets(ModelViewSet):
 
             if interview.guest_type in ['coder', 'assistance']:
                 title = "Interview cancelled, coding is not required"
-                coder_request_notification(request.user, interview, title)
+                coder_request_notification(interview, title, request)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
@@ -1866,10 +1878,12 @@ class InterviewViewSets(ModelViewSet):
                 today = datetime.now().astimezone(est)
 
                 if today.date() < interview.start_time.date():
-                    coder_assigned_notification(request.user, interview)
+                    teams.coder_assigned_card(interview, request)
+                    slack.coder_assigned_card(interview, request)
 
                 if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
-                    coder_assigned_notification(request.user, interview)
+                    teams.coder_assigned_card(interview, request)
+                    slack.coder_assigned_card(interview, request)
 
                 title = get_interview_title(interview)
                 _, attendees = get_users_and_attendees(request, interview)
@@ -2282,7 +2296,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 "link": request.data.get('link', None),
                 "deadline": request.data.get('deadline', None),
                 "skills": json.loads(request.data.get('skills')),
-                "con_timezone": request.data.get('con_timezone', None),
+                "con_timezone": request.data.get('con_timezone', 'NA'),
                 "additional_details": request.data.get('additional_details', None),
             }
             test = Test.objects.create(
@@ -2319,8 +2333,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             res = "Development Server"
             if os.environ.get('ENV', 'local') == 'prod':
+                test_received_notification(test, data.get('con_timezone', 'NA'), request)
                 res, error = self.send_test_mail(test, data, 'new', request)
-                test_received_notification(request.user, test, data['con_timezone'])
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
                     return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
@@ -2433,11 +2447,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 consultant_name = submission.consultant.name
                 assigned = ", ".join(assigned.employee_name for assigned in test.assign_to.all())
                 text = f"Test Assigned to :- {assigned} <br>"
-                data = {
-                    "title": f"&#128203; Test Assigned :: {consultant_name} :: {submission.client} :: {skills} <br>",
-                    "text": text
+                payload = {
+                    "title": text,
+                    "body": f"&#128203; Test Assigned :: {consultant_name} :: {submission.client} :: {skills}"
                 }
-                post_msg_using_webhook(config.engineering_url, data)
+                # data = MessageCard.get_simple_card(payload)
+                # post_msg_using_webhook(config.slack_engineering_url, data)
 
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test assigned"}, status=202)

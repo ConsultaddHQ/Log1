@@ -3,7 +3,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from marketing.models import Test
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -16,14 +16,14 @@ class Command(BaseCommand):
             ).order_by('-modified')
 
             text = f""" <tr>
-                <th style="padding:5px 8px 5px 8px;">#</th>
-                <th style="padding:5px 8px 5px 8px;">Created</th>
-                <th style="padding:5px 8px 5px 8px;">Marketer</th>
-                <th style="padding:5px 8px 5px 8px;">Consultant</th>
-                <th style="padding:5px 8px 5px 8px;">Assigned to</th>
-                <th style="padding:5px 8px 5px 8px;">Client</th>
-                <th style="padding:5px 8px 5px 8px;">Video</th>
-                <th style="padding:5px 8px 5px 8px;">Deadline</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">#</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Created</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Marketer</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Consultant</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Assigned to</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Client</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Video</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Deadline</th>
                 </tr>"""
             if tests.count() > 0:
                 for index, test in enumerate(tests):
@@ -36,18 +36,18 @@ class Command(BaseCommand):
                     if assigned.count() > 0:
                         assigned_to = ", ".join(assign.employee_name for assign in assigned)
                     text += f"""<tr>
-                                    <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {test.created.strftime('%a, %d %B')} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {test.submission.created_by.employee_name} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {test.submission.consultant.name} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {assigned_to} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {test.submission.client} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {"Yes" if test.is_video else "No"} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {deadline} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {index + 1} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {test.created.strftime('%a, %d %B')} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {test.submission.created_by.employee_name} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {test.submission.consultant.name} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {assigned_to} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {test.submission.client} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {"Yes" if test.is_video else "No"} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {deadline} </td>
                                 </tr>"""
                 data = {
                     "title": "New/Assigned Test &#128203;",
-                    "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+                    "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
                 }
             else:
                 data = {
@@ -55,8 +55,12 @@ class Command(BaseCommand):
                     "text": "No Pending test"
                 }
 
-            res, msg = post_msg_using_webhook(config.engineering_url, data)
-            if msg == 'error':
-                raise Exception(res)
+            payload = {
+                "data": data, "report_name": "new/assigned_test",
+                "title": f"{data.get('title')} :MEMO:",
+            }
+            # res, msg = MessageCard.data_report(payload, config.slack_engineering_url)
+            # if msg == 'error':
+            #     raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)

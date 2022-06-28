@@ -3,7 +3,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -41,54 +41,60 @@ class Command(BaseCommand):
 
             data = {
                 "title": "Project Details &#128221;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>
+                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>
                                 <tr>
-                                    <th style="padding:5px 8px 5px 8px;">Project Status</th>
-                                    <th style="padding:5px 8px 5px 8px;">Count</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Project Status</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Count</th>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">New Offer</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{new_offer}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">New Offer</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{new_offer}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Paper Work Received</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{received_projects}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Paper Work Received</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{received_projects}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">On-boarded</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{on_boarded_projects}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">On-boarded</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{on_boarded_projects}</td>
                                 </tr>
                             </table>"""
             }
-            post_msg_using_webhook(config.announcement_url, data)
+            payload = {
+                "data": data, "title": data.get('title'), "report_name": job.name,
+            }
+            # MessageCard.data_report(payload, config.slack_announcement_url)
 
             data = {
                 "title": "Business Health for this month &#128221;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>
+                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>
                                 <tr>
-                                    <th style="padding:5px 8px 5px 8px;">Project Status</th>
-                                    <th style="padding:5px 8px 5px 8px;">Count</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Project Status</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Count</th>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Joined</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{joined_projects}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Joined</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{joined_projects}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Cancelled</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{cancelled_projects}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Cancelled</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{cancelled_projects}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Terminated</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{terminated_projects}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Terminated</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{terminated_projects}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Total Offer</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{total_projects}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Total Offer</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{total_projects}</td>
                                 </tr>
                             </table>"""
             }
-            res, msg = post_msg_using_webhook(config.announcement_url, data)
-            if msg == 'error':
-                raise Exception(res)
+            payload = {
+                "data": data, "title": data.get('title'), "report_name": job.name,
+            }
+            # res, msg = MessageCard.data_report(payload, config.slack_announcement_url)
+            # if msg == 'error':
+            #     raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)

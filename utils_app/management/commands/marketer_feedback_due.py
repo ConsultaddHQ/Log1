@@ -3,7 +3,8 @@ from django.core.management import BaseCommand
 
 from constance import config
 from marketing.models import Test, Interview
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
+from utils_app.slack_notification import MessageCard
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -43,38 +44,42 @@ class Command(BaseCommand):
                     }
 
             column_names = f""" <tr>
-                <th style="padding:5px 8px 5px 8px;">#</th>
-                <th style="padding:5px 8px 5px 8px;">Marketer</th>
-                <th style="padding:5px 8px 5px 8px;">Team</th>
-                <th style="padding:5px 8px 5px 8px;">Test, Interview</th>
-                <th style="padding:5px 8px 5px 8px;">Count</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">#</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Marketer</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Team</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Test, Interview</th>
+                <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Count</th>
                 </tr>"""
             if payload != {}:
                 text = column_names
                 index = 0
                 for item in payload:
                     text += f"""<tr>
-                                    <td style="padding:5px 8px 5px 8px;"> {index+1} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {item} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {payload[item]['team']} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {payload[item]['pending_for']} </td>
-                                    <td style="padding:5px 8px 5px 8px;"> {payload[item]['count']} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {index+1} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {item} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {payload[item]['team']} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {payload[item]['pending_for']} </td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;"> {payload[item]['count']} </td>
                                 </tr>"""
                     index = index + 1
                     if index == 46:
                         data = {
                             "title": "Marketers whose Tests/Interviews are in feedback due status",
-                            "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+                            "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
                         }
-                        res, msg = post_msg_using_webhook(config.marketing_report_url, data)
-                        if msg == 'error':
-                            print(res)
-                            continue
+                        payload = {
+                            "data": data, "report_name": "project_joining",
+                            "title": data.get('title'),
+                        }
+                        # res, msg = MessageCard.data_report(payload, config.slack_marketing_report_url)
+                        # if msg == 'error':
+                        #     print(res)
+                        #     continue
                         text, index = column_names, 0
 
                 data = {
                     "title": "Marketers whose Tests/Interviews are in feedback due status",
-                    "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+                    "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
                 }
             else:
                 data = {
@@ -82,8 +87,12 @@ class Command(BaseCommand):
                     "text": "No Pending test"
                 }
 
-            res, msg = post_msg_using_webhook(config.marketing_report_url, data)
-            if msg == 'error':
-                raise Exception(res)
+            payload = {
+                "data": data, "title": data.get('title'),
+                "report_name": "test/interview_feedback_due",
+            }
+            # res, msg = MessageCard.data_report(payload, config.slack_marketing_report_url)
+            # if msg == 'error':
+            #     raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)
