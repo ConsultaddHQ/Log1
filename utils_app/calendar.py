@@ -123,7 +123,7 @@ class GoogleCalendar:
             event = self.get_body(data)
             updated_event = service.events().update(calendarId='primary', eventId=event_id, body=event,
                                                     sendUpdates='all').execute()
-            return updated_event
+            return updated_event, 'ok'
         except Exception as error:
             write_info(message=error, function='update_calendar')
             return str(error), "error"
