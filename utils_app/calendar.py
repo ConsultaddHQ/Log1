@@ -3,10 +3,10 @@ import json
 import os.path
 import requests
 from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from log1.utils import write_exception, write_info
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 

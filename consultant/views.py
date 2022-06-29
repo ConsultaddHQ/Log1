@@ -1475,11 +1475,11 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 terminate_consultant(con_exit, request)
             else:
                 # Email for starting Exit Process
-                # if os.environ.get('ENV', 'local') == 'prod':
-                res, error = send_exit_process_mail(con_exit, 'start', request)
-                if error == 'error':
-                    write_exception(res, request)
-                    return Response({"message": "Exit process mail not sent", "error": str(res)}, status=400)
+                if os.environ.get('ENV', 'local') == 'prod':
+                    res, error = send_exit_process_mail(con_exit, 'start', request)
+                    if error == 'error':
+                        write_exception(res, request)
+                        return Response({"message": "Exit process mail not sent", "error": str(res)}, status=400)
             serializer = self.serializer_class(consultant.exit.all().order_by('-created'), many=True)
 
             # Activity
@@ -1540,11 +1540,11 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
                 # Email for Exit Process Cancelled
                 res = "Development Server"
-                # if os.environ.get('ENV', 'local') == 'prod':
-                res, error = send_exit_process_mail(con_exit, 'cancel', request)
-                if error == 'error':
-                    write_exception(res, request)
-                    return Response({"message": "Cancel Termination main not sent", "error": str(res)}, status=400)
+                if os.environ.get('ENV', 'local') == 'prod':
+                    res, error = send_exit_process_mail(con_exit, 'cancel', request)
+                    if error == 'error':
+                        write_exception(res, request)
+                        return Response({"message": "Cancel Termination main not sent", "error": str(res)}, status=400)
 
                 # Activity
                 desc = f"{request.user.employee_name} cancelled exit process"
@@ -1791,8 +1791,8 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                     'link': f'https://app.log1.com/#/consultant/bench/{consultant_id}?key=feedback',
                 },
             }
-            # if os.environ.get('ENV', 'local') == 'prod':
-            send_email(mail_data, request.user.email)
+            if os.environ.get('ENV', 'local') == 'prod':
+                send_email(mail_data, request.user.email)
             return Response({"message": "mail sent"}, status=201)
         except Exception as error:
             write_exception(error, request)
