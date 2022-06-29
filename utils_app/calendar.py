@@ -74,8 +74,10 @@ class GoogleCalendar:
     def get_body(self, data):
         description = self.calendar_description(data)
         if os.environ.get('ENV', 'local') != 'prod':
-            data['attendees'] = [{'email': 'suman.buie.cpp@gmail'}, {'email': 'shreyaskhede26@gmail.com'},
-                                 {'email': 'log1.consultadd@gmail.com'},{'email':'eduone7@gmail.com'}]
+            data['attendees'] = [{'email': 'suman.m@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'},
+                                 {'email': 'shivam.k@gmail.com'}]
+            description = 'testing from log1' + description
+            
         return {
             'summary': data["summary"],
             'description': description,
@@ -176,13 +178,13 @@ class GoogleCalendar:
             write_info(message=error, function='get_interviews')
             return str(error), "error"
 
-    def delete_calendar_booking(self, event_id):
+    def delete_calendar_booking(self, event_id, request):
         try:
             service = self.calendar_con()
             service.events().delete(calendarId='primary', eventId=event_id, sendUpdates='all').execute()
             return True, "ok"
         except Exception as error:
-            write_exception(message=error, function='delete_calendar_booking')
+            write_exception(message=error, request=request)
             return str(error), "error"
 
 

@@ -15,11 +15,11 @@ from utils_app.utils import get_timezone
 from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
-from utils_app.calendar import get_profile_picture
 from activity.serializers import ActivitySerializer
 from utils_app.aws_utils import download_s3_object_beats
+from utils_app.slack_notification import MessageCard as slack
+from log1.utils import html_to_text, write_exception, write_info
 from notification.utils import create_notification, push_notification
-from log1.utils import post_msg_using_webhook, html_to_text, write_exception, write_info
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth
 
@@ -108,13 +108,14 @@ def send_exit_interview_detail(terminate, request):
             termination_date = datetime.strptime(str(terminate.last_date), '%Y-%m-%d').strftime('%m/%d/%Y')
         else:
             termination_date = "NA"
-        data = {
-            "title": f"Exit interview for {terminate.consultant.name}",
-            "text": f"**Reason for leaving** : {reason}<br>"
-                    f"**Termination Date** : {termination_date}<br>"
-                    f"**Exit Interview Details** : {exit_details} <br>"
+        payload = {
+            "reason": reason,
+            "exit_details": exit_details,
+            "termination_date": termination_date,
+            "consultant": terminate.consultant.name
         }
-        post_msg_using_webhook(config.exit_interview_url, data)
+        # MessageCard.exit_interview_card(payload, request)
+
         user_list = []
         tags = request.data.get('tagged_user', [])
         if len(tags) > 0:
@@ -163,7 +164,7 @@ def send_exit_interview_detail(terminate, request):
 
         return None
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
         return error
 
 
@@ -371,16 +372,19 @@ def fetch_consultant_count(team):
     return total_count, team_count
 
 
-def new_recruit_notification(consultant, source, cfr, feedback):
+def new_recruit_notification(consultant, request):
     try:
+        cfr = request.data.get('cfr', "NA")
+        source = request.data.get('source', "NA")
+        feedback = request.data.get('feedback', "NA")
         visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
-        recruiter_gender = '&#129490;'
+        recruiter_gender = ':man::skin-tone-2:'
         qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
         if qs:
             recruiter = qs.first().poc
             recruiter_team = recruiter.team
             if recruiter.gender == 'female':
-                recruiter_gender = '&#128103;'
+                recruiter_gender = ':red_haired_woman::skin-tone-2:'
 
         total_count, team_count = fetch_consultant_count(recruiter_team)
         qs = WorkAuth.objects.filter(consultant=consultant)
@@ -390,29 +394,22 @@ def new_recruit_notification(consultant, source, cfr, feedback):
         if qs:
             rate = qs.first().rate
 
-        consultant_gender = '&#128105;' if consultant.gender == 'female' else '&#128104;'
-        data = {
-            "title": "New Recruit on Bench  &#129304;&#128516;&#129304;",
-            "text": f""" **Consultant** <br>
-                {consultant_gender} Name :  {consultant.name} <br>
-                {consultant_gender} Email :  {consultant.email} <br>
-                {recruiter_gender} Recruiter :  {recruiter.employee_name} <br>
-                 ✨ Profile :  {consultant.skills} <br>
-                🇺🇸 Visa :  {visa}<br>
-                ✨ Source :  {source}<br>
-                &#128181; Rate : {rate} <br>
-                 🇺🇸  Current Location :  {consultant.current_city} <br>
-                &#x1F4BC; Team :  {recruiter_team} <br>
-                &#129490; CFR :  {cfr} <br>
-                ✨ Feedback :  {feedback}<br>
-                <br> Recruit Count of {recruiter_team} for this month - {team_count}
-                <br> Total Recruit Count of this month - {total_count}"""
+        consultant_gender = ':red_haired_woman::skin-tone-2:' if consultant.gender == 'female' else ':man::skin-tone-2:'
+        payload = {
+            "cfr": cfr,
+            "visa": visa,
+            "rate": rate,
+            "source": source,
+            "feedback": feedback,
+            "team_count": team_count,
+            "total_count": total_count,
+            "gender": consultant_gender,
+            "recruiter_team": recruiter_team,
+            "recruiter_gender": recruiter_gender,
         }
-        # Sending message on Messaging Tool
-        post_msg_using_webhook(config.new_recruit_on_bench, data)
-
+        slack.new_recruit_card(consultant, payload, request)
     except Exception as error:
-        write_exception(message=error)
+        write_exception(message=error, request=request)
 
 
 def add_other_details(request, consultant):
@@ -560,9 +557,7 @@ def create_consultant(request, creator_id):
             )
 
             add_other_details(request, consultant)
-            new_recruit_notification(
-                consultant, request.data.get('source'), request.data.get('cfr'), request.data.get('feedback')
-            )
+            new_recruit_notification(consultant, request)
             return consultant, "ok"
     except Exception as error:
         write_exception(error, request)
@@ -750,60 +745,6 @@ def candidate_filter(request):
     except Exception as error:
         write_exception(error, request)
         return str(error), "error"
-
-
-def pre_joining_feedback_notification(feedback, request):
-    try:
-        project = feedback.project
-        title = project.submission.lead.job_title
-        profile_path = get_profile_picture(request.user)
-        data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"Pre-Joining-Call feedback",
-            "sections": [
-                {
-                    "activityTitle": f"{project.consultant.name} :: {title} :: {project.submission.client}",
-                    "activitySubtitle": f"***Pre joining feedback by {request.user.employee_name}***",
-                    "activityText": feedback.description,
-                    "activityImage": profile_path,
-                    "markdown": True
-                }
-            ]
-        }
-        post_msg_using_webhook(config.pre_joining_feedback_url, data)
-        return "ok"
-    except Exception as error:
-        write_exception(message=error, request=request)
-        return str(error)
-
-
-def engineering_feedback_notification(feedback, request):
-    try:
-        project = feedback.project
-        profile_path = get_profile_picture(request.user)
-        data = {
-            "@type": "MessageCard",
-            "themeColor": "#0076D7",
-            "@context": "http://schema.org/extensions",
-            "summary": f"***Engineering Issue***",
-            "sections": [
-                {
-                    "activityTitle": f"***{project.consultant.name}*** :: ***{project.submission.lead.job_title}*** "
-                                     f":: ***{project.submission.client}***",
-                    "activitySubtitle": f"***Engineering Issue feedback by {request.user.employee_name}***",
-                    "activityText": feedback.description,
-                    "activityImage": profile_path,
-                    "markdown": True
-                }
-            ]
-        }
-        post_msg_using_webhook(config.candidate_feedback_url, data)
-        return "ok"
-    except Exception as error:
-        write_exception(message=error, request=request)
-        return str(error)
 
 
 def create_and_send_notification(consultant, feedback, title, user_list, request):
