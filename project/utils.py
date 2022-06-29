@@ -11,7 +11,6 @@ from project.models import Project, TimeSheet
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
 from utils_app.slack_notification import MessageCard as slack
-from utils_app.teams_notification import MessageCard as teams
 from engineering.models import TrainingCheckList, ProjectDescription
 
 
@@ -218,7 +217,6 @@ class ProjectUtil:
                 "city": self.project.city, "supervisors": supervisors, "job_title": self.project.submission.lead.job_title,
             }
             slack.po_receive_message_card(payload, self.request)
-            teams.po_receive_message_card(payload, self.request)
 
             title = f" Project Received :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, "project")
@@ -245,7 +243,6 @@ class ProjectUtil:
                 "submission_id": self.project.submission.id, "project_id": self.project.id,
             }
             slack.po_termination_message_card(payload, self.request)
-            teams.po_termination_message_card(payload, self.request)
 
             title = f"Project Terminated :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')

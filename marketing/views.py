@@ -18,7 +18,7 @@ from marketing.utils import *
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
-from utils_app.calendar import Calendar
+from utils_app.calendar import Calendar, GoogleCalendar
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
@@ -26,7 +26,6 @@ from activity.serializers import ActivitySerializer
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from utils_app.slack_notification import MessageCard as slack
-from utils_app.teams_notification import MessageCard as teams
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
@@ -1197,6 +1196,7 @@ class InterviewViewSets(ModelViewSet):
                 # Ranking Interview
                 if interview.round == 1:
                     interview = self.rank_interviews(interview, 'create')
+
                 # Calendar attendees and User for sending notification
                 title = get_interview_title(interview)
                 user_list, attendees = get_users_and_attendees(request, interview)
@@ -1213,11 +1213,11 @@ class InterviewViewSets(ModelViewSet):
 
                 # Booking MS calendar
                 try:
-                    calendar = Calendar(request=request)
-                    cal_res, msg = calendar.book_ms_calendar(event)
+                    # calendar = Calendar(request=request)
+                    # cal_res, msg = calendar.book_ms_calendar(event)
                     # Booking Google calendar
-                    # calendar = GoogleCalendar()
-                    # cal_res, msg = calendar.book_calendar(event)
+                    calendar = GoogleCalendar()
+                    cal_res, msg = calendar.book_calendar(event)
 
                     if msg == 'error':
                         return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
@@ -1327,12 +1327,11 @@ class InterviewViewSets(ModelViewSet):
 
                     # Updating calendar Booking
                     calendar_id = interview.calendar_id
-                    # calendar = GoogleCalendar()
-                    calendar = Calendar(request=request)
+                    calendar = GoogleCalendar()
 
                     if not calendar_id:
-                        res, msg = calendar.book_ms_calendar(event)
-                        # res, msg = calendar.book_calendar(event)
+                        # res, msg = calendar.book_ms_calendar(event)
+                        res, msg = calendar.book_calendar(event)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": res}, status=400)
 
@@ -1340,8 +1339,7 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'booked'
                         interview.save()
                     else:
-                        # res, msg = calendar.update_calendar(calendar_id, event)
-                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        res, msg = calendar.update_calendar(calendar_id, event)
                         if msg == 'booked':
                             interview.calendar_id = res['id']
                             booking_res = 'updated'
@@ -1397,8 +1395,8 @@ class InterviewViewSets(ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        calendar = Calendar(request=request)
-                        calendar.delete_ms_calendar(interview.calendar_id)
+                        calendar = GoogleCalendar()
+                        calendar.delete_calendar_booking(interview.calendar_id, request)
                 except Exception as error:
                     write_exception(f"Booking deletion failed: {error}", request)
                     return Response({"data": "Calendar booking deletion failed", "error": str(error)}, status=400)
@@ -1484,9 +1482,8 @@ class InterviewViewSets(ModelViewSet):
                     else:
                         desc = "Failed"
 
-                    slack_card_json, teams_card_json = interview_feedback_card(interview, request)
+                    slack_card_json = interview_feedback_card(interview, request)
                     post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
-                    post_msg_using_webhook(config.interview_feedback_url, teams_card_json)
 
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -1562,10 +1559,10 @@ class InterviewViewSets(ModelViewSet):
 
                 # Updating calendar Booking
                 calendar_id = interview.calendar_id
-                calendar = Calendar(request=request)
+                calendar = GoogleCalendar()
                 if not calendar_id:
                     try:
-                        cal_res, msg = calendar.book_ms_calendar(event)
+                        cal_res, msg = calendar.book_calendar(event)
                         if msg == "error":
                             return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
@@ -1576,7 +1573,7 @@ class InterviewViewSets(ModelViewSet):
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                 else:
                     try:
-                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        res, msg = calendar.update_calendar(calendar_id, event)
                         booking_res = 'updated'
                         if msg == 'booked':
                             interview.calendar_id = res['id']
@@ -1648,11 +1645,11 @@ class InterviewViewSets(ModelViewSet):
             interview = qs.first()
             try:
                 if interview.calendar_id:
-                    calendar = Calendar(request=request)
-                    calendar.delete_ms_calendar(interview.calendar_id)
+                    calendar = GoogleCalendar()
+                    calendar.delete_calendar_booking(interview.calendar_id, request)
             except Exception as error:
                 write_exception(f"Booking cancellation failed: {error}", request)
-                return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
+                # return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
 
             interview.feedback = request.data.get('feedback', None)
             interview.status = 'cancelled'
@@ -1878,11 +1875,9 @@ class InterviewViewSets(ModelViewSet):
                 today = datetime.now().astimezone(est)
 
                 if today.date() < interview.start_time.date():
-                    teams.coder_assigned_card(interview, request)
                     slack.coder_assigned_card(interview, request)
 
                 if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
-                    teams.coder_assigned_card(interview, request)
                     slack.coder_assigned_card(interview, request)
 
                 title = get_interview_title(interview)
@@ -1910,9 +1905,9 @@ class InterviewViewSets(ModelViewSet):
                 booking_res = 'Development Server'
                 if os.environ.get('ENV', 'local') == 'prod':
                     calendar_id = interview.calendar_id
-                    calendar = Calendar(request=request)
+                    calendar = GoogleCalendar()
                     if not calendar_id:
-                        res, msg = calendar.book_ms_calendar(event)
+                        res, msg = calendar.book_calendar(event)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": res}, status=400)
                         booking_res = 'booked'
@@ -1920,7 +1915,7 @@ class InterviewViewSets(ModelViewSet):
                         interview.save()
                     else:
                         booking_res = 'updated'
-                        res, msg = calendar.update_ms_calendar(calendar_id, event)
+                        res, msg = calendar.update_calendar(calendar_id, event)
                         if msg == 'booked':
                             booking_res = 'booked'
                             interview.calendar_id = res['id']
@@ -2494,11 +2489,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 create_attachment(file_data)
             # test submit mail
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'submit', request)
-                if error == 'error':
-                    write_info(message=res, function='create-send_test_mail', request=request)
-                    return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+            # if os.environ.get('ENV', 'local') == 'prod':
+            res, error = self.send_test_mail(test, data, 'submit', request)
+            if error == 'error':
+                write_info(message=res, function='create-send_test_mail', request=request)
+                return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test submitted"}, status=202)
         except Exception as error:
@@ -2608,11 +2603,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             # test submit mail
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                res, error = self.send_test_mail(test, data, 'submit', request)
-                if error == 'error':
-                    write_info(message=res, function='create-send_test_mail', request=request)
-                    return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
+            res, error = self.send_test_mail(test, data, 'submit', request)
+
+            if error == 'error':
+                write_info(message=res, function='create-send_test_mail', request=request)
+                return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
 
             return Response({"message": "Feedback submitted", "mail": res}, status=201)
         except Exception as error:

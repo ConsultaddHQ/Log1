@@ -9,7 +9,6 @@ from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
-from utils_app.teams_notification import MessageCard as teams
 from marketing.models import Submission, Interview, Question, Answer
 
 
@@ -175,7 +174,6 @@ def coder_request_notification(interview, title, request):
             "interview": interview
         }
         slack.coder_request_card(payload, request)
-        teams.coder_request_card(payload, request)
         return "ok"
     except Exception as error:
         write_exception(error, request)
@@ -430,7 +428,7 @@ def interview_feedback_card(obj, request):
     try:
         interview_data, header_names, teams_container_names = interview_card_data(obj, request)
         slack_card_data = slack.interview_feedback_card(interview_data, header_names, request)
-        teams_card_data = teams.interview_feedback_card(interview_data, teams_container_names, request)
-        return slack_card_data, teams_card_data
+        # teams_card_data = teams.interview_feedback_card(interview_data, teams_container_names, request)
+        return slack_card_data
     except Exception as error:
         write_exception(error, request)

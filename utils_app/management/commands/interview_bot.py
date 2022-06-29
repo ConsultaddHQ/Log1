@@ -4,7 +4,6 @@ from django.core.management import BaseCommand
 from constance import config
 from marketing.models import Interview
 from utils_app.slack_notification import MessageCard as slack
-from utils_app.teams_notification import MessageCard as teams
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -67,7 +66,6 @@ class Command(BaseCommand):
                 "title": data.get('title'),
                 "report_name": "interview_scheduled",
             }
-            teams.data_report(data, config.announcement_url)
             res, msg = slack.data_report(payload, config.slack_announcement_url)
             if msg == 'error':
                 raise Exception(res)
