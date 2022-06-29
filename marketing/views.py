@@ -1646,7 +1646,7 @@ class InterviewViewSets(ModelViewSet):
                     calendar.delete_calendar_booking(interview.calendar_id)
             except Exception as error:
                 write_exception(f"Booking cancellation failed: {error}", request)
-                return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
+                # return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
 
             interview.feedback = request.data.get('feedback', None)
             interview.status = 'cancelled'
