@@ -16,22 +16,22 @@ class GoogleCalendar:
     @staticmethod
     def calendar_con():
         creeds = None
-        if os.path.exists('token.json'):
-            creeds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if os.path.exists(os.environ.get("TOKEN")):
+            creeds = Credentials.from_authorized_user_file(os.environ.get("TOKEN"), SCOPES)
         if not creeds or not creeds.valid:
             if creeds and creeds.expired and creeds.refresh_token:
                 creeds.refresh(Request())
             else:
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    'key.json', SCOPES)
+                    os.environ.get("KEY_FILE"), SCOPES)
                 creeds = flow.run_local_server(port=0)
-            with open('token.json', 'w') as token:
+            with open(os.environ.get("TOKEN"), 'w') as token:
                 token.write(creeds.to_json())
         try:
             service = build('calendar', 'v3', credentials=creeds)
             return service
         except Exception as error:
-            write_exception(message=error, function='calendar_con')
+            write_exception(message=error)
             return str(error), "error"
 
     @staticmethod
@@ -74,10 +74,7 @@ class GoogleCalendar:
     def get_body(self, data):
         description = self.calendar_description(data)
         if os.environ.get('ENV', 'local') != 'prod':
-            data['attendees'] = [{'email': 'suman.m@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'},
-                                 {'email': 'shivam.k@gmail.com'}]
-            description = 'testing from log1' + description
-            
+            data['attendees'] = [{'email': 'shivam.m@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'}]
         return {
             'summary': data["summary"],
             'description': description,
@@ -111,7 +108,7 @@ class GoogleCalendar:
         try:
             service = self.calendar_con()
             event = self.get_body(data)
-            event = service.events().insert(calendarId='primary', body=event, sendUpdates='all').execute()
+            event = service.events().insert(calendarId=os.environ.get('LOG1_CALENDER_ID'), body=event, sendUpdates='all').execute()
             return event, "ok"
         except Exception as error:
             write_info(message=error, function='book_calendar')
@@ -121,67 +118,38 @@ class GoogleCalendar:
         try:
             service = self.calendar_con()
             event = self.get_body(data)
-            updated_event = service.events().update(calendarId='primary', eventId=event_id, body=event,
+            updated_event = service.events().update(calendarId=os.environ.get('LOG1_CALENDER_ID'), eventId=event_id, body=event,
                                                     sendUpdates='all').execute()
             return updated_event
         except Exception as error:
             write_info(message=error, function='update_calendar')
             return str(error), "error"
 
-    def get_interviews(self, data):
+    def get_interviews(self, user_emails, start, end):
         try:
+            items = []
+            for email in user_emails:
+                data = {"id":email}
+                items.append(data)
             service = self.calendar_con()
-            page_token = None
-            calendar_data = []
-            time_min = data["start"] + '06:00:00-04:00'
-            time_max = data["end"] + '23:59:00-04:00'
-            while True:
-                events = service.events().list(calendarId=data["email"],
-                                               pageToken=page_token,
-                                               singleEvents=True,
-                                               orderBy="startTime",
-                                               timeMin=time_min,
-                                               timeMax=time_max
-                                               ).execute()
-                visibility = True
-                for event in events["items"]:
-                    if "visibility" in event:
-                        visibility = False
-                        data = {
-                            "id": event["id"],
-                            "visibility": False,
-                            "updated": event["updated"],
-                            "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
-                            "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"][
-                                "date"],
-                        }
-                    else:
-                        data = {
-                            "id": event["id"],
-                            "visibility": True,
-                            "created": event["created"],
-                            "updated": event["updated"],
-                            "end": event["end"]["dateTime"] if "dateTime" in event["end"] else event["end"]["date"],
-                            "start": event["start"]["dateTime"] if "dateTime" in event["start"] else event["start"][
-                                "date"],
-                            "title": event["summary"] if "summary" in event else "",
-                            "description": event["description"] if "description" in event else "",
-                            "attendees": [i["email"] for i in event["attendees"]] if "attendees" in event else [],
-                            "attachments": [{"fileUrl": i["fileUrl"], "title": i["title"]} for i in
-                                            event["attachments"]] if "attachments" in event else []
-                        }
-                    calendar_data.append(data)
-                page_token = events.get('nextPageToken')
-                if not page_token:
-                    return calendar_data, visibility
+            time_min = start + 'T00:00:00-04:00'
+            time_max = end + '-04:00'
+            freebusy_query = {
+                "timeMin": time_min,
+                "timeMax": time_max,
+                "timeZone": "America/New_York",
+                "items": items
+            }
+            res = service.freebusy().query(body=freebusy_query).execute()
+            return res['calendars'],True
         except Exception as error:
-            write_info(message=error, function='get_interviews')
+            write_exception(message=error)
             return str(error), "error"
 
     def delete_calendar_booking(self, event_id, request):
         try:
             service = self.calendar_con()
-            service.events().delete(calendarId='primary', eventId=event_id, sendUpdates='all').execute()
+            service.events().delete(calendarId=os.environ.get('LOG1CALENDER_ID'), eventId=event_id, sendUpdates='all').execute()
             return True, "ok"
         except Exception as error:
             write_exception(message=error, request=request)
