@@ -16,11 +16,10 @@ from utils_app.mailing import send_email
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
-from utils_app.slack_notification import MessageCard as slack
-from utils_app.teams_notification import MessageCard as teams
 from utils_app.aws_utils import download_s3_object_beats
-from notification.utils import create_notification, push_notification
+from utils_app.slack_notification import MessageCard as slack
 from log1.utils import html_to_text, write_exception, write_info
+from notification.utils import create_notification, push_notification
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth
 
@@ -252,7 +251,6 @@ def send_exit_process_mail(terminate, exit_status, request):
             poc = consultant.relation
         else:
             poc = consultant.recruiter
-
         if os.environ.get('ENV', 'local') == 'prod':
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
             cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
@@ -410,7 +408,6 @@ def new_recruit_notification(consultant, request):
             "recruiter_gender": recruiter_gender,
         }
         slack.new_recruit_card(consultant, payload, request)
-        teams.new_recruit_card(consultant, payload, request)
     except Exception as error:
         write_exception(message=error, request=request)
 

@@ -1365,8 +1365,8 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 title__iexact='Original', consultant_id=serializer.data['consultant'])
             if profiles:
                 profile = profiles.first()
-                profile.visa_start = serializer.data['visa_start']
                 profile.visa_end = serializer.data['visa_end']
+                profile.visa_start = serializer.data['visa_start']
                 profile.visa_type = serializer.data['visa_type']
                 profile.save()
 
