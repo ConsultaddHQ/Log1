@@ -311,6 +311,25 @@ CONSTANCE_CONFIG = OrderedDict([
     ('candidate_feedback_url', ('URL', 'Candidate Feedback Channel')),
     ('new_recruit_on_bench', ('URL', 'New Recruit On Bench Channel')),
     ('pre_joining_feedback_url', ('URL', 'Pre Joining Feedback Channel')),
+
+    ('slack_general_url', ('URL', 'Slack General Channel')),
+    ('slack_test_team_url', ('URL', 'Slack Test Team channel')),
+    ('slack_products_dev', ('URL', 'Slack Products Dev Channel')),
+    ('slack_engineering_url', ('URL', 'Slack Engineering channel')),
+    ('slack_recruitment_url', ('URL', 'Slack Recruitment Channel')),
+    ('slack_pool_channel_url', ('URL', 'Slack 45dayslimit Channel')),
+    ('slack_offer_url', ('URL', 'Slack Offer Announcement Channel')),
+    ('slack_loud_speakers_url', ('URL', 'Slack Loudspeaker Channel')),
+    ('slack_announcement_url', ('URL', 'Slack Announcement Channel')),
+    ('slack_marketing_report_url', ('URL', 'Slack Marketing Report')),
+    ('slack_joined_url', ('URL', 'Slack Joining Announcement Channel')),
+    ('slack_offer_failure_url', ('URL', 'Slack Offer Failure Channel')),
+    ('slack_interview_feedback_url', ('URL', 'Slack Interview Feedback')),
+    ('slack_exit_interview_url', ('URL', 'Slack Exit Interview Channel')),
+    ('slack_project_termination_url', ('URL', 'Slack Project Terminations')),
+    ('slack_candidate_feedback_url', ('URL', 'Slack Candidate Feedback Channel')),
+    ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
+    ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -326,5 +345,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'pool_channel_url', 'exit_interview_url', 'interview_feedback_url', 'project_termination_url',
         'loud_speakers_url', 'joined_url', 'marketing_report_url', 'general_url', 'offer_failure_url',
         'products_dev', 'new_recruit_on_bench', 'pre_joining_feedback_url', 'candidate_feedback_url',
+        'slack_engineering_url', 'slack_test_team_url', 'slack_offer_url', 'slack_announcement_url',
+        'slack_interview_feedback_url', 'slack_project_termination_url', 'slack_loud_speakers_url',
+        'slack_joined_url', 'slack_marketing_report_url', 'slack_general_url', 'slack_offer_failure_url',
+        'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url', 'slack_joined_url',
+        'slack_recruitment_url', 'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
     ),
 }

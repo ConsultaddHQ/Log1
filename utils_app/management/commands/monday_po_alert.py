@@ -3,7 +3,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -17,14 +17,14 @@ class Command(BaseCommand):
             start = date.today() - timedelta(days=7)
 
             text = f"<tr>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Consultant</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Team</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Client</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Vendor</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Marketer</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Start Date</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Employer</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>City</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Consultant</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Team</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Client</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Vendor</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Marketer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Start Date</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Employer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>City</th>" \
                    f"</tr>"
 
             joined_last_week = Project.objects.filter(
@@ -36,30 +36,34 @@ class Command(BaseCommand):
                 submission = project.submission
                 text += f"<tr>" \
                         f"<td style='padding:px 8px 0px 8px;'> {project.consultant.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.team.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.client} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.lead.vendor_company.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.employee_name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {project.start_date.strftime('%m/%d/%Y')} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.employer} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {project.city} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.team.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.client} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.lead.vendor_company.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.employee_name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {project.start_date.strftime('%m/%d/%Y')} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.employer} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {project.city} </td>" \
                         f"</tr>\n"
 
             data = {
                 "title": "Project Joined Last Week &#128221;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
             }
-            post_msg_using_webhook(config.joined_url, data)
+            payload = {
+                "data": data, "title": data.get('title'),
+                "report_name": "monday_po_alert",
+            }
+            # MessageCard.data_report(payload, config.slack_joined_url)
 
             text = f"<tr>" \
                    f"<th style='padding:2px 8px 0px 8px;'>Consultant</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Team</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Client</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Vendor</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Marketer</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Start Date</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>Employer</th>" \
-                   f"<th style='padding:5px 8px 5px 8px;'>City</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Team</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Client</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Vendor</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Marketer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Start Date</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>Employer</th>" \
+                   f"<th style='padding:5px 8px 5px 8px;font-size: 2.5em;'>City</th>" \
                    f"</tr>"
             start = date.today()
             end = date.today() + timedelta(days=5)
@@ -77,26 +81,34 @@ class Command(BaseCommand):
             for project in joining_this_week:
                 submission = project.submission
                 text += f"<tr>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {project.consultant.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.team.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.client} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.lead.vendor_company.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.created_by.employee_name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {project.start_date.strftime('%m/%d/%Y')} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {submission.employer} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;'> {project.city} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {project.consultant.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.team.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.client} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.lead.vendor_company.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.employee_name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {project.start_date.strftime('%m/%d/%Y')} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.employer} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {project.city} </td>" \
                         f"</tr>\n"
 
             data = {
                 "title": "Project Joining in this Week &#128221;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
+                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
             }
-            res, msg = post_msg_using_webhook(config.joined_url, data)
-            if msg == 'error':
-                create_cron_error(job, res)
-            res, msg = post_msg_using_webhook(config.general_url, data)
-            if msg == 'error':
-                create_cron_error(job, res)
+            payload = {
+                "data": data, "title": data.get('title'),
+                "report_name": "monday_po_alert",
+            }
+            # res, msg = MessageCard.data_report(payload, config.slack_joined_url)
+            # if msg == 'error':
+            #     create_cron_error(job, res)
+            payload = {
+                "data": data, "title": data.get('title'),
+                "report_name": "monday_po_alert",
+            }
+            # res, msg = MessageCard.data_report(payload, config.slack_general_url)
+            # if msg == 'error':
+            #     create_cron_error(job, res)
 
         except Exception as error:
             create_cron_error(job, error)

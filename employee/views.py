@@ -829,15 +829,17 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             if isinstance(team, str):
                 team = get_object_or_404(Team, name=team)
             user = User.objects.create_user(
-                employee_id=int(request.data.get('employee_id')),
-                email=request.data.get('email'),
-                name=request.data.get('name'),
                 team=team,
-                gender=request.data.get('gender').lower(),
+                name=request.data.get('name'),
+                email=request.data.get('email'),
                 phone=request.data.get('phone', None),
+                gender=request.data.get('gender').lower(),
                 password=request.data.get('password').strip(),
-                is_active=True if request.data.get('keep_active', False) else False
+                employee_id=int(request.data.get('employee_id')),
             )
+            if not request.data.get('keep_active'):
+                user.is_active = False
+                user.save()
             for role in request.data.get("role", []):
                 user_role = get_object_or_404(Role, name=role)
                 user.role.add(user_role)
@@ -862,21 +864,19 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             records = request.data.get('data')
             for record in records:
                 record["log1"] = record['log1'] if record.get('log1') else False
-                if isinstance(record.get('team'), str):
-                    record['team'] = Team.objects.filter(name=record.get('team')).first()
-                else:
-                    record['team'] = get_object_or_404(Team, name='Consultadd')
-                roles.append(record.get('roles', ['marketer']))
+                roles.append(record.get('roles', []))
                 record_list.append(User(
-                    team=record.get('team'),
                     email=record.get('email'),
                     phone=record.get('phone'),
                     employee_name=record.get('name'),
                     gender=record.get('gender', 'male'),
-                    is_active=record.get('log1', False),
                     username=int(record.get('employee_id')),
                     employee_id=int(record.get('employee_id')),
+                    is_active=True if record.get('log1') else False,
                     password=make_password(record.get('password', 'consultadd')),
+                    team=Team.objects.filter(
+                        name=record.get('team').capitalize()
+                    ).first() if isinstance(record.get('team'), str) else None
                 ))
 
             users = User.objects.bulk_create(record_list)
@@ -950,9 +950,10 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user.email = request.data.get('email', user.email)
             user.phone = request.data.get('number', user.phone)
             user.gender = request.data.get('gender', user.gender)
-            user.team_id = request.data.get('team', user.team_id)
             user.is_active = request.data.get('is_active', user.is_active)
             user.employee_name = request.data.get('name', user.employee_name)
+            user.employee_id = request.data.get('employee_id', user.employee_id)
+            user.team = Team.objects.get(name=request.data['team']) if request.data.get('team') else user.team
             user.save()
             return Response({'data': user_previous_data, 'role': user_previous_role.values(),
                              "result": "User updated on log1 successfully"}, status=201)

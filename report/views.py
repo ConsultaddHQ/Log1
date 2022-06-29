@@ -81,7 +81,7 @@ class ScrumMeetingReport(GenericViewSet):
                 "username": "Log1 Updates",
                 "text": text,
             }
-            post_msg_using_webhook(config.loud_speakers_url, data)
+            # post_msg_using_webhook(config.loud_speakers_url, data)
             return Response({"message": "message sent"}, status=200)
         return Response({"message": "Previous meeting not found"}, status=400)
 

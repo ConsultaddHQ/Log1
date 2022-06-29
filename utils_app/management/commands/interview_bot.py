@@ -3,7 +3,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from marketing.models import Interview
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard as slack
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -15,6 +15,7 @@ class Command(BaseCommand):
         try:
             from pytz import timezone
             tz = timezone('EST')
+            slack_data = []
             today_date = tz.localize(datetime.now())
             interviews = Interview.objects.filter(
                 start_time__date=today_date,
@@ -33,8 +34,8 @@ class Command(BaseCommand):
                 <th style="padding:5px 8px 5px 8px;">Job Position</th>
                 </tr>"""
 
-            for index, interview in enumerate(interviews):
-                position = interview.submission.lead.position.display_name
+            for index, interview in enumerate(interviews[0: 7]):
+                position = interview.submission.lead.position.display_name if interview.submission.lead.position else None
                 text += f"""<tr>
                                 <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {interview.supervisor.employee_name} </td>
@@ -47,12 +48,25 @@ class Command(BaseCommand):
                                 <td style="padding:5px 8px 5px 8px;"> {interview.marketer.employee_name} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {position} </td>
                             </tr>"""
-
+                slack_data.append(
+                    {
+                        "type": interview.get_interview_mode_display(),
+                        "ctb": interview.supervisor.employee_name, "round": interview.round,
+                        "start": interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST'),
+                        "marketer": interview.marketer.employee_name, "position": position,
+                        "consultant": interview.consultant.name, "client": interview.submission.client,
+                    }
+                )
             data = {
                 "title": "Interviews Scheduled for today &#128203;",
                 "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
             }
-            res, msg = post_msg_using_webhook(config.announcement_url, data)
+            payload = {
+                "data": slack_data,
+                "title": data.get('title'),
+                "report_name": "interview_scheduled",
+            }
+            res, msg = slack.data_report(payload, config.slack_announcement_url)
             if msg == 'error':
                 raise Exception(res)
         except Exception as error:

@@ -1332,8 +1332,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             profiles = work_auth.consultant.profiles.filter(title__iexact='Original')
             if profiles:
                 profile = profiles.first()
-                if request.data['visa_type'] != 'gc':
-                    profile.visa_end = work_auth.visa_end
+                profile.visa_end = work_auth.visa_end
                 profile.visa_type = work_auth.visa_type
                 profile.visa_start = work_auth.visa_start
                 profile.save()
@@ -1366,8 +1365,8 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 title__iexact='Original', consultant_id=serializer.data['consultant'])
             if profiles:
                 profile = profiles.first()
-                profile.visa_start = serializer.data['visa_start']
                 profile.visa_end = serializer.data['visa_end']
+                profile.visa_start = serializer.data['visa_start']
                 profile.visa_type = serializer.data['visa_type']
                 profile.save()
 
@@ -1641,11 +1640,11 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             if feedback.feedback_type in ['engineering_issue', '2_week', 'independent']:
                 setattr(feedback, 'department', 'engineering')
                 feedback.save()
-                if feedback.feedback_type == 'engineering_issue':
-                    engineering_feedback_notification(feedback, request)
-
-            elif feedback.feedback_type == 'pre_joining':
-                pre_joining_feedback_notification(feedback, request)
+            #     if feedback.feedback_type == 'engineering_issue':
+            #         MessageCard.feedback_card(feedback, request)
+            #
+            # elif feedback.feedback_type == 'pre_joining':
+            #     MessageCard.feedback_card(feedback, request)
 
             consultant = feedback.consultant
             emp_name = request.user.employee_name

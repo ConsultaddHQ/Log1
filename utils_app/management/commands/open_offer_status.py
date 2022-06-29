@@ -2,7 +2,7 @@ from django.core.management import BaseCommand
 
 from constance import config
 from project.models import Project
-from log1.utils import post_msg_using_webhook
+from utils_app.slack_notification import MessageCard
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -28,31 +28,34 @@ class Command(BaseCommand):
 
             data = {
                 "title": "Open Offer Status &#128221;",
-                "text": f"""<table border='2' style='border-collapse:collapse'>
+                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>
                                 <tr>
-                                    <th style="padding:5px 8px 5px 8px;">PO Status</th>
-                                    <th style="padding:5px 8px 5px 8px;">Count</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">PO Status</th>
+                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Count</th>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">New</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{new}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">New</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{new}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Received</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{received}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Received</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{received}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">On-boarded</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{on_boarded}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">On-boarded</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{on_boarded}</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:5px 8px 5px 8px;">Total</td>
-                                    <td style="padding:5px 8px 5px 8px;text-align: center;">{total}</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">Total</td>
+                                    <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{total}</td>
                                 </tr>
                             </table>"""
             }
-            res, msg = post_msg_using_webhook(config.marketing_report_url, data)
-            if msg == 'error':
-                raise Exception(res)
+            payload = {
+                "data": data, "title": data.get('title'), "report_name": job.name,
+            }
+            # res, msg = MessageCard.data_report(payload, config.slack_marketing_report_url)
+            # if msg == 'error':
+            #     raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)
