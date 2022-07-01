@@ -1993,6 +1993,13 @@ class InterviewViewSets(ModelViewSet):
         try:
             passed_reasons = Interview.PASSED_CHOICES
             failed_reasons = Interview.FAILURE_CHOICES
+            is_active = request.query_params.get('is_active', False)
+            if not is_active:
+                failed_reasons_list = list(failed_reasons)
+                failed_reasons_list.append(('hired_else', 'Hired Someone Else'))
+                return Response(
+                    {"passed_reasons": passed_reasons, "failure_reasons": tuple(failed_reasons_list)}, status=200
+                )
             return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -2506,6 +2513,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
+            test.submitted_by = request.user
             test.save()
 
             # Activity

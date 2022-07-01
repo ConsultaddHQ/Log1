@@ -17,5 +17,5 @@ models
 /fixtures
 log1key.json
 log1token.json
-key.json
-token.json
+prod_key.json
+prod_token.json
