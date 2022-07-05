@@ -31,7 +31,8 @@ def create_csv_file(payload):
             aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
         )
         file.seek(0)
-        s3.put_object(Body=file, Bucket=os.getenv('AWS_REPORT_STORAGE_BUCKET_NAME'), Key=f'{file.name}')
+        s3.put_object(Body=file, Key=f'{file.name}', ContentType='application/csv',
+                      Bucket=f'{os.getenv("AWS_REPORT_STORAGE_BUCKET_NAME")}')
         file_url = f"https://{os.getenv('AWS_REPORT_STORAGE_BUCKET_NAME')}.s3.ap-south-1.amazonaws.com/{file.name}"
 
         return file_url
