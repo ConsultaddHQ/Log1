@@ -928,12 +928,16 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             category = request.GET.get('category', None)
+            consultant_type = request.GET.get('type', None)
+            frequency = json.loads(request.GET.get('status')) \
+                if request.GET.get('status', None) else ['active', 'less_active']
 
             engineer = User.objects.filter(
-                projects__end=None, projects__statuses__is_current=True,
-                projects__statuses__frequency__in=['active', 'less_active']
+                projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
+                projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
             ).order_by('employee_id').distinct('employee_id')
-
+            if consultant_type:
+                engineer = engineer.filter(projects__project__is_remote=True)
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 if category:
@@ -956,12 +960,15 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         )
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
+            if consultant_type:
+                projects = projects.filter(is_remote=True)
             counts = self.project_filter_counts(projects)
             total = counts['support_status']['total']['count']
             independent = counts['support_status']['independent']['count']
             counts['support_status']['total']['count'] = total - independent
 
-            serializer = EngineerReportSerializer(engineer[first: last], many=True)
+            context = {"frequency": frequency, "type": consultant_type}
+            serializer = EngineerReportSerializer(engineer[first: last], many=True, context=context)
             return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
         except Exception as error:
             write_exception(error, request)

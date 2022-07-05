@@ -739,7 +739,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"{payload.get('activity_sub_title', '')}\n{payload.get('activity_text', '')}"
+                            "text": f"{payload.get('sub_title', '')}" + "\n" + f"{payload.get('activity_text', '')}"
                         }
                     },
                     {
@@ -1000,8 +1000,6 @@ class MessageCard:
                                     "text": f"{payload.get('employer', 'NA')} - {payload.get('team', 'NA')}"
                                 },
                                 "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
                             },
                             {
                                 "type": "button",
@@ -1011,8 +1009,6 @@ class MessageCard:
                                     "text": f"Total - {payload.get('total', 'NA')}"
                                 },
                                 "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
                             },
                             {
                                 "type": "button",
@@ -1191,63 +1187,68 @@ class MessageCard:
 
     @staticmethod
     def data_report(payload, url):
-        file_url = create_csv_file(payload)
-        card_data = {
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": ":MEMO: Interview Scheduled for today",
-                        "emoji": True
+        try:
+            if payload.get('data') is None:
+                return "No data to display", "ok"
+            file_url = create_csv_file(payload)
+            card_data = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":MEMO: Interview Scheduled for today",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "divider"
                     }
-                },
-                {
+                ]
+            }
+            for data in payload['data']:
+                card_data['blocks'].append(
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": f"CTB-{data.get('ctb', None)}  ::  Round-{data.get('round', 1)}  ::  "
+                                        f"Type-{data.get('type', None)}  ::  Start Time-{data.get('start', None)}  ::  "
+                                        f"Consultant-{data.get('consultant')}  ::  Client-{data.get('client', None)} ::  "
+                                        f"Marketer-{data.get('marketer')}  ::  Job Position-{data.get('position')}",
+                                "emoji": True
+                            },
+                        ]
+                    },
+                )
+                card_data['blocks'].append({
                     "type": "divider"
-                }
-            ]
-        }
-        for data in payload['data']:
+                })
             card_data['blocks'].append(
                 {
-                    "type": "context",
-                    "elements": [
-                        {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "Click on the button to download csv file"
+                    },
+                    "accessory": {
+                        "type": "button",
+                        "text": {
                             "type": "plain_text",
-                            "text": f"CTB-{data.get('ctb', None)}  ::  Round-{data.get('round', 1)}  ::  "
-                                    f"Type-{data.get('type', None)}  ::  Start Time-{data.get('start', None)}  ::  "
-                                    f"Consultant-{data.get('consultant')}  ::  Client-{data.get('client', None)} ::  "
-                                    f"Marketer-{data.get('marketer')}  ::  Job Position-{data.get('position')}",
+                            "text": "Click Me",
                             "emoji": True
                         },
-                    ]
+                        "url": file_url,
+                        "value": "click_me_123",
+                        "action_id": "button-action"
+                    }
                 },
             )
             card_data['blocks'].append({
                 "type": "divider"
             })
-        card_data['blocks'].append(
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "Click on the button to download csv file"
-                },
-                "accessory": {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "Click Me",
-                        "emoji": True
-                    },
-                    "url": file_url,
-                    "value": "click_me_123",
-                    "action_id": "button-action"
-                }
-            },
-        )
-        card_data['blocks'].append({
-            "type": "divider"
-        })
-        res, msg = post_msg_using_webhook(url, card_data)
-        return res, msg
+            res, msg = post_msg_using_webhook(url, card_data)
+            return res, msg
+        except Exception as error:
+            print("No data found")
