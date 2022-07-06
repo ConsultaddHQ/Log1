@@ -403,7 +403,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
     def get_project(self, obj):
         frequency = self.context.get("frequency")
         consultant_type = self.context.get("type")
-        if consultant_type == 'remote':
+        if consultant_type:
             projects = obj.projects.filter(
                 statuses__is_current=True, end=None, project__is_remote=True, statuses__frequency__in=frequency,
             ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)

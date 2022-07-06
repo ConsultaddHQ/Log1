@@ -936,7 +936,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
                 projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
             ).order_by('employee_id').distinct('employee_id')
-            if consultant_type == 'remote':
+            if consultant_type:
                 engineer = engineer.filter(projects__project__is_remote=True)
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -960,7 +960,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                         )
 
             projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
-            if consultant_type == 'remote':
+            if consultant_type:
                 projects = projects.filter(is_remote=True)
             counts = self.project_filter_counts(projects)
             total = counts['support_status']['total']['count']
