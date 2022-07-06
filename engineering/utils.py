@@ -71,7 +71,7 @@ def get_csv_report(payload, request):
         writer = csv.writer(file)
         writer.writerow([
             "Engineer name", "consultant name", "support start date", "project start date", "support duration",
-            "technology", "client", "modified at", "timezone", "status"
+            "technology", "client", "modified at", "timezone", "status", "is_remote"
         ])
         for data in payload:
             count = 0

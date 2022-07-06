@@ -23,6 +23,7 @@ def upload_csv_file_s3(filename):
         s3.put_object(Body=file, Key=f'{file.name}', ContentType='application/csv',
                       Bucket=f'{os.getenv("AWS_REPORT_STORAGE_BUCKET_NAME")}')
         file_url = f"https://{os.getenv('AWS_REPORT_STORAGE_BUCKET_NAME')}.s3.ap-south-1.amazonaws.com/{file.name}"
+        delete_temp_file([file.name])
         return file_url
     except Exception as error:
         write_info(message=f"{error}", function='create_csv_file')
