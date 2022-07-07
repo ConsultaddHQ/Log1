@@ -206,8 +206,9 @@ class ProjectUtil:
 
             total, team = self.fetch_project_count("received")
             interviews = self.project.submission.screening.exclude(status='cancelled')
-            supervisors = "\n".join([f"<li>Round {interview.round} - {interview.supervisor.employee_name}</li>"
-                                     for interview in interviews if interview.supervisor])
+            supervisors = "\n".join([f"{count+1}. Round {interview.round} - {interview.supervisor.employee_name}"
+                                     for interview, count in zip(interviews, range(0, len(interviews)))
+                                     if interview.supervisor])
 
             payload = {
                 "submission_id": self.project.submission.id, "project_id": self.project.id,
