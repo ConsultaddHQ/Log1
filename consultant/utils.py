@@ -184,10 +184,10 @@ def terminate_consultant(terminate, request):
         terminate.save()
 
         # Email for Exit Process Cancelled
-        # if os.environ.get('ENV', 'local') == 'prod':
-        res, error = send_exit_process_mail(terminate, 'complete', request)
-        if error == 'error':
-            write_info(message=error, function='terminate_consultant')
+        if os.environ.get('ENV', 'local') == 'prod':
+            res, error = send_exit_process_mail(terminate, 'complete', request)
+            if error == 'error':
+                write_info(message=error, function='terminate_consultant')
 
         # App Notification
         recruiter = consultant.recruiter

@@ -3,10 +3,10 @@ import json
 import os.path
 import requests
 from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from log1.utils import write_exception, write_info
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
@@ -74,7 +74,7 @@ class GoogleCalendar:
     def get_body(self, data):
         description = self.calendar_description(data)
         if os.environ.get('ENV', 'local') != 'prod':
-            data['attendees'] = [{'email': 'shivam.m@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'}]
+            data['attendees'] = [{'email': 'shivam.k@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'}]
         return {
             'summary': data["summary"],
             'description': description,
@@ -120,7 +120,7 @@ class GoogleCalendar:
             event = self.get_body(data)
             updated_event = service.events().update(calendarId=os.environ.get('LOG1_CALENDER_ID'), eventId=event_id, body=event,
                                                     sendUpdates='all').execute()
-            return updated_event
+            return updated_event, 'ok'
         except Exception as error:
             write_info(message=error, function='update_calendar')
             return str(error), "error"
@@ -149,7 +149,7 @@ class GoogleCalendar:
     def delete_calendar_booking(self, event_id, request):
         try:
             service = self.calendar_con()
-            service.events().delete(calendarId=os.environ.get('LOG1CALENDER_ID'), eventId=event_id, sendUpdates='all').execute()
+            service.events().delete(calendarId=os.environ.get('LOG1_CALENDER_ID'), eventId=event_id, sendUpdates='all').execute()
             return True, "ok"
         except Exception as error:
             write_exception(message=error, request=request)
