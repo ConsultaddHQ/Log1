@@ -1033,7 +1033,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         try:
             query = request.GET.get('query', None)
             category = request.GET.get('category', None)
-            consultant_type = request.GET.get('type', None)
+            consultant_type = json.loads(request.GET.get('remote', 'false'))
             frequency = json.loads(request.GET.get('status')) \
                 if request.GET.get('status', None) else ["active", "less_active"]
 
