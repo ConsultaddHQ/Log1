@@ -417,7 +417,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
                                        project__start_date__gt=date.today())
         elif frequency == ['active']:
             projects = projects.filter(statuses__frequency='active', statuses__is_current=True,
-                                       project__start_date__lt=date.today())
+                                       project__start_date__lte=date.today())
         else:
             projects = projects.filter(statuses__frequency__in=frequency, statuses__is_current=True)
         data = {
