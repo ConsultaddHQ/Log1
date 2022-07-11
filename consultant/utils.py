@@ -377,12 +377,13 @@ def new_recruit_notification(consultant, request):
         cfr = request.data.get('cfr', "NA")
         source = request.data.get('source', "NA")
         feedback = request.data.get('feedback', "NA")
-        visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
+        visa, rate, recruiter_name, recruiter_team = "NA", "NA", "NA", None
         recruiter_gender = ':man::skin-tone-2:'
         qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
         if qs:
             recruiter = qs.first().poc
             recruiter_team = recruiter.team
+            recruiter_name = recruiter.name
             if recruiter.gender == 'female':
                 recruiter_gender = ':red_haired_woman::skin-tone-2:'
 
@@ -404,6 +405,7 @@ def new_recruit_notification(consultant, request):
             "team_count": team_count,
             "total_count": total_count,
             "gender": consultant_gender,
+            "recruiter_name": recruiter_name,
             "recruiter_team": recruiter_team,
             "recruiter_gender": recruiter_gender,
         }
@@ -522,8 +524,8 @@ def create_consultant(request, creator_id):
                 consultant.save()
 
             # Adding Recruiter of Consultant
-            recruiter_employee_id = request.data.get('recruiter')
-            qs = User.objects.filter(email=recruiter_employee_id)
+            recruiter_employee_email = request.data.get('recruiter')
+            qs = User.objects.filter(email=recruiter_employee_email)
             if qs:
                 recruiter = qs.first()
                 ConsultantPOC.objects.create(
