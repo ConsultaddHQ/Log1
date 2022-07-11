@@ -11,6 +11,24 @@ from log1.utils import write_exception, write_info
 from utils_app.mailing import send_email_without_template
 
 
+def upload_csv_file_s3(filename):
+    try:
+        file = open(f'{filename}', 'rb')
+        session = boto3.Session()
+        s3 = session.client(
+            "s3", aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
+        )
+        file.seek(0)
+        s3.put_object(Body=file, Key=f'{file.name}', ContentType='application/csv',
+                      Bucket=f'{os.getenv("AWS_REPORT_STORAGE_BUCKET_NAME")}')
+        file_url = f"https://{os.getenv('AWS_REPORT_STORAGE_BUCKET_NAME')}.s3.ap-south-1.amazonaws.com/{file.name}"
+        delete_temp_file([file.name])
+        return file_url
+    except Exception as error:
+        write_info(message=f"{error}", function='create_csv_file')
+
+
 def create_csv_file(payload):
     try:
         filename = f"{payload.get('report_name')}_{datetime.now().strftime('%d-%B-%Y')}"
@@ -24,16 +42,7 @@ def create_csv_file(payload):
                  data.get('client'), data.get('marketer'), data.get('position')]
             )
         file.close()
-        file = open(f'{filename}.csv', 'rb')
-        session = boto3.Session()
-        s3 = session.client(
-            "s3", aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-        )
-        file.seek(0)
-        s3.put_object(Body=file, Bucket=os.getenv('AWS_REPORT_STORAGE_BUCKET_NAME'), Key=f'{file.name}')
-        file_url = f"https://{os.getenv('AWS_REPORT_STORAGE_BUCKET_NAME')}.s3.ap-south-1.amazonaws.com/{file.name}"
-
+        file_url = upload_csv_file_s3(file.name)
         return file_url
     except Exception as error:
         write_info(message=f"{error}", function='create_csv_file')

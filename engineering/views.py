@@ -17,7 +17,7 @@ from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
 from activity.views import create_activity
-from engineering.utils import tag_and_notify
+from engineering.utils import tag_and_notify, get_csv_report
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, DONT_HAVE_ACCESS, get_page_limits, write_exception
@@ -104,7 +104,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     "independent": {
                         "display_name": "Independent",
                         "count": projects.filter(support__statuses__is_current=True, support_required=True,
-                                                 support__statuses__frequency='independent',).count()
+                                                 support__statuses__frequency='independent').count()
                     },
                     "handover": {
                         "display_name": "Handover",
@@ -814,33 +814,43 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "active": {
                     "display_name": "Active",
                     "count": queryset.filter(
-                        support__end=None, start_date__lt=date.today(),
-                        support__statuses__is_current=True, support__statuses__frequency='active',
+                        end=None, project__start_date__lte=date.today(),
+                        statuses__is_current=True, statuses__frequency='active',
                     ).count()},
                 "training": {
                     "display_name": "Training",
                     "count": queryset.filter(
-                        support__statuses__is_current=True, support__end=None,
-                        support__statuses__frequency='active', start_date__gte=date.today(),
+                        statuses__is_current=True, end=None,
+                        statuses__frequency='active', project__start_date__gt=date.today(),
                     ).count()
                 },
                 "less_active": {
                     "display_name": "Less Active",
                     "count": queryset.filter(
-                        support__statuses__frequency='less_active',
-                        support__end=None, support__statuses__is_current=True,
+                        statuses__frequency='less_active', end=None, statuses__is_current=True,
                     ).count()
                 },
                 "independent": {
                     "display_name": "Independent",
                     "count": queryset.filter(
-                        support__statuses__frequency='independent',
-                        support__end=None, support__statuses__is_current=True,
+                        statuses__frequency='independent', end=None, statuses__is_current=True,
+                    ).count()
+                },
+                "handover": {
+                    "display_name": "Handover",
+                    "count": queryset.filter(
+                        statuses__frequency='independent', end=None, statuses__is_current=True,
+                    ).count()
+                },
+                "terminated": {
+                    "display_name": "Terminated",
+                    "count": queryset.filter(
+                        statuses__frequency='independent', end=None, statuses__is_current=True,
                     ).count()
                 },
                 "total": {
                     "display_name": "Total",
-                    "count": queryset.filter(support__statuses__is_current=True, support__end=None).count()
+                    "count": queryset.filter(statuses__is_current=True, end=None).count()
                 },
             },
         }
@@ -928,12 +938,16 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             category = request.GET.get('category', None)
+            consultant_type = json.loads(request.GET.get('remote', 'false'))
+            frequency = json.loads(request.GET.get('status')) \
+                if request.GET.get('status', None) else ['active', 'less_active']
 
             engineer = User.objects.filter(
-                projects__end=None, projects__statuses__is_current=True,
-                projects__statuses__frequency__in=['active', 'less_active']
+                projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
+                projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
             ).order_by('employee_id').distinct('employee_id')
-
+            if consultant_type:
+                engineer = engineer.filter(projects__project__is_remote=True)
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 if category:
@@ -955,14 +969,72 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             Q(projects__project__submission__lead__vendor_company__name__istartswith=query)
                         )
 
-            projects = Project.objects.exclude(statuses__is_current=True, statuses__status__istartswith='terminated')
-            counts = self.project_filter_counts(projects)
+            support = ProjectSupport.objects.exclude(project__statuses__is_current=True,
+                                                     project__statuses__status__istartswith='terminated')
+            if consultant_type:
+                support = support.filter(project__is_remote=True)
+            counts = self.project_filter_counts(support)
             total = counts['support_status']['total']['count']
             independent = counts['support_status']['independent']['count']
             counts['support_status']['total']['count'] = total - independent
+            counts['remote_count'] = support.filter(project__is_remote=True).count()
 
-            serializer = EngineerReportSerializer(engineer[first: last], many=True)
-            return Response({"data": serializer.data, "counts": counts, "total": engineer.count()}, status=200)
+            context = {"frequency": frequency, "type": consultant_type}
+            serializer = EngineerReportSerializer(engineer[first: last], many=True, context=context)
+            support_list = []
+            if serializer.data and (frequency != ['active', 'less_active'] or consultant_type):
+                for data in serializer.data:
+                    if data['project']['bandwidth'] != 0:
+                        support_list.append(data)
+            else:
+                support_list = serializer.data
+            return Response({"data": support_list, "counts": counts, "total": engineer.count()}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='export')
+    def export(self, request, *args, **kwargs):
+        try:
+            query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
+            consultant_type = json.loads(request.GET.get('remote', 'false'))
+            frequency = json.loads(request.GET.get('status')) \
+                if request.GET.get('status', None) else ["active", "less_active"]
+
+            engineer = User.objects.filter(
+                projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
+                projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
+            ).order_by('employee_id').distinct('employee_id')
+            if consultant_type:
+                engineer = engineer.filter(projects__project__is_remote=True)
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if category:
+                    if category == 'support_name':
+                        engineer = engineer.filter(employee_name__istartswith=query)
+                    elif category == 'consultant_name':
+                        engineer = engineer.filter(projects__project__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        engineer = engineer.filter(projects__project__submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        engineer = engineer.filter(
+                            projects__project__submission__lead__vendor_company__name__istartswith=query
+                        )
+                    else:
+                        engineer = engineer.filter(
+                            Q(employee_name__istartswith=query) |
+                            Q(projects__project__consultant__name__istartswith=query) |
+                            Q(projects__project__submission__client__istartswith=query) |
+                            Q(projects__project__submission__lead__vendor_company__name__istartswith=query)
+                        )
+
+            context = {"frequency": frequency, "type": consultant_type}
+            serializer = EngineerReportSerializer(engineer, many=True, context=context)
+            if serializer.data:
+                report_url = get_csv_report(serializer.data, request)
+                return Response({"data": report_url}, status=200)
+            return Response({"message": "No data found"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
