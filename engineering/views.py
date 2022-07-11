@@ -814,14 +814,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "active": {
                     "display_name": "Active",
                     "count": queryset.filter(
-                        end=None, project__start_date__lt=date.today(),
+                        end=None, project__start_date__lte=date.today(),
                         statuses__is_current=True, statuses__frequency='active',
                     ).count()},
                 "training": {
                     "display_name": "Training",
                     "count": queryset.filter(
                         statuses__is_current=True, end=None,
-                        statuses__frequency='active', project__start_date__gte=date.today(),
+                        statuses__frequency='active', project__start_date__gt=date.today(),
                     ).count()
                 },
                 "less_active": {
