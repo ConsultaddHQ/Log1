@@ -375,7 +375,6 @@ class Interview(TimeStampedModel):
     )
     FAILURE_CHOICES = (
         ('resume_error', 'Error In Resume'),
-        ('hired_else', 'Hired Someone Else'),
         ('internal_hiring', 'Internal Hiring'),
         ('system_updated', 'System Auto Update'),
         ('caught_mimicking', 'Caught us Mimicking'),
@@ -385,7 +384,7 @@ class Interview(TimeStampedModel):
         ('irresponsible_behaviour', "Candidate's Irresponsible Behaviour"),
         ('lack_of_coordination', 'Lack of Coordination Between Coder and Interviewee'),
         ('call_attempted_by_inexperienced', 'Call Attempted by Someone with Less Experience'),
-        ('client_decided_to_fill_the_role_on_a_full-time_basis', 'Client Decided to Fill the Role on a Full-Time Basis'),
+        ('client_decided_to_fill_the_role_on_a_full-time_basis', 'Client Decided to Fill the Role on a Full-Time Basis')
     )
     PASSED_CHOICES = (
         ('call_went_well', 'Call went well'),
