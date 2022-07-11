@@ -70,8 +70,8 @@ def get_csv_report(payload, request):
         file = open(f"engineer_report_{filename}.csv", "w")
         writer = csv.writer(file)
         writer.writerow([
-            "Engineer name", "consultant name", "support start date", "project start date", "support duration",
-            "technology", "client", "modified at", "timezone", "status", "is_remote"
+            "Engineer name", "Consultant Name", "Support Start Date", "Project Start Date", "Support Duration",
+            "Technology", "Client", "Modified at", "Timezone", "Status", "Remote Project"
         ])
         for data in payload:
             count = 0
@@ -80,11 +80,12 @@ def get_csv_report(payload, request):
                 support_info = project['support_info']
                 description = project['description']
                 consultant = project['consultant']
+                modified_at = project['modified_at']['date'] if project.get('modified_at') else "Not Updated"
                 writer.writerow([
                     data.get('employee_name'), consultant.get('name'), support_info.get('start'), project.get('start'),
-                    f'{support_info.get("duration")} months', description.get('technology'),
-                    project['project'].get('client'), project.get('modified_at'), description.get('timezone'),
-                    project.get('support_status'), project.get('is_remote')
+                    f'{support_info.get("duration", 0)} months', description.get('technology'),
+                    project['project'].get('client'), modified_at, description.get('timezone'),
+                    project.get('support_status'), "Yes" if project.get('is_remote') else "No"
                 ])
                 count += 1
         file.close()

@@ -357,7 +357,10 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     def get_modified_at(obj):
         update = obj.project.updates.all().order_by('-created').first()
         if update:
-            return update.created.date()
+            return {
+                "id": update.id,
+                "date": update.created.date()
+            }
         return None
 
     @staticmethod
@@ -404,13 +407,19 @@ class EngineerReportSerializer(serializers.ModelSerializer):
         frequency = self.context.get("frequency")
         consultant_type = self.context.get("type")
         if consultant_type:
-            projects = obj.projects.filter(
-                statuses__is_current=True, end=None, project__is_remote=True, statuses__frequency__in=frequency,
-            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+            projects = obj.projects.filter(end=None, project__is_remote=True,)\
+                .exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
         else:
-            projects = obj.projects.filter(
-                statuses__is_current=True, end=None, statuses__frequency__in=frequency,
-            ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+            projects = obj.projects.filter(end=None)\
+                .exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+        if frequency == ['training']:
+            projects = projects.filter(statuses__frequency='active', statuses__is_current=True,
+                                       project__start_date__gt=date.today())
+        elif frequency == ['active']:
+            projects = projects.filter(statuses__frequency='active', statuses__is_current=True,
+                                       project__start_date__lt=date.today())
+        else:
+            projects = projects.filter(statuses__frequency__in=frequency, statuses__is_current=True)
         data = {
             "bandwidth": len(projects),
             "data": EngineerProjectSerializer(projects, many=True).data
