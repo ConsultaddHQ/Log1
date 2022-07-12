@@ -77,9 +77,9 @@ def get_csv_report(payload, request):
             count = 0
             while count < data['project']['bandwidth']:
                 project = data['project']['data'][count]
-                support_info = project['support_info']
-                description = project['description']
-                consultant = project['consultant']
+                consultant = project.get('consultant')
+                description = project.get('description')
+                support_info = project.get('support_info')
                 modified_at = project['modified_at']['date'] if project.get('modified_at') else "Not Updated"
                 writer.writerow([
                     data.get('employee_name'), consultant.get('name'), support_info.get('start'), project.get('start'),
