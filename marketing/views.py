@@ -27,6 +27,7 @@ from utils_app.slack_notification import MessageCard as slack
 from utils_app.teams_notification import MessageCard as teams
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
+from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
@@ -1197,7 +1198,7 @@ class InterviewViewSets(ModelViewSet):
                 # Ranking Interview
                 if interview.round == 1:
                     interview = self.rank_interviews(interview, 'create')
-                    
+
                 # Calendar attendees and User for sending notification
                 title = get_interview_title(interview)
                 user_list, attendees = get_users_and_attendees(request, interview)
@@ -1397,7 +1398,7 @@ class InterviewViewSets(ModelViewSet):
                 try:
                     if interview.calendar_id:
                         calendar = GoogleCalendar()
-                        calendar.delete_calendar_booking(interview.calendar_id)
+                        calendar.delete_calendar_booking(interview.calendar_id, request)
                 except Exception as error:
                     write_exception(f"Booking deletion failed: {error}", request)
                     return Response({"data": "Calendar booking deletion failed", "error": str(error)}, status=400)
@@ -1483,9 +1484,8 @@ class InterviewViewSets(ModelViewSet):
                     else:
                         desc = "Failed"
 
-                    slack_card_json, teams_card_json = interview_feedback_card(interview, request)
+                    slack_card_json = interview_feedback_card(interview, request)
                     post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
-                    post_msg_using_webhook(config.interview_feedback_url, teams_card_json)
 
                 # Activity
                 create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -1648,10 +1648,10 @@ class InterviewViewSets(ModelViewSet):
             try:
                 if interview.calendar_id:
                     calendar = GoogleCalendar()
-                    calendar.delete_calendar_booking(interview.calendar_id)
+                    calendar.delete_calendar_booking(interview.calendar_id, request)
             except Exception as error:
                 write_exception(f"Booking cancellation failed: {error}", request)
-                return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
+                # return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
 
             interview.feedback = request.data.get('feedback', None)
             interview.status = 'cancelled'
@@ -1877,11 +1877,9 @@ class InterviewViewSets(ModelViewSet):
                 today = datetime.now().astimezone(est)
 
                 if today.date() < interview.start_time.date():
-                    teams.coder_assigned_card(interview, request)
                     slack.coder_assigned_card(interview, request)
 
                 if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
-                    teams.coder_assigned_card(interview, request)
                     slack.coder_assigned_card(interview, request)
 
                 title = get_interview_title(interview)
@@ -1997,6 +1995,13 @@ class InterviewViewSets(ModelViewSet):
         try:
             passed_reasons = Interview.PASSED_CHOICES
             failed_reasons = Interview.FAILURE_CHOICES
+            is_active = request.query_params.get('is_active', False)
+            if not is_active:
+                failed_reasons_list = list(failed_reasons)
+                failed_reasons_list.append(('hired_else', 'Hired Someone Else'))
+                return Response(
+                    {"passed_reasons": passed_reasons, "failure_reasons": tuple(failed_reasons_list)}, status=200
+                )
             return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -2332,11 +2337,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             test_received_notification(test, data.get('con_timezone', 'NA'), request)
             res = "Development Server"
-            # if os.environ.get('ENV', 'local') == 'prod':
-            res, error = self.send_test_mail(test, data, 'new', request)
-            if error == 'error':
-                write_info(message=res, function='create-send_test_mail', request=request)
-                return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
+            if os.environ.get('ENV', 'local') == 'prod':
+                test_received_notification(test, data.get('con_timezone', 'NA'), request)
+                res, error = self.send_test_mail(test, data, 'new', request)
+                if error == 'error':
+                    write_info(message=res, function='create-send_test_mail', request=request)
+                    return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
         except Exception as error:
@@ -2510,6 +2516,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
+            test.submitted_by = request.user
             test.save()
 
             # Activity

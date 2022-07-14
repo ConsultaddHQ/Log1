@@ -15,3 +15,7 @@
 **/media/*
 models
 /fixtures
+log1key.json
+log1token.json
+prod_key.json
+prod_token.json

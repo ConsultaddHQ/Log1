@@ -19,8 +19,13 @@ from activity.serializers import ActivitySerializer
 from utils_app.slack_notification import MessageCard as slack
 from utils_app.teams_notification import MessageCard as teams
 from utils_app.aws_utils import download_s3_object_beats
-from notification.utils import create_notification, push_notification
+from utils_app.slack_notification import MessageCard as slack
 from log1.utils import html_to_text, write_exception, write_info
+from notification.utils import create_notification, push_notification
+<<<<<<< HEAD
+from log1.utils import html_to_text, write_exception, write_info
+=======
+>>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth
 
@@ -185,10 +190,10 @@ def terminate_consultant(terminate, request):
         terminate.save()
 
         # Email for Exit Process Cancelled
-        # if os.environ.get('ENV', 'local') == 'prod':
-        res, error = send_exit_process_mail(terminate, 'complete', request)
-        if error == 'error':
-            write_info(message=error, function='terminate_consultant')
+        if os.environ.get('ENV', 'local') == 'prod':
+            res, error = send_exit_process_mail(terminate, 'complete', request)
+            if error == 'error':
+                write_info(message=error, function='terminate_consultant')
 
         # App Notification
         recruiter = consultant.recruiter
@@ -379,12 +384,17 @@ def new_recruit_notification(consultant, request):
         cfr = request.data.get('cfr', "NA")
         source = request.data.get('source', "NA")
         feedback = request.data.get('feedback', "NA")
+<<<<<<< HEAD
         visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
+=======
+        visa, rate, recruiter_name, recruiter_team = "NA", "NA", "NA", None
+>>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
         recruiter_gender = ':man::skin-tone-2:'
         qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
         if qs:
             recruiter = qs.first().poc
             recruiter_team = recruiter.team
+            recruiter_name = recruiter.name
             if recruiter.gender == 'female':
                 recruiter_gender = ':red_haired_woman::skin-tone-2:'
 
@@ -406,11 +416,18 @@ def new_recruit_notification(consultant, request):
             "team_count": team_count,
             "total_count": total_count,
             "gender": consultant_gender,
+<<<<<<< HEAD
+=======
+            "recruiter_name": recruiter_name,
+>>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
             "recruiter_team": recruiter_team,
             "recruiter_gender": recruiter_gender,
         }
         slack.new_recruit_card(consultant, payload, request)
+<<<<<<< HEAD
         teams.new_recruit_card(consultant, payload, request)
+=======
+>>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
     except Exception as error:
         write_exception(message=error, request=request)
 
@@ -525,8 +542,8 @@ def create_consultant(request, creator_id):
                 consultant.save()
 
             # Adding Recruiter of Consultant
-            recruiter_employee_id = request.data.get('recruiter')
-            qs = User.objects.filter(email=recruiter_employee_id)
+            recruiter_employee_email = request.data.get('recruiter')
+            qs = User.objects.filter(email=recruiter_employee_email)
             if qs:
                 recruiter = qs.first()
                 ConsultantPOC.objects.create(

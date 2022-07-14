@@ -296,6 +296,7 @@ class TrainingCheckListSerializer(serializers.ModelSerializer):
 
 class EngineerProjectSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
+    is_remote = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
     modified_at = serializers.SerializerMethodField()
@@ -305,7 +306,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectSupport
         fields = ('id', 'created', 'start', 'end', 'feedback', 'support_status', 'consultant', 'project', 'description',
-                  'support_info', 'modified_at')
+                  'support_info', 'modified_at', 'is_remote')
 
     @staticmethod
     def get_support_status(obj):
@@ -381,13 +382,18 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             else:
                 diff = date.today() - start_date
             if diff.days < 7:
-                return f"0.0.{diff.days}"
+                return {"duration": f"0.0.{diff.days}", "start": start_date}
             months = int(diff.days) // 30
             weeks = round(int(diff.days - months * 30) // 7, 0)
             duration = months + weeks / 10
         else:
             duration = 0
         return {"duration": duration, "start": start_date}
+
+    @staticmethod
+    def get_is_remote(obj):
+        is_remote = obj.project.is_remote
+        return is_remote
 
 
 class EngineerReportSerializer(serializers.ModelSerializer):
@@ -397,11 +403,23 @@ class EngineerReportSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'employee_id', 'email', 'employee_name', 'project')
 
-    @staticmethod
-    def get_project(obj):
-        projects = obj.projects.filter(
-            statuses__is_current=True, statuses__frequency__in=['active', 'less_active'], end=None,
-        ).exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+    def get_project(self, obj):
+        frequency = self.context.get("frequency")
+        consultant_type = self.context.get("type")
+        if consultant_type:
+            projects = obj.projects.filter(end=None, project__is_remote=True,)\
+                .exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+        else:
+            projects = obj.projects.filter(end=None)\
+                .exclude(project__statuses__status__istartswith='terminated', project__statuses__is_current=True)
+        if frequency == ['training']:
+            projects = projects.filter(statuses__frequency='active', statuses__is_current=True,
+                                       project__start_date__gt=date.today())
+        elif frequency == ['active']:
+            projects = projects.filter(statuses__frequency='active', statuses__is_current=True,
+                                       project__start_date__lte=date.today())
+        else:
+            projects = projects.filter(statuses__frequency__in=frequency, statuses__is_current=True)
         data = {
             "bandwidth": len(projects),
             "data": EngineerProjectSerializer(projects, many=True).data

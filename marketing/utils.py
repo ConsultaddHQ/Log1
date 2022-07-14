@@ -9,7 +9,6 @@ from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
-from utils_app.teams_notification import MessageCard as teams
 from marketing.models import Submission, Interview, Question, Answer
 
 
@@ -175,7 +174,6 @@ def coder_request_notification(interview, title, request):
             "interview": interview
         }
         slack.coder_request_card(payload, request)
-        teams.coder_request_card(payload, request)
         return "ok"
     except Exception as error:
         write_exception(error, request)
@@ -299,6 +297,8 @@ def interview_card_data(obj, request):
         interview_data = []
         container_names = []
         coding_feedback_data = []
+        log1_container_names = {}
+        log1_container_position = 0
         supervisor_feedback_data = []
         interview_info = [
             {
@@ -359,6 +359,8 @@ def interview_card_data(obj, request):
         if obj.status == 'offer':
             emoji = ':v:'
         container_names.append(f"{emoji} Interview Feedback")
+        log1_container_names[log1_container_position] = f"{emoji} Interview Feedback"
+        log1_container_position += 2
 
         coding_feedback = obj.supervisor_feedback.filter(
             question__form_name='coding').order_by('question_id').distinct('question_id')
@@ -382,6 +384,8 @@ def interview_card_data(obj, request):
             )
             interview_data.append(coding_feedback_data)
             container_names.append(":computer: Coder's Feedback")
+            log1_container_names[log1_container_position] = f"🔹 Coder's Feedback"
+            log1_container_position += 2
 
         supervisor_feedback = obj.supervisor_feedback.filter(
             question__form_name='interview').order_by('question__position')
@@ -399,6 +403,8 @@ def interview_card_data(obj, request):
             )
             interview_data.append(supervisor_feedback_data)
             container_names.append(":telephone_receiver: Supervisor's Feedback")
+            log1_container_names[log1_container_position] = f"🔹 Supervisor's Feedback"
+            log1_container_position += 2
 
         status = "NA"
         for i in obj.STATUS_CHOICES:
@@ -410,17 +416,19 @@ def interview_card_data(obj, request):
         ]
         interview_data.append(marketer_feedback_data)
         container_names.append(":lower_left_fountain_pen: Vendor/Client's Feedback")
+        log1_container_names[log1_container_position] = f"🔹 Vendor/Client's Feedback"
+        log1_container_position += 2
 
-        return interview_data, container_names
+        return interview_data, container_names, log1_container_names
     except Exception as error:
         write_exception(error, request)
 
 
 def interview_feedback_card(obj, request):
     try:
-        interview_data, header_names = interview_card_data(obj, request)
-        slack_card_data = slack.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
-        teams_card_data = teams.interview_feedback_card(interview_data=interview_data, header_names=header_names, request=request)
-        return slack_card_data, teams_card_data
+        interview_data, header_names, teams_container_names = interview_card_data(obj, request)
+        slack_card_data = slack.interview_feedback_card(interview_data, header_names, request)
+        # teams_card_data = teams.interview_feedback_card(interview_data, teams_container_names, request)
+        return slack_card_data
     except Exception as error:
         write_exception(error, request)
