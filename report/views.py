@@ -712,7 +712,7 @@ class MarketingReportViewSets(GenericViewSet):
                 data.append({
                     "id": user.id,
                     "offer": offer_count,
-                    "team": user.team.name,
+                    "team": user.team.name if user.team else 'NA',
                     "submission": submission_count,
                     "employee_name": user.employee_name,
                     "unique_interview": unique_interview_count,

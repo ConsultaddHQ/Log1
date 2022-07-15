@@ -1875,10 +1875,10 @@ class InterviewViewSets(ModelViewSet):
                 today = datetime.now().astimezone(est)
 
                 if today.date() < interview.start_time.date():
-                    slack.coder_assigned_card(interview, request)
+                    coder_request_notification(interview, "Coding Assignment", request)
 
                 if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
-                    slack.coder_assigned_card(interview, request)
+                    coder_request_notification(interview, "Coding Assignment", request)
 
                 title = get_interview_title(interview)
                 _, attendees = get_users_and_attendees(request, interview)
