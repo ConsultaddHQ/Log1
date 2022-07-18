@@ -18,11 +18,11 @@ from marketing.utils import *
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
-from utils_app.calendar import Calendar, GoogleCalendar
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
 from activity.serializers import ActivitySerializer
+from utils_app.calendar import Calendar, GoogleCalendar
 from attachment.models import Attachment, create_attachment
 from utils_app.mailing import send_email_attachment_multiple
 from utils_app.slack_notification import MessageCard as slack
@@ -1147,6 +1147,97 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
 
             return Response({"counts": screen_data, "data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='export')
+    def export(self, request, *args, **kwargs):
+        query = request.GET.get('query', None)
+        filter_for = request.GET.get('filter_for', 'all')
+        filter_json = request.GET.get('filter_json', None)
+
+        try:
+            user_id = request.user.id
+            roles = request.user.roles
+            team = request.user.team
+            queryset = Interview.objects.all()
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if query.isnumeric():
+                    queryset = queryset.filter(
+                        Q(id=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+
+            if filter_for == 'my':
+                if 'interviewee' in roles:
+                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
+                else:
+                    queryset = queryset.filter(submission__created_by_id=user_id)
+
+            elif filter_for == 'team':
+                queryset = queryset.filter(submission__created_by__team=team)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+
+                if 'assignment' in filters:
+                    if filters["assignment"] == 'assigned':
+                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
+                    if filters["assignment"] == 'unassigned':
+                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
+
+                if 'coding_interview' in filters:
+                    if filters["coding_interview"] == 'yes':
+                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                    elif filters["coding_interview"] == 'no':
+                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+
+                if 'status' in filters and len(filters["status"]) > 0:
+                    queryset = queryset.filter(status__in=filters["status"])
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
+
+                if 'ctb' in filters and len(filters["ctb"]) > 0:
+                    queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
+
+                if 'client' in filters and len(filters["client"]) > 0:
+                    queryset = queryset.filter(submission__client__in=filters["client"])
+
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
+
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters["vendor"])
+
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    queryset = queryset.filter(
+                        submission__consultant_marketing__consultant_id__in=filters["consultant"]
+                    )
+
+                start_time = filters.get('start_time', None)
+                queryset = date_filter(queryset, start_time, "start_time")
+
+            queryset = queryset.order_by('id').distinct('id')
+            serializer = InterviewListSerializer(queryset, many=True)
+            if serializer.data:
+                report = get_interview_report(serializer.data, request)
+                return report
+            return Response({"message": "No Data to Extract"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
