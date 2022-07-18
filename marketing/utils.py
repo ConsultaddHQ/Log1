@@ -1,4 +1,6 @@
+import csv
 import json
+from django.http import HttpResponse
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
@@ -337,5 +339,27 @@ def interview_feedback_card(obj, request):
         interview_data = interview_card_data(obj, request)
         slack_card_data = slack.interview_feedback_card(obj, interview_data, request)
         return slack_card_data
+    except Exception as error:
+        write_exception(error, request)
+
+
+def get_interview_report(payload, request):
+    try:
+        response = HttpResponse(content_type='text/csv')
+        writer = csv.writer(response)
+        writer.writerow([
+            "Interview Id", "Consultant Name", "Marketer Name", "Supervisor Name", "Client Name", "Vendor Name",
+            "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack", "Status", "Failure Reason", "Passed Reason"
+        ])
+        for data in payload:
+            writer.writerow([
+                data.get('id', None), data.get('consultant_name', None), data['submission'].get('marketer_name', None),
+                f"{data['supervisor_detail']['supervisor_name']}({data['supervisor_detail']['call_given_by']})",
+                data['submission'].get('client', None), data['submission'].get('vendor', None), data.get('round', None),
+                data.get('start_time', None), data.get('interview_mode', None), data.get('screening_type', None),
+                data.get('tech_stack', None), data.get('status', None), data.get('failure_reason', None),
+                data.get('passed_reason', None),
+            ])
+        return response
     except Exception as error:
         write_exception(error, request)
