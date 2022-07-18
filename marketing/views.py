@@ -26,7 +26,8 @@ from activity.serializers import ActivitySerializer
 from utils_app.slack_notification import MessageCard as slack
 from utils_app.teams_notification import MessageCard as teams
 from attachment.models import Attachment, create_attachment
-from utils_app.mailing import send_email_attachment_multiple
+# from utils_app.mailing import send_email_attachment_multiple
+from utils_app.thred_mail import send_email_attachment_multiple
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
@@ -2067,6 +2068,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 cc = [created_by.email] + scrum_masters
                 subject = f'Test Received :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills} '
                 resume = test.submission.attachments.filter(attachment_type='resume')
+                breakpoint()
                 if resume:
                     response, error = download_s3_object(resume.first().attachment_file.name)
                     path.append(response)
@@ -2337,8 +2339,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             test_received_notification(test, data.get('con_timezone', 'NA'), request)
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                test_received_notification(test, data.get('con_timezone', 'NA'), request)
+            breakpoint()
+            if True:
+                # test_received_notification(test, data.get('con_timezone', 'NA'), request)
                 res, error = self.send_test_mail(test, data, 'new', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)

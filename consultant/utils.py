@@ -22,10 +22,6 @@ from utils_app.aws_utils import download_s3_object_beats
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import html_to_text, write_exception, write_info
 from notification.utils import create_notification, push_notification
-<<<<<<< HEAD
-from log1.utils import html_to_text, write_exception, write_info
-=======
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
 from consultant.models import Consultant, ConsultantProfile, ConsultantPOC, ConsultantMarketing, EXIT_TYPE_CHOICE, \
     ConsultantRateRevision, Education, Experience, WorkAuth
 
@@ -384,11 +380,7 @@ def new_recruit_notification(consultant, request):
         cfr = request.data.get('cfr', "NA")
         source = request.data.get('source', "NA")
         feedback = request.data.get('feedback', "NA")
-<<<<<<< HEAD
         visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
-=======
-        visa, rate, recruiter_name, recruiter_team = "NA", "NA", "NA", None
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
         recruiter_gender = ':man::skin-tone-2:'
         qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
         if qs:
@@ -416,18 +408,11 @@ def new_recruit_notification(consultant, request):
             "team_count": team_count,
             "total_count": total_count,
             "gender": consultant_gender,
-<<<<<<< HEAD
-=======
-            "recruiter_name": recruiter_name,
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
             "recruiter_team": recruiter_team,
             "recruiter_gender": recruiter_gender,
         }
         slack.new_recruit_card(consultant, payload, request)
-<<<<<<< HEAD
         teams.new_recruit_card(consultant, payload, request)
-=======
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
     except Exception as error:
         write_exception(message=error, request=request)
 

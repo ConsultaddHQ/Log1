@@ -2,11 +2,7 @@ import os
 
 import boto3
 from constance import config
-<<<<<<< HEAD
 from utils_app.utils import create_table_image
-=======
-from utils_app.utils import create_csv_file
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
 from log1.utils import write_exception, post_msg_using_webhook
 
 
@@ -158,13 +154,8 @@ class MessageCard:
                             "type": "mrkdwn",
                             "text":
                                 f"*Consultant*\n"
-<<<<<<< HEAD
-                                f"{payload.get('consultant_gender')} *Name* :  {consultant}\n"
-                                f"{payload.get('consultant_gender')} *Email* :  {consultant.email}\n"
-=======
                                 f"{payload.get('gender')} *Name* :  {consultant}\n"
                                 f"{payload.get('gender')} *Email* :  {consultant.email}\n"
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
                                 f"{payload.get('recruiter_gender')} *Recruiter* :  {payload.get('recruiter_name', 'NA')}\n"
                                 f"✨ *Profile* :  {consultant.skills} \n"
                                 f"🇺🇸 *Visa* :  {payload.get('visa', 'NA')}\n"
@@ -748,11 +739,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-<<<<<<< HEAD
-                            "text": f"{payload.get('activity_sub_title', '')}\n{payload.get('activity_text', '')}"
-=======
                             "text": f"{payload.get('sub_title', '')}" + "\n" + f"{payload.get('activity_text', '')}"
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
                         }
                     },
                     {
@@ -1013,11 +1000,6 @@ class MessageCard:
                                     "text": f"{payload.get('employer', 'NA')} - {payload.get('team', 'NA')}"
                                 },
                                 "style": "primary",
-<<<<<<< HEAD
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-=======
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
                             },
                             {
                                 "type": "button",
@@ -1027,11 +1009,6 @@ class MessageCard:
                                     "text": f"Total - {payload.get('total', 'NA')}"
                                 },
                                 "style": "primary",
-<<<<<<< HEAD
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-=======
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa
                             },
                             {
                                 "type": "button",
@@ -1209,55 +1186,6 @@ class MessageCard:
             return str(error)
 
     @staticmethod
-<<<<<<< HEAD
-    def data_report(data, url):
-        title = data.get('title')
-        image_name = create_table_image(data['data']['text'], data.get('report_name'))
-        file = open(image_name, 'rb')
-        session = boto3.Session()
-        s3 = session.client(
-            "s3", aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY')
-        )
-        file.seek(0)
-        s3.put_object(Body=file, Bucket='bugtracking', Key=f'{file.name}')
-        image_url = f"https://bugtracking.s3.ap-south-1.amazonaws.com/{file.name}"
-
-        card_data = {
-            "blocks": [
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": f"*{title}*",
-                        "emoji": True
-                    }
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "image",
-                    "image_url": image_url,
-                    "alt_text": "report_data"
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": " "
-                        }
-                    ]
-                }
-            ]
-        }
-        res, msg = post_msg_using_webhook(url, card_data)
-        return res, msg
-=======
     def data_report(payload, url):
         try:
             if payload.get('data') is None:
@@ -1324,4 +1252,3 @@ class MessageCard:
             return res, msg
         except Exception as error:
             print("No data found")
->>>>>>> 2dd22b2e6835411b1c0fce630e8347be628cbafa

@@ -1,16 +1,16 @@
 import os
-import os.path
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from email.mime.text import MIMEText
-from celery import shared_task
-from django.template.loader import render_to_string
-from django.core.mail import EmailMultiAlternatives
-
-from log1.utils import write_exception, write_info
 import base64
+import os.path
+from email import encoders
+from celery import shared_task
+from email.mime.text import MIMEText
+from email.mime import multipart, base
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from log1.utils import write_exception, write_info
+from django.template.loader import render_to_string
+from google_auth_oauthlib.flow import InstalledAppFlow
 
 
 SCOPES = ['https://mail.google.com/','https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send']
@@ -38,7 +38,17 @@ def get_field(email, field_name):
     for m in header:
         if m['name'] == field_name:
             return m['value']   
-        
+
+
+def add_file(filepath, filename, object):
+    attachment = open(filepath, "rb")
+    p = base.MIMEBase('application', 'octet-stream')
+    p.set_payload((attachment).read())
+    encoders.encode_base64(p)
+    p.add_header('Content-Disposition', "attachment; filename= %s" % filename)
+    object.attach(p)
+    return object        
+
 
 def create_message(from_email, mail_data):
     body = render_to_string(mail_data["template"], mail_data["context"])
@@ -48,49 +58,57 @@ def create_message(from_email, mail_data):
     message['subject'] = mail_data["subject"]
     message['from'] = from_email
     if os.environ.get('ENV', 'local') == 'prod':
-        message['to'] = mail_data["to"]
-        message['cc'] = mail_data["cc"]
-        message['bcc'] = mail_data["bcc"]
+        message['to'] = ','.join(mail_data["to"])
+        message['cc'] = ','.join(mail_data["cc"])
+        message['bcc'] = ','.join(mail_data["bcc"])
         
     else:
-        message['to'] = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
-        message['cc'] = []
-        message['bcc'] = []
+        message['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+        message['cc'] = ''
+        message['bcc'] = ''
 
     return {'raw': base64.urlsafe_b64encode(message.as_string())}
 
 
+def set_mail_config(to, from_mail, cc, bcc, subject, object):
+    if os.environ.get('ENV', 'local') == 'prod':
+        object['from'] = from_mail
+        object['to'] = ','.join(to)
+        object['cc'] = ','.join(cc)
+        object['subject'] = subject
+        object['bcc'] = ','.join(bcc)
+    else:
+        object['cc'] = ''
+        object['bcc'] = ''        
+        object['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+    return object
+
+
 @shared_task
 def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=None):
-    service = cred()
-    email_data = service.users().messages().get(userId='me', id=mail_id).execute()
+    try:
+        service = cred()
+        email_data = service.users().messages().get(userId='me', id=mail_id).execute()
 
-    body = render_to_string(mail_data["template"], mail_data["context"])
-    body = body.replace("\\r\\n", "<br>").replace(";newline;", "<br>").replace(
-            "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")    
-    message = MIMEText(body, 'html')
-    message['to'] = mail_data["to"]
-    message['from'] = from_email
-    message['subject'] = get_field(email_data, 'subject')
-    message['In-Reply-To'] = get_field(email_data, 'Message-Id')
-    message['References'] = get_field(email_data, 'Message-Id')
-
-    if os.environ.get('ENV', 'local') == 'prod':
-        message['to'] = mail_data["to"]
-        message['cc'] = mail_data["cc"]
-        message['bcc'] = mail_data["bcc"]
-        
-    else:
-        message['to'] = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
-        message['cc'] = []
-        message['bcc'] = []
-        
-    email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode()}}
-    service = cred()
-    draft = service.users().drafts().create(userId='me', body=email_body).execute()
-    message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
-    return message['id'], True    
-
+        body = render_to_string(mail_data["template"], mail_data["context"])
+        body = body.replace("\\r\\n", "<br>").replace(";newline;", "<br>").replace(
+                "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")    
+        message = MIMEText(body, 'html')
+        subject = get_field(email_data, 'subject')
+        message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
+        message['In-Reply-To'] = get_field(email_data, 'Message-Id')
+        message['References'] = get_field(email_data, 'Message-Id')
+        email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode()}}
+        draft = service.users().drafts().create(userId='me', body=email_body).execute()
+        message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
+        return message['id'], True   
+     
+    except Exception as error:
+        write_exception(message=error, request=request)
+        invalid_keys = ['template', 'context']
+        data = {x: mail_data[x] for x in mail_data if x not in invalid_keys}
+        write_info(message=str(data), function='send_email', request=request)
+        return str(error), False
 
 
 @shared_task
@@ -110,23 +128,27 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
 
 
 @shared_task
-def send_email_without_template(mail_data, from_email, request=None):
+def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
-        message = MIMEText(mail_data["body"])
-        message['subject'] = mail_data["subject"]
-        message['from'] = from_email
-        if os.environ.get('ENV', 'local') == 'prod':
-            message['to'] = mail_data["to"]
-            message['cc'] = mail_data["cc"]
-            message['bcc'] = mail_data["bcc"]
-            
-        else:
-            message['to'] = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
-            message['cc'] = []
-            message['bcc'] = []
         service = cred()
-        message = (service.users().messages().send(userId="me", body={'raw': base64.urlsafe_b64encode(message.as_string())}).execute())
-        return message['id'], True
+        if mail_id:
+            email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
+            message = MIMEText(mail_data["body"])
+            subject = get_field(email_data, 'subject')
+            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
+            message['In-Reply-To'] = get_field(email_data, 'Message-Id')
+            message['References'] = get_field(email_data, 'Message-Id')
+            email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode()}}
+            draft = service.users().drafts().create(userId='me', body=email_body).execute()
+            message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
+            return message['id'], True
+        else:
+            message = MIMEText(mail_data["body"])
+            subject = mail_data["subject"]
+            message['from'] = from_email
+            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
+            message = (service.users().messages().send(userId="me", body={'raw': base64.urlsafe_b64encode(message.as_string())}).execute())
+            return message['id'], True
 
     except Exception as error:
         write_exception(message=error, request=request)
@@ -137,34 +159,59 @@ def send_email_without_template(mail_data, from_email, request=None):
 
 
 @shared_task
-def send_email_attachment_multiple(mail_data, from_email, reply_to=None, request=None):
-    if os.environ.get('ENV', 'local') == 'prod':
-        to = mail_data["to"]
-        cc = mail_data["cc"]
-        bcc = mail_data["bcc"]
-    else:
-        cc, bcc = [], []
-        to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
-    breakpoint()
-    if reply_to is None:
-        reply_to = []
+def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None):
     try:
-        msg = EmailMultiAlternatives(
-            body="body",
-            reply_to=reply_to,
-            from_email=from_email,
-            to=to, cc=cc, bcc=bcc,
-            subject=mail_data["subject"],
-        )
+        service = cred()
+        if mail_id is not None:
+            email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
+            message = multipart.MIMEMultipart()
 
-        body = render_to_string(mail_data["template"], mail_data["context"])
-        body = body.replace("\\n", "<br>").replace(";newline;", "<br>").replace(
-            "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
-        msg.attach_alternative(body, 'text/html')
-        for i in mail_data["attachments"]:
-            msg.attach_file(i)
-        msg.send()
-        return "mail sent", True
+            subject = get_field(email_data, 'subject')
+            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message)            
+            message['In-Reply-To'] = get_field(email_data, 'Message-Id')
+            message['References'] = get_field(email_data, 'Message-Id')
+
+            if reply_to is None:
+                reply_to = []
+                message['reply_to'] = ','.join(mail_data["reply_to"])
+                body = render_to_string(mail_data["template"], mail_data["context"])
+                body = body.replace("\\n", "<br>").replace(";newline;", "<br>").replace(
+                    "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+                message.attach(MIMEText(body,'html'))
+                
+                for i in mail_data["attachments"]:
+                    filename = i.split('/')[2]
+                    message = add_file(i, filename, message)
+    
+                b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
+                b64_string = b64_bytes.decode()
+        
+            email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : b64_string}}
+            draft = service.users().drafts().create(userId='me', body=email_body).execute()
+            message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
+            return message['id'], True
+        else:
+            message = multipart.MIMEMultipart()
+            message['from'] = from_email
+            subject = mail_data["subject"]
+            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
+            
+            if reply_to is None:
+                # reply_to = []
+                # message['reply_to'] = ','.join(mail_data["reply_to"])
+                body = render_to_string(mail_data["template"], mail_data["context"])
+                body = body.replace("\\n", "<br>").replace(";newline;", "<br>").replace(
+                    "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
+                message.attach(MIMEText(body,'html'))
+                
+                for i in mail_data["attachments"]:
+                    filename = i.split('/')[2]
+                    message = add_file(i, filename, message)
+    
+                b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
+                b64_string = b64_bytes.decode()
+                message = (service.users().messages().send(userId="me", body={'raw':b64_string}).execute())
+                return message['id'], True
     except Exception as error:
         write_exception(message=error, request=request)
         invalid_keys = ['template', 'context']
