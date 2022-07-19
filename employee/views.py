@@ -1,3 +1,4 @@
+import json
 from itertools import chain
 from datetime import timedelta, datetime
 
@@ -25,7 +26,7 @@ from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
-    AssetSerializer, UserDirectorySerializer, HandoverSerializer
+    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer
 
 
 # Route - /auth/
@@ -318,7 +319,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:
-            return Response({"data": UserSerializer(request.user).data}, status=200)
+            return Response({"data": UserDashboardSerializer(request.user).data}, status=200)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
@@ -338,7 +339,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             if query == 'all':
                 teams = Team.objects.exclude(dept='marketing').values('id', 'name')
             else:
-                teams = Team.objects.filter(dept='Marketing').values('id', 'name')
+                teams = Team.objects.all().values('id', 'name')
             return Response({"data": teams}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -387,6 +388,34 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 serializer = UserDirectorySerializer(users[first:last], many=True)
                 return Response({"data": serializer.data, "total": total}, status=200)
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=False, url_path='update')
+    def update_user(self, request):
+        try:
+            data = request.data
+            employee = request.user
+            employee.phone = data.get('phone', employee.phone)
+            employee.shift = data.get('shift', employee.shift)
+            employee.gender = data.get('gender', employee.gender)
+            employee.employee_name = data.get('employee_name', employee.employee_name)
+            employee.team = Team.objects.get(name=data.get('team', employee.team.name))
+            employee.technology = json.loads(data.get('technology')) if data.get('technology') else employee.technology
+            if request.FILES.get('image'):
+                employee.avatar = request.FILES['image']
+            employee.save()
+            return Response({"message": "User Profile Updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='shifts')
+    def shift_timings(self, request):
+        try:
+            data = User.SHIFT_CHOICE
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

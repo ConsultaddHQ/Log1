@@ -217,8 +217,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        exclude = ('notes', 'calendar_id', 'description', 'call_details', 'attachment_link',
-                   'failure_reason', 'supervisor')
+        exclude = ('notes', 'calendar_id', 'description', 'call_details', 'attachment_link', 'supervisor')
 
     @staticmethod
     def get_submission(obj):
