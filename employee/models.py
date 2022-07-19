@@ -88,6 +88,12 @@ class User(AbstractUser, PermissionsMixin):
         ('male', 'Male'),
         ('female', 'Female')
     )
+    SHIFT_CHOICE = (
+        ('morning', 'Morning Shift- 6 AM to 3 PM'),
+        ('general', 'General Shift- 10 AM to 7 PM'),
+        ('evening', 'Evening Shift- 5:30 PM to 2:30 AM'),
+        ('afternoon', 'Afternoon Shift- 12 Noon to 9 PM'),
+    )
     email = models.EmailField(_('Email'))
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -97,9 +103,11 @@ class User(AbstractUser, PermissionsMixin):
     employee_id = models.IntegerField(_('Employee ID'), unique=True)
     date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
     employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
+    slack_id = models.CharField(_("Slack Id"), max_length=20, null=True, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
+    shift = models.CharField(_('Shift Time'), choices=SHIFT_CHOICE, max_length=20, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name='employees', null=True, blank=True)
     technology = ArrayField(models.CharField(_('Technologies'), max_length=30, blank=True), blank=True, null=True)
 
