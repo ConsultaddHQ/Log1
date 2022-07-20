@@ -206,8 +206,10 @@ class ProjectUtil:
 
             total, team = self.fetch_project_count("received")
             interviews = self.project.submission.screening.exclude(status='cancelled')
-            supervisors = "\n".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
+            supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
                                      if interview.supervisor.slack_id else interview.supervisor.employee_name
+                                    if interview.supervisor.employee_id != 9999
+                                    else self.project.submission.consultant.name
                                      for interview, count in zip(interviews, range(0, len(interviews)))
                                      if interview.supervisor])
 

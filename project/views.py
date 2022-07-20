@@ -241,7 +241,7 @@ class ProjectViewSets(ModelViewSet):
                 return res, "error"
             return res, "ok"
         except Exception as error:
-            write_exception(message=f"Offer mail error for {marketer.email}: {error}")
+            write_exception(message=f"Offer mail error for {marketer.email}: {error}", request=request)
             return error, "error"
 
     @staticmethod
@@ -577,7 +577,7 @@ class ProjectViewSets(ModelViewSet):
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
 
-                    util.send_join_notification()
+                    # util.send_join_notification()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:

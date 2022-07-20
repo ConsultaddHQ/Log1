@@ -5,7 +5,7 @@ from activity.models import Activity, Comment, ConsultantComment
 
 @admin.register(Activity)
 class ActivityAdmin(ExportActionModelAdmin):
-    list_filter = ('activity_type', 'content_type__model')
+    list_filter = ('activity_type', 'content_type__model', 'object_id')
     search_fields = ('user__employee_name', 'activity_type', 'content_type__model')
     list_display = ('id', 'user', 'object_id', 'activity_type', 'content_type')
 
