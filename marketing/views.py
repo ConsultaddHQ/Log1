@@ -1328,8 +1328,8 @@ class InterviewViewSets(ModelViewSet):
                     # data = MessageCard.get_simple_card(payload)
                     # post_msg_using_webhook(config.slack_announcement_url, data)
 
-                if interview.guest_type in ['coder', 'assistance']:
-                    coder_request_notification(interview, "Coding request", request)
+                # if interview.guest_type in ['coder', 'assistance']:
+                    # coder_request_notification(interview, "Coding request", request)
 
                 data = queryset.annotate(
                     rank=F('submission__rank'),
@@ -1438,12 +1438,12 @@ class InterviewViewSets(ModelViewSet):
                         if msg == "error":
                             return Response({"message": "Calendar update failed", "error": res}, status=400)
 
-                if interview.guest_type in ['coder', 'assistance'] and (
-                        pre_guest_type == 'not_required' or pre_guest_type is None):
-                    coder_request_notification(interview, "Coding request", request)
+                # if interview.guest_type in ['coder', 'assistance'] and (
+                #         pre_guest_type == 'not_required' or pre_guest_type is None):
+                #     coder_request_notification(interview, "Coding request", request)
 
                 if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
-                    coder_request_notification(interview, "Coding not required for this Interview", request)
+                    # coder_request_notification(interview, "Coding not required for this Interview", request)
                     interview.guest.clear()
 
                 # Activity
@@ -1694,15 +1694,15 @@ class InterviewViewSets(ModelViewSet):
 
                     if today.date() < interview.start_time.date():
                         title = "Coding request, Interview Rescheduled"
-                        coder_request_notification(interview, title, request)
+                    #     coder_request_notification(interview, title, request)
 
                     if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
                         title = "Coding request, Interview Rescheduled"
-                        coder_request_notification(interview, title, request)
+                    #     coder_request_notification(interview, title, request)
 
                     if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
                         title = "Coding request"
-                        coder_request_notification(interview, title, request)
+                    #     coder_request_notification(interview, title, request)
 
                 data = queryset.annotate(
                     client=F('submission__client'),
@@ -1759,9 +1759,9 @@ class InterviewViewSets(ModelViewSet):
             submission.is_active = True
             submission.save()
 
-            if interview.guest_type in ['coder', 'assistance']:
-                title = "Interview cancelled, coding is not required"
-                coder_request_notification(interview, title, request)
+            # if interview.guest_type in ['coder', 'assistance']:
+            #     title = "Interview cancelled, coding is not required"
+                # coder_request_notification(interview, title, request)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
@@ -1965,11 +1965,11 @@ class InterviewViewSets(ModelViewSet):
                 est = pytz.timezone('US/Eastern')
                 today = datetime.now().astimezone(est)
 
-                if today.date() < interview.start_time.date():
-                    coder_request_notification(interview, "Coding Assignment", request)
+                # if today.date() < interview.start_time.date():
+                #     coder_request_notification(interview, "Coding Assignment", request)
 
-                if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
-                    coder_request_notification(interview, "Coding Assignment", request)
+                # if today.date() == interview.start_time.date() and today.time() < interview.start_time.time():
+                #     coder_request_notification(interview, "Coding Assignment", request)
 
                 title = get_interview_title(interview)
                 _, attendees = get_users_and_attendees(request, interview)
