@@ -97,6 +97,7 @@ class User(AbstractUser, PermissionsMixin):
     employee_id = models.IntegerField(_('Employee ID'), unique=True)
     date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
     employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
+    slack_id = models.CharField(_("Slack Id"), max_length=20, null=True, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)

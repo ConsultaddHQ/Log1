@@ -104,7 +104,7 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
     def technology(self, request):
         try:
             data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
-                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
+                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
