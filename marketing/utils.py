@@ -275,105 +275,44 @@ def create_answer(request, obj, model):
         return str(error)
 
 
-def get_display_choice(data, data_type, request):
-    try:
-        if data_type == 'interview_mode':
-            for mode in Interview.INTERVIEW_MODE:
-                if data == mode[0]:
-                    return mode[1]
-            return None
-        if data_type == 'screening_type':
-            for mode in Interview.TYPE_CHOICES:
-                if data == mode[0]:
-                    return mode[1]
-            return None
-    except Exception as error:
-        write_exception(error, request)
-        return str(error)
-
-
 def interview_card_data(obj, request):
     try:
         interview_data = []
-        container_names = []
-        coding_feedback_data = []
-        log1_container_names = {}
-        log1_container_position = 0
-        supervisor_feedback_data = []
-        interview_info = [
-            {
-                "question": "Interview ID",
-                "answer": f"I-{obj.id}"
-            },
-            {
-                "question": "Consultant Name",
-                "answer": obj.consultant.name
-            },
-            {
-                "question": "Client",
-                "answer": obj.submission.client
-            },
-            {
-                "question": "Technology",
-                "answer": obj.submission.lead.job_title if obj.submission.lead.job_title else "NA"
-            },
-            {
-                "question": "Round",
-                "answer": f"{obj.round if obj.round else 'NA'}"
-            },
-            {
-                "question": "Mode",
-                "answer": get_display_choice(obj.interview_mode, 'interview_mode', request),
-            },
-            {
-                "question": "Screening Type",
-                "answer": get_display_choice(obj.screening_type, 'screening_type', request)
-            },
-            {
-                "question": "Marketer",
-                "answer": obj.marketer.employee_name
-            },
-            {
-                "question": "Recruiter",
-                "answer": obj.consultant.recruiter.employee_name
-            },
-            {
-                "question": "Team",
-                "answer": obj.submission.created_by.team.name
-            },
-            {
-                "question": "Date",
-                "answer": obj.start_time.date().strftime("%m/%d/%Y")
-            },
-            {
-                "question": "Time",
-                "answer": obj.start_time.time().strftime("%H:%M")
-            },
-        ]
-        interview_data.append(interview_info)
-        emoji = ''
-        if obj.status == 'next_round':
-            emoji = ':+1:'
-        elif obj.status == 'failed':
-            emoji = ':-1:'
-        if obj.status == 'offer':
-            emoji = ':v:'
-        container_names.append(f"{emoji} Interview Feedback")
-        log1_container_names[log1_container_position] = f"{emoji} Interview Feedback"
-        log1_container_position += 2
+        supervisor_feedback = obj.supervisor_feedback.filter(
+            question__form_name='interview').order_by('question__position')
+        if supervisor_feedback:
+            supervisor_feedback_data = []
+            supervisor = obj.supervisor
+            for feedback in supervisor_feedback:
+                sup_feedback = {
+                    "question": feedback.question.title,
+                    "answer": feedback.answer
+                    if feedback.question.answer_type != 'multi_select' else ", ".join(feedback.answer.split(", ")),
+                    "answer_type": feedback.question.answer_type
+                }
+                supervisor_feedback_data.append(sup_feedback)
+            supervisor_feedback_data.insert(
+                0, {"question": "Supervisor Name",
+                    "answer": f"<@{supervisor.slack_id}>" if supervisor.slack_id else f"`{supervisor}`"}
+            )
+            sup_feedback = " \n ".join(
+                f"*{feedback['question']}*:  {feedback['answer']}" for feedback in supervisor_feedback_data)
+            supervisor_data = {"feedback": sup_feedback, "header": ":telephone_receiver: Supervisor Feedback"}
+            interview_data.append(supervisor_data)
 
         coding_feedback = obj.supervisor_feedback.filter(
             question__form_name='coding').order_by('question_id').distinct('question_id')
         if coding_feedback or obj.coding_present is not None:
+            coding_feedback_data = []
             for feedback in coding_feedback:
                 coding_feedback = {
                     "answer": feedback.answer
-                    if feedback.question.answer_type != 'multi_select' else "\n".join(feedback.answer.split(", ")),
+                    if feedback.question.answer_type != 'multi_select' else ", ".join(feedback.answer.split(", ")),
                     "question": feedback.question.title,
                     "answer_type": feedback.question.answer_type
                 }
                 coding_feedback_data.append(coding_feedback)
-            guest = "\n".join([i.employee_name for i in obj.guest.all()])
+            guest = " ".join([f"`<@{i.slack_id}>`" if i.slack_id else f"`{i.employee_name}`" for i in obj.guest.all()])
             coding_feedback_data.insert(0, {"question": "Coder's name", "answer": guest if guest else "NA"})
             coding_feedback_data.insert(
                 1, {"question": "Coding Present", "answer": "Yes" if obj.coding_present else "No"}
@@ -382,53 +321,21 @@ def interview_card_data(obj, request):
                 {"question": "Feedback", "answer_type": "long_text",
                  "answer": obj.guest_remark if obj.guest_remark else "NA"}
             )
-            interview_data.append(coding_feedback_data)
-            container_names.append(":computer: Coder's Feedback")
-            log1_container_names[log1_container_position] = f"🔹 Coder's Feedback"
-            log1_container_position += 2
+            coder_feedback = " \n ".join(
+                f"*{feedback['question']}*:  {feedback['answer']}" for feedback in coding_feedback_data)
+            coders_data = {"feedback": coder_feedback, "header": " :computer: Coder Feedback"}
+            interview_data.append(coders_data)
 
-        supervisor_feedback = obj.supervisor_feedback.filter(
-            question__form_name='interview').order_by('question__position')
-        if supervisor_feedback:
-            for feedback in supervisor_feedback:
-                sup_feedback = {
-                    "question": feedback.question.title,
-                    "answer": feedback.answer
-                    if feedback.question.answer_type != 'multi_select' else "\n".join(feedback.answer.split(", ")),
-                    "answer_type": feedback.question.answer_type
-                }
-                supervisor_feedback_data.append(sup_feedback)
-            supervisor_feedback_data.insert(
-                0, {"question": "Supervisor Name", "answer": obj.supervisor.employee_name}
-            )
-            interview_data.append(supervisor_feedback_data)
-            container_names.append(":telephone_receiver: Supervisor's Feedback")
-            log1_container_names[log1_container_position] = f"🔹 Supervisor's Feedback"
-            log1_container_position += 2
-
-        status = "NA"
-        for i in obj.STATUS_CHOICES:
-            if i[0] == obj.status:
-                status = i[1]
-        marketer_feedback_data = [
-            {"question": "Status", "answer": status, "answer_type": "long_text"},
-            {"question": "Feedback", "answer": obj.feedback, "answer_type": "long_text"}
-        ]
-        interview_data.append(marketer_feedback_data)
-        container_names.append(":lower_left_fountain_pen: Vendor/Client's Feedback")
-        log1_container_names[log1_container_position] = f"🔹 Vendor/Client's Feedback"
-        log1_container_position += 2
-
-        return interview_data, container_names, log1_container_names
+        interview_data.append({"feedback": obj.feedback, "header": ":lower_left_fountain_pen:  Vendor/Client Feedback"})
+        return interview_data
     except Exception as error:
         write_exception(error, request)
 
 
 def interview_feedback_card(obj, request):
     try:
-        interview_data, header_names, teams_container_names = interview_card_data(obj, request)
-        slack_card_data = slack.interview_feedback_card(interview_data, header_names, request)
-        # teams_card_data = teams.interview_feedback_card(interview_data, teams_container_names, request)
+        interview_data = interview_card_data(obj, request)
+        slack_card_data = slack.interview_feedback_card(obj, interview_data, request)
         return slack_card_data
     except Exception as error:
         write_exception(error, request)

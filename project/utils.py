@@ -146,9 +146,9 @@ class ProjectUtil:
             self.employer = self.project.employer
         else:
             self.employer = self.project.submission.employer
-
-        self.activity_text = f"Project by *{self.project.marketer_name}* from " \
-                             f"*{self.project.created_by.team.name}*"
+        marketer = self.project.submission.created_by
+        marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
+        self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
 
     def fetch_project_count(self, project_status):
         try:
@@ -202,11 +202,14 @@ class ProjectUtil:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             if recruiter:
-                recruiter_name = self.consultant.recruiter.employee_name
+                recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
             total, team = self.fetch_project_count("received")
             interviews = self.project.submission.screening.exclude(status='cancelled')
-            supervisors = "\n".join([f"{count+1}. Round {interview.round} - {interview.supervisor.employee_name}"
+            supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
+                                     if interview.supervisor.slack_id else interview.supervisor.employee_name
+                                    if interview.supervisor.employee_id != 9999
+                                    else self.project.submission.consultant.name
                                      for interview, count in zip(interviews, range(0, len(interviews)))
                                      if interview.supervisor])
 
@@ -229,7 +232,7 @@ class ProjectUtil:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             if recruiter:
-                recruiter_name = self.consultant.recruiter.employee_name
+                recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
             months = diff_month_days(self.project.start_date, self.project.end_date)
             reason = self.project.feedback if self.project.feedback else "Not updated on Log1"

@@ -382,7 +382,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             else:
                 diff = date.today() - start_date
             if diff.days < 7:
-                return f"0.0.{diff.days}"
+                return {"duration": f"0.0.{diff.days}", "start": start_date}
             months = int(diff.days) // 30
             weeks = round(int(diff.days - months * 30) // 7, 0)
             duration = months + weeks / 10
