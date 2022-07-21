@@ -1259,15 +1259,24 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def team_structure(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
+            query = request.GET.get('query', '')
             shifts = json.loads(request.GET.get('shifts', '[]'))
             skills = json.loads(request.GET.get('skills', '[]'))
             engineers = User.objects.filter(role__name='engineer')
+            if query:
+                engineers = engineers.filter(employee_name__istartswith=query)
             if skills:
-                engineers = engineers.filter(technology__in=skills)
+                engineers = engineers.filter(technology__overlap=skills)
             if shifts:
                 engineers = engineers.filter(shift__in=shifts)
             serializer = TeamStructureSerializer(engineers[first: last], many=True)
-            return Response({"data": serializer.data}, status=200)
+
+            shifts = User.SHIFT_CHOICE
+            shift_counts = [
+                {shift[1]: User.objects.filter(shift=shift[0]).exclude(shift=None).count()}
+                for shift in shifts
+            ]
+            return Response({"data": serializer.data, "total": len(engineers), "counts": shift_counts}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -1275,11 +1284,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path='team_export')
     def team_export(self, request, **kwargs):
         try:
+            query = request.GET.get('query', '')
             shifts = json.loads(request.GET.get('shifts', '[]'))
             skills = json.loads(request.GET.get('skills', '[]'))
             engineers = User.objects.filter(role__name='engineer')
+            if query:
+                engineers = engineers.filter(employee_name__istartswith=query)
             if skills:
-                engineers = engineers.filter(technology__in=skills)
+                engineers = engineers.filter(technology__overlap=skills)
             if shifts:
                 engineers = engineers.filter(shift__in=shifts)
             serializer = TeamStructureSerializer(engineers, many=True)
@@ -1291,7 +1303,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     writer.writerow(
                         [data.get('employee_name'), ", ".join([i for i in data.get('technology', [])]),
                          self.get_shift(data.get('shift'), request),
-                         ", ".join([i['consultant'] for i in data.get('current_project', [])])]
+                         ", ".join([i['consultant'] for i in data['current_project']['project']])
+                         if data.get('current_project') else None]
                     )
                 return response
             return Response({"message": "No Data to export"}, status=400)

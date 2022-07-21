@@ -504,6 +504,9 @@ class TeamStructureSerializer(serializers.ModelSerializer):
                                        end=None, is_proxy_support=False).exclude(
             project__statuses__is_current=True, project__statuses__status__istartswith='terminated')
         if projects:
-            data = [{"id": project.id, "consultant": project.project.consultant.name} for project in projects]
+            data = {
+                "count": len(projects),
+                "project": [{"id": project.id, "consultant": project.project.consultant.name} for project in projects]
+            }
             return data
         return []
