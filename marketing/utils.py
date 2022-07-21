@@ -288,8 +288,7 @@ def interview_card_data(obj, request):
             for feedback in supervisor_feedback:
                 sup_feedback = {
                     "question": feedback.question.title,
-                    "answer": feedback.answer
-                    if feedback.question.answer_type != 'multi_select' else ", ".join(feedback.answer.split(", ")),
+                    "answer": feedback.answer,
                     "answer_type": feedback.question.answer_type
                 }
                 supervisor_feedback_data.append(sup_feedback)
@@ -298,7 +297,10 @@ def interview_card_data(obj, request):
                     "answer": f"<@{supervisor.slack_id}>" if supervisor.slack_id else f"`{supervisor}`"}
             )
             sup_feedback = " \n ".join(
-                f"*{feedback['question']}*:  {feedback['answer']}" for feedback in supervisor_feedback_data)
+                f"*{feedback['question']}*:  {feedback['answer']}"
+                if feedback.get('answer_type') != 'multi_select'
+                else f"*{feedback['question']}*:  {feedback.get('answer', 'NA').replace('[', '').replace(']', '')}"
+                for feedback in supervisor_feedback_data)
             supervisor_data = {"feedback": sup_feedback, "header": ":telephone_receiver: Supervisor Feedback"}
             interview_data.append(supervisor_data)
 
@@ -308,8 +310,7 @@ def interview_card_data(obj, request):
             coding_feedback_data = []
             for feedback in coding_feedback:
                 coding_feedback = {
-                    "answer": feedback.answer
-                    if feedback.question.answer_type != 'multi_select' else ", ".join(feedback.answer.split(", ")),
+                    "answer": feedback.answer,
                     "question": feedback.question.title,
                     "answer_type": feedback.question.answer_type
                 }
@@ -324,7 +325,10 @@ def interview_card_data(obj, request):
                  "answer": obj.guest_remark if obj.guest_remark else "NA"}
             )
             coder_feedback = " \n ".join(
-                f"*{feedback['question']}*:  {feedback['answer']}" for feedback in coding_feedback_data)
+                f"*{feedback['question']}*:  {feedback['answer']}"
+                if feedback.get('answer_type') != 'multi_select'
+                else f"*{feedback['question']}*:  {feedback.get('answer', 'NA').replace('[', '').replace(']', '')}"
+                for feedback in coding_feedback_data)
             coders_data = {"feedback": coder_feedback, "header": " :computer: Coder Feedback"}
             interview_data.append(coders_data)
 
