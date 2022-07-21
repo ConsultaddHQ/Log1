@@ -19,3 +19,6 @@ log1key.json
 log1token.json
 prod_key.json
 prod_token.json
+service.json
+mailkey.json
+mailtoken.json

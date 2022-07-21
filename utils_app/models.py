@@ -55,6 +55,22 @@ class Choice(models.Model):
         return f'{self.name}-{self.field}-{self.content_type}'
 
 
+class MapMail(TimeStampedModel):
+    mail_id = models.CharField(_('Mail Id'), max_length=50)
+    object_id = models.CharField(_('Object Id'), max_length=50)
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE,
+        verbose_name='Model Name', null=True, blank=True
+    )
+    
+    def save(self, *args, **kwargs):
+        return super(MapMail, self).save(*args, **kwargs)    
+    
+    def __str__(self):
+        return self.content_type + ' ' + self.object_id 
+
+
+
 class Field(models.Model):
     name = models.CharField(_('Field Name'), max_length=100)
     model = models.CharField(_('Model Name'), max_length=100)

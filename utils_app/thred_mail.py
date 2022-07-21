@@ -6,30 +6,26 @@ from celery import shared_task
 from email.mime.text import MIMEText
 from email.mime import multipart, base
 from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
+from google.oauth2.service_account import Credentials
+# from google.auth.transport.requests import Request
 from log1.utils import write_exception, write_info
 from django.template.loader import render_to_string
-from google_auth_oauthlib.flow import InstalledAppFlow
+# from google_auth_oauthlib.flow import InstalledAppFlow
 
+# SCOPES = ['https://mail.google.com/','https://www.googleapis.com/auth/gmail.readonly']
+SERVICE_ACCOUNT_FILE = 'service.json'
+SCOPES = ['https://mail.google.com/']
 
-SCOPES = ['https://mail.google.com/','https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send']
-
-
-def cred():
-    creds = None
-    if os.path.exists('mailtoken.json'):
-        creds = Credentials.from_authorized_user_file('mailtoken.json', SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'mailkey.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open('mailtoken.json', 'w') as token:
-            token.write(creds.to_json())
-    service = build('gmail', 'v1', credentials=creds)
+def cred(mail_id):
+    if os.environ.get('ENV', 'local') != 'prod':
+        mail_id="suman.m@consultadd.com"
+        
+    credentials = Credentials.from_service_account_file(
+        filename=SERVICE_ACCOUNT_FILE,
+        scopes = SCOPES,
+        subject=mail_id,
+    )
+    service = build('gmail', 'v1', credentials=credentials)
     return service
 
 
@@ -71,15 +67,18 @@ def create_message(from_email, mail_data):
 
 
 def set_mail_config(to, from_mail, cc, bcc, subject, object):
+    breakpoint()
+    
+    object['subject'] = subject
     if os.environ.get('ENV', 'local') == 'prod':
-        object['from'] = from_mail
         object['to'] = ','.join(to)
         object['cc'] = ','.join(cc)
-        object['subject'] = subject
         object['bcc'] = ','.join(bcc)
+        object['from'] = from_mail
     else:
+        object['from'] = "suman.m@consultadd.com"
         object['cc'] = ''
-        object['bcc'] = ''        
+        object['bcc'] = ''      
         object['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
     return object
 
@@ -87,7 +86,7 @@ def set_mail_config(to, from_mail, cc, bcc, subject, object):
 @shared_task
 def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=None):
     try:
-        service = cred()
+        service = cred(from_email)
         email_data = service.users().messages().get(userId='me', id=mail_id).execute()
 
         body = render_to_string(mail_data["template"], mail_data["context"])
@@ -115,7 +114,7 @@ def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=N
 def send_email(mail_data, from_email, reply_to=None, request=None):
     try:
         msg = create_message(from_email, mail_data)
-        service = cred()
+        service = cred(from_email)
         message = (service.users().messages().send(userId="me", body=msg).execute())
         return message['id'], True
     
@@ -130,7 +129,7 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
-        service = cred()
+        service = cred(from_email)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = MIMEText(mail_data["body"])
@@ -161,7 +160,8 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
 @shared_task
 def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None):
     try:
-        service = cred()
+        breakpoint()
+        service = cred(from_email)
         if mail_id is not None:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = multipart.MIMEMultipart()
@@ -172,8 +172,6 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
             message['References'] = get_field(email_data, 'Message-Id')
 
             if reply_to is None:
-                reply_to = []
-                message['reply_to'] = ','.join(mail_data["reply_to"])
                 body = render_to_string(mail_data["template"], mail_data["context"])
                 body = body.replace("\\n", "<br>").replace(";newline;", "<br>").replace(
                     "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")
@@ -197,8 +195,6 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
             message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
             
             if reply_to is None:
-                # reply_to = []
-                # message['reply_to'] = ','.join(mail_data["reply_to"])
                 body = render_to_string(mail_data["template"], mail_data["context"])
                 body = body.replace("\\n", "<br>").replace(";newline;", "<br>").replace(
                     "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")

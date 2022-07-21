@@ -22,6 +22,7 @@ from utils_app.calendar import Calendar, GoogleCalendar
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
+from utils_app.models import MapMail
 from activity.serializers import ActivitySerializer
 from utils_app.slack_notification import MessageCard as slack
 from utils_app.teams_notification import MessageCard as teams
@@ -33,6 +34,7 @@ from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+from django.contrib.auth.models import ContentType
 
 
 # Route - /vendor_company/
@@ -2068,7 +2070,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 cc = [created_by.email] + scrum_masters
                 subject = f'Test Received :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills} '
                 resume = test.submission.attachments.filter(attachment_type='resume')
-                breakpoint()
                 if resume:
                     response, error = download_s3_object(resume.first().attachment_file.name)
                     path.append(response)
@@ -2112,9 +2113,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res, msg = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
+                content_type = ContentType.objects.get(model="test")
+                mail_object = MapMail(mail_id=res, object_id=test.id, content_type=content_type)
+                mail_object.save()
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -2154,7 +2159,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'single_question': single_question, 'remarks': test.engineer_remarks,
                     },
                 }
-                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
+                # Need to filter on based one type and objectId
+                mail_id = MapMail.objects.filter(content_type__model="test",object_id=test.id).first().mail_id
+                
+                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request, mail_id = mail_id)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2339,7 +2347,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             # Test email to engineering team
             test_received_notification(test, data.get('con_timezone', 'NA'), request)
             res = "Development Server"
-            breakpoint()
             if True:
                 # test_received_notification(test, data.get('con_timezone', 'NA'), request)
                 res, error = self.send_test_mail(test, data, 'new', request)
