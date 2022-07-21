@@ -15,7 +15,7 @@ admin.site.site_header = "Log1"
 class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     fieldsets = (
         (None, {'fields': ('team', 'employee_id', 'username', 'email', 'password')}),
-        ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role', 'technology')}),
+        ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role', 'technology', 'shift', 'slack_id')}),
         ('Permissions', {'fields': ('account_login', 'is_active', 'is_superuser', 'is_staff', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
@@ -24,7 +24,7 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     date_hierarchy = 'last_login'
     list_filter = ('team', 'role', 'is_active')
     search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
-    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'account_login', 'roles')
+    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'account_login', 'roles', 'slack_id')
 
     def roles(self, obj):
         return ", ".join([

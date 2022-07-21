@@ -1,96 +1,110 @@
 import os
 
-import boto3
 from constance import config
+<<<<<<< HEAD
 from utils_app.utils import create_table_image
+=======
+from marketing.models import Interview
+from utils_app.utils import create_csv_file
+>>>>>>> 7589fa277c176a780285b5e8a137cea290ea5bab
 from log1.utils import write_exception, post_msg_using_webhook
 
 
-def get_element(element_type, data=None):
-    if data is None:
-        data = {}
-    divider_set = {
-        "type": "divider"
-    }
-    header_set = {
-        "type": "header",
-        "text":
-            {
-                "type": "plain_text",
-                "text": data.get('title', None),
-                "emoji": True
-            }
-    }
-    column_set = {
-        "type": "section",
-        "fields": [
-            {
-                "type": "mrkdwn",
-                "text": f"*{data.get('question', None)}*\n{data.get('answer', None)}"
-            }
-        ]
-    }
-    section_set = {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": f"*{data.get('question', None)}*\n{data.get('answer', None)}"
-        }
-    }
-    element_set = {
-        "type": "mrkdwn",
-        "text": f"*{data.get('question')}*\n{data.get('answer')}"
-    }
-    context_set = {
-        "type": "context",
-        "elements": [
-            {
-                "type": "mrkdwn",
-                "text": " "
-            }
-        ]
-    }
-    if element_type == "element_set":
-        return element_set
-    elif element_type == "column_set":
-        return column_set
-    elif element_type == "section_set":
-        return section_set
-    elif element_type == "header_set":
-        return header_set
-    elif element_type == "divider_set":
-        return divider_set
-    elif element_type == "context_set":
-        return context_set
-    return None
+def get_display_choice(data, data_type, request):
+    try:
+        if data_type == 'interview_mode':
+            for mode in Interview.INTERVIEW_MODE:
+                if data == mode[0]:
+                    return mode[1]
+            return None
+        if data_type == 'screening_type':
+            for mode in Interview.TYPE_CHOICES:
+                if data == mode[0]:
+                    return mode[1]
+            return None
+    except Exception as error:
+        write_exception(error, request)
+        return str(error)
+
+
+def get_status_emoji(status):
+    if status == 'next_round':
+        emoji = ':+1:'
+    elif status == 'failed':
+        emoji = ':-1:'
+    if status == 'offer':
+        emoji = ':v:'
+    return emoji
 
 
 class MessageCard:
 
     @staticmethod
-    def interview_feedback_card(interview_data, header_names, request):
+    def interview_feedback_card(obj, payload, request):
         try:
-            header_position = 0
-            card_data = {"blocks": []}
-            body = card_data['blocks']
-            for data_set, header_name in zip(interview_data, header_names):
-                column_length = 2
-                body.append(get_element('header_set', {"title": header_name}))
-                for data, count in zip(data_set, range(0, len(data_set))):
-                    if type(data.get('answer')) is str:
-                        data['answer'] = data.get('answer').replace('[', '').replace(']', '').replace('"', '') \
-                            .replace('\n', '')
-                    if data.get('answer_type') == 'long_text':
-                        body.append(get_element("section_set", data))
-                        count -= 1
-                    elif count % column_length != 0:
-                        body[-1]['fields'].append(get_element("element_set", data))
-                    else:
-                        body.append(get_element("column_set", data))
-                body.append(get_element('divider_set'))
-                header_position += 1
-            card_data['blocks'].append(get_element('context_set'))
-            return card_data
+            marketer = obj.marketer
+            marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
+            status = "NA"
+            for i in obj.STATUS_CHOICES:
+                if i[0] == obj.status:
+                    status = i[1]
+            data = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":speech_balloon:  Interview Feedback",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Consultant name:* `{obj.consultant.name}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Status:* {get_status_emoji(obj.status)} {status}"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"`I-{obj.id}` :: {obj.round if obj.round else 1}R :: "
+                                    f"{get_display_choice(obj.screening_type, 'screening_type', request)} :: "
+                                    f"{get_display_choice(obj.interview_mode, 'interview_mode', request)} :: "
+                                    f"{obj.start_time.date().strftime('%m/%d/%Y')} :: "
+                                    f"{obj.start_time.time().strftime('%H:%M')} EST :: {obj.submission.client} :: "
+                                    f"{marketer_name} ::  {obj.submission.created_by.team.name}"
+                        }
+                    }
+                ]
+            }
+            for item in payload:
+                block = [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": item.get('header'),
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": item.get('feedback')
+                        }
+                    },
+                ]
+                data['blocks'].extend(block)
+            return data
         except Exception as error:
             write_exception(message=error, request=request)
             return error
@@ -245,6 +259,10 @@ class MessageCard:
         try:
             title = payload.get('title', 'NA')
             interview = payload.get('interview', 'NA')
+            supervisor = interview.supervisor
+            marketer = interview.submission.created_by
+            supervisor_name = f"<@{supervisor.slack_id}>" if supervisor.slack_id else supervisor.employee_name
+            marketer_name = f"<@{marketer.slack_id}>" if marketer and marketer.slack_id else marketer.employee_name
             data = {
                 "blocks": [
                     {
@@ -260,224 +278,69 @@ class MessageCard:
                         "text": {
                             "type": "mrkdwn",
                             "text": f"I-{interview.id} : Interview from *{interview.submission.client}* for "
-                                    f"*{interview.submission.consultant.name}* \n"
-                                    f"Requested by *{interview.submission.created_by.employee_name}* from "
-                                    f"*{interview.submission.created_by.team.name}*",
-                        },
-                    },
-                    {
-                        "type": "divider"
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Technology*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": str(interview.tech_stack) if interview.tech_stack else "NA",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Supervisor*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": str(interview.supervisor.employee_name),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Date*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": str(interview.start_time.strftime('%a, %d %B')),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Time*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": f"{interview.start_time.strftime('%I:%M %p EST')} - "
-                                        f"{interview.end_time.strftime('%I:%M %p EST')}",
-                                "emoji": True
-                            }
-                        ]
+                                    f"*{interview.submission.consultant.name}*"
+                        }
                     },
                     {
                         "type": "context",
                         "elements": [
                             {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
+                                "type": "mrkdwn",
+                                "text": f"Requested by *{marketer_name}* from *{marketer.team.name}*",
                             }
                         ]
                     },
                     {
                         "type": "divider"
-                    }
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Technology:* {str(interview.tech_stack) if interview.tech_stack else 'NA'}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Supervisor:* {supervisor_name}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Date:* `{interview.start_time.strftime('%a, %d %B')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Time:* `{interview.start_time.strftime('%I:%M %p EST')} - "
+                                        f"{interview.end_time.strftime('%I:%M %p EST')}`"
+                            }
+                        ]
+                    },
                 ]
             }
-            if interview.coding_info:
-                data_len = len(data['blocks'])
-                data['blocks'].insert(data_len - 2, {
+            if title == 'Coding Assignment' and interview.guest.all():
+                coding_experts = ", ".join(
+                    [f"<@{coder.slack_id}>" if coder.slack_id else coder.employee_name for coder in
+                     interview.guest.all()]
+                )
+                block = {
                     "type": "section",
-                    "fields": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "*Coder's Info*"
-                        },
-                        {
-                            "type": "plain_text",
-                            "text": interview.coding_info,
-                            "emoji": True
-                        }
-                    ]
-                },
-                                      )
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Coding expert*: {coding_experts}"
+                    }
+                }
+                data['blocks'].append(block)
+            if interview.coding_info:
+                block = {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Coding Info*: {interview.coding_info}"
+                    }
+                }
+                data['blocks'].append(block)
             post_msg_using_webhook(config.slack_engineering_url, data)
             return "ok"
-        except Exception as error:
-            write_exception(message=error, request=request)
-            return str(error)
-
-    @staticmethod
-    def coder_assigned_card(interview, request):
-        try:
-            coding_experts = ", ".join(interview.guest.all().values_list('employee_name', flat=True))
-            data = {
-                "blocks": [
-                    {
-                        "type": "header",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Coding Assignment",
-                            "emoji": True
-                        }
-                    },
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"I-{interview.id} : Interview from *{interview.submission.client}* for "
-                                    f"*{interview.submission.consultant.name}* \n"
-                                    f"Requested by *{interview.submission.created_by.employee_name}* from "
-                                    f"*{interview.submission.created_by.team.name}*",
-                        },
-                    },
-                    {
-                        "type": "divider"
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Technology*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": str(interview.tech_stack),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Supervisor*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": str(interview.supervisor.employee_name),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Date*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": str(interview.start_time.strftime('%a, %d %B')),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Time*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": f"{interview.start_time.strftime('%I:%M %p EST')} - "
-                                        f"{interview.end_time.strftime('%I:%M %p EST')}",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Coding expert*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": coding_experts,
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
-                    }
-                ]
-            }
-            post_msg_using_webhook(config.slack_engineering_url, data)
-            return 'ok'
         except Exception as error:
             write_exception(message=error, request=request)
             return str(error)
@@ -724,14 +587,13 @@ class MessageCard:
     @staticmethod
     def po_termination_message_card(payload, request):
         try:
-
             data = {
                 "blocks": [
                     {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": "Project Termination Feedback",
+                            "text": ":small_red_triangle_down: Project Termination Feedback",
                             "emoji": True
                         }
                     },
@@ -743,97 +605,35 @@ class MessageCard:
                         }
                     },
                     {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " "
-                            }
-                        ]
+                        "type": "divider"
                     },
                     {
                         "type": "section",
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": "*Project duration*"
+                                "text": f"*Project duration:* {payload.get('months', 0)} months"
                             },
                             {
-                                "type": "plain_text",
-                                "text": f"{payload.get('months', 0)} months",
-                                "emoji": True
+                                "type": "mrkdwn",
+                                "text": f"*Employer:* {payload.get('employer', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Status:* {payload.get('status', 'NA')}"
                             }
                         ]
                     },
                     {
                         "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Employer*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('employer', "NA"),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Location*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('project.city', "NA"),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Recruiter*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('recruiter_name', "NA"),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Status*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('status', "NA"),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Feedback*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('reason', "NA"),
-                                "emoji": True
-                            }
-                        ]
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": payload.get('reason', "NA")
+                        }
                     },
                     {
                         "type": "actions",
@@ -842,28 +642,15 @@ class MessageCard:
                                 "type": "button",
                                 "text": {
                                     "type": "plain_text",
-                                    "text": "View in Log1",
-                                    "emoji": True
+                                    "emoji": True,
+                                    "text": "View in Log1"
                                 },
                                 "style": "primary",
                                 "url": f"https://app.log1.com/#/details/{payload.get('submission_id')}/"
                                        f"project?id={payload.get('project_id')}",
-                                "action_id": "actionId-0"
+                                "value": "click_me_123"
                             }
                         ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
                     }
                 ]
             }
@@ -884,7 +671,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": "Offer",
+                            "text": ":v: Offer",
                             "emoji": True
                         }
                     },
@@ -897,97 +684,44 @@ class MessageCard:
                         }
                     },
                     {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " "
-                            }
-                        ]
+                        "type": "divider"
                     },
                     {
                         "type": "section",
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": "*Employer*"
+                                "text": f"*Employer:* {payload.get('employer', 'NA')}"
                             },
                             {
-                                "type": "plain_text",
-                                "text": payload.get('employer', 'NA'),
-                                "emoji": True
+                                "type": "mrkdwn",
+                                "text": f"*Start:* `{payload.get('project_start', 'NA')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Location:* {payload.get('city', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Role:* {payload.get('job_title', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Supervisors:* \n{payload.get('supervisors', 'NA')}"
                             }
                         ]
                     },
                     {
                         "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Start Date*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('project_start', 'NA'),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Location*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('city', 'NA'),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Role*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('job_title', 'NA'),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Recruiter*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('recruiter_name', 'NA'),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Supervisors*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('supervisors', 'NA'),
-                                "emoji": True
-                            }
-                        ]
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f":pushpin: *`{payload.get('employer', 'NA')}`* - *{payload.get('team', 'NA')}*  |  "
+                                    f"`Total` - *{payload.get('total', 'NA')}*"
+                        }
                     },
                     {
                         "type": "actions",
@@ -997,50 +731,16 @@ class MessageCard:
                                 "text": {
                                     "type": "plain_text",
                                     "emoji": True,
-                                    "text": f"{payload.get('employer', 'NA')} - {payload.get('team', 'NA')}"
-                                },
-                                "style": "primary",
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": f"Total - {payload.get('total', 'NA')}"
-                                },
-                                "style": "primary",
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "View in Log1",
-                                    "emoji": True
+                                    "text": "View in Log1"
                                 },
                                 "style": "primary",
                                 "url": f"https://app.log1.com/#/details/{payload.get('submission_id')}/project?id={payload.get('project_id')}",
-                                "value": "click_me_123",
-                                "action_id": "actionId-0"
+                                "value": "click_me_123"
                             }
                         ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
                     }
                 ]
             }
-
-            # Sending message on Messaging Tool
             post_msg_using_webhook(config.slack_offer_url, data)
             return "ok"
         except Exception as error:

@@ -58,6 +58,7 @@ class Attachment(TimeStampedModel):
         ('work_order', 'Work Order'),
         ('academic', 'Academic Docs'),
         ('photo_id', 'Miscellaneous'),
+        ('other_doc', 'Other Document'),
         ('results', 'Assessment Results'),
         ('project_update', 'Project Update'),
         ('msa_signed', 'MSA/Agreement Signed'),
@@ -66,6 +67,7 @@ class Attachment(TimeStampedModel):
         ('test_feedback', "Test Feedback Docs"),
         ('project_resource', "Project Resource"),
         ('work_order_signed', 'Work Order Signed'),
+        ('other_doc_signed', 'Other Document Signed'),
         ('work_order_msa', 'Work Order and MSA/Agreement'),
         ('work_order_msa_signed', 'Work Order and MSA/Agreement Signed'),
     )

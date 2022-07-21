@@ -489,3 +489,24 @@ class EngineerInterviewSerializer(serializers.ModelSerializer):
             "marketer_name": submission.created_by.employee_name,
             "vendor_company": submission.lead.vendor_company.name,
         }
+
+
+class TeamStructureSerializer(serializers.ModelSerializer):
+    current_project = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_name', 'shift', 'technology', 'current_project')
+
+    @staticmethod
+    def get_current_project(obj):
+        projects = obj.projects.filter(statuses__is_current=True, statuses__frequency__in=['active', 'less_active'],
+                                       end=None, is_proxy_support=False).exclude(
+            project__statuses__is_current=True, project__statuses__status__istartswith='terminated')
+        if projects:
+            data = {
+                "count": len(projects),
+                "project": [{"id": project.id, "consultant": project.project.consultant.name} for project in projects]
+            }
+            return data
+        return []

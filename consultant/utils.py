@@ -386,7 +386,7 @@ def new_recruit_notification(consultant, request):
         if qs:
             recruiter = qs.first().poc
             recruiter_team = recruiter.team
-            recruiter_name = recruiter.name
+            recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.name
             if recruiter.gender == 'female':
                 recruiter_gender = ':red_haired_woman::skin-tone-2:'
 
