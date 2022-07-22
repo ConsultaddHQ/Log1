@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
+from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -21,15 +22,18 @@ from employee.models import User, Team
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
+from utils_app.models import MapMail
 from activity.serializers import ActivitySerializer
 from utils_app.calendar import Calendar, GoogleCalendar
 from attachment.models import Attachment, create_attachment
-from utils_app.mailing import send_email_attachment_multiple
+# from utils_app.mailing import send_email_attachment_multiple
+from utils_app.thred_mail import send_email_attachment_multiple
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+
 
 
 # Route - /vendor_company/
@@ -2198,10 +2202,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res, msg = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
+                content_type = ContentType.objects.get(model="test")
+                mail_object = MapMail(mail_id=res, object_id=test.id, content_type=content_type, from_mail_id=from_mail)
+                mail_object.save()
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -2241,7 +2249,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'single_question': single_question, 'remarks': test.engineer_remarks,
                     },
                 }
-                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
+                # Need to filter on based one type and objectId
+                mail_id = None
+                from_mail = test.submitted_by.email
+                email_object = MapMail.objects.filter(content_type__model="test",object_id=test.id).first()
+                if email_object:
+                    mail_id = email_object.mail_id
+                    from_mail = email_object.from_mail_id 
+                res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail,request, mail_id)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2424,9 +2439,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 create_attachment(file_data)
 
             # Test email to engineering team
+            test_received_notification(test, data.get('con_timezone', 'NA'), request)
             res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                test_received_notification(test, data.get('con_timezone', 'NA'), request)
+            if True:
+                # test_received_notification(test, data.get('con_timezone', 'NA'), request)
                 res, error = self.send_test_mail(test, data, 'new', request)
                 if error == 'error':
                     write_info(message=res, function='create-send_test_mail', request=request)
@@ -2702,8 +2718,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             }
             # test submit mail
             res = "Development Server"
+            # if os.environ.get('ENV', 'local') == 'prod':
             res, error = self.send_test_mail(test, data, 'submit', request)
-
             if error == 'error':
                 write_info(message=res, function='create-send_test_mail', request=request)
                 return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)
