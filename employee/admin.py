@@ -15,7 +15,7 @@ admin.site.site_header = "Log1"
 class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     fieldsets = (
         (None, {'fields': ('team', 'employee_id', 'username', 'email', 'password')}),
-        ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role', 'technology')}),
+        ('Personal info', {'fields': ('employee_name', 'avatar', 'phone', 'gender', 'role', 'technology', 'shift', 'slack_id')}),
         ('Permissions', {'fields': ('account_login', 'is_active', 'is_superuser', 'is_staff', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )

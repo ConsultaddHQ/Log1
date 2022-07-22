@@ -89,10 +89,10 @@ class User(AbstractUser, PermissionsMixin):
         ('female', 'Female')
     )
     SHIFT_CHOICE = (
-        ('morning', 'Morning Shift- 6 AM to 3 PM'),
-        ('general', 'General Shift- 10 AM to 7 PM'),
-        ('evening', 'Evening Shift- 5:30 PM to 2:30 AM'),
-        ('afternoon', 'Afternoon Shift- 12 Noon to 9 PM'),
+        ('morning', 'Morning Shift (6 AM to 3 PM)'),
+        ('general', 'General Shift (10 AM to 7 PM)'),
+        ('evening', 'Evening Shift (5:30 PM to 2:30 AM)'),
+        ('afternoon', 'Afternoon Shift (12 Noon to 9 PM)'),
     )
     email = models.EmailField(_('Email'))
     is_staff = models.BooleanField(default=False)

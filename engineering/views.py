@@ -4,8 +4,6 @@ from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 
 from django.db.models import Q, Max
-from django.shortcuts import get_object_or_404
-from django.contrib.contenttypes.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -13,11 +11,11 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
+from engineering.utils import *
 from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
 from activity.views import create_activity
-from engineering.utils import tag_and_notify, get_csv_report
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, DONT_HAVE_ACCESS, get_page_limits, write_exception
@@ -1035,7 +1033,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             context = {"frequency": frequency, "type": consultant_type}
             serializer = EngineerReportSerializer(engineer, many=True, context=context)
             if serializer.data:
-                report_url = get_csv_report(serializer.data, request)
+                report_url = get_engineer_detail_csv(serializer.data, request)
                 return Response({"data": report_url}, status=200)
             return Response({"message": "No data found"}, status=400)
         except Exception as error:
@@ -1238,6 +1236,65 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "supervisor_interview": supervisor_interview,
             }
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @staticmethod
+    def get_shift(data, request):
+        try:
+            shifts = User.SHIFT_CHOICE
+            for shift in shifts:
+                if data == shifts[0]:
+                    return shift[1]
+            return None
+        except Exception as error:
+            write_exception(error, request)
+
+    @action(methods=['get'], detail=False, url_path='team_structure')
+    def team_structure(self, request, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', '')
+            shifts = json.loads(request.GET.get('shifts', '[]'))
+            skills = json.loads(request.GET.get('skills', '[]'))
+            engineers = User.objects.filter(role__name='engineer')
+            if query:
+                engineers = engineers.filter(employee_name__istartswith=query)
+            if skills:
+                engineers = engineers.filter(technology__overlap=skills)
+            if shifts:
+                engineers = engineers.filter(shift__in=shifts)
+            serializer = TeamStructureSerializer(engineers[first: last], many=True)
+
+            shifts = User.SHIFT_CHOICE
+            shift_counts = [
+                {shift[1]: User.objects.filter(shift=shift[0]).exclude(shift=None).count()}
+                for shift in shifts
+            ]
+            return Response({"data": serializer.data, "total": len(engineers), "counts": shift_counts}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='team_export')
+    def team_export(self, request, **kwargs):
+        try:
+            query = request.GET.get('query', '')
+            shifts = json.loads(request.GET.get('shifts', '[]'))
+            skills = json.loads(request.GET.get('skills', '[]'))
+            engineers = User.objects.filter(role__name='engineer')
+            if query:
+                engineers = engineers.filter(employee_name__istartswith=query)
+            if skills:
+                engineers = engineers.filter(technology__overlap=skills)
+            if shifts:
+                engineers = engineers.filter(shift__in=shifts)
+            serializer = TeamStructureSerializer(engineers, many=True)
+            if serializer.data:
+                file_url = get_team_structure_xlsx(serializer.data, request)
+                return Response({"data": file_url}, status=200)
+            return Response({"message": "No Data to export"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
