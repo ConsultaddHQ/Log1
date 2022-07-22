@@ -58,6 +58,7 @@ class Choice(models.Model):
 class MapMail(TimeStampedModel):
     mail_id = models.CharField(_('Mail Id'), max_length=50)
     object_id = models.CharField(_('Object Id'), max_length=50)
+    from_mail_id = models.CharField(_('From Mail Id'), max_length=50, null=True, blank=True)
     content_type = models.ForeignKey(
         ContentType, on_delete=models.CASCADE,
         verbose_name='Model Name', null=True, blank=True

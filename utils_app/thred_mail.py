@@ -26,7 +26,7 @@ def cred(mail_id):
         subject=mail_id,
     )
     service = build('gmail', 'v1', credentials=credentials)
-    return service
+    return service, mail_id 
 
 
 def get_field(email, field_name):
@@ -52,6 +52,10 @@ def create_message(from_email, mail_data):
             "\\t", "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;")    
     message = MIMEText(body, 'html')
     message['subject'] = mail_data["subject"]
+    
+    if os.environ.get('ENV', 'local') != 'prod':
+        from_email="suman.m@consultadd.com"
+    
     message['from'] = from_email
     if os.environ.get('ENV', 'local') == 'prod':
         message['to'] = ','.join(mail_data["to"])
@@ -66,9 +70,7 @@ def create_message(from_email, mail_data):
     return {'raw': base64.urlsafe_b64encode(message.as_string())}
 
 
-def set_mail_config(to, from_mail, cc, bcc, subject, object):
-    breakpoint()
-    
+def set_mail_config(to, from_mail, cc, bcc, subject, object):    
     object['subject'] = subject
     if os.environ.get('ENV', 'local') == 'prod':
         object['to'] = ','.join(to)
@@ -86,7 +88,7 @@ def set_mail_config(to, from_mail, cc, bcc, subject, object):
 @shared_task
 def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=None):
     try:
-        service = cred(from_email)
+        service, from_mail_id = cred(from_email)
         email_data = service.users().messages().get(userId='me', id=mail_id).execute()
 
         body = render_to_string(mail_data["template"], mail_data["context"])
@@ -100,7 +102,7 @@ def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=N
         email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode()}}
         draft = service.users().drafts().create(userId='me', body=email_body).execute()
         message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
-        return message['id'], True   
+        return message['id'], True, from_mail_id   
      
     except Exception as error:
         write_exception(message=error, request=request)
@@ -114,9 +116,9 @@ def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=N
 def send_email(mail_data, from_email, reply_to=None, request=None):
     try:
         msg = create_message(from_email, mail_data)
-        service = cred(from_email)
+        service,from_mail_id = cred(from_email)
         message = (service.users().messages().send(userId="me", body=msg).execute())
-        return message['id'], True
+        return message['id'], True, from_mail_id
     
     except Exception as error:
         write_exception(message=error, request=request)
@@ -129,7 +131,7 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
-        service = cred(from_email)
+        service, from_mail_id = cred(from_email)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = MIMEText(mail_data["body"])
@@ -140,14 +142,14 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
             email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode()}}
             draft = service.users().drafts().create(userId='me', body=email_body).execute()
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
-            return message['id'], True
+            return message['id'], True, from_mail_id
         else:
             message = MIMEText(mail_data["body"])
             subject = mail_data["subject"]
             message['from'] = from_email
             message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
             message = (service.users().messages().send(userId="me", body={'raw': base64.urlsafe_b64encode(message.as_string())}).execute())
-            return message['id'], True
+            return message['id'], True, from_mail_id
 
     except Exception as error:
         write_exception(message=error, request=request)
@@ -160,8 +162,7 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
 @shared_task
 def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None):
     try:
-        breakpoint()
-        service = cred(from_email)
+        service, from_mail_id = cred(from_email)
         if mail_id is not None:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = multipart.MIMEMultipart()
@@ -187,7 +188,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
             email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : b64_string}}
             draft = service.users().drafts().create(userId='me', body=email_body).execute()
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
-            return message['id'], True
+            return message['id'], True, from_mail_id
         else:
             message = multipart.MIMEMultipart()
             message['from'] = from_email
@@ -207,7 +208,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
                 b64_string = b64_bytes.decode()
                 message = (service.users().messages().send(userId="me", body={'raw':b64_string}).execute())
-                return message['id'], True
+                return message['id'], True, from_mail_id
     except Exception as error:
         write_exception(message=error, request=request)
         invalid_keys = ['template', 'context']

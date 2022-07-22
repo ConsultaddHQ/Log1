@@ -22,7 +22,7 @@ def create_table_image(data, filename=None):
         write_exception(message=error)
 
 
-def upload_csv_file_s3(filename):
+def generate_s3_url(filename):
     try:
         file = open(f'{filename}', 'rb')
         session = boto3.Session()
@@ -53,7 +53,7 @@ def create_csv_file(payload):
                  data.get('client'), data.get('marketer'), data.get('position')]
             )
         file.close()
-        file_url = upload_csv_file_s3(file.name)
+        file_url = generate_s3_url(file.name)
         return file_url
     except Exception as error:
         write_info(message=f"{error}", function='create_csv_file')

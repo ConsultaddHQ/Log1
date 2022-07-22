@@ -1,13 +1,9 @@
 import os
-import csv
 import json
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 
 from django.db.models import Q, Max
-from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
-from django.contrib.contenttypes.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -15,11 +11,11 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
+from engineering.utils import *
 from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
 from activity.views import create_activity
-from engineering.utils import tag_and_notify, get_csv_report
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, DONT_HAVE_ACCESS, get_page_limits, write_exception
@@ -1037,7 +1033,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             context = {"frequency": frequency, "type": consultant_type}
             serializer = EngineerReportSerializer(engineer, many=True, context=context)
             if serializer.data:
-                report_url = get_csv_report(serializer.data, request)
+                report_url = get_engineer_detail_csv(serializer.data, request)
                 return Response({"data": report_url}, status=200)
             return Response({"message": "No data found"}, status=400)
         except Exception as error:
@@ -1296,17 +1292,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 engineers = engineers.filter(shift__in=shifts)
             serializer = TeamStructureSerializer(engineers, many=True)
             if serializer.data:
-                response = HttpResponse(content_type='text/csv')
-                writer = csv.writer(response)
-                writer.writerow(['Engineer Name', 'SkillSet', 'Shift', 'Support Consultant'])
-                for data in serializer.data:
-                    writer.writerow(
-                        [data.get('employee_name'), ", ".join([i for i in data.get('technology', [])]),
-                         self.get_shift(data.get('shift'), request),
-                         ", ".join([i['consultant'] for i in data['current_project']['project']])
-                         if data.get('current_project') else None]
-                    )
-                return response
+                file_url = get_team_structure_xlsx(serializer.data, request)
+                return Response({"data": file_url}, status=200)
             return Response({"message": "No Data to export"}, status=400)
         except Exception as error:
             write_exception(error, request)

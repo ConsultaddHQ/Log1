@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
+from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -33,6 +34,7 @@ from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from django.contrib.auth.models import ContentType
+
 
 
 # Route - /vendor_company/
@@ -2201,13 +2203,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res, msg = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
                 
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
                 content_type = ContentType.objects.get(model="test")
-                mail_object = MapMail(mail_id=res, object_id=test.id, content_type=content_type)
+                mail_object = MapMail(mail_id=res, object_id=test.id, content_type=content_type, from_mail_id=from_mail)
                 mail_object.save()
                 return res, "ok"
 
@@ -2249,9 +2251,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                 }
                 # Need to filter on based one type and objectId
-                mail_id = MapMail.objects.filter(content_type__model="test",object_id=test.id).first().mail_id
-                
-                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request, mail_id = mail_id)
+                mail_id = None
+                from_mail = test.submitted_by.email
+                email_object = MapMail.objects.filter(content_type__model="test",object_id=test.id).first()
+                if email_object:
+                    mail_id = email_object.mail_id
+                    from_mail = email_object.from_mail_id 
+                res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail,request, mail_id)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
