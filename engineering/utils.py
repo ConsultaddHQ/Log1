@@ -96,11 +96,11 @@ def get_engineer_detail_csv(payload, request):
         write_exception(error, request)
 
 
-def get_shift(data, request):
+def get_shift(shift_type, request):
     try:
         shifts = User.SHIFT_CHOICE
         for shift in shifts:
-            if data == shifts[0]:
+            if shift_type == shift[0]:
                 return shift[1]
         return None
     except Exception as error:
@@ -112,7 +112,8 @@ def get_team_structure_xlsx(payload, request):
         columns = ['Engineer Name', 'SkillSet', 'Shift', 'Support Consultant']
         rows = []
         for data in payload:
-            rows.append([data.get('employee_name'), ", ".join([i for i in data.get('technology', [])]),
+            rows.append([data.get('employee_name'),
+                         ", ".join([i for i in data.get('technology', [])]) if data.get('technology', []) else None,
                          get_shift(data.get('shift'), request),
                          ", ".join([i['consultant'] for i in data['current_project']['project']])
                          if data.get('current_project') else None])
