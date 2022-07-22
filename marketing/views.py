@@ -2162,11 +2162,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     response, error = download_s3_object(resume.first().attachment_file.name)
-                    path.append(response)
+                    if not error:
+                        path.append(response)
                 test_docs = test.attachments.all()
                 for doc in test_docs:
                     response, error = download_s3_object(doc.attachment_file.name)
-                    path.append(response)
+                    if not error:
+                        path.append(response)
                 deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
                     "%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
