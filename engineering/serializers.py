@@ -506,7 +506,7 @@ class TeamStructureSerializer(serializers.ModelSerializer):
         if projects:
             data = {
                 "count": len(projects),
-                "project": [{"id": project.id, "consultant": project.project.consultant.name} for project in projects]
+                "project": [{"id": project.project.id, "consultant": project.project.consultant.name} for project in projects]
             }
             return data
         return []
