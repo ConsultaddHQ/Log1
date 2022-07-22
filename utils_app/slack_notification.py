@@ -1,12 +1,8 @@
 import os
 
 from constance import config
-<<<<<<< HEAD
-from utils_app.utils import create_table_image
-=======
 from marketing.models import Interview
 from utils_app.utils import create_csv_file
->>>>>>> 7589fa277c176a780285b5e8a137cea290ea5bab
 from log1.utils import write_exception, post_msg_using_webhook
 
 
