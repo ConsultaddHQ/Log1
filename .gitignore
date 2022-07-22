@@ -19,4 +19,7 @@ log1key.json
 log1token.json
 prod_key.json
 prod_token.json
+service.json
 archive_functions.py
+mailkey.json
+mailtoken.json
