@@ -251,6 +251,7 @@ def send_exit_process_mail(terminate, exit_status, request):
             poc = consultant.relation
         else:
             poc = consultant.recruiter
+
         if os.environ.get('ENV', 'local') == 'prod':
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
             cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
