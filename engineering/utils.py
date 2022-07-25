@@ -1,12 +1,13 @@
 import csv
+import pandas as pd
 from datetime import datetime
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
 
+from log1.utils import write_exception
 from employee.models import User, Tagging
-from log1.utils import write_exception, ERROR_MSG
+from utils_app.utils import generate_s3_url
 from notification.utils import create_notification, push_notification
-from utils_app.utils import upload_csv_file_s3
 
 
 def tag_and_notify(update, tags, user, tag_type='create'):
@@ -64,7 +65,7 @@ def tag_and_notify(update, tags, user, tag_type='create'):
     push_notification(tags, message_body)
 
 
-def get_csv_report(payload, request):
+def get_engineer_detail_csv(payload, request):
     try:
         filename = f'{datetime.now()}'.replace(' ', '')
         file = open(f"engineer_report_{filename}.csv", "w")
@@ -89,7 +90,47 @@ def get_csv_report(payload, request):
                 ])
                 count += 1
         file.close()
-        file_url = upload_csv_file_s3(file.name)
+        file_url = generate_s3_url(file.name)
+        return file_url
+    except Exception as error:
+        write_exception(error, request)
+
+
+def get_shift(shift_type, request):
+    try:
+        shifts = User.SHIFT_CHOICE
+        for shift in shifts:
+            if shift_type == shift[0]:
+                return shift[1]
+        return None
+    except Exception as error:
+        write_exception(error, request)
+
+
+def get_team_structure_xlsx(payload, request):
+    try:
+        columns = ['Engineer Name', 'SkillSet', 'Shift', 'Support Consultant']
+        rows = []
+        for data in payload:
+            rows.append([data.get('employee_name'),
+                         ", ".join([i for i in data.get('technology', [])]) if data.get('technology', []) else None,
+                         get_shift(data.get('shift'), request),
+                         ", ".join([i['consultant'] for i in data['current_project']['project']])
+                         if data.get('current_project') else None])
+        df1 = pd.DataFrame(rows, columns=columns)
+
+        shifts = User.SHIFT_CHOICE
+        columns = ['Shift Type', 'Count']
+        rows = [[shift[1], User.objects.filter(shift=shift[0]).exclude(shift=None).count()] for shift in shifts]
+        df2 = pd.DataFrame(rows, columns=columns)
+
+        filename = f'{datetime.now()}'.replace(' ', '')
+        writer = pd.ExcelWriter(f'team_structure_{filename}.xlsx', engine='xlsxwriter')
+        df1.to_excel(writer, sheet_name='Team Structure', index=None)
+        df2.to_excel(writer, sheet_name='Count', index=None)
+
+        writer.save()
+        file_url = generate_s3_url(f'team_structure_{filename}.xlsx')
         return file_url
     except Exception as error:
         write_exception(error, request)

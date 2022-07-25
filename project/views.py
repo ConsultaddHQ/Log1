@@ -241,7 +241,7 @@ class ProjectViewSets(ModelViewSet):
                 return res, "error"
             return res, "ok"
         except Exception as error:
-            write_exception(message=f"Offer mail error for {marketer.email}: {error}")
+            write_exception(message=f"Offer mail error for {marketer.email}: {error}", request=request)
             return error, "error"
 
     @staticmethod
