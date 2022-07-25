@@ -2442,13 +2442,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             # Test email to engineering team
             test_received_notification(test, data.get('con_timezone', 'NA'), request)
-            res = "Development Server"
-            if True:
-                # test_received_notification(test, data.get('con_timezone', 'NA'), request)
-                res, error = self.send_test_mail(test, data, 'new', request)
-                if error == 'error':
-                    write_info(message=res, function='create-send_test_mail', request=request)
-                    return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
+            res, error = self.send_test_mail(test, data, 'new', request)
+            if error == 'error':
+                write_info(message=res, function='create-send_test_mail', request=request)
+                return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
         except Exception as error:
@@ -2719,8 +2716,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'rate_performance': rate_performance,
             }
             # test submit mail
-            res = "Development Server"
-            # if os.environ.get('ENV', 'local') == 'prod':
             res, error = self.send_test_mail(test, data, 'submit', request)
             if error == 'error':
                 write_info(message=res, function='create-send_test_mail', request=request)

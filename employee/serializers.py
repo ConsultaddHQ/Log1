@@ -57,7 +57,7 @@ class UserDashboardSerializer(serializers.ModelSerializer):
             current_project = project.filter(end=None, statuses__is_current=True, is_proxy_support=False,
                                              statuses__frequency__in=['active', 'less_active']).exclude(
                 project__statuses__is_current=True, project__statuses__status__istartswith='terminated')
-            data = [{"id": p.id, "name": p.project.consultant.name} for p in current_project]
+            data = [{"id": p.project.id, "name": p.project.consultant.name} for p in current_project]
             return {"current_project": data, "total": len(project)}
         return None
 
