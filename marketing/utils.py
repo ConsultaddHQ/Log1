@@ -1,4 +1,6 @@
+import csv
 import json
+from django.http import HttpResponse
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
@@ -286,8 +288,7 @@ def interview_card_data(obj, request):
             for feedback in supervisor_feedback:
                 sup_feedback = {
                     "question": feedback.question.title,
-                    "answer": feedback.answer
-                    if feedback.question.answer_type != 'multi_select' else ", ".join(feedback.answer.split(", ")),
+                    "answer": feedback.answer,
                     "answer_type": feedback.question.answer_type
                 }
                 supervisor_feedback_data.append(sup_feedback)
@@ -296,7 +297,10 @@ def interview_card_data(obj, request):
                     "answer": f"<@{supervisor.slack_id}>" if supervisor.slack_id else f"`{supervisor}`"}
             )
             sup_feedback = " \n ".join(
-                f"*{feedback['question']}*:  {feedback['answer']}" for feedback in supervisor_feedback_data)
+                f"*{feedback['question']}*:  {feedback['answer']}"
+                if feedback.get('answer_type') != 'multi_select'
+                else f"*{feedback['question']}*:  {feedback.get('answer', 'NA').replace('[', '').replace(']', '')}"
+                for feedback in supervisor_feedback_data)
             supervisor_data = {"feedback": sup_feedback, "header": ":telephone_receiver: Supervisor Feedback"}
             interview_data.append(supervisor_data)
 
@@ -306,8 +310,7 @@ def interview_card_data(obj, request):
             coding_feedback_data = []
             for feedback in coding_feedback:
                 coding_feedback = {
-                    "answer": feedback.answer
-                    if feedback.question.answer_type != 'multi_select' else ", ".join(feedback.answer.split(", ")),
+                    "answer": feedback.answer,
                     "question": feedback.question.title,
                     "answer_type": feedback.question.answer_type
                 }
@@ -322,7 +325,10 @@ def interview_card_data(obj, request):
                  "answer": obj.guest_remark if obj.guest_remark else "NA"}
             )
             coder_feedback = " \n ".join(
-                f"*{feedback['question']}*:  {feedback['answer']}" for feedback in coding_feedback_data)
+                f"*{feedback['question']}*:  {feedback['answer']}"
+                if feedback.get('answer_type') != 'multi_select'
+                else f"*{feedback['question']}*:  {feedback.get('answer', 'NA').replace('[', '').replace(']', '')}"
+                for feedback in coding_feedback_data)
             coders_data = {"feedback": coder_feedback, "header": " :computer: Coder Feedback"}
             interview_data.append(coders_data)
 
@@ -337,5 +343,27 @@ def interview_feedback_card(obj, request):
         interview_data = interview_card_data(obj, request)
         slack_card_data = slack.interview_feedback_card(obj, interview_data, request)
         return slack_card_data
+    except Exception as error:
+        write_exception(error, request)
+
+
+def get_interview_report(payload, request):
+    try:
+        response = HttpResponse(content_type='text/csv')
+        writer = csv.writer(response)
+        writer.writerow([
+            "Interview Id", "Consultant Name", "Marketer Name", "Supervisor Name", "Client Name", "Vendor Name",
+            "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack", "Status", "Failure Reason", "Passed Reason"
+        ])
+        for data in payload:
+            writer.writerow([
+                data.get('id', None), data.get('consultant_name', None), data['submission'].get('marketer_name', None),
+                f"{data['supervisor_detail']['supervisor_name']}({data['supervisor_detail']['call_given_by']})",
+                data['submission'].get('client', None), data['submission'].get('vendor', None), data.get('round', None),
+                data.get('start_time', None), data.get('interview_mode', None), data.get('screening_type', None),
+                data.get('tech_stack', None), data.get('status', None), data.get('failure_reason', None),
+                data.get('passed_reason', None),
+            ])
+        return response
     except Exception as error:
         write_exception(error, request)

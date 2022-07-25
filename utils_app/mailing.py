@@ -19,6 +19,7 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
     if reply_to is None:
         reply_to = []
     try:
+        cc.append('suman.m@consultadd.com')
         msg = EmailMultiAlternatives(
             body="body",
             reply_to=reply_to,

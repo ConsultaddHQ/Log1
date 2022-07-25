@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models.functions import Lower
 from django.db.models import F, Q, Max, Count
+from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.decorators import action
@@ -18,18 +19,21 @@ from marketing.utils import *
 from marketing.serializers import *
 from activity.models import Activity
 from employee.models import User, Team
-from utils_app.calendar import Calendar, GoogleCalendar
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
+from utils_app.models import MapMail
 from activity.serializers import ActivitySerializer
+from utils_app.calendar import Calendar, GoogleCalendar
 from attachment.models import Attachment, create_attachment
-from utils_app.mailing import send_email_attachment_multiple
+# from utils_app.mailing import send_email_attachment_multiple
+from utils_app.thred_mail import send_email_attachment_multiple
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+
 
 
 # Route - /vendor_company/
@@ -1151,6 +1155,97 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='export')
+    def export(self, request, *args, **kwargs):
+        query = request.GET.get('query', None)
+        filter_for = request.GET.get('filter_for', 'all')
+        filter_json = request.GET.get('filter_json', None)
+
+        try:
+            user_id = request.user.id
+            roles = request.user.roles
+            team = request.user.team
+            queryset = Interview.objects.all()
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if query.isnumeric():
+                    queryset = queryset.filter(
+                        Q(id=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+
+            if filter_for == 'my':
+                if 'interviewee' in roles:
+                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
+                else:
+                    queryset = queryset.filter(submission__created_by_id=user_id)
+
+            elif filter_for == 'team':
+                queryset = queryset.filter(submission__created_by__team=team)
+
+            if filter_json:
+                filters = json.loads(filter_json)
+
+                if 'assignment' in filters:
+                    if filters["assignment"] == 'assigned':
+                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
+                    if filters["assignment"] == 'unassigned':
+                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
+
+                if 'coding_interview' in filters:
+                    if filters["coding_interview"] == 'yes':
+                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                    elif filters["coding_interview"] == 'no':
+                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+
+                if 'status' in filters and len(filters["status"]) > 0:
+                    queryset = queryset.filter(status__in=filters["status"])
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
+
+                if 'ctb' in filters and len(filters["ctb"]) > 0:
+                    queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
+
+                if 'client' in filters and len(filters["client"]) > 0:
+                    queryset = queryset.filter(submission__client__in=filters["client"])
+
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
+
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters["vendor"])
+
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    queryset = queryset.filter(
+                        submission__consultant_marketing__consultant_id__in=filters["consultant"]
+                    )
+
+                start_time = filters.get('start_time', None)
+                queryset = date_filter(queryset, start_time, "start_time")
+
+            queryset = queryset.order_by('id').distinct('id')
+            serializer = InterviewListSerializer(queryset, many=True)
+            if serializer.data:
+                report = get_interview_report(serializer.data, request)
+                return report
+            return Response({"message": "No Data to Extract"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     def create(self, request, *args, **kwargs):
         try:
             # Change status of past Interview to feedback due
@@ -2067,11 +2162,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     response, error = download_s3_object(resume.first().attachment_file.name)
-                    path.append(response)
+                    if not error:
+                        path.append(response)
                 test_docs = test.attachments.all()
                 for doc in test_docs:
                     response, error = download_s3_object(doc.attachment_file.name)
-                    path.append(response)
+                    if not error:
+                        path.append(response)
                 deadline = datetime.strptime(test.deadline, "%Y-%m-%d").strftime(
                     "%b. %d, %Y") if test.deadline else 'NA'
                 mail_data = {
@@ -2107,10 +2204,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     },
                     'attachments': path
                 }
-                res, msg = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
+                
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
+                content_type = ContentType.objects.get(model="test")
+                mail_object = MapMail(mail_id=res, object_id=test.id, content_type=content_type, from_mail_id=from_mail)
+                mail_object.save()
                 return res, "ok"
 
             elif test_status == 'submit':
@@ -2150,7 +2251,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         'single_question': single_question, 'remarks': test.engineer_remarks,
                     },
                 }
-                res, msg = send_email_attachment_multiple(mail_data, test.submitted_by.email, request=request)
+                # Need to filter on based one type and objectId
+                mail_id = None
+                from_mail = test.submitted_by.email
+                email_object = MapMail.objects.filter(content_type__model="test",object_id=test.id).first()
+                if email_object:
+                    mail_id = email_object.mail_id
+                    from_mail = email_object.from_mail_id 
+                res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail,request, mail_id)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2333,13 +2441,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 create_attachment(file_data)
 
             # Test email to engineering team
-            res = "Development Server"
-            if os.environ.get('ENV', 'local') == 'prod':
-                test_received_notification(test, data.get('con_timezone', 'NA'), request)
-                res, error = self.send_test_mail(test, data, 'new', request)
-                if error == 'error':
-                    write_info(message=res, function='create-send_test_mail', request=request)
-                    return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
+            test_received_notification(test, data.get('con_timezone', 'NA'), request)
+            res, error = self.send_test_mail(test, data, 'new', request)
+            if error == 'error':
+                write_info(message=res, function='create-send_test_mail', request=request)
+                return Response({"message": "Test created but mail not sent", "error": str(res)}, status=400)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "mail": res, "message": "Test created and mail sent"}, status=201)
         except Exception as error:
@@ -2610,9 +2716,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'rate_performance': rate_performance,
             }
             # test submit mail
-            res = "Development Server"
             res, error = self.send_test_mail(test, data, 'submit', request)
-
             if error == 'error':
                 write_info(message=res, function='create-send_test_mail', request=request)
                 return Response({"message": "Test submitted but mail not sent", "error": str(res)}, status=400)

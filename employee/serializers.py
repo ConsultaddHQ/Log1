@@ -25,6 +25,43 @@ class UserSerializer(serializers.ModelSerializer):
         return get_profile_picture(obj)
 
 
+class UserDashboardSerializer(serializers.ModelSerializer):
+    team = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone',
+                  'is_superuser', 'technology', 'shift', 'project')
+
+    @staticmethod
+    def get_team(obj):
+        team = obj.team
+        if team:
+            return {
+                "name": team.name,
+                "department": team.dept
+            }
+        return None
+
+    @staticmethod
+    def get_avatar(obj):
+        if obj.avatar:
+            return obj.avatar.url
+
+    @staticmethod
+    def get_project(obj):
+        project = obj.projects.all()
+        if project:
+            current_project = project.filter(end=None, statuses__is_current=True, is_proxy_support=False,
+                                             statuses__frequency__in=['active', 'less_active']).exclude(
+                project__statuses__is_current=True, project__statuses__status__istartswith='terminated')
+            data = [{"id": p.project.id, "name": p.project.consultant.name} for p in current_project]
+            return {"current_project": data, "total": len(project)}
+        return None
+
+
 class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
