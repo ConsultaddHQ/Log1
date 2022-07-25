@@ -68,8 +68,7 @@ class MapMail(TimeStampedModel):
         return super(MapMail, self).save(*args, **kwargs)    
     
     def __str__(self):
-        return self.content_type + ' ' + self.object_id 
-
+        return f'{self.content_type}_{self.object_id}'
 
 
 class Field(models.Model):

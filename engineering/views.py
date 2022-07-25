@@ -1258,7 +1258,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.GET.get('query', '')
             shifts = json.loads(request.GET.get('shifts', '[]'))
             skills = json.loads(request.GET.get('skills', '[]'))
-            engineers = User.objects.filter(role__name='engineer')
+            engineers = User.objects.filter(role__name='engineer', is_active=True)
             if query:
                 engineers = engineers.filter(employee_name__istartswith=query)
             if skills:
@@ -1283,7 +1283,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.GET.get('query', '')
             shifts = json.loads(request.GET.get('shifts', '[]'))
             skills = json.loads(request.GET.get('skills', '[]'))
-            engineers = User.objects.filter(role__name='engineer')
+            engineers = User.objects.filter(role__name='engineer', is_active=True)
             if query:
                 engineers = engineers.filter(employee_name__istartswith=query)
             if skills:
