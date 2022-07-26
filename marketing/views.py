@@ -1626,9 +1626,9 @@ class InterviewViewSets(ModelViewSet):
                 serializer.save()
 
             interview.status = 'rescheduled'
-            if interview.guest_type in ['coder', 'assistance']:
+            if interview.guest_type in ['coder', 'assistance', 'assigned']:
                 interview.guest.clear()
-                interview.save()
+            interview.save()
 
             submission = interview.submission
             user_list, attendees = get_users_and_attendees(request, interview)
