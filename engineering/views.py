@@ -942,7 +942,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             engineers = User.objects.filter(
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
-                projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
+                is_active=True, projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False
             ).order_by('employee_id').distinct('employee_id')
             if consultant_type:
                 engineers = engineers.filter(projects__project__is_remote=True)
@@ -1005,7 +1005,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             engineer = User.objects.filter(
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
-                projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
+                is_active=True, projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False
             ).order_by('employee_id').distinct('employee_id')
             if consultant_type:
                 engineer = engineer.filter(projects__project__is_remote=True)
