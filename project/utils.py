@@ -369,3 +369,40 @@ def create_checklist(project_id, request):
             )
     except Exception as error:
         write_exception(error, request)
+
+
+def support_assignment_mail(support, request):
+    try:
+        project = support.project
+        submission = project.submission
+        consultant = project.submission.consultant
+
+        project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
+        poc_emails = list(consultant.pocs.filter(end=None).values_list('poc__email', flat=True))
+        support_emails = list(project.support.all().values_list('support__email', flat=True))
+        marketing_poc = list(User.objects.filter(
+            team=submission.created_by.team, role__name='admin'
+        ).values_list('email', flat=True))
+
+        mail_data = {
+            'template': '../templates/support_assignment.html',
+            'to': [submission.created_by.email] + support_emails,
+            'cc': ['engineering@consultadd.com'] + poc_emails + marketing_poc, 'bcc': [],
+            'subject': f"{consultant.name}'s support initiated for  {project.submission.client} by"
+                       f" {support.support.employee_name}",
+            'context': {
+                'support_name': support.support.employee_name,
+                'client': submission.client, 'support_email': support.support.email,
+                'consultant_name': consultant.name, 'consultant_email': consultant.email,
+                'marketer_name': submission.created_by.employee_name, 'start': project_start_date,
+                'job_title': submission.lead.job_title, 'consultant_phone_no': consultant.phone_no,
+                'project_location': submission.lead.city, 'consultant_location': consultant.current_city,
+            }
+        }
+        res, msg = send_email(mail_data, request.user.email, request=request)
+        if not msg:
+            return res, "error"
+        return res, "ok"
+    except Exception as error:
+        write_exception(message=error)
+        return error, "error"
