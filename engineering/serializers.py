@@ -492,11 +492,16 @@ class EngineerInterviewSerializer(serializers.ModelSerializer):
 
 
 class TeamStructureSerializer(serializers.ModelSerializer):
+    team = serializers.SerializerMethodField()
     current_project = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'employee_name', 'shift', 'technology', 'current_project')
+        fields = ('id', 'employee_name', 'shift', 'technology', 'current_project', 'team')
+
+    @staticmethod
+    def get_team(obj):
+        return obj.team.name if obj.team else None
 
     @staticmethod
     def get_current_project(obj):

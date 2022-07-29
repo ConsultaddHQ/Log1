@@ -107,9 +107,9 @@ def get_shift(shift_type, request):
         write_exception(error, request)
 
 
-def get_team_structure_xlsx(payload, request):
+def get_team_structure_xlsx(payload, counts, request):
     try:
-        columns = ['Engineer Name', 'SkillSet', 'Shift', 'Support Consultant']
+        columns = ['Engineer Name', 'SkillSet', 'Shift', 'Support Consultant', 'Team Name']
         rows = []
         for data in payload:
             rows.append([data.get('employee_name'),
