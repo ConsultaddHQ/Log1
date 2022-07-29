@@ -8,6 +8,7 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from django.contrib.contenttypes.models import ContentType
 
+from utils_app.utils import TECHNOLOGIES
 from utils_app.models import City, Choice
 from log1.utils import write_exception, ERROR_MSG
 
@@ -103,9 +104,7 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
     @action(methods=['get'], detail=False, url_path='technology')
     def technology(self, request):
         try:
-            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
-                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
-            return Response({"data": data}, status=200)
+            return Response({"data": TECHNOLOGIES}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
