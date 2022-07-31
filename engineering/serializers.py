@@ -497,7 +497,7 @@ class TeamStructureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'employee_name', 'shift', 'technology', 'current_project', 'team')
+        fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_project', 'team')
 
     @staticmethod
     def get_team(obj):
@@ -511,7 +511,9 @@ class TeamStructureSerializer(serializers.ModelSerializer):
         if projects:
             data = {
                 "count": len(projects),
-                "project": [{"id": project.project.id, "consultant": project.project.consultant.name} for project in projects]
+                "project": [{
+                    "id": project.project.id, "consultant": project.project.consultant.name
+                } for project in projects]
             }
             return data
         return []

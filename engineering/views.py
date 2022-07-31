@@ -1270,8 +1270,6 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             eng_teams = Team.objects.filter(dept='Engineering')
 
             if filters:
-                if "query" in filters:
-                    queryset = queryset.filter(employee_name__istartswith=filters['query'])
                 if "skills" in filters:
                     queryset = queryset.filter(technology__overlap=filters['skills'])
                 if "shifts" in filters:
@@ -1310,23 +1308,14 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def list(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
             filters = json.loads(request.GET.get('filter_json', '{}'))
             engineers = User.objects.filter(role__name='engineer', is_active=True)
-            if filters:
-                engineers, counts = self.filter_engineer(filters, request)
-            serializer = TeamStructureSerializer(engineers[first: last], many=True)
-            return Response({"data": serializer.data, "total": len(engineers)}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
-    @action(methods=['get'], detail=False, url_path='analytical')
-    def analytical_view(self, request, **kwargs):
-        try:
-            filters = json.loads(request.GET.get('filter_json', '{}'))
-            engineers = User.objects.filter(role__name='engineer', is_active=True)
+            if query:
+                engineers = engineers.filter(employee_name__istartswith=filters['query'])
             engineers, counts = self.filter_engineer(engineers, filters, request)
-            return Response({"counts": counts, "total": len(engineers)}, status=200)
+            serializer = TeamStructureSerializer(engineers[first: last], many=True)
+            return Response({"data": serializer.data, "count": counts, "total": len(engineers)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -1334,14 +1323,33 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path='export')
     def export(self, request, **kwargs):
         try:
+            query = request.GET.get('query', None)
             filters = json.loads(request.GET.get('filter_json', '{}'))
             engineers = User.objects.filter(role__name='engineer', is_active=True)
+            if query:
+                engineers = engineers.filter(employee_name__istartswith=filters['query'])
             engineers, counts = self.filter_engineer(engineers, filters, request)
             serializer = TeamStructureSerializer(engineers, many=True)
             if serializer.data:
                 file_url = get_team_structure_xlsx(serializer.data, counts, request)
                 return Response({"data": file_url}, status=200)
             return Response({"message": "No Data to export"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['put'], detail=False, url_path='update_shift')
+    def shift(self, request, **kwargs):
+        try:
+            shift = request.data.get('shift', None)
+            employee_ids = request.data.get('employee_ids', [])
+            if not employee_ids or not shift:
+                return Response({"message": "Data not provided"}, status=400)
+            for emp_id in employee_ids:
+                employee = get_object_or_404(User, employee_id=emp_id)
+                employee.shift = shift
+                employee.save()
+            return Response({"message": "Shift Detail Updated"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
