@@ -11,7 +11,6 @@ from log1.utils import write_exception, write_info
 SCOOPS = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/admin.directory.user']
 SERVICE_ACCOUNT_FILE = 'calendar.json'
 
-
 class GoogleCalendar:
 
     @staticmethod
