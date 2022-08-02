@@ -116,18 +116,23 @@ def get_team_structure_xlsx(payload, counts, request):
                          ", ".join([i for i in data.get('technology', [])]) if data.get('technology', []) else None,
                          get_shift(data.get('shift'), request),
                          ", ".join([i['consultant'] for i in data['current_project']['project']])
-                         if data.get('current_project') else None])
+                         if data.get('current_project') else None, data['team']])
         df1 = pd.DataFrame(rows, columns=columns)
 
-        shifts = User.SHIFT_CHOICE
-        columns = ['Shift Type', 'Count']
-        rows = [[shift[1], User.objects.filter(shift=shift[0]).exclude(shift=None).count()] for shift in shifts]
-        df2 = pd.DataFrame(rows, columns=columns)
+        frames = []
+        for count_type in counts:
+            columns = [None, count_type.capitalize(), 'Count', None]
+            rows = []
+            for data in counts[count_type]:
+                rows.append([None, data['display_name'], data['count'], None])
+            df2 = pd.DataFrame(rows, columns=columns)
+            frames.append(df2)
+        result = pd.concat(frames, axis=1)
 
         filename = f'{datetime.now()}'.replace(' ', '')
         writer = pd.ExcelWriter(f'team_structure_{filename}.xlsx', engine='xlsxwriter')
         df1.to_excel(writer, sheet_name='Team Structure', index=None)
-        df2.to_excel(writer, sheet_name='Count', index=None)
+        result.to_excel(writer, sheet_name='Count', index=None)
 
         writer.save()
         file_url = generate_s3_url(f'team_structure_{filename}.xlsx')
