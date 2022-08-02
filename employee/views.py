@@ -20,7 +20,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from api_key.models import APIKey
-from project.models import Project
+from project.models import Project, ProjectSupport
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
@@ -418,6 +418,24 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             data = User.SHIFT_CHOICE
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='get_projects')
+    def projects(self, request):
+        try:
+            projects = ProjectSupport.objects.filter(
+                statuses__frequency__in=['active', 'less_active'],  end=None,
+                statuses__is_current=True, is_proxy_support=False, support=request.user
+            ).exclude(project__statuses__is_current=True,
+                      project__statuses__status__istartswith='terminated' or 'cancelled').annotate(
+                employer=F('project__employer'),
+                consultant_name=F('project__submission__consultant_marketing__consultant__name'),
+                client=F('project__submission__client'), vendor=F('project__submission__lead__vendor_company__name'),
+            ).values("project_id", "client", "consultant_name", "employer", "vendor")
+
+            return Response({"data": projects}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
