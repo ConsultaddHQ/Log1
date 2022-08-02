@@ -36,7 +36,6 @@ from log1.utils import get_page_limits, post_msg_using_webhook, write_exception,
 from django.contrib.auth.models import ContentType
 
 
-
 # Route - /vendor_company/
 class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     queryset = VendorCompany.objects.all()

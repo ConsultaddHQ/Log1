@@ -12,9 +12,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from engineering.utils import *
+from employee.models import Team
 from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
+from utils_app.utils import TECHNOLOGIES
 from activity.views import create_activity
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
@@ -942,7 +944,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             engineers = User.objects.filter(
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
-                projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
+                is_active=True, projects__end=None, projects__statuses__is_current=True,
+                projects__is_proxy_support=False
             ).order_by('employee_id').distinct('employee_id')
             if consultant_type:
                 engineers = engineers.filter(projects__project__is_remote=True)
@@ -1005,7 +1008,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
             engineer = User.objects.filter(
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
-                projects__end=None, projects__statuses__is_current=True, projects__is_proxy_support=False,
+                is_active=True, projects__end=None, projects__statuses__is_current=True,
+                projects__is_proxy_support=False
             ).order_by('employee_id').distinct('employee_id')
             if consultant_type:
                 engineer = engineer.filter(projects__project__is_remote=True)
@@ -1251,50 +1255,101 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         except Exception as error:
             write_exception(error, request)
 
-    @action(methods=['get'], detail=False, url_path='team_structure')
-    def team_structure(self, request, **kwargs):
-        try:
-            first, last = get_page_limits(request)
-            query = request.GET.get('query', '')
-            shifts = json.loads(request.GET.get('shifts', '[]'))
-            skills = json.loads(request.GET.get('skills', '[]'))
-            engineers = User.objects.filter(role__name='engineer', is_active=True)
-            if query:
-                engineers = engineers.filter(employee_name__istartswith=query)
-            if skills:
-                engineers = engineers.filter(technology__overlap=skills)
-            if shifts:
-                engineers = engineers.filter(shift__in=shifts)
-            serializer = TeamStructureSerializer(engineers[first: last], many=True)
 
+# Route - /team_structure/
+class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+    queryset = User.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = EngineerReportSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    @staticmethod
+    def filter_engineer(queryset, filters, request):
+        try:
             shifts = User.SHIFT_CHOICE
-            shift_counts = [
-                {shift[1]: User.objects.filter(shift=shift[0]).exclude(shift=None).count()}
-                for shift in shifts
-            ]
-            return Response({"data": serializer.data, "total": len(engineers), "counts": shift_counts}, status=200)
+            eng_teams = Team.objects.filter(dept='Engineering')
+
+            if filters:
+                if "skills" in filters:
+                    queryset = queryset.filter(technology__overlap=filters['skills'])
+                if "shifts" in filters:
+                    queryset = queryset.filter(shift__in=filters['shifts'])
+                if "team" in filters:
+                    queryset = queryset.filter(team_id=filters['team'])
+            counts = {
+                "shift": [
+                    {
+                        "name": shift[0],
+                        "display_name": shift[1],
+                        "count": queryset.filter(shift=shift[0]).exclude(shift=None).count()
+                    }
+                    for shift in shifts
+                ],
+                "team": [
+                    {
+                        "display_name": team.name,
+                        "count": queryset.filter(team=team).exclude(team=None).count()
+                    }
+                    for team in eng_teams
+                ],
+                "skill": [
+                    {
+                        "display_name": technology,
+                        "count": queryset.filter(technology__overlap=[technology]).count()
+                    }
+                    for technology in TECHNOLOGIES
+                ]
+            }
+            return queryset, counts
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='team_export')
-    def team_export(self, request, **kwargs):
+    def list(self, request, **kwargs):
         try:
-            query = request.GET.get('query', '')
-            shifts = json.loads(request.GET.get('shifts', '[]'))
-            skills = json.loads(request.GET.get('skills', '[]'))
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            filters = json.loads(request.GET.get('filter_json', '{}'))
             engineers = User.objects.filter(role__name='engineer', is_active=True)
             if query:
-                engineers = engineers.filter(employee_name__istartswith=query)
-            if skills:
-                engineers = engineers.filter(technology__overlap=skills)
-            if shifts:
-                engineers = engineers.filter(shift__in=shifts)
+                engineers = engineers.filter(employee_name__istartswith=filters['query'])
+            engineers, counts = self.filter_engineer(engineers, filters, request)
+            serializer = TeamStructureSerializer(engineers[first: last], many=True)
+            return Response({"data": serializer.data, "count": counts, "total": len(engineers)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='export')
+    def export(self, request, **kwargs):
+        try:
+            query = request.GET.get('query', None)
+            filters = json.loads(request.GET.get('filter_json', '{}'))
+            engineers = User.objects.filter(role__name='engineer', is_active=True)
+            if query:
+                engineers = engineers.filter(employee_name__istartswith=filters['query'])
+            engineers, counts = self.filter_engineer(engineers, filters, request)
             serializer = TeamStructureSerializer(engineers, many=True)
             if serializer.data:
-                file_url = get_team_structure_xlsx(serializer.data, request)
+                file_url = get_team_structure_xlsx(serializer.data, counts, request)
                 return Response({"data": file_url}, status=200)
             return Response({"message": "No Data to export"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['put'], detail=False, url_path='update_shift')
+    def shift(self, request, **kwargs):
+        try:
+            shift = request.data.get('shift', None)
+            employee_ids = request.data.get('employee_ids', [])
+            if not employee_ids or not shift:
+                return Response({"message": "Data not provided"}, status=400)
+            for emp_id in employee_ids:
+                employee = get_object_or_404(User, employee_id=emp_id)
+                employee.shift = shift
+                employee.save()
+            return Response({"message": "Shift Detail Updated"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)

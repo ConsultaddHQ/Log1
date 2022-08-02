@@ -10,6 +10,9 @@ from utils_app.models import CronJob, CronError
 from log1.utils import write_exception, write_info
 from utils_app.mailing import send_email_without_template
 
+TECHNOLOGIES = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
+                'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
+
 
 def generate_s3_url(filename):
     try:
