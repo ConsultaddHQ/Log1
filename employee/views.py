@@ -427,10 +427,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             vendor = request.GET['vendor']
             client = request.GET['client']
-            consultant_id = request.GET['consultant_id']
+            consultant = request.GET['consultant']
             project = Project.objects.filter(
                 submission__lead__vendor_company__name__icontains=vendor,
-                submission__consultant_marketing__consultant_id=consultant_id,
+                submission__consultant_marketing__consultant__name=consultant,
                 submission__client__icontains=client, statuses__is_current=True,
                 statuses__status__in=['new', 'joined', 'signed', 'received', 'extended', 'on_boarded']
             ).annotate(
@@ -438,7 +438,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 client=F('submission__client'), vendor=F('submission__lead__vendor_company__name'),
             ).values("id", "client", "consultant_name", "employer", "vendor")
             if not project:
-                return Response({"message": "No Project Found"}, status=400)
+                return Response({"data": [], "message": "No Project Found"}, status=200)
             return Response({"data": project, "message": "Project Found"}, status=200)
         except Exception as error:
             write_exception(error, request)
