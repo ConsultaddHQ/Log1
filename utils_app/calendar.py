@@ -8,7 +8,7 @@ from log1.utils import write_exception, write_info
 # from google.auth.transport.requests import Request
 # from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPS = ['https://www.googleapis.com/auth/calendar','https://www.googleapis.com/auth/admin.directory.user']
+SCOOPS = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/admin.directory.user']
 SERVICE_ACCOUNT_FILE = 'calendar.json'
 
 class GoogleCalendar:
@@ -17,7 +17,7 @@ class GoogleCalendar:
     def calendar_con(calendar_id):
         credentials = Credentials.from_service_account_file(
             filename=SERVICE_ACCOUNT_FILE,
-            scopes = SCOPS,
+            scopes=SCOOPS,
             subject=calendar_id,
         )
         try:
@@ -100,7 +100,7 @@ class GoogleCalendar:
     def book_calendar(self, data, calendar_id):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id="suman.m@consultadd.com"
+                calendar_id = "suman.m@consultadd.com"
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
             event = service.events().insert(calendarId=calendar_id, body=event, sendUpdates='all').execute()
@@ -112,11 +112,11 @@ class GoogleCalendar:
     def update_calendar(self, event_id, data, calendar_id):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id="suman.m@consultadd.com"
+                calendar_id = "suman.m@consultadd.com"
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
-            if calendar_id=="suman.m@consultadd.com" and os.environ.get('ENV', 'local') == 'prod':
-                calendar_id=os.environ.get('LOG1_CALENDER_ID')
+            if calendar_id == "suman.m@consultadd.com" and os.environ.get('ENV', 'local') == 'prod':
+                calendar_id = os.environ.get('LOG1_CALENDER_ID')
             updated_event = service.events().update(calendarId=calendar_id, eventId=event_id, body=event,
                                                     sendUpdates='all').execute()
             return updated_event, 'ok'
@@ -128,7 +128,7 @@ class GoogleCalendar:
         try:
             items = []
             for email in user_emails:
-                data = {"id":email}
+                data = {"id": email}
                 items.append(data)
             service = self.calendar_con(calendar_id)
             time_min = start + 'T00:00:00-04:00'
@@ -140,7 +140,7 @@ class GoogleCalendar:
                 "items": items
             }
             res = service.freebusy().query(body=freebusy_query).execute()
-            return res['calendars'],True
+            return res['calendars'], True
         except Exception as error:
             write_exception(message=error)
             return str(error), "error"
@@ -148,16 +148,15 @@ class GoogleCalendar:
     def delete_calendar_booking(self, event_id, calendar_id, request):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id="suman.m@consultadd.com"
+                calendar_id = "suman.m@consultadd.com"
             service = self.calendar_con(calendar_id)
-            if calendar_id=="suman.m@consultadd.com" and os.environ.get('ENV', 'local') == 'prod':
-                calendar_id=os.environ.get('LOG1_CALENDER_ID')
+            if calendar_id == "suman.m@consultadd.com" and os.environ.get('ENV', 'local') == 'prod':
+                calendar_id = os.environ.get('LOG1_CALENDER_ID')
             service.events().delete(calendarId=calendar_id, eventId=event_id, sendUpdates='all').execute()
             return True, "ok"
         except Exception as error:
             write_exception(message=error, request=request)
             return str(error), "error"
-
 
 
 def get_ms_header(request=None):
@@ -186,8 +185,6 @@ def get_ms_header(request=None):
     except Exception as error:
         write_exception(message=error, request=request)
         return None
-
-
 
 
 class Calendar:
