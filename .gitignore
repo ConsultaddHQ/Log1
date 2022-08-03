@@ -23,3 +23,11 @@ service.json
 archive_functions.py
 mailkey.json
 mailtoken.json
+NameWise.csv
+calendar.json
+marketers.csv
+teamwise.csv
+utils_app/management/commands/change_user_team.py
+utils_app/management/commands/get_marketer.py
+utils_app/management/commands/update_team.py
+utils_app/management/commands/update_user_id.py
