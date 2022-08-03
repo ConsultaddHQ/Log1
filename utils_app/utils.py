@@ -21,6 +21,9 @@ def create_table_image(data, filename=None):
     except Exception as error:
         write_exception(message=error)
 
+TECHNOLOGIES = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
+                'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
+
 
 def generate_s3_url(filename):
     try:

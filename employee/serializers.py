@@ -56,8 +56,13 @@ class UserDashboardSerializer(serializers.ModelSerializer):
         if project:
             current_project = project.filter(end=None, statuses__is_current=True, is_proxy_support=False,
                                              statuses__frequency__in=['active', 'less_active']).exclude(
-                project__statuses__is_current=True, project__statuses__status__istartswith='terminated')
-            data = [{"id": p.id, "name": p.project.consultant.name} for p in current_project]
+                project__statuses__is_current=True, project__statuses__status__istartswith='terminated' or 'cancelled')
+            data = [{
+                "vendor": p.project.submission.lead.vendor_company.name
+                if p.project.submission.lead.vendor_company.name else None,
+                "employer": p.project.employer if p.project.employer else None,
+                "id": p.project.id, "name": p.project.consultant.name, "client": p.project.submission.client,
+            } for p in current_project]
             return {"current_project": data, "total": len(project)}
         return None
 
@@ -75,7 +80,8 @@ class UserSerializerLogin(UserSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'is_superuser')
+        fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'technology',
+                  'shift', 'is_superuser')
 
     @staticmethod
     def get_token(obj):

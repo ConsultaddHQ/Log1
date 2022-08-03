@@ -74,7 +74,7 @@ def date_filter(queryset, timestamp, field_str):
 def change_to_feedback_due():
     try:
         now = datetime.now() - timedelta(hours=4)
-        previous_interviews = Interview.objects.filter(end_time__lte=now, status__in=['scheduled', 'rescheduled'])
+        previous_interviews = Interview.objects.filter(start_time__lte=now, status__in=['scheduled', 'rescheduled'])
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
