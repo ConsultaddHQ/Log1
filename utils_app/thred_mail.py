@@ -16,6 +16,7 @@ from django.template.loader import render_to_string
 SERVICE_ACCOUNT_FILE = 'service.json'
 SCOPES = ['https://mail.google.com/']
 
+
 def cred(mail_id):
     if os.environ.get('ENV', 'local') != 'prod':
         mail_id="suman.m@consultadd.com"
@@ -39,7 +40,7 @@ def get_field(email, field_name):
 def add_file(filepath, filename, object):
     attachment = open(filepath, "rb")
     p = base.MIMEBase('application', 'octet-stream')
-    p.set_payload((attachment).read())
+    p.set_payload(attachment.read())
     encoders.encode_base64(p)
     p.add_header('Content-Disposition', "attachment; filename= %s" % filename)
     object.attach(p)
@@ -54,7 +55,7 @@ def create_message(from_email, mail_data):
     message['subject'] = mail_data["subject"]
     
     if os.environ.get('ENV', 'local') != 'prod':
-        from_email="suman.m@consultadd.com"
+        from_email = "suman.m@consultadd.com"
     
     message['from'] = from_email
     if os.environ.get('ENV', 'local') == 'prod':
@@ -66,23 +67,24 @@ def create_message(from_email, mail_data):
         message['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
         message['cc'] = ''
         message['bcc'] = ''
+        
+    b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
+    return {'raw': b64_bytes.decode()}
 
-    return {'raw': base64.urlsafe_b64encode(message.as_string())}
 
-
-def set_mail_config(to, from_mail, cc, bcc, subject, object):    
-    object['subject'] = subject
+def set_mail_config(to, from_mail, cc, bcc, subject, obj):
+    obj['subject'] = subject
     if os.environ.get('ENV', 'local') == 'prod':
-        object['to'] = ','.join(to)
-        object['cc'] = ','.join(cc)
-        object['bcc'] = ','.join(bcc)
-        object['from'] = from_mail
+        obj['to'] = ','.join(to)
+        obj['cc'] = ','.join(cc)
+        obj['bcc'] = ','.join(bcc)
+        obj['from'] = from_mail
     else:
-        object['from'] = "suman.m@consultadd.com"
-        object['cc'] = ''
-        object['bcc'] = ''      
-        object['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
-    return object
+        obj['from'] = "suman.m@consultadd.com"
+        obj['cc'] = ''
+        obj['bcc'] = ''
+        obj['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+    return obj
 
 
 @shared_task
@@ -109,14 +111,14 @@ def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=N
         invalid_keys = ['template', 'context']
         data = {x: mail_data[x] for x in mail_data if x not in invalid_keys}
         write_info(message=str(data), function='send_email', request=request)
-        return str(error), False
+        return str(error), False, None
 
 
 @shared_task
-def send_email(mail_data, from_email, reply_to=None, request=None):
+def send_email(mail_data, from_email, request=None):
     try:
-        msg = create_message(from_email, mail_data)
         service,from_mail_id = cred(from_email)
+        msg = create_message(from_mail_id, mail_data)
         message = (service.users().messages().send(userId="me", body=msg).execute())
         return message['id'], True, from_mail_id
     
@@ -125,7 +127,7 @@ def send_email(mail_data, from_email, reply_to=None, request=None):
         invalid_keys = ['template', 'context']
         data = {x: mail_data[x] for x in mail_data if x not in invalid_keys}
         write_info(message=str(data), function='send_email', request=request)
-        return str(error), False
+        return str(error), False, None
 
 
 @shared_task
@@ -156,7 +158,7 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
         invalid_keys = ['body']
         data = {x: mail_data[x] for x in mail_data if x not in invalid_keys}
         write_info(message=str(data), function='send_email_without_template', request=request)
-        return str(error), False
+        return str(error), False, None
 
 
 @shared_task
@@ -191,9 +193,9 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
             return message['id'], True, from_mail_id
         else:
             message = multipart.MIMEMultipart()
-            message['from'] = from_email
+            message['from'] = from_mail_id
             subject = mail_data["subject"]
-            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
+            message = set_mail_config(mail_data["to"], from_mail_id, mail_data["cc"], mail_data["bcc"], subject, message) 
             
             if reply_to is None:
                 body = render_to_string(mail_data["template"], mail_data["context"])
@@ -214,4 +216,4 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
         invalid_keys = ['template', 'context']
         data = {x: mail_data[x] for x in mail_data if x not in invalid_keys}
         write_info(message=str(data), function='send_email_attachment_multiple', request=request)
-        return str(error), False
+        return str(error), False, None
