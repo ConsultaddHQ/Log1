@@ -17,6 +17,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 from constance import config
 from marketing.utils import date_filter
 from utils_app.models import ObjectGroup
+from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
@@ -25,7 +26,8 @@ from attachment.models import create_attachment
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
-from utils_app.mailing import send_email_attachment_multiple, send_email
+from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple
+
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
@@ -105,7 +107,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res, msg = send_email(mail_data, submission.created_by.email, request=request)
+            res, msg, mail_id = send_email_(mail_data, submission.created_by.email, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -163,7 +165,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
+            res, msg, mail_id = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
             delete_temp_file(path)
             if not msg:
                 return res, "error"
@@ -238,7 +240,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res, msg = send_email_attachment_multiple(mail_data, marketer.email, request=request)
+            res, msg, email_id = send_email_attachment_multiple(mail_data, marketer.email, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -302,8 +304,11 @@ class ProjectViewSets(ModelViewSet):
                     'vendor_name': vendor_name, 'start': project_start_date, 'remark': project.feedback,
                 }
             }
-            res1, msg1 = send_email(mail_data, marketer.email, request=request)
+            res1, msg1, mail_id = send_email_(mail_data, marketer.email, request=request)
 
+            if msg1:
+                res1="mail send"
+            
             mail_data_eng = {
                 'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
                 'template': '../templates/po_termination_engineering.html',
@@ -319,7 +324,10 @@ class ProjectViewSets(ModelViewSet):
                     'project_duration': f"{diff_month_days(project.start_date, project.end_date)} months",
                 }
             }
-            res2, msg2 = send_email(mail_data_eng, marketer.email, request=request)
+            res2, msg2, mail_id = send_email_(mail_data_eng, marketer.email, request=request)
+
+            if msg2:
+                res2="mail send"
 
             return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
@@ -511,7 +519,7 @@ class ProjectViewSets(ModelViewSet):
                            f"creating PO"
                     create_activity(project.id, 'projectsupport', request.user, desc, 'created')
                     support_assignment_mail(support, request)
-
+                
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
