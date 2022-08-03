@@ -1274,8 +1274,8 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     queryset = queryset.filter(technology__overlap=filters['skills'])
                 if "shifts" in filters:
                     queryset = queryset.filter(shift__in=filters['shifts'])
-                if "team" in filters:
-                    queryset = queryset.filter(team_id=filters['team'])
+                if "teams" in filters:
+                    queryset = queryset.filter(team__name__in=filters['teams'])
             counts = {
                 "shift": [
                     {
@@ -1312,7 +1312,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             filters = json.loads(request.GET.get('filter_json', '{}'))
             engineers = User.objects.filter(role__name='engineer', is_active=True)
             if query:
-                engineers = engineers.filter(employee_name__istartswith=filters['query'])
+                engineers = engineers.filter(employee_name__istartswith=query)
             engineers, counts = self.filter_engineer(engineers, filters, request)
             serializer = TeamStructureSerializer(engineers[first: last], many=True)
             return Response({"data": serializer.data, "count": counts, "total": len(engineers)}, status=200)
@@ -1327,7 +1327,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             filters = json.loads(request.GET.get('filter_json', '{}'))
             engineers = User.objects.filter(role__name='engineer', is_active=True)
             if query:
-                engineers = engineers.filter(employee_name__istartswith=filters['query'])
+                engineers = engineers.filter(employee_name__istartswith=query)
             engineers, counts = self.filter_engineer(engineers, filters, request)
             serializer = TeamStructureSerializer(engineers, many=True)
             if serializer.data:
