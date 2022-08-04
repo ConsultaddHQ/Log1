@@ -34,7 +34,7 @@ class Command(BaseCommand):
                 <th style="padding:5px 8px 5px 8px;">Job Position</th>
                 </tr>"""
 
-            for index, interview in enumerate(interviews[0: 7]):
+            for index, interview in enumerate(interviews):
                 position = interview.submission.lead.position.display_name if interview.submission.lead.position else None
                 text += f"""<tr>
                                 <td style="padding:5px 8px 5px 8px;"> {index + 1} </td>

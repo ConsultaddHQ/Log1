@@ -17,6 +17,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 from constance import config
 from marketing.utils import date_filter
 from utils_app.models import ObjectGroup
+from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
@@ -25,12 +26,13 @@ from attachment.models import create_attachment
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
-from utils_app.mailing import send_email_attachment_multiple, send_email
+from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple
+
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant
 from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status, create_checklist, diff_month_days
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer
 
@@ -105,7 +107,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res, msg = send_email(mail_data, submission.created_by.email, request=request)
+            res, msg, mail_id = send_email_(mail_data, submission.created_by.email, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -163,7 +165,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res, msg = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
+            res, msg, mail_id = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
             delete_temp_file(path)
             if not msg:
                 return res, "error"
@@ -173,7 +175,9 @@ class ProjectViewSets(ModelViewSet):
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):
-        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
+        support_res, support_msg = '', ''
+        if not request.data.get('engineer', None):
+            support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
 
         message = "Project created"
@@ -236,7 +240,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res, msg = send_email_attachment_multiple(mail_data, marketer.email, request=request)
+            res, msg, email_id = send_email_attachment_multiple(mail_data, marketer.email, request=request)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -300,8 +304,11 @@ class ProjectViewSets(ModelViewSet):
                     'vendor_name': vendor_name, 'start': project_start_date, 'remark': project.feedback,
                 }
             }
-            res1, msg1 = send_email(mail_data, marketer.email, request=request)
+            res1, msg1, mail_id = send_email_(mail_data, marketer.email, request=request)
 
+            if msg1:
+                res1="mail send"
+            
             mail_data_eng = {
                 'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
                 'template': '../templates/po_termination_engineering.html',
@@ -317,7 +324,10 @@ class ProjectViewSets(ModelViewSet):
                     'project_duration': f"{diff_month_days(project.start_date, project.end_date)} months",
                 }
             }
-            res2, msg2 = send_email(mail_data_eng, marketer.email, request=request)
+            res2, msg2, mail_id = send_email_(mail_data_eng, marketer.email, request=request)
+
+            if msg2:
+                res2="mail send"
 
             return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
@@ -495,6 +505,21 @@ class ProjectViewSets(ModelViewSet):
                 desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
                 create_activity(sub.id, 'submission', request.user, desc, 'created')
 
+                # Assign Support Person
+                engineer = get_object_or_404(User, employee_id=request.data['engineer']) \
+                    if request.data.get('engineer', None) else None
+                if engineer:
+                    support = ProjectSupport.objects.create(
+                        project=project, start=project.start_date, support=engineer
+                    )
+                    SupportStatus.objects.create(
+                        frequency='active', support=support, is_current=True
+                    )
+                    desc = f"{request.user.employee_name} added {engineer.employee_name} as support person while " \
+                           f"creating PO"
+                    create_activity(project.id, 'projectsupport', request.user, desc, 'created')
+                    support_assignment_mail(support, request)
+                
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
@@ -741,43 +766,6 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
         ).values_list('email', flat=True))
         return scrum_masters
 
-    @staticmethod
-    def support_assignment_mail(support, request):
-        try:
-            project = support.project
-            submission = project.submission
-            consultant = project.submission.consultant
-
-            project_start_date = datetime.strptime(str(project.start_date), '%Y-%m-%d').strftime('%m/%d/%Y')
-            poc_emails = list(consultant.pocs.filter(end=None).values_list('poc__email', flat=True))
-            support_emails = list(project.support.all().values_list('support__email', flat=True))
-            marketing_poc = list(User.objects.filter(
-                team=submission.created_by.team, role__name='admin'
-            ).values_list('email', flat=True))
-
-            mail_data = {
-                'template': '../templates/support_assignment.html',
-                'to': [submission.created_by.email] + support_emails,
-                'cc': ['engineering@consultadd.com'] + poc_emails + marketing_poc, 'bcc': [],
-                'subject': f"{consultant.name}'s support initiated for  {project.submission.client} by"
-                           f" {support.support.employee_name}",
-                'context': {
-                    'support_name': support.support.employee_name,
-                    'client': submission.client, 'support_email': support.support.email,
-                    'consultant_name': consultant.name, 'consultant_email': consultant.email,
-                    'marketer_name': submission.created_by.employee_name, 'start': project_start_date,
-                    'job_title': submission.lead.job_title, 'consultant_phone_no': consultant.phone_no,
-                    'project_location': submission.lead.city, 'consultant_location': consultant.current_city,
-                },
-            }
-            res, msg = send_email(mail_data, request.user.email, request=request)
-            if not msg:
-                return res, "error"
-            return res, "ok"
-        except Exception as error:
-            write_exception(message=error)
-            return error, "error"
-
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
@@ -836,7 +824,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             create_activity(project.id, 'projectsupport', request.user, desc, 'created')
 
             if not support_qs:
-                message, exception_msg = self.support_assignment_mail(project_support, request)
+                message, exception_msg = support_assignment_mail(project_support, request)
                 if exception_msg != 'Mail sent':
                     return Response(
                         {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400

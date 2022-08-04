@@ -164,7 +164,7 @@ class MessageCard:
                             "type": "mrkdwn",
                             "text":
                                 f"*Consultant*\n"
-                                f"{payload.get('gender')} *Name* :  {consultant}\n"
+                                f"{payload.get('gender')} *Name* :  {consultant.name}\n"
                                 f"{payload.get('gender')} *Email* :  {consultant.email}\n"
                                 f"{payload.get('recruiter_gender')} *Recruiter* :  {payload.get('recruiter_name', 'NA')}\n"
                                 f"✨ *Profile* :  {consultant.skills} \n"
