@@ -2,23 +2,25 @@ import json
 from itertools import chain
 from datetime import timedelta, datetime
 
-from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, F, Value, CharField
+from django.contrib.auth.hashers import make_password
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
+
 from rest_framework.mixins import *
-from rest_framework.decorators import action
 from rest_framework import exceptions
+from rest_framework.decorators import action
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from api_key.models import APIKey
+from project.models import Project, ProjectSupport
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from notification.models import FCMDevice
@@ -336,8 +338,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     def team(self, request):
         try:
             query = request.GET.get('query', None)
+            department = request.GET.get('dept', None)
             if query == 'all':
                 teams = Team.objects.exclude(dept='marketing').values('id', 'name')
+            elif department:
+                teams = Team.objects.filter(dept=department).values('id', 'name')
             else:
                 teams = Team.objects.all().values('id', 'name')
             return Response({"data": teams}, status=200)
@@ -416,6 +421,46 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             data = User.SHIFT_CHOICE
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='get_projects')
+    def projects(self, request):
+        try:
+            projects = ProjectSupport.objects.filter(
+                statuses__frequency__in=['active', 'less_active'],  end=None,
+                statuses__is_current=True, is_proxy_support=False, support=request.user
+            ).exclude(project__statuses__is_current=True,
+                      project__statuses__status__istartswith='terminated' or 'cancelled').annotate(
+                employer=F('project__employer'),
+                consultant_name=F('project__submission__consultant_marketing__consultant__name'),
+                client=F('project__submission__client'), vendor=F('project__submission__lead__vendor_company__name'),
+            ).values("project_id", "client", "consultant_name", "employer", "vendor")
+
+            return Response({"data": projects}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='projects')
+    def verify_project(self, request):
+        try:
+            vendor = request.GET['vendor']
+            client = request.GET['client']
+            consultant = request.GET['consultant']
+            project = Project.objects.filter(
+                submission__lead__vendor_company__name__icontains=vendor,
+                submission__consultant_marketing__consultant__name=consultant,
+                submission__client__icontains=client, statuses__is_current=True,
+                statuses__status__in=['new', 'joined', 'signed', 'received', 'extended', 'on_boarded']
+            ).annotate(
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+                client=F('submission__client'), vendor=F('submission__lead__vendor_company__name'),
+            ).values("id", "client", "consultant_name", "employer", "vendor")
+            if not project:
+                return Response({"data": [], "message": "No Project Found"}, status=200)
+            return Response({"data": project, "message": "Project Found"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

@@ -24,7 +24,7 @@ from activity.views import create_activity
 from utils_app.utils import delete_temp_file
 from utils_app.models import MapMail
 from activity.serializers import ActivitySerializer
-from utils_app.calendar import Calendar, GoogleCalendar
+from utils_app.calendar import GoogleCalendar
 from attachment.models import Attachment, create_attachment
 # from utils_app.mailing import send_email_attachment_multiple
 from utils_app.thred_mail import send_email_attachment_multiple
@@ -33,7 +33,7 @@ from consultant.models import Consultant, ConsultantMarketing
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-
+from django.contrib.auth.models import ContentType
 
 
 # Route - /vendor_company/
@@ -1294,6 +1294,7 @@ class InterviewViewSets(ModelViewSet):
 
                 # Calendar attendees and User for sending notification
                 title = get_interview_title(interview)
+                # interview.submission.created_by.email
                 user_list, attendees = get_users_and_attendees(request, interview)
                 end_time = datetime.strptime(str(interview.end_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
@@ -1311,13 +1312,15 @@ class InterviewViewSets(ModelViewSet):
                     # calendar = Calendar(request=request)
                     # cal_res, msg = calendar.book_ms_calendar(event)
                     # Booking Google calendar
+                    # Need to get marketing_email
                     calendar = GoogleCalendar()
-                    cal_res, msg = calendar.book_calendar(event)
+                    cal_res, msg = calendar.book_calendar(event,interview.submission.created_by.email)
 
                     if msg == 'error':
                         return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
                     interview.calendar_id = cal_res['id']
+                    interview.if_previous_calendar = False
                     booking_res = 'booked'
                     interview.save()
                 except Exception as error:
@@ -1426,15 +1429,20 @@ class InterviewViewSets(ModelViewSet):
 
                     if not calendar_id:
                         # res, msg = calendar.book_ms_calendar(event)
-                        res, msg = calendar.book_calendar(event)
+                        res, msg = calendar.book_calendar(event, interview.submission.created_by.email)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": res}, status=400)
 
                         interview.calendar_id = res['id']
+                        interview.if_previous_calendar = False
                         booking_res = 'booked'
                         interview.save()
                     else:
-                        res, msg = calendar.update_calendar(calendar_id, event)
+                        calendar_mail_id = interview.submission.created_by.email 
+                        if interview.if_previous_calendar:
+                            calendar_mail_id="suman.m@consultadd.com"
+                            
+                        res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id)
                         if msg == 'booked':
                             interview.calendar_id = res['id']
                             booking_res = 'updated'
@@ -1490,8 +1498,11 @@ class InterviewViewSets(ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
+                        calendar_mail_id = interview.submission.created_by.email 
+                        if interview.if_previous_calendar:
+                            calendar_mail_id="suman.m@consultadd.com"
                         calendar = GoogleCalendar()
-                        calendar.delete_calendar_booking(interview.calendar_id, request)
+                        calendar.delete_calendar_booking(interview.calendar_id, calendar_mail_id, request)
                 except Exception as error:
                     write_exception(f"Booking deletion failed: {error}", request)
                     return Response({"data": "Calendar booking deletion failed", "error": str(error)}, status=400)
@@ -1626,9 +1637,9 @@ class InterviewViewSets(ModelViewSet):
                 serializer.save()
 
             interview.status = 'rescheduled'
-            if interview.guest_type in ['coder', 'assistance']:
+            if interview.guest_type in ['coder', 'assistance', 'assigned']:
                 interview.guest.clear()
-                interview.save()
+            interview.save()
 
             submission = interview.submission
             user_list, attendees = get_users_and_attendees(request, interview)
@@ -1657,18 +1668,22 @@ class InterviewViewSets(ModelViewSet):
                 calendar = GoogleCalendar()
                 if not calendar_id:
                     try:
-                        cal_res, msg = calendar.book_calendar(event)
+                        cal_res, msg = calendar.book_calendar(event, interview.submission.created_by.email)
                         if msg == "error":
                             return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
                         interview.calendar_id = cal_res['id']
+                        interview.if_previous_calendar = False
                         booking_res = 'booked'
                         interview.save()
                     except Exception as error:
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                 else:
                     try:
-                        res, msg = calendar.update_calendar(calendar_id, event)
+                        calendar_mail_id = interview.submission.created_by.email 
+                        if interview.if_previous_calendar:
+                            calendar_mail_id="suman.m@consultadd.com"
+                        res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id)
                         booking_res = 'updated'
                         if msg == 'booked':
                             interview.calendar_id = res['id']
@@ -1740,8 +1755,11 @@ class InterviewViewSets(ModelViewSet):
             interview = qs.first()
             try:
                 if interview.calendar_id:
+                    calendar_mail_id = interview.submission.created_by.email 
+                    if interview.if_previous_calendar:
+                        calendar_mail_id="suman.m@consultadd.com"
                     calendar = GoogleCalendar()
-                    calendar.delete_calendar_booking(interview.calendar_id, request)
+                    calendar.delete_calendar_booking(interview.calendar_id, calendar_mail_id, request)
             except Exception as error:
                 write_exception(f"Booking cancellation failed: {error}", request)
                 # return Response({"data": "Calendar booking cancellation failed", "error": str(error)}, status=400)
@@ -2002,7 +2020,7 @@ class InterviewViewSets(ModelViewSet):
                     calendar_id = interview.calendar_id
                     calendar = GoogleCalendar()
                     if not calendar_id:
-                        res, msg = calendar.book_calendar(event)
+                        res, msg = calendar.book_calendar(event, interview.submission.created_by.email)
                         if msg == 'error':
                             return Response({"message": "Calendar booking failed", "error": res}, status=400)
                         booking_res = 'booked'
@@ -2010,7 +2028,10 @@ class InterviewViewSets(ModelViewSet):
                         interview.save()
                     else:
                         booking_res = 'updated'
-                        res, msg = calendar.update_calendar(calendar_id, event)
+                        calendar_mail_id = interview.submission.created_by.email 
+                        if interview.if_previous_calendar:
+                            calendar_mail_id="suman.m@consultadd.com"
+                        res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id)
                         if msg == 'booked':
                             booking_res = 'booked'
                             interview.calendar_id = res['id']
