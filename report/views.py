@@ -827,7 +827,7 @@ class MarketingReportViewSets(GenericViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
                 )
             return Response({"data": data, "file_url": url}, status=200)
         except Exception as error:
@@ -842,13 +842,15 @@ class MarketingReportViewSets(GenericViewSet):
             export = json.loads(request.GET.get('export', 'false'))
             filter_by_team = request.GET.get('filter_by_team', None)
 
-            bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='terminated')
+            bench_consultant = Consultant.objects.filter(marketing__status='open').\
+                exclude(status='terminated').distinct('id').order_by('id')
 
             if query:
                 bench_consultant = bench_consultant.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
 
             if filter_by_team:
-                bench_consultant = bench_consultant.filter(marketing__teams__name__iexact=filter_by_team)
+                bench_consultant = bench_consultant.filter(marketing__teams__name=filter_by_team,
+                                                           marketing__status='open')
 
             data, url = list(), ""
             total = bench_consultant.count()
