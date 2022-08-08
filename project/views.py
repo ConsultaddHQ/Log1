@@ -20,12 +20,12 @@ from utils_app.models import ObjectGroup
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
-from utils_app.utils import delete_temp_file
 from marketing.models import Submission, User
 from attachment.models import create_attachment
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
+from utils_app.utils import delete_temp_file, export_to_csv
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple
 
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
@@ -347,11 +347,13 @@ class ProjectViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
+        url = ""
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', None)
         filter_json = request.GET.get('filter_json', None)
+        export = json.loads(request.GET.get('export', 'false'))
         filter_by_time = request.GET.get('filter_by_time', None)
         filter_by_lead = request.GET.get('filter_by_lead', None)
         filter_by_status = request.GET.get('filter_by_status', None)
@@ -461,8 +463,27 @@ class ProjectViewSets(ModelViewSet):
                     order_by = '-modified'
 
                 projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
+            if export:
+                first, last = 0, len(projects)
             serializer = self.serializer_class(projects[first:last], many=True)
-            return Response({"counts": data_count, "data": serializer.data}, status=200)
+            col_name = [
+                {"name": "consultant_name", "display_name": "Consultant Name"},
+                {"name": "marketer_name", "display_name": "Marketer Name"},
+                {"name": "client", "display_name": "Client Name"},
+                {"name": "employer", "display_name": "Employer Name"},
+                {"name": "company_name", "display_name": "Company Name"},
+                {"name": "start_date", "display_name": "Start Date"},
+                {"name": "end_date", "display_name": "End Date"},
+                {"name": "duration", "display_name": "Duration"},
+                {"name": "city", "display_name": "City"},
+                {"name": "is_remote", "display_name": "Remote"},
+                {"name": "status", "display_name": "Status"}
+            ]
+            if export:
+                url = export_to_csv(
+                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                )
+            return Response({"counts": data_count, "data": serializer.data, "file_url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
