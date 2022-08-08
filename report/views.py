@@ -15,7 +15,7 @@ from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
-from utils_app.utils import generate_s3_url
+from utils_app.utils import export_to_csv
 from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
@@ -670,30 +670,6 @@ class MarketingReportViewSets(GenericViewSet):
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
-    @staticmethod
-    def export_to_csv(payload, columns, filename, request):
-        try:
-            file = open(filename, 'w')
-            writer = csv.writer(file)
-            column_name = [column for column in columns]
-            writer.writerow([column.capitalize() for column in columns])
-            for data in payload:
-                row_elems = []
-                for i in range(0, len(column_name)):
-                    if data[column_name[i]] and type(data[column_name[i]]) == list:
-                        if None in data[column_name[i]]:
-                            data[column_name[i]].remove(None)
-                        row_elems.append(", ".join(elem for elem in data[column_name[i]]))
-                    else:
-                        row_elems.append(data[column_name[i]])
-                writer.writerow(row_elems)
-            file.close()
-            file_url = generate_s3_url(file.name)
-            return file_url
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
@@ -749,10 +725,17 @@ class MarketingReportViewSets(GenericViewSet):
                     "repeat_interview": repeat_interview_count,
                     "consultant_assigned": con_assigned if len(con_assigned) > 0 else None,
                 })
-                col_name = ["employee_name", "team", "submission", "unique_interview", "repeat_interview", "offer",
-                            "consultant_assigned"]
+                col_name = [
+                    {"name": "employee_name", "display_name": "Employee Name"},
+                    {"name": "team", "display_name": "Team Name"},
+                    {"name": "submission", "display_name": "Submission"},
+                    {"name": "unique_interview", "display_name": "Unique Interview"},
+                    {"name": "repeat_interview", "display_name": "Repeat Interview"},
+                    {"name": "offer", "display_name": "Offer"},
+                    {"name": "consultant_assigned", "display_name": "Consultant Assigned"},
+                ]
                 if export:
-                    url = self.export_to_csv(
+                    url = export_to_csv(
                         data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv", request
                     )
             return Response({"data": data, "total": total, "file_url": url}, status=200)
@@ -833,10 +816,17 @@ class MarketingReportViewSets(GenericViewSet):
                 "submission_count": total_submissions,
             })
 
-            col_name = ["team", "scrum_master", "bench_consultant", "submission_count", "interview_count", "offer_count",
-                        "joined_count"]
+            col_name = [
+                {"name": "team", "display_name": "Team Name"},
+                {"name": "scrum_master", "display_name": "Scrum Master"},
+                {"name": "bench_consultant", "display_name": "Bench Consultant"},
+                {"name": "submission_count", "display_name": "Submission Count"},
+                {"name": "interview_count", "display_name": "Interview Count"},
+                {"name": "offer_count", "display_name": "Offer Count"},
+                {"name": "joined_count", "display_name": "Joined Count"},
+            ]
             if export:
-                url = self.export_to_csv(
+                url = export_to_csv(
                     data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
                 )
             return Response({"data": data, "file_url": url}, status=200)
@@ -885,9 +875,17 @@ class MarketingReportViewSets(GenericViewSet):
                     'email': consultant.email, 'status': consultant.status, 'project_count': project_count,
                     'phone_no': consultant.phone_no, 'interview_count': interview_count, 'name': consultant.name,
                 })
-                col_name = ["name", "teams", "days", "submission_count", "interview_count", "project_count", "status"]
+                col_name = [
+                    {"name": "name", "display_name": "Name"},
+                    {"name": "teams", "display_name": "Teams"},
+                    {"name": "days", "display_name": "Days on Bench"},
+                    {"name": "submission_count", "display_name": "Submission"},
+                    {"name": "interview_count", "display_name": "Interview"},
+                    {"name": "project_count", "display_name": "Project"},
+                    {"name": "status", "display_name": "Status"},
+                ]
                 if export:
-                    url = self.export_to_csv(
+                    url = export_to_csv(
                         data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
                     )
             return Response({'data': data, "total": total, "file_url": url}, status=200)
@@ -914,7 +912,7 @@ class MarketingReportViewSets(GenericViewSet):
 
             supervisors = User.objects.filter(is_active=True, role__name='interviewee')
             if query:
-                supervisors = supervisors.filter(employee_name=query.lstrip().replace(':amp:', '&'))
+                supervisors = supervisors.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             data = []
             if export:
                 first, last = 0, len(supervisors)-1
@@ -924,13 +922,18 @@ class MarketingReportViewSets(GenericViewSet):
                 offer_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end,
                                                        status='offer').count()
                 data.append({
-                    "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
+                    "id": sup.id, "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
                     "offers": offer_count, "technology": sup.technology, "team": sup.team.name if sup.team else None
                 })
-            col_name = ['name', 'interviews', 'offers', 'technology']
+            col_name = [
+                {"name": "name", "display_name": "Name"},
+                {"name": "interviews", "display_name": "Interviews"},
+                {"name": "offers", "display_name": "Offers"},
+                {"name": "technology", "display_name": "Technology"},
+            ]
             url = ""
             if export:
-                url = self.export_to_csv(
+                url = export_to_csv(
                     data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
                 )
             return Response({'data': data, "total": supervisors.count(), "file_url": url}, status=200)
