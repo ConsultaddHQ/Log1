@@ -1,3 +1,5 @@
+import csv
+import json
 from datetime import datetime, date, timedelta
 
 from django.db.models import Q
@@ -13,6 +15,7 @@ from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
+from utils_app.utils import generate_s3_url
 from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
@@ -667,6 +670,30 @@ class MarketingReportViewSets(GenericViewSet):
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
+    @staticmethod
+    def export_to_csv(payload, columns, filename, request):
+        try:
+            file = open(filename, 'w')
+            writer = csv.writer(file)
+            column_name = [column for column in columns]
+            writer.writerow([column.capitalize() for column in columns])
+            for data in payload:
+                row_elems = []
+                for i in range(0, len(column_name)):
+                    if data[column_name[i]] and type(data[column_name[i]]) == list:
+                        if None in data[column_name[i]]:
+                            data[column_name[i]].remove(None)
+                        row_elems.append(", ".join(elem for elem in data[column_name[i]]))
+                    else:
+                        row_elems.append(data[column_name[i]])
+                writer.writerow(row_elems)
+            file.close()
+            file_url = generate_s3_url(file.name)
+            return file_url
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
@@ -674,6 +701,7 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
+            export = json.loads(request.GET.get('export', 'false'))
             filter_by_team = request.GET.get('filter_by_team', None)
 
             if query:
@@ -689,8 +717,10 @@ class MarketingReportViewSets(GenericViewSet):
                 start = date.today() - timedelta(days=30)
             if not end:
                 end = date.today()
-            data = list()
+            data, url = list(), ""
             total = employees.count()
+            if export:
+                first, last = 0, len(employees)-1
             for user in employees[first:last]:
                 con_assigned = ", ".join(
                     list(user.marketed.filter(status='open').values_list('consultant__name', flat=True))
@@ -719,7 +749,13 @@ class MarketingReportViewSets(GenericViewSet):
                     "repeat_interview": repeat_interview_count,
                     "consultant_assigned": con_assigned if len(con_assigned) > 0 else None,
                 })
-            return Response({"data": data, "total": total}, status=200)
+                col_name = ["employee_name", "team", "submission", "unique_interview", "repeat_interview", "offer",
+                            "consultant_assigned"]
+                if export:
+                    url = self.export_to_csv(
+                        data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    )
+            return Response({"data": data, "total": total, "file_url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -729,6 +765,7 @@ class MarketingReportViewSets(GenericViewSet):
         try:
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
+            export = json.loads(request.GET.get('export', 'false'))
 
             if start and end and datetime.strptime(
                     start, '%Y-%m-%d').date() > datetime.strptime(end, '%Y-%m-%d').date():
@@ -739,7 +776,7 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today()
 
-            data = list()
+            data, url = list(), ""
             total_bench = total_submissions = total_interviews = total_joined = total_offers = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
@@ -795,7 +832,14 @@ class MarketingReportViewSets(GenericViewSet):
                 "interview_count": total_interviews,
                 "submission_count": total_submissions,
             })
-            return Response({"data": data}, status=200)
+
+            col_name = ["team", "scrum_master", "bench_consultant", "submission_count", "interview_count", "offer_count",
+                        "joined_count"]
+            if export:
+                url = self.export_to_csv(
+                    data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                )
+            return Response({"data": data, "file_url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -805,6 +849,7 @@ class MarketingReportViewSets(GenericViewSet):
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
+            export = json.loads(request.GET.get('export', 'false'))
             filter_by_team = request.GET.get('filter_by_team', None)
 
             bench_consultant = Consultant.objects.filter(marketing__status='open').exclude(status='terminated')
@@ -815,8 +860,10 @@ class MarketingReportViewSets(GenericViewSet):
             if filter_by_team:
                 bench_consultant = bench_consultant.filter(marketing__teams__name__iexact=filter_by_team)
 
-            data = list()
+            data, url = list(), ""
             total = bench_consultant.count()
+            if export:
+                first, last = 0, len(bench_consultant)-1
             for consultant in bench_consultant[first:last]:
                 preferred_location = ''
                 marketing = consultant.marketing.filter(status='open').first()
@@ -838,7 +885,55 @@ class MarketingReportViewSets(GenericViewSet):
                     'email': consultant.email, 'status': consultant.status, 'project_count': project_count,
                     'phone_no': consultant.phone_no, 'interview_count': interview_count, 'name': consultant.name,
                 })
-            return Response({'data': data, "total": total}, status=200)
+                col_name = ["name", "teams", "days", "submission_count", "interview_count", "project_count", "status"]
+                if export:
+                    url = self.export_to_csv(
+                        data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    )
+            return Response({'data': data, "total": total, "file_url": url}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='supervisor')
+    def supervisor(self, request):
+        try:
+            first, last = get_page_limits(request)
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
+            query = request.GET.get('query', None)
+            export = json.loads(request.GET.get('export', 'false'))
+
+            if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
+                                                                                                 '%Y-%m-%d').date():
+                return Response({'message': 'Invalid date filter'}, status=400)
+            if not start:
+                start = date.today() - timedelta(days=30)
+            if not end:
+                end = date.today()
+
+            supervisors = User.objects.filter(is_active=True, role__name='interviewee')
+            if query:
+                supervisors = supervisors.filter(employee_name=query.lstrip().replace(':amp:', '&'))
+            data = []
+            if export:
+                first, last = 0, len(supervisors)-1
+            for sup in supervisors[first:last]:
+                interview_count = Interview.objects.filter(supervisor=sup, created__gte=start,
+                                                           created__lte=end).exclude(status='cancelled').count()
+                offer_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end,
+                                                       status='offer').count()
+                data.append({
+                    "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
+                    "offers": offer_count, "technology": sup.technology, "team": sup.team.name if sup.team else None
+                })
+            col_name = ['name', 'interviews', 'offers', 'technology']
+            url = ""
+            if export:
+                url = self.export_to_csv(
+                    data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                )
+            return Response({'data': data, "total": supervisors.count(), "file_url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
