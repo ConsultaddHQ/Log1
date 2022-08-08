@@ -696,7 +696,7 @@ class MarketingReportViewSets(GenericViewSet):
             data, url = list(), ""
             total = employees.count()
             if export:
-                first, last = 0, len(employees)-1
+                first, last = 0, len(employees)
             for user in employees[first:last]:
                 con_assigned = ", ".join(
                     list(user.marketed.filter(status='open').values_list('consultant__name', flat=True))
@@ -853,7 +853,7 @@ class MarketingReportViewSets(GenericViewSet):
             data, url = list(), ""
             total = bench_consultant.count()
             if export:
-                first, last = 0, len(bench_consultant)-1
+                first, last = 0, len(bench_consultant)
             for consultant in bench_consultant[first:last]:
                 preferred_location = ''
                 marketing = consultant.marketing.filter(status='open').first()
@@ -915,7 +915,7 @@ class MarketingReportViewSets(GenericViewSet):
                 supervisors = supervisors.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             data = []
             if export:
-                first, last = 0, len(supervisors)-1
+                first, last = 0, len(supervisors)
             for sup in supervisors[first:last]:
                 interview_count = Interview.objects.filter(supervisor=sup, created__gte=start,
                                                            created__lte=end).exclude(status='cancelled').count()

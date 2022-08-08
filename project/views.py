@@ -463,6 +463,8 @@ class ProjectViewSets(ModelViewSet):
                     order_by = '-modified'
 
                 projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
+            if export:
+                first, last = 0, len(projects)
             serializer = self.serializer_class(projects[first:last], many=True)
             col_name = [
                 {"name": "consultant_name", "display_name": "Consultant Name"},
@@ -474,7 +476,8 @@ class ProjectViewSets(ModelViewSet):
                 {"name": "end_date", "display_name": "End Date"},
                 {"name": "duration", "display_name": "Duration"},
                 {"name": "city", "display_name": "City"},
-                {"name": "is_remote", "display_name": "Remote"}
+                {"name": "is_remote", "display_name": "Remote"},
+                {"name": "status", "display_name": "Status"}
             ]
             if export:
                 url = export_to_csv(
