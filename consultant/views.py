@@ -1053,7 +1053,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_marketing = queryset.first()
             else:
                 return Response({"message": "Consultant is not in Marketing"})
-            if 'superadmin' in request.user.roles:
+            if 'superadmin' or 'recruiter' in request.user.roles:
                 team_ids = request.data.get('teams')
                 for team_id in team_ids:
                     team = get_object_or_404(Team, id=team_id)
