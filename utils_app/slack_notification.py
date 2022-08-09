@@ -620,7 +620,7 @@ class MessageCard:
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Status:* {payload.get('status', 'NA')}"
+                                "text": f"*Status:* `{payload.get('status', 'NA')}`"
                             }
                         ]
                     },
@@ -629,6 +629,14 @@ class MessageCard:
                         "text": {
                             "type": "mrkdwn",
                             "text": payload.get('reason', "NA")
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Termination Count:* \n:pushpin: *`{payload.get('team', 'NA')}`* - "
+                                    f"*{payload.get('team_count', 'NA')}*  `Total` - *{payload.get('total', 'NA')}*"
                         }
                     },
                     {
@@ -715,8 +723,8 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f":pushpin: *`{payload.get('employer', 'NA')}`* - *{payload.get('team', 'NA')}*  |  "
-                                    f"`Total` - *{payload.get('total', 'NA')}*"
+                            "text": f":pushpin: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*  "
+                                    f"  `Total` - *{payload.get('total', 'NA')}*"
                         }
                     },
                     {

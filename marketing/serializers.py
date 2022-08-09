@@ -503,8 +503,8 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_question_answer(obj):
-        if ": " in obj.answer and obj.question.answer_type in ["yes_attachment", "no_attachment", "yes_remark",
-                                                               "no_remark"]:
+        if obj.answer and ": " in obj.answer and obj.question.answer_type in ["yes_attachment", "no_attachment",
+                                                                              "yes_remark", "no_remark"]:
             answer = obj.answer.split(": ")
         else:
             answer = [obj.answer, None]
