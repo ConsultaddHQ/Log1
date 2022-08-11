@@ -24,7 +24,8 @@ class CustomUserAdmin(UserAdmin, ExportCsvMixin):
     date_hierarchy = 'last_login'
     list_filter = ('team', 'role', 'is_active')
     search_fields = ('email', 'employee_id', 'employee_name', 'id', 'team__name')
-    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'account_login', 'roles', 'slack_id')
+    list_display = ('id', 'employee_id', 'email', 'employee_name', 'team', 'is_active', 'account_login', 'roles',
+                    'slack_id', 'technology')
 
     def roles(self, obj):
         return ", ".join([

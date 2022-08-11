@@ -162,7 +162,23 @@ class ProjectUtil:
                 statuses__created__gte=day_one,
                 submission__created_by__team=team,
             ).count()
-            return total_count, team_count
+            return total_count, team_count, team.name
+        except Exception as error:
+            write_exception(message=error, request=self.request)
+
+    def fetch_project_termination_count(self):
+        try:
+            team = self.project.submission.created_by.team
+            day_one = datetime.today().replace(day=1, hour=0, minute=0)
+            total_count = Project.objects.filter(
+                statuses__status__istartswith="terminated", statuses__created__gte=day_one
+            ).count()
+            team_count = Project.objects.filter(
+                statuses__created__gte=day_one,
+                submission__created_by__team=team,
+                statuses__status__istartswith="terminated"
+            ).count()
+            return total_count, team_count, team.name
         except Exception as error:
             write_exception(message=error, request=self.request)
 
@@ -170,7 +186,7 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
-            total, team = self.fetch_project_count("joined")
+            total, team_count, team = self.fetch_project_count("joined")
             team_name = self.project.submission.created_by.team.name
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
@@ -204,7 +220,7 @@ class ProjectUtil:
             if recruiter:
                 recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
-            total, team = self.fetch_project_count("received")
+            total, team_count, team = self.fetch_project_count("received")
             interviews = self.project.submission.screening.exclude(status='cancelled')
             supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
                                      if interview.supervisor.slack_id else interview.supervisor.employee_name
@@ -216,8 +232,8 @@ class ProjectUtil:
             payload = {
                 "submission_id": self.project.submission.id, "project_id": self.project.id,
                 "client": self.project.submission.client, "consultant": self.consultant.name,
-                "activity_text": self.activity_text, "total": total, "employer": self.employer,
-                "recruiter_name": recruiter_name, "team": team, "project_start": self.project_start,
+                "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
+                "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
                 "city": self.project.city, "supervisors": supervisors, "job_title": self.project.submission.lead.job_title,
             }
             slack.po_receive_message_card(payload, self.request)
@@ -231,6 +247,7 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
+            total, team_count, team = self.fetch_project_termination_count()
             if recruiter:
                 recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
@@ -242,9 +259,9 @@ class ProjectUtil:
 
             payload = {
                 "recruiter_name": recruiter_name, "status": status, "reason": reason,
-                "sub_title": activity_sub_title, "activity_text": self.activity_text,
-                "months": months, "employer": self.employer, "city": self.project.city,
-                "submission_id": self.project.submission.id, "project_id": self.project.id,
+                "sub_title": activity_sub_title, "activity_text": self.activity_text, "team": team,
+                "months": months, "employer": self.employer, "city": self.project.city, "total": total,
+                "submission_id": self.project.submission.id, "project_id": self.project.id, "team_count": team_count
             }
             slack.po_termination_message_card(payload, self.request)
 

@@ -12,7 +12,8 @@ from django.contrib.contenttypes.models import ContentType
 from constance import config
 from activity.models import Activity
 from utils_app.utils import get_timezone
-from utils_app.mailing import send_email
+# from utils_app.mailing import send_email
+from utils_app.thred_mail import send_email as send_email_
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
@@ -257,9 +258,7 @@ def send_exit_process_mail(terminate, exit_status, request):
         if os.environ.get('ENV', 'local') == 'prod':
             to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, config.LEGAL]
             cc = [poc.email, config.SUPERADMIN, terminate.created_by.email]
-        else:
-            cc, bcc = [], []
-            to = ['suman.buie.cpp@gmail.com', 'shreyaskhede26@gmail.com', 'log1.consultadd@gmail.com']
+
 
         scrum_masters = User.objects.filter(team=recruiter.team, role__name__in=['admin', 'proxy'], is_active=True)
         for user in scrum_masters:
@@ -312,7 +311,7 @@ def send_exit_process_mail(terminate, exit_status, request):
                 'cancel_reason': terminate.cancel_reason if terminate.cancel_reason else 'NA',
             },
         }
-        res, msg = send_email(mail_data, terminate.created_by.email, request=request)
+        res, msg, from_id = send_email_(mail_data, terminate.created_by.email, request=request)
         if not msg:
             return res, "error"
         return res, "ok"

@@ -338,8 +338,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     def team(self, request):
         try:
             query = request.GET.get('query', None)
+            department = request.GET.get('dept', None)
             if query == 'all':
                 teams = Team.objects.exclude(dept='marketing').values('id', 'name')
+            elif department:
+                teams = Team.objects.filter(dept=department).values('id', 'name')
             else:
                 teams = Team.objects.all().values('id', 'name')
             return Response({"data": teams}, status=200)
