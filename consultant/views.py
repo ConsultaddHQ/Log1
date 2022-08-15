@@ -301,6 +301,7 @@ class ConsultantViewSets(ModelViewSet):
                 is_w2=data['is_w2'],
                 skills=data['skills'],
                 gender=data['gender'],
+                country=data['country'],
                 phone_no=data['phone_no'],
                 current_city=data['current_city'],
                 date_of_birth=data['date_of_birth'],

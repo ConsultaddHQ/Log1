@@ -515,6 +515,7 @@ def create_consultant(request, creator_id):
                 email=request.data.get('email'),
                 skype=request.data.get('skype'),
                 gender=request.data.get('gender'),
+                country=request.data.get('country'),
                 date_of_birth=request.data.get('dob'),
                 current_city=request.data.get('current_location'),
                 marital_status=request.data.get('marital_status', 'unmarried'),
