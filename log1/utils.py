@@ -157,8 +157,8 @@ def get_time_filter_by_start(queryset, filter_by):
 def post_msg_using_webhook(url, data):
     try:
         data = json.dumps(data)
-        data = data.replace("\\n","\n")
-        data = data.replace("\\t","\t")
+        data = data.replace("\\n", "\n")
+        data = data.replace("\\t", "\t")
         headers = {'Content-Type': 'application/json'}
         if os.environ.get("ENV", "local") == 'prod':
             resp = requests.post(url, headers=headers, data=data)

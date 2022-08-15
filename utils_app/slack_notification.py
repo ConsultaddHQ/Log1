@@ -1,5 +1,5 @@
-from datetime import date
 import os
+from datetime import date
 
 from constance import config
 from marketing.models import Interview
@@ -926,16 +926,19 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}"+" \n \t"+f"   *Round:* {data.get('round', 1)}" +" \n \t"+f"   *Type:* {data.get('type', None)}"+" \n \t"+f"   *Time:* {data.get('start', None).split('::')[1]}"
+                                "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
+                                        f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
+                                        f"   *Time:* {data.get('start', None).split('::')[1]}"
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"`Consultant` {data.get('consultant')}"+" \n"+f" `Client` {data.get('client', None)}"+" \n"+f" `Marketer` {data.get('marketer')}"+" \n"+f" `Job` {data.get('position')}"
+                                "text": f"`Consultant` {data.get('consultant')}\n `Client` {data.get('client', None)} "
+                                        f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
                             }
                         ]
                     },                    
                 )
-                sl+=1
+                sl += 1
             card_data['blocks'].append(
                 {
                         "type": "actions",
@@ -958,4 +961,4 @@ class MessageCard:
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
         except Exception as error:
-            print("No data found")
+            return error, "error"
