@@ -386,6 +386,7 @@ class ConsultantViewSets(ModelViewSet):
                 "skills": "Skills",
                 "gender": "Gender",
                 "skype": "Skype Id",
+                "country": "Country",
                 "phone_no": "Phone No",
                 "current_city": "Current City",
                 "date_of_birth": "Date of Birth",
