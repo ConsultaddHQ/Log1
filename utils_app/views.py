@@ -27,7 +27,8 @@ class CityViewSet(ListModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
-            city = City.objects.filter(name__istartswith=query)
+            country = request.GET.get('country', '')
+            city = City.objects.filter(name__istartswith=query, country=country)
             data = city[:15].values('id', 'name', 'state', 'country')
             return Response({"data": data}, status=200)
         except Exception as error:
