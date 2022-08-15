@@ -17,8 +17,6 @@ from utils_app.thred_mail import send_email as send_email_
 from employee.models import tag_users, User
 from attachment.serializers import Attachment
 from activity.serializers import ActivitySerializer
-from utils_app.slack_notification import MessageCard as slack
-from utils_app.teams_notification import MessageCard as teams
 from utils_app.aws_utils import download_s3_object_beats
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import html_to_text, write_exception, write_info
@@ -379,7 +377,7 @@ def new_recruit_notification(consultant, request):
         cfr = request.data.get('cfr', "NA")
         source = request.data.get('source', "NA")
         feedback = request.data.get('feedback', "NA")
-        visa, rate, recruiter, recruiter_team = "NA", "NA", "NA", None
+        visa, rate, recruiter_name, recruiter_team = "NA", "NA", "NA", None
         recruiter_gender = ':man::skin-tone-2:'
         qs = ConsultantPOC.objects.filter(consultant=consultant, poc_type='recruiter')
         if qs:
@@ -407,11 +405,11 @@ def new_recruit_notification(consultant, request):
             "team_count": team_count,
             "total_count": total_count,
             "gender": consultant_gender,
+            "recruiter_name": recruiter_name,
             "recruiter_team": recruiter_team,
             "recruiter_gender": recruiter_gender,
         }
         slack.new_recruit_card(consultant, payload, request)
-        teams.new_recruit_card(consultant, payload, request)
     except Exception as error:
         write_exception(message=error, request=request)
 
