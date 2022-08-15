@@ -1,3 +1,4 @@
+from datetime import date
 import os
 
 from constance import config
@@ -897,61 +898,63 @@ class MessageCard:
             file_url = create_csv_file(payload)
             card_data = {
                 "blocks": [
-                    {
+                  {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": ":MEMO: Interview Scheduled for today",
+                            "text": ":clipboard: Interview Scheduled Today",
                             "emoji": True
                         }
                     },
                     {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"`Date : {date.today()}`"
+                        }
+                    },
+                    {
                         "type": "divider"
-                    }
+                    },
                 ]
             }
+            sl = 1
             for data in payload['data']:
                 card_data['blocks'].append(
                     {
-                        "type": "context",
-                        "elements": [
+                        "type": "section",
+                        "fields": [
                             {
-                                "type": "plain_text",
-                                "text": f"CTB-{data.get('ctb', None)}  ::  Round-{data.get('round', 1)}  ::  "
-                                        f"Type-{data.get('type', None)}  ::  Start Time-{data.get('start', None)}  ::  "
-                                        f"Consultant-{data.get('consultant')}  ::  Client-{data.get('client', None)} ::  "
-                                        f"Marketer-{data.get('marketer')}  ::  Job Position-{data.get('position')}",
-                                "emoji": True
+                                "type": "mrkdwn",
+                                "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}"+" \n \t"+f"   *Round:* {data.get('round', 1)}" +" \n \t"+f"   *Type:* {data.get('type', None)}"+" \n \t"+f"   *Time:* {data.get('start', None).split('::')[1]}"
                             },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"`Consultant` {data.get('consultant')}"+" \n"+f" `Client` {data.get('client', None)}"+" \n"+f" `Marketer` {data.get('marketer')}"+" \n"+f" `Job` {data.get('position')}"
+                            }
                         ]
-                    },
+                    },                    
                 )
-                card_data['blocks'].append({
-                    "type": "divider"
-                })
+                sl+=1
             card_data['blocks'].append(
                 {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "Click on the button to download csv file"
-                    },
-                    "accessory": {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Click Me",
-                            "emoji": True
-                        },
-                        "url": file_url,
-                        "value": "click_me_123",
-                        "action_id": "button-action"
-                    }
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": "Download CSV"
+                                },
+                                "style": "primary",
+                                "url": file_url,
+                                "value": "click_me_123",
+                                "action_id": "button-action"
+                            }
+                        ]
                 },
             )
-            card_data['blocks'].append({
-                "type": "divider"
-            })
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
         except Exception as error:
