@@ -16,8 +16,8 @@ class ConsultantAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('status', 'work_type', 'remote_only', 'first_login')
     search_fields = ('id', 'email', 'name', 'skills', 'current_city', 'status')
-    list_display = ('id', 'name', 'email', 'date_of_birth', 'domain', 'skills', 'status', 'current_city', 'ssn',
-                    'links', 'gender', 'internal_employee', 'work_type', 'remote_only', 'password', 'is_active',
+    list_display = ('id', 'name', 'email', 'date_of_birth', 'domain', 'skills', 'status', 'country', 'current_city',
+                    'ssn', 'links', 'gender', 'internal_employee', 'work_type', 'remote_only', 'password', 'is_active',
                     'first_login', 'pin')
 
     class Media(object):
