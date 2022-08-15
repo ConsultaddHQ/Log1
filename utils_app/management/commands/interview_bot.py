@@ -60,7 +60,7 @@ class Command(BaseCommand):
                 )
             data = {
                 "title": "Interviews Scheduled for today &#128203;",
-                "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
+                "text": f"""<table border='2' style='border-collapse:collapse'>{text}</table>"""
             }
             payload = {
                 "data": slack_data,
