@@ -25,12 +25,26 @@ class CityViewSet(ListModelMixin, GenericViewSet):
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
+        queryset = self.queryset
+        query = request.query_params.get('query', None)
+        country = request.query_params.get('country', '')
+        if country:
+            queryset = queryset.filter(country=country)
+        if query:
+            queryset = queryset.filter(name__istartswith=query)
+        data = queryset[0:30].values('id', 'name', 'state', 'country')
+        return Response({"data": data}, status=200)
+
+    @action(methods=['get'], detail=False, url_path='country')
+    def country(self, request):
         try:
-            query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
-            country = request.GET.get('country', '')
-            city = City.objects.filter(name__istartswith=query, country=country)
-            data = city[:15].values('id', 'name', 'state', 'country')
-            return Response({"data": data}, status=200)
+            city = request.GET.get('city', None)
+            if city:
+                location = city.split(',')
+                city = City.objects.filter(name=location[0], state=location[1])
+                country = city.first().country if city else None
+                return Response({"data": country}, status=200)
+            return Response({"data": "No Country Found"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
