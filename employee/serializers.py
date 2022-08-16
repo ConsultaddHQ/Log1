@@ -96,7 +96,7 @@ class UserSerializerLogin(UserSerializer):
 class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
-        fields = ('id', 'name', 'dept')
+        fields = ('id', 'name', 'dept', 'scrum_timing')
 
 
 class RoleSerializer(serializers.ModelSerializer):

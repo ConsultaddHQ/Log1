@@ -12,12 +12,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from engineering.utils import *
-from employee.models import Team
+from employee.models import Team, Role
 from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
 from utils_app.utils import TECHNOLOGIES
 from activity.views import create_activity
+from employee.serializers import TeamSerializer
 from attachment.models import Attachment, create_attachment
 from activity.serializers import Activity, ActivitySerializer
 from log1.utils import ERROR_MSG, DONT_HAVE_ACCESS, get_page_limits, write_exception
@@ -1257,10 +1258,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
 
 # Route - /team_structure/
-class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
-    queryset = User.objects.all()
+class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
+    queryset = Team.objects.all()
     permission_classes = (IsAuthenticated,)
-    serializer_class = EngineerReportSerializer
+    serializer_class = TeamStructureSerializer
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
@@ -1275,7 +1276,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 if "shifts" in filters:
                     queryset = queryset.filter(shift__in=filters['shifts'])
                 if "teams" in filters:
-                    queryset = queryset.filter(team__name__in=filters['teams'])
+                    queryset = queryset.filter(team__id__in=filters['teams'])
             counts = {
                 "shift": [
                     {
@@ -1320,6 +1321,34 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            team = get_object_or_404(Team, id=kwargs.get('pk'))
+            data = {
+                "count": team.employees.filter(is_active=True).count(),
+                "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
+            }
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            team = get_object_or_404(Team, id=kwargs.get('pk'))
+            serializer = TeamSerializer(team, data=request.data, partial=True)
+            serializer.is_valid()
+            serializer.save()
+
+            # Activity
+            desc = f"{request.user.employee_name} update {team.name} details."
+            create_activity(kwargs.get('pk'), 'team', request.user, desc, 'updated')
+
+            return Response({"message": "Team Details Updated"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
     @action(methods=['get'], detail=False, url_path='export')
     def export(self, request, **kwargs):
         try:
@@ -1350,6 +1379,90 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 employee.shift = shift
                 employee.save()
             return Response({"message": "Shift Detail Updated"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='teams')
+    def teams(self, request, **kwargs):
+        try:
+            team_data = []
+            query = request.GET.get('query', None)
+            teams = Team.objects.filter(dept='Engineering')
+            if query:
+                teams = teams.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
+            for team in teams:
+                data = {
+                    "count": team.employees.filter(is_active=True).count(),
+                    "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
+                    "scrum_master": team.employees.filter(role__name='scrum_master', is_active=True).values(
+                        'id', 'employee_name')
+                }
+                team_data.append(data)
+
+            return Response({"data": team_data, "total": len(team_data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='move_employee')
+    def move_employee(self, request, **kwargs):
+        try:
+            team = get_object_or_404(Team, id=kwargs.get('pk'))
+            employee_ids = request.data.get('employee_ids', [])
+            if not employee_ids or not team:
+                return Response({"message": "Data not provided"}, status=400)
+            for emp_id in employee_ids:
+                employee = get_object_or_404(User, employee_id=emp_id)
+                employee.team = team
+                employee.save()
+
+            return Response({"message": "Engineer Moved Successfully"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='update_scrum')
+    def update_scrum(self, request, **kwargs):
+        try:
+            team_id = kwargs.get('pk')
+            employee_id = request.GET.get('employee_id', None)
+            if not employee_id:
+                return Response({"message": "No employee selected"}, status=200)
+            scrum_role = Role.objects.get(name='scrum_master')
+            employee = get_object_or_404(User, id=employee_id, team_id=kwargs.GET.get('pk'))
+            prev_scrum = User.objects.filter(team_id=team_id, role=scrum_role)
+            if prev_scrum:
+                prev_scrum.role.remove(scrum_role)
+            employee.role.add(scrum_role)
+
+            # Activity
+            desc = f"{request.user.employee_name} made {employee.employee_name} as scrum master for {employee.team.name}"
+            create_activity(kwargs.get('pk'), 'team', request.user, desc, 'updated')
+
+            return Response({"message": "Scrum Master Updated Successfully"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='remove')
+    def remove(self, request, **kwargs):
+        try:
+            team_id = kwargs.get('pk')
+            employee_ids = request.data.get('employee_ids', [])
+            if not employee_ids:
+                return Response({"message": "No employee selected"}, status=200)
+            for emp_id in employee_ids:
+                employee = get_object_or_404(User, employee_id=emp_id, team_id=team_id)
+                employee.is_active = False
+                employee.account_login = False
+                employee.save()
+
+            # Activity
+            desc = f"{request.user.employee_name} deactivated Employee Id-{employee_ids}"
+            create_activity(kwargs.get('pk'), 'team', request.user, desc, 'updated')
+
+            return Response({"message": "Employee Removed Successfully"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)

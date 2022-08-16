@@ -493,15 +493,26 @@ class EngineerInterviewSerializer(serializers.ModelSerializer):
 
 class TeamStructureSerializer(serializers.ModelSerializer):
     team = serializers.SerializerMethodField()
+    is_scrum = serializers.SerializerMethodField()
     current_project = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_project', 'team')
+        fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_project', 'team', 'is_scrum')
 
     @staticmethod
     def get_team(obj):
-        return obj.team.name if obj.team else None
+        if obj.team:
+            return {
+                "id": obj.team.id, "name": obj.team.name
+            }
+        return None
+
+    @staticmethod
+    def get_is_scrum(obj):
+        if obj.role.filter(name='scrum_master'):
+            return True
+        return False
 
     @staticmethod
     def get_current_project(obj):
