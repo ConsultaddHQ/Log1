@@ -27,9 +27,24 @@ class CityViewSet(ListModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
-            city = City.objects.filter(name__istartswith=query)
+            country = request.GET.get('country', 'USA')
+            city = City.objects.filter(name__istartswith=query, country=country)
             data = city[:15].values('id', 'name', 'state', 'country')
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='country')
+    def country(self, request):
+        try:
+            city = request.GET.get('city', None)
+            if city:
+                location = city.split(',')
+                city = City.objects.filter(name=location[0], state=location[1])
+                country = city.first().country
+                return Response({"data": country}, status=200)
+            return Response({"data": "No Country Found"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

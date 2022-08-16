@@ -910,7 +910,7 @@ class MarketingReportViewSets(GenericViewSet):
             if not start:
                 start = date.today() - timedelta(days=30)
             if not end:
-                end = date.today()
+                end = date.today() + timedelta(days=1)
 
             supervisors = User.objects.filter(is_active=True, role__name='interviewee')
             if query:
@@ -919,10 +919,11 @@ class MarketingReportViewSets(GenericViewSet):
             if export:
                 first, last = 0, len(supervisors)
             for sup in supervisors[first:last]:
-                interview_count = Interview.objects.filter(supervisor=sup, created__gte=start,
-                                                           created__lte=end).exclude(status='cancelled').count()
-                offer_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end,
-                                                       status='offer').count()
+                interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end)\
+                    .exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                offer_count = Interview.objects.filter(
+                    supervisor=sup, created__gte=start, created__lte=end, status='offer'
+                ).order_by('submission_id').distinct('submission_id').count()
                 data.append({
                     "id": sup.id, "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
                     "offers": offer_count, "technology": sup.technology, "team": sup.team.name if sup.team else None
