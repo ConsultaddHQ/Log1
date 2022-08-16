@@ -2086,20 +2086,42 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    @action(methods=['post'], detail=True, url_path='supervisor_feedback')
+    @action(methods=['post', 'put'], detail=True, url_path='supervisor_feedback')
     def feedback(self, request, pk):
         try:
-            interview = get_object_or_404(Interview, id=pk)
+            if request.method == 'POST':
+                interview = get_object_or_404(Interview, id=pk)
 
-            ques_answers = create_answer(request, interview, 'interview')
-            if not ques_answers:
-                return Response({"message": "No feedback given"}, status=400)
+                ques_answers = create_answer(request, interview, 'interview')
+                if not ques_answers:
+                    return Response({"message": "No feedback given"}, status=400)
 
-            # Activity
-            desc = f"{request.user.employee_name} provided supervisor feedback for Interview I-{interview.id}"
-            create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
+                # Activity
+                desc = f"{request.user.employee_name} provided supervisor feedback for Interview I-{interview.id}"
+                create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
 
-            return Response({"message": "Feedback submitted"}, status=201)
+                return Response({"message": "Feedback submitted"}, status=201)
+            else:
+                interview = get_object_or_404(Interview, id=pk)
+                ques_answers = request.data.get('question_answers', None)
+                content_type = ContentType.obejcts.get(model='interview')
+                if ques_answers:
+                    for answer in ques_answers:
+                        if "answer_id" in answer:
+                            ans = Answer.objects.get(id=answer['answer_id'])
+                            ans.answer = answer['value']
+                            ans.save()
+                        else:
+                            Answer.objects.create(
+                                content_type=content_type, answer=answer['value'],
+                                object_id=interview.id, submitted_by=request.user, question=answer['question_id'],
+                            )
+
+                    # Activity
+                    desc = f"{request.user.employee_name} updated supervisor feedback for Interview I-{interview.id}"
+                    create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
+                    return Response({"message": "Feedback Updated"}, status=202)
+                return Response({"message": "No Data to Update"}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
