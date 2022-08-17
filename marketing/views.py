@@ -2102,26 +2102,28 @@ class InterviewViewSets(ModelViewSet):
 
                 return Response({"message": "Feedback submitted"}, status=201)
             else:
+                prev_feedback = []
                 interview = get_object_or_404(Interview, id=pk)
-                ques_answers = request.data.get('question_answers', None)
-                content_type = ContentType.obejcts.get(model='interview')
-                if ques_answers:
-                    for answer in ques_answers:
-                        if "answer_id" in answer:
-                            ans = Answer.objects.get(id=answer['answer_id'])
-                            ans.answer = answer['value']
-                            ans.save()
-                        else:
-                            Answer.objects.create(
-                                content_type=content_type, answer=answer['value'],
-                                object_id=interview.id, submitted_by=request.user, question=answer['question_id'],
-                            )
+                answers = Answer.objects.filter(object_id=interview.id, content_type__model='interview',
+                                                question__form_name=request.GET.get("form_name", "interview")).values('id')
+                for ans in answers:
+                    prev_feedback.append(ans['id'])
+                ques_answers = create_answer(request, interview, 'interview')
+                if not ques_answers:
+                    return Response({"message": "No feedback given"}, status=400)
 
-                    # Activity
-                    desc = f"{request.user.employee_name} updated supervisor feedback for Interview I-{interview.id}"
-                    create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
-                    return Response({"message": "Feedback Updated"}, status=202)
-                return Response({"message": "No Data to Update"}, status=400)
+                for value in prev_feedback:
+                    answer = get_object_or_404(Answer, id=value)
+                    answer.delete()
+
+                # Activity
+                desc = f"{request.user.employee_name} updated supervisor feedback for Interview I-{interview.id}"
+                create_activity(interview.submission.id, 'submission', request.user, desc, 'created')
+
+                if interview.status in ['passed', 'next_round', 'failed']:
+                    slack_card_json = interview_feedback_card(interview, request)
+                    post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
+                return Response({"message": "Feedback updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -2248,7 +2250,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
-                
+
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2300,7 +2302,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 email_object = MapMail.objects.filter(content_type__model="test",object_id=test.id).first()
                 if email_object:
                     mail_id = email_object.mail_id
-                    from_mail = email_object.from_mail_id 
+                    from_mail = email_object.from_mail_id
                 res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail,request, mail_id)
                 delete_temp_file(path)
                 if not msg:
