@@ -383,7 +383,7 @@ def new_recruit_notification(consultant, request):
         if qs:
             recruiter = qs.first().poc
             recruiter_team = recruiter.team
-            recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.name
+            recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
             if recruiter.gender == 'female':
                 recruiter_gender = ':red_haired_woman::skin-tone-2:'
 
@@ -513,6 +513,7 @@ def create_consultant(request, creator_id):
                 email=request.data.get('email'),
                 skype=request.data.get('skype'),
                 gender=request.data.get('gender'),
+                country=request.data.get('country'),
                 date_of_birth=request.data.get('dob'),
                 current_city=request.data.get('current_location'),
                 marital_status=request.data.get('marital_status', 'unmarried'),

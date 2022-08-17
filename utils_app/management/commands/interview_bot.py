@@ -48,10 +48,11 @@ class Command(BaseCommand):
                                 <td style="padding:5px 8px 5px 8px;"> {interview.marketer.employee_name} </td>
                                 <td style="padding:5px 8px 5px 8px;"> {position} </td>
                             </tr>"""
+                supervisor = interview.supervisor
                 slack_data.append(
                     {
                         "type": interview.get_interview_mode_display(),
-                        "ctb": interview.supervisor.employee_name, "round": interview.round,
+                        "ctb": f'<@{supervisor.slack_id}>' if supervisor.slack_id else supervisor.employee_name, "round": interview.round,
                         "start": interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST'),
                         "marketer": interview.marketer.employee_name, "position": position,
                         "consultant": interview.consultant.name, "client": interview.submission.client,
