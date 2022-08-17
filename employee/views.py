@@ -938,7 +938,8 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             records = request.data.get('data')
             for record in records:
                 record["log1"] = record['log1'] if record.get('log1') else False
-                roles.append(record.get('roles', []))
+                if record.get('role', []):
+                    roles.append(record.get('role', [])[0].replace(' ', '').split(","))
                 record_list.append(User(
                     email=record.get('email'),
                     phone=record.get('phone'),
