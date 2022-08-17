@@ -12,6 +12,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         try:
+            content = ContentType.objects.get(model='workauth')
             choices = Choice.objects.filter(field='visa')
             for choice in choices:
                 choice.field = "visa_usa"
@@ -29,7 +30,7 @@ class Command(BaseCommand):
             ]
             for v in visa:
                 Choice.objects.create(
-                    name=v['name'], display_name=v['display_name'], field=v['field'], content_type='consultantfeedback'
+                    name=v['name'], display_name=v['display_name'], field=v['field'], content_type=content
                 )
         except Exception as error:
             print(error)
