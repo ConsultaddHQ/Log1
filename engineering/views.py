@@ -1311,7 +1311,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             filters = json.loads(request.GET.get('filter_json', '{}'))
-            engineers = User.objects.filter(team__name='Engineer', is_active=True)
+            engineers = User.objects.filter(team__dept='Engineering', is_active=True)
             if query:
                 engineers = engineers.filter(employee_name__istartswith=query)
             engineers, counts = self.filter_engineer(engineers, filters, request)
@@ -1430,20 +1430,16 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             if not employee_ids or not team:
                 return Response({"message": "Data not provided"}, status=400)
 
-            move_counts, scrum_masters, not_engineer = 0, '', ''
+            scrum_masters = []
             for emp_id in employee_ids:
                 employee = get_object_or_404(User, id=emp_id)
                 if employee.role.filter(name='scrum_master'):
-                    scrum_masters = employee.employee_name + ', ' + scrum_masters
+                    scrum_masters.append(employee.employee_name)
                     continue
                 employee.team = team
                 employee.save()
-                move_counts += 1
-            failure_message = f"Can not move {scrum_masters} as employee is assigned as scrum master in another team" \
-                if scrum_masters else ''
 
-            return Response({"message": "Engineers moved successfully", "failed": failure_message, "count": move_counts}
-                            , status=202)
+            return Response({"message": "Engineers moved successfully", "not_moved": scrum_masters}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
