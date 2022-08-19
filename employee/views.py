@@ -22,7 +22,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from api_key.models import APIKey
 from project.models import Project, ProjectSupport
 from consultant.models import Consultant
-from utils_app.mailing import send_email
+from utils_app.thred_mail import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
@@ -777,8 +777,11 @@ class AssetsViewSets(ModelViewSet):
                         'failed': failed,
                     },
                 }
-                send_email(mail_data, "log1@consultadd.com", request=request)
-                return Response({"message": "Upload Complete", "count": mail_data['context']}, status=201)
+                _, result, mId = send_email(mail_data, "product@consultadd.com", request=request)
+                message = "mail send fail"
+                if result:
+                    message = "mail sent successfully"
+                return Response({"message": "Upload Complete", "count": mail_data['context'], "mail":message}, status=201)
             return Response({"message": "Empty File"}, status=404)
         except Exception as error:
             write_exception(error, request)
