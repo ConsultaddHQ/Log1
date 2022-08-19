@@ -21,6 +21,9 @@ def cred(mail_id):
     if os.environ.get('ENV', 'local') != 'prod':
         mail_id="suman.m@consultadd.com"
         
+    if mail_id == "product@consultadd.com":
+        mail_id="suman.m@consultadd.com"
+        
     credentials = Credentials.from_service_account_file(
         filename=SERVICE_ACCOUNT_FILE,
         scopes = SCOPES,
@@ -56,7 +59,10 @@ def create_message(from_email, mail_data):
     
     if os.environ.get('ENV', 'local') != 'prod':
         from_email = "suman.m@consultadd.com"
-    
+        
+    if from_email == "suman.m@consultadd.com":
+        from_email="product@consultadd.com"
+        
     message['from'] = from_email
     if os.environ.get('ENV', 'local') == 'prod':
         message['to'] = ','.join(mail_data["to"])
@@ -74,13 +80,12 @@ def create_message(from_email, mail_data):
 
 def set_mail_config(to, from_mail, cc, bcc, subject, obj):
     obj['subject'] = subject
+    obj['from'] = from_mail
     if os.environ.get('ENV', 'local') == 'prod':
         obj['to'] = ','.join(to)
         obj['cc'] = ','.join(cc)
         obj['bcc'] = ','.join(bcc)
-        obj['from'] = from_mail
     else:
-        obj['from'] = "suman.m@consultadd.com"
         obj['cc'] = ''
         obj['bcc'] = ''
         obj['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
@@ -146,11 +151,20 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
             return message['id'], True, from_mail_id
         else:
-            message = MIMEText(mail_data["body"])
-            subject = mail_data["subject"]
-            message['from'] = from_email
-            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
-            message = (service.users().messages().send(userId="me", body={'raw': base64.urlsafe_b64encode(message.as_string())}).execute())
+            message = MIMEText(mail_data["body"],'html')
+            message['subject'] = mail_data["subject"]
+            if os.environ.get('ENV', 'local') == 'prod':
+                message['to'] = ','.join(mail_data["to"])
+                message['cc'] = ','.join(mail_data["cc"])
+                message['bcc'] = ','.join(mail_data["bcc"])
+                
+            else:
+                message['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+                message['cc'] = ''
+                message['bcc'] = ''
+            message['from'] = 'product@consultadd.com'
+            b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
+            message = (service.users().messages().send(userId="me", body={'raw': b64_bytes.decode()}).execute())
             return message['id'], True, from_mail_id
 
     except Exception as error:
