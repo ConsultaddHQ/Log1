@@ -34,12 +34,14 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     Q(supervisor=request.user) |
                     Q(submission__created_by=request.user)
                 )
+                consultant = Consultant.objects.filter(marketing__marketer=request.user)
                 projects = Project.objects.filter(submission__created_by=request.user)
 
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
                 sub = Submission.objects.filter(created_by__team__name=team_name)
+                consultant = Consultant.objects.filter(marketing__teams=request.user.team)
                 interviews = Interview.objects.filter(submission__created_by__team__name=team_name)
                 projects = Project.objects.filter(submission__created_by__team__name=team_name)
 
@@ -47,6 +49,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 sub = Submission.objects.all()
                 projects = Project.objects.all()
                 interviews = Interview.objects.all()
+                consultant = Consultant.objects.all()
 
             upcoming_interviews = interviews.filter(
                 status__in=['scheduled', 'rescheduled'], start_time__gte=datetime.today()
@@ -89,6 +92,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             if filter_by_time == 'last_month':
                 first = last.replace(day=1)
 
+            elif filter_by_time == 'this_year':
+                first = last.replace(day=1) + relativedelta(months=-(last.month-1))
+
             elif filter_by_time == 'last_6_month':
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
@@ -117,9 +123,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 'total_offers': total,
                 'offer': projects.filter(created__range=[first, last]).count(),
                 'submission': sub.filter(created__range=[first, last]).count(),
-                'on_project': Consultant.objects.filter(status='on_project').count(),
-                'ba_bench': Consultant.objects.filter(skills__contains='BA', status='on_bench').count(),
-                'dev_bench': Consultant.objects.filter(status='on_bench').exclude(skills__exact='BA').count(),
+                'on_project': consultant.filter(status='on_project', created__range=[first, last]).count(),
+                'ba_bench': consultant.filter(skills__contains='BA', status='on_bench', created__range=[first, last]).count(),
+                'dev_bench':  consultant.filter(status='on_bench', created__range=[first, last]).exclude(skills__exact='BA').count(),
                 'interview': interviews.filter(
                     created__range=[first, last], status__in=['offer', 'feedback_due', 'failed']
                 ).count(),
