@@ -1429,18 +1429,23 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             if not employee_ids or not team:
                 return Response({"message": "Data not provided"}, status=400)
 
-            scrum_masters = ''
+            scrum_masters, not_engineer = '', ''
             for emp_id in employee_ids:
                 employee = get_object_or_404(User, id=emp_id)
                 if employee.role.filter(name='scrum_master'):
                     scrum_masters = employee.employee_name + ', ' + scrum_masters
                     continue
+                elif employee.role.exclude(name='engineer'):
+                    not_engineer = employee.employee_name + ', ' + scrum_masters
+                    continue
                 employee.team = team
                 employee.save()
             failure_message = f"Can not move {scrum_masters} as employee is assigned as scrum master in another team" \
                 if scrum_masters else ''
+            not_engineer = f"{not_engineer} not an engineer, first assign role as Engineer" if not_engineer else ''
 
-            return Response({"message": "Engineers moved successfully", "failed": failure_message}, status=202)
+            return Response({"message": "Engineers moved successfully", "failed": failure_message,
+                             "not_engineer": not_engineer}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
