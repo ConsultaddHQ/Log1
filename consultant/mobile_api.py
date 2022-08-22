@@ -13,7 +13,8 @@ from rest_framework.viewsets import GenericViewSet
 
 from constance import config
 from project.models import Project
-from utils_app.mailing import send_email
+# from utils_app.mailing import send_email
+from utils_app.thred_mail import send_email
 from log1.utils import write_exception, write_info
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.serializers import ConsultantLoginSerializer
@@ -53,7 +54,7 @@ class ConsultantAuthViewSet(GenericViewSet):
                 },
             }
 
-            send_email(customer_mail_data, "log1@consultadd.com")
+            send_email(customer_mail_data, "product@consultadd.com")
 
             mail_data = {
                 'to': [config.TIMESHEET_APP_ADMIN],
@@ -69,7 +70,7 @@ class ConsultantAuthViewSet(GenericViewSet):
                     'designation': designation,
                 },
             }
-            send_email(mail_data, "log1@consultadd.com")
+            send_email(mail_data, "product@consultadd.com")
             return Response({"result": "mail sent"}, status=200)
         except Exception as error:
             write_exception(error, request)
