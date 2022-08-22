@@ -759,7 +759,7 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today()
 
-            data, url = list(), ""
+            data, counts, url = list(), list(), ""
             total_bench = total_submissions = total_interviews = total_joined = total_offers = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
@@ -800,6 +800,16 @@ class MarketingReportViewSets(GenericViewSet):
                     "bench_consultant": bench_consultant,
                     "submission_count": submission_count,
                 })
+                counts.append({
+                    team.name: [
+                        {"display_name": "Offer Count", "count": offer_count},
+                        {"display_name": "Joined Count", "count": joined_count},
+                        {"display_name": "Bench Count", "count": bench_consultant},
+                        {"display_name": "Interview Count", "count": interview_count},
+                        {"display_name": "Submission Count", "count": submission_count}
+                    ],
+                    f"Total": offer_count + joined_count + interview_count + submission_count + bench_consultant
+                })
                 total_offers += offer_count
                 total_joined += joined_count
                 total_bench += bench_consultant
@@ -829,7 +839,7 @@ class MarketingReportViewSets(GenericViewSet):
                 url = export_to_csv(
                     data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
                 )
-            return Response({"data": data, "file_url": url}, status=200)
+            return Response({"data": data, "file_url": url, "counts": counts}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -842,7 +852,7 @@ class MarketingReportViewSets(GenericViewSet):
             export = json.loads(request.GET.get('export', 'false'))
             filter_by_team = request.GET.get('filter_by_team', None)
 
-            bench_consultant = Consultant.objects.filter(marketing__status='open').\
+            bench_consultant = Consultant.objects.filter(marketing__status='open'). \
                 exclude(status='terminated').distinct('id').order_by('id')
 
             if query:
@@ -870,7 +880,8 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__consultant_marketing__consultant=consultant
                 ).exclude(status='cancelled').distinct('submission').order_by().count()
                 project_count = Project.objects.filter(consultant=consultant).count()
-                days = (date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
+                days = (
+                               date.today() - marketing.start).days + marketing.previous_marketing_days if marketing.start else None
                 data.append({
                     'id': consultant.id, 'days': days, 'teams': teams, 'recruiter': recruiter,
                     'submission_count': submission_count, 'preferred_location': preferred_location,
@@ -919,7 +930,7 @@ class MarketingReportViewSets(GenericViewSet):
             if export:
                 first, last = 0, len(supervisors)
             for sup in supervisors[first:last]:
-                interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end)\
+                interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end) \
                     .exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Interview.objects.filter(
                     supervisor=sup, created__gte=start, created__lte=end, status='offer'

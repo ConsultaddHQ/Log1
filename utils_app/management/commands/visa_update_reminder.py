@@ -4,7 +4,8 @@ from django.core.management import BaseCommand
 from constance import config
 from consultant.models import Consultant
 from utils_app.utils import create_cron_error, create_cron_object
-from utils_app.mailing import send_email, send_email_without_template
+from utils_app.thred_mail import send_email, send_email_without_template
+# from utils_app.mailing import send_email_without_template
 
 
 class Command(BaseCommand):
@@ -36,7 +37,7 @@ class Command(BaseCommand):
                             'body': f"{consultant.name} {visa.get_visa_type_display()} is expiring on {expiry_date} "
                                     f"Please Update the work authorisation on log1."
                         }
-                        res, ok = send_email_without_template(mail_data, "log1@consultadd.com")
+                        res, ok, _  = send_email_without_template(mail_data, "product@consultadd.com")
                         if not ok:
                             mail_error.append((consultant.id, res))
             if len(mail_error) > 0:
@@ -60,7 +61,7 @@ class Command(BaseCommand):
                     'subject': f"Reminder: Visa expiry reminder of On-Project consultants",
                     'context': {'data': data}
                 }
-                res, ok = send_email(mail_data, "log1@consultadd.com")
+                res, ok, _ = send_email(mail_data, "product@consultadd.com")
                 if not ok:
                     create_cron_error(job, res)
 
