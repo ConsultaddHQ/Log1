@@ -1311,7 +1311,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             filters = json.loads(request.GET.get('filter_json', '{}'))
-            engineers = User.objects.filter(role__name='engineer', is_active=True)
+            engineers = User.objects.filter(team__dept='Engineering', is_active=True)
             if query:
                 engineers = engineers.filter(employee_name__istartswith=query)
             engineers, counts = self.filter_engineer(engineers, filters, request)
@@ -1403,11 +1403,12 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     def teams(self, request, **kwargs):
         try:
             team_data = []
+            first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             teams = Team.objects.filter(dept='Engineering').order_by('-id')
             if query:
                 teams = teams.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
-            for team in teams:
+            for team in teams[first: last]:
                 data = {
                     "count": team.employees.filter(is_active=True).count(),
                     "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
@@ -1416,7 +1417,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 }
                 team_data.append(data)
 
-            return Response({"data": team_data, "total": len(team_data)}, status=200)
+            return Response({"data": team_data, "total": len(teams)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -1429,23 +1430,16 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             if not employee_ids or not team:
                 return Response({"message": "Data not provided"}, status=400)
 
-            scrum_masters, not_engineer = '', ''
+            scrum_masters = []
             for emp_id in employee_ids:
                 employee = get_object_or_404(User, id=emp_id)
                 if employee.role.filter(name='scrum_master'):
-                    scrum_masters = employee.employee_name + ', ' + scrum_masters
-                    continue
-                elif employee.role.exclude(name='engineer'):
-                    not_engineer = employee.employee_name + ', ' + scrum_masters
+                    scrum_masters.append(employee.employee_name)
                     continue
                 employee.team = team
                 employee.save()
-            failure_message = f"Can not move {scrum_masters} as employee is assigned as scrum master in another team" \
-                if scrum_masters else ''
-            not_engineer = f"{not_engineer} not an engineer, first assign role as Engineer" if not_engineer else ''
 
-            return Response({"message": "Engineers moved successfully", "failed": failure_message,
-                             "not_engineer": not_engineer}, status=202)
+            return Response({"message": "Engineers moved successfully", "not_moved": scrum_masters}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)

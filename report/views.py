@@ -804,8 +804,9 @@ class MarketingReportViewSets(GenericViewSet):
                     team.name: [
                         {"display_name": "Offer Count", "count": offer_count},
                         {"display_name": "Joined Count", "count": joined_count},
+                        {"display_name": "Bench Count", "count": bench_consultant},
                         {"display_name": "Interview Count", "count": interview_count},
-                        {"display_name": "Bench Consultant", "count": bench_consultant}
+                        {"display_name": "Submission Count", "count": submission_count}
                     ],
                     f"Total": offer_count + joined_count + interview_count + submission_count + bench_consultant
                 })

@@ -2203,7 +2203,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     test_type = 'Offline'
                 to = [config.ENGINEERING]
                 cc = [created_by.email] + scrum_masters
-                subject = f'Test Received :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills} '
+                subject = f'Test :: TST-{test.id} :: {test_type} :: {consultant.name} :: {skills} '
                 resume = test.submission.attachments.filter(attachment_type='resume')
                 if resume:
                     response, error = download_s3_object(resume.first().attachment_file.name)
