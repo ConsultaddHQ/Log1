@@ -1430,14 +1430,20 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             if not employee_ids or not team:
                 return Response({"message": "Data not provided"}, status=400)
 
-            scrum_masters = []
+            scrum_masters, employee_added = [], []
             for emp_id in employee_ids:
                 employee = get_object_or_404(User, id=emp_id)
                 if employee.role.filter(name='scrum_master'):
                     scrum_masters.append(employee.employee_name)
                     continue
+                employee_added.append(employee.employee_name)
                 employee.team = team
                 employee.save()
+
+            # Activity
+            employees = ", ".join(emp for emp in employee_added)
+            desc = f"{request.user.employee_name} added {employees} to {team.name}"
+            create_activity(kwargs.get('pk'), 'team', request.user, desc, 'updated')
 
             return Response({"message": "Engineers moved successfully", "not_moved": scrum_masters}, status=202)
         except Exception as error:
