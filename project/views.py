@@ -186,9 +186,7 @@ class ProjectViewSets(ModelViewSet):
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):
-        support_res, support_msg = '', ''
-        if not request.data.get('engineer', None):
-            support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
+        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
 
         message = "Project created"

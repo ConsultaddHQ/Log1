@@ -472,6 +472,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def employer(self, request):
         try:
             consultadd_emp = Team.objects.get(name='Consultadd')
+            canada_emp = Team.objects.get(name='Consultadd Canada')
             if 'superadmin' in request.user.roles:
                 employers = Team.objects.filter(
                     Q(dept='Marketing') | Q(name='Consultadd')
@@ -480,6 +481,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 employers = [
                     {"id": request.user.team.id, "name": request.user.team.name},
                     {"id": consultadd_emp.id, "name": consultadd_emp.name},
+                    {"id": canada_emp.id, "name": canada_emp.name}
                 ]
             return Response({"data": employers}, status=200)
         except Exception as error:
