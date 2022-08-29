@@ -127,12 +127,13 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                     'category': 'info',
                     'description': title,
                     'target_id': comment.id,
-                    'target_type': 'feedback',
+                    'target_type': 'comment',
                     'parent_user_type': model,
                     'sender_user_type': 'user',
                     'sender_id': request.user.id,
                     'recipient_user_type': 'user',
                     'parent_id': request.data['id'],
+                    'parent_type': content_type.model if content_type else None
                 }
                 create_notification(user_list, notification_data)
 
