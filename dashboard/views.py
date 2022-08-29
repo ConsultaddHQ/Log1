@@ -41,7 +41,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 if not team_name:
                     team_name = request.user.team.name
                 sub = Submission.objects.filter(created_by__team__name=team_name)
-                consultant = Consultant.objects.filter(marketing__teams=request.user.team)
+                consultant = Consultant.objects.filter(marketing__teams__name=team_name)
                 interviews = Interview.objects.filter(submission__created_by__team__name=team_name)
                 projects = Project.objects.filter(submission__created_by__team__name=team_name)
 

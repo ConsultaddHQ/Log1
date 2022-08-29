@@ -93,7 +93,7 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
 
 
 @shared_task
-def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=None):
+def send_mail_in_thread(mail_data, from_email, request, mail_id):
     try:
         service, from_mail_id = cred(from_email)
         email_data = service.users().messages().get(userId='me', id=mail_id).execute()
@@ -106,7 +106,7 @@ def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=N
         message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
         message['In-Reply-To'] = get_field(email_data, 'Message-Id')
         message['References'] = get_field(email_data, 'Message-Id')
-        email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode()}}
+        email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_bytes()).decode()}}
         draft = service.users().drafts().create(userId='me', body=email_body).execute()
         message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
         return message['id'], True, from_mail_id   
