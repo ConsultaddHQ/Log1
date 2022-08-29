@@ -605,7 +605,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
 
-            if 'superadmin' not in roles:
+            if ('superadmin' not in roles) and ('scrum_master' not in roles):
                 # Team submissions for Scrum master and Proxy Scrum Master
                 if 'admin' in roles or 'proxy' in roles:
                     consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
