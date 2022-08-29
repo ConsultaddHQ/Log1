@@ -760,7 +760,7 @@ class MarketingReportViewSets(GenericViewSet):
                 end = date.today()
 
             data, counts, url = list(), list(), ""
-            total_bench = total_submissions = total_interviews = total_joined = total_offers = 0
+            total_bench = total_submissions = total_interviews = total_joined = total_offers = total_termination = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
                 team_id = team.id
@@ -786,6 +786,11 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__created_by__team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
+                termination_count = Project.objects.filter(
+                    statuses__status__istartswith='terminated',
+                    submission__created_by__team__id=team_id,
+                    statuses__created__gte=start, statuses__created__lte=end,
+                ).order_by('id').distinct('id').count()
                 scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
                 scrum_master = None
                 if scrum_masters:
@@ -799,6 +804,7 @@ class MarketingReportViewSets(GenericViewSet):
                     "interview_count": interview_count,
                     "bench_consultant": bench_consultant,
                     "submission_count": submission_count,
+                    "termination_count": termination_count,
                 })
                 counts.append({
                     team.name: [
@@ -806,7 +812,8 @@ class MarketingReportViewSets(GenericViewSet):
                         {"display_name": "Joined Count", "count": joined_count},
                         {"display_name": "Bench Count", "count": bench_consultant},
                         {"display_name": "Interview Count", "count": interview_count},
-                        {"display_name": "Submission Count", "count": submission_count}
+                        {"display_name": "Submission Count", "count": submission_count},
+                        {"display_name": "Termination Count", "count": termination_count}
                     ],
                     f"Total": offer_count + joined_count + interview_count + submission_count + bench_consultant
                 })
@@ -815,6 +822,7 @@ class MarketingReportViewSets(GenericViewSet):
                 total_bench += bench_consultant
                 total_interviews += interview_count
                 total_submissions += submission_count
+                total_termination += termination_count
             data.append({
                 "id": 0,
                 "team": "Total",
@@ -824,6 +832,7 @@ class MarketingReportViewSets(GenericViewSet):
                 "bench_consultant": total_bench,
                 "interview_count": total_interviews,
                 "submission_count": total_submissions,
+                "total_termination": total_termination,
             })
 
             col_name = [
@@ -931,19 +940,24 @@ class MarketingReportViewSets(GenericViewSet):
                 first, last = 0, len(supervisors)
             for sup in supervisors[first:last]:
                 interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end) \
-                    .exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
-                offer_count = Interview.objects.filter(
-                    supervisor=sup, created__gte=start, created__lte=end, status='offer'
-                ).order_by('submission_id').distinct('submission_id').count()
+                    .exclude(status='cancelled').count()
+                pass_count = Interview.objects.filter(
+                    supervisor=sup, created__gte=start, created__lte=end, status__in=['offer', 'next_round']
+                ).count()
+                fail_count = Interview.objects.filter(
+                    supervisor=sup, created__gte=start, created__lte=end, status='failed'
+                ).count()
                 data.append({
                     "id": sup.id, "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
-                    "offers": offer_count, "technology": sup.technology, "team": sup.team.name if sup.team else None
+                    "pass": pass_count, "technology": sup.technology, "fail": fail_count,
+                    "team": sup.team.name if sup.team else None
                 })
             col_name = [
                 {"name": "name", "display_name": "Name"},
-                {"name": "interviews", "display_name": "Interviews"},
-                {"name": "offers", "display_name": "Offers"},
                 {"name": "technology", "display_name": "Technology"},
+                {"name": "interviews", "display_name": "Total Interviews"},
+                {"name": "pass", "display_name": "Total Passed"},
+                {"name": "fail", "display_name": "Total Failed"}
             ]
             url = ""
             if export:
