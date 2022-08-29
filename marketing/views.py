@@ -17,23 +17,22 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from marketing.utils import *
 from marketing.serializers import *
+from utils_app.models import MapMail
 from activity.models import Activity
 from employee.models import User, Team
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
-from utils_app.models import MapMail
-from activity.serializers import ActivitySerializer
 from utils_app.calendar import GoogleCalendar
+from django.contrib.auth.models import ContentType
+from activity.serializers import ActivitySerializer
 from attachment.models import Attachment, create_attachment
-# from utils_app.mailing import send_email_attachment_multiple
-from utils_app.thred_mail import send_email_attachment_multiple
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
+from utils_app.thred_mail import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from django.contrib.auth.models import ContentType
 
 
 # Route - /vendor_company/
@@ -2250,7 +2249,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
-
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
