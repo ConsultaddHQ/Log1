@@ -16,7 +16,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 
 from constance import config
 from marketing.utils import date_filter
-from utils_app.models import ObjectGroup
+from utils_app.models import MapMail, ObjectGroup
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -26,7 +26,7 @@ from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from utils_app.utils import delete_temp_file, export_to_csv
-from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple
+from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant
@@ -106,10 +106,14 @@ class ProjectViewSets(ModelViewSet):
                     'vendor_company': submission.vendor.name, 'marketer_name': submission.created_by.employee_name,
                 },
             }
-
             res, msg, mail_id = send_email_(mail_data, submission.created_by.email, request=request)
+            
             if not msg:
                 return res, "error"
+
+            content_type = ContentType.objects.get(model="project")
+            mail_object = MapMail(mail_id=res, object_id=project.id, content_type=content_type, from_mail_id=mail_id)
+            mail_object.save()            
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -164,8 +168,15 @@ class ProjectViewSets(ModelViewSet):
                     'client_name': submission.client, 'jd': submission.lead.job_desc.replace("\n", " ;newline; "),
                 },
             }
-
-            res, msg, mail_id = send_email_attachment_multiple(mail_data, submission.created_by.email, request=request)
+            # need to change here
+            mail_id = None
+            from_mail = submission.created_by.email
+            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            if email_object:
+                mail_id = email_object.mail_id
+                from_mail = email_object.from_mail_id     
+                       
+            res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
             delete_temp_file(path)
             if not msg:
                 return res, "error"
@@ -240,7 +251,14 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
 
-            res, msg, email_id = send_email_attachment_multiple(mail_data, marketer.email, request=request)
+            mail_id = None
+            from_mail = marketer.email
+            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            if email_object:
+                mail_id = email_object.mail_id
+                from_mail = email_object.from_mail_id     
+                       
+            res, msg, email_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
             if not msg:
                 return res, "error"
             return res, "ok"
@@ -304,8 +322,19 @@ class ProjectViewSets(ModelViewSet):
                     'vendor_name': vendor_name, 'start': project_start_date, 'remark': project.feedback,
                 }
             }
-            res1, msg1, mail_id = send_email_(mail_data, marketer.email, request=request)
 
+            # mail_id = None
+            # from_mail = marketer.email
+            # email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            # if email_object:
+            #     mail_id = email_object.mail_id
+            #     from_mail = email_object.from_mail_id   
+                  
+            # if mail_id:                     
+            #     res1, msg1, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
+            # else:
+            res1, msg1, mail_id = send_email_(mail_data, marketer.email, request=request)
+                
             if msg1:
                 res1="mail send"
             
@@ -324,8 +353,18 @@ class ProjectViewSets(ModelViewSet):
                     'project_duration': f"{diff_month_days(project.start_date, project.end_date)} months",
                 }
             }
-            res2, msg2, mail_id = send_email_(mail_data_eng, marketer.email, request=request)
-
+            mail_id = None
+            from_mail = marketer.email
+            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            if email_object:
+                mail_id = email_object.mail_id
+                from_mail = email_object.from_mail_id  
+                 
+            if mail_id:        
+                res2, msg2, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
+            else:
+                res2, msg2, mail_id = send_email_(mail_data, from_mail, request=request)
+                
             if msg2:
                 res2="mail send"
 
@@ -540,7 +579,6 @@ class ProjectViewSets(ModelViewSet):
                            f"creating PO"
                     create_activity(project.id, 'projectsupport', request.user, desc, 'created')
                     support_assignment_mail(support, request)
-                
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
@@ -922,8 +960,18 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     'consultant_name': consultant.name, 'consultant_email': consultant.email,
                 },
             }
-
-            res, msg = send_email(mail_data, support.email, request=request)
+            
+            mail_id = None
+            from_mail = support.email
+            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            if email_object:
+                mail_id = email_object.mail_id
+                from_mail = email_object.from_mail_id  
+            # need to work here
+            if mail_id:
+                res, msg, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
+            else:
+                res, msg, mail_id = send_email_(mail_data, support.email, request=request)
             if not msg:
                 return Response({"message": "Unable to send mail"}, status=400)
             return Response({"message": "Support is initiated", "result": res}, status=202)
