@@ -458,7 +458,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": "Project Joined",
+                            "text": ":white_check_mark:  Project Joined",
                             "emoji": True
                         }
                     },
@@ -470,11 +470,32 @@ class MessageCard:
                         }
                     },
                     {
-                        "type": "context",
-                        "elements": [
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Umang Shamajibhai Jethwa* joined project at *AT&T* on `Mon, 12 August 2019` as a *Java Developer* \n Project by *Gaurav Tyagi* from *OC10*"
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Submitted on:* `{payload.get('submitted_on', 'NA')}`"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
                             {
-                                "type": "plain_text",
-                                "text": " "
+                                "type": "mrkdwn",
+                                "text": f"*Employer:* `{payload.get('employer', 'NA')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
                             }
                         ]
                     },
@@ -483,42 +504,16 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": "*Submitted On*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": f"{payload.get('submitted_on', 'NA')}",
-                                "emoji": True
+                                "text": "*Joining Count*"
                             }
                         ]
                     },
                     {
                         "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Employer*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('employer', 'NA'),
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": "*Recruiter*"
-                            },
-                            {
-                                "type": "plain_text",
-                                "text": payload.get('recruiter_name', 'NA'),
-                                "emoji": True
-                            }
-                        ]
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f":pushpin: `{payload.get('team_name', 'NA')}` - *{payload.get('team', 'NA')}*  |  `Total` - *{payload.get('total', 'NA')}*"
+                        }
                     },
                     {
                         "type": "actions",
@@ -528,52 +523,17 @@ class MessageCard:
                                 "text": {
                                     "type": "plain_text",
                                     "emoji": True,
-                                    "text": f"{payload.get('team_name', 'NA')} - {payload.get('team', 'NA')}"
-                                },
-                                "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": f"Total - {payload.get('total', 'NA')}"
-                                },
-                                "style": "primary",
-                                "value": "click_me_123",
-                                "url": f"https://app.log1.com/api/util/?api_key={os.environ.get('teams_api_key')}"
-                            },
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "text": "View in Log1",
-                                    "emoji": True
+                                    "text": "View in Log1"
                                 },
                                 "style": "primary",
                                 "url": f"https://app.log1.com/#/details/{payload.get('submission_id')}/project?id={payload.get('project_id')}",
-                                "value": "click_me_123",
-                                "action_id": "actionId-0"
+                                "value": "click_me_123"
                             }
                         ]
-                    },
-                    {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " ",
-                                "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "divider"
                     }
                 ]
             }
+            
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.slack_joined_url, data)
             return "ok"

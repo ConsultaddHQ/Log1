@@ -658,8 +658,7 @@ class ProjectViewSets(ModelViewSet):
                     # Setting password for User (consultant)
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
-
-                    # util.send_join_notification()
+                    util.send_join_notification()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
@@ -700,7 +699,7 @@ class ProjectViewSets(ModelViewSet):
             else:
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
-
+           
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
