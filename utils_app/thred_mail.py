@@ -19,14 +19,14 @@ SCOPES = ['https://mail.google.com/']
 
 def cred(mail_id):
     if os.environ.get('ENV', 'local') != 'prod':
-        mail_id="suman.m@consultadd.com"
+        mail_id = "suman.m@consultadd.com"
         
     if mail_id == "product@consultadd.com":
-        mail_id="suman.m@consultadd.com"
+        mail_id = "suman.m@consultadd.com"
         
     credentials = Credentials.from_service_account_file(
         filename=SERVICE_ACCOUNT_FILE,
-        scopes = SCOPES,
+        scopes=SCOPES,
         subject=mail_id,
     )
     service = build('gmail', 'v1', credentials=credentials)
@@ -122,7 +122,7 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
 @shared_task
 def send_email(mail_data, from_email, request=None):
     try:
-        service,from_mail_id = cred(from_email)
+        service, from_mail_id = cred(from_email)
         msg = create_message(from_mail_id, mail_data)
         message = (service.users().messages().send(userId="me", body=msg).execute())
         return message['id'], True, from_mail_id
