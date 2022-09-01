@@ -27,6 +27,4 @@ class Command(BaseCommand):
                     continue
             print(count)
         except Exception as error:
-            print(consultant.current_city)
             print(error)
-            create_cron_error(job, error)
