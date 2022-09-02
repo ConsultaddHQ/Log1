@@ -13,7 +13,7 @@ from django.template.loader import render_to_string
 # from google_auth_oauthlib.flow import InstalledAppFlow
 
 # SCOPES = ['https://mail.google.com/','https://www.googleapis.com/auth/gmail.readonly']
-SERVICE_ACCOUNT_FILE = 'service.json'
+# SERVICE_ACCOUNT_FILE = 'service.json'
 SCOPES = ['https://mail.google.com/']
 
 
@@ -25,7 +25,7 @@ def cred(mail_id):
         mail_id = "suman.m@consultadd.com"
         
     credentials = Credentials.from_service_account_file(
-        filename=SERVICE_ACCOUNT_FILE,
+        filename="service.json",
         scopes=SCOPES,
         subject=mail_id,
     )
@@ -95,6 +95,7 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
 @shared_task
 def send_mail_in_thread(mail_data, from_email, request, mail_id):
     try:
+        from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         email_data = service.users().messages().get(userId='me', id=mail_id).execute()
 
@@ -122,6 +123,7 @@ def send_mail_in_thread(mail_data, from_email, request, mail_id):
 @shared_task
 def send_email(mail_data, from_email, request=None):
     try:
+        from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         msg = create_message(from_mail_id, mail_data)
         message = (service.users().messages().send(userId="me", body=msg).execute())
@@ -138,6 +140,7 @@ def send_email(mail_data, from_email, request=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
+        from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
@@ -178,13 +181,16 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
 @shared_task
 def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None):
     try:
+        from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         if mail_id is not None:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = multipart.MIMEMultipart()
 
             subject = get_field(email_data, 'subject')
-            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message)            
+            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message)
+            if from_email == "suman.m@consultadd.com": 
+                message['from'] = 'product@consultadd.com'
             message['In-Reply-To'] = get_field(email_data, 'Message-Id')
             message['References'] = get_field(email_data, 'Message-Id')
 

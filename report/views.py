@@ -863,7 +863,7 @@ class MarketingReportViewSets(GenericViewSet):
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             offer_count = Project.objects.filter(
                 submission__created_by__team__id=pk,
-                statuses__status__in=['received', 'on_boarded'],
+                statuses__status__in=['new', 'received', 'on_boarded'],
                 statuses__created__gte=start, statuses__created__lte=end,
             ).order_by('id').distinct('id').count()
             joining_count = Project.objects.filter(
@@ -954,7 +954,6 @@ class MarketingReportViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='supervisor')
     def supervisor(self, request):
         try:
-            first, last = get_page_limits(request)
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
@@ -974,9 +973,9 @@ class MarketingReportViewSets(GenericViewSet):
             data = []
             if export:
                 first, last = 0, len(supervisors)
-            for sup in supervisors[first:last]:
+            for sup in supervisors:
                 interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end) \
-                    .exclude(status='cancelled').count()
+                    .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).count()
                 pass_count = Interview.objects.filter(
                     supervisor=sup, created__gte=start, created__lte=end, status__in=['offer', 'next_round']
                 ).count()
@@ -991,7 +990,7 @@ class MarketingReportViewSets(GenericViewSet):
             col_name = [
                 {"name": "name", "display_name": "Name"},
                 {"name": "technology", "display_name": "Technology"},
-                {"name": "interviews", "display_name": "Total Interviews"},
+                {"name": "interviews", "display_name": "Total Interview Rounds"},
                 {"name": "pass", "display_name": "Total Passed"},
                 {"name": "fail", "display_name": "Total Failed"}
             ]
