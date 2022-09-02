@@ -16,12 +16,12 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 
 from constance import config
 from marketing.utils import date_filter
-from utils_app.models import MapMail, ObjectGroup
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
 from attachment.models import create_attachment
+from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
@@ -110,10 +110,9 @@ class ProjectViewSets(ModelViewSet):
             
             if not msg:
                 return res, "error"
-
             content_type = ContentType.objects.get(model="project")
             mail_object = MapMail(mail_id=res, object_id=project.id, content_type=content_type, from_mail_id=mail_id)
-            mail_object.save()            
+            mail_object.save()
             return res, "ok"
         except Exception as error:
             write_exception(message=error)
@@ -135,7 +134,8 @@ class ProjectViewSets(ModelViewSet):
 
             if resume:
                 response, error = download_s3_object(resume.first().attachment_file.name)
-                path.append(response)
+                if not error:
+                    path.append(response)
 
             consultant = project.submission.consultant
             recruiter = consultant.recruiter
@@ -171,11 +171,11 @@ class ProjectViewSets(ModelViewSet):
             # need to change here
             mail_id = None
             from_mail = submission.created_by.email
-            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            email_object = MapMail.objects.filter(content_type__model="project", object_id=project.id).first()
             if email_object:
                 mail_id = email_object.mail_id
-                from_mail = email_object.from_mail_id     
-                       
+                from_mail = email_object.from_mail_id
+
             res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
             delete_temp_file(path)
             if not msg:
@@ -186,9 +186,13 @@ class ProjectViewSets(ModelViewSet):
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):
-        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
-
+        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
+        engineer = get_object_or_404(User, employee_id=request.data['engineer']) \
+            if request.data.get('engineer', None) else None
+        if engineer:
+            support = get_object_or_404(ProjectSupport, project=project, support=engineer)
+            support_assignment_mail(support, request)
         message = "Project created"
         exception_msg = "Mail sent"
         if support_msg == 'error' and offer_msg == 'error':
@@ -251,11 +255,11 @@ class ProjectViewSets(ModelViewSet):
 
             mail_id = None
             from_mail = marketer.email
-            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            email_object = MapMail.objects.filter(content_type__model="project", object_id=project.id).first()
             if email_object:
                 mail_id = email_object.mail_id
-                from_mail = email_object.from_mail_id     
-                       
+                from_mail = email_object.from_mail_id
+
             res, msg, email_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
             if not msg:
                 return res, "error"
@@ -327,15 +331,15 @@ class ProjectViewSets(ModelViewSet):
             # if email_object:
             #     mail_id = email_object.mail_id
             #     from_mail = email_object.from_mail_id   
-                  
+
             # if mail_id:                     
             #     res1, msg1, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
             # else:
             res1, msg1, mail_id = send_email_(mail_data, marketer.email, request=request)
-                
+
             if msg1:
-                res1="mail send"
-            
+                res1 = "mail send"
+
             mail_data_eng = {
                 'to': [config.ENGINEERING], 'cc': [], 'bcc': [],
                 'template': '../templates/po_termination_engineering.html',
@@ -353,18 +357,18 @@ class ProjectViewSets(ModelViewSet):
             }
             mail_id = None
             from_mail = marketer.email
-            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            email_object = MapMail.objects.filter(content_type__model="project", object_id=project.id).first()
             if email_object:
                 mail_id = email_object.mail_id
-                from_mail = email_object.from_mail_id  
-                 
-            if mail_id:        
+                from_mail = email_object.from_mail_id
+
+            if mail_id:
                 res2, msg2, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
             else:
                 res2, msg2, mail_id = send_email_(mail_data, from_mail, request=request)
-                
+
             if msg2:
-                res2="mail send"
+                res2 = "mail send"
 
             return f"Res1: {res1} and res2: {res2}", "ok"
         except Exception as error:
@@ -576,7 +580,7 @@ class ProjectViewSets(ModelViewSet):
                     desc = f"{request.user.employee_name} added {engineer.employee_name} as support person while " \
                            f"creating PO"
                     create_activity(project.id, 'projectsupport', request.user, desc, 'created')
-                    support_assignment_mail(support, request)
+                    # support_assignment_mail(support, request)
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
@@ -658,8 +662,7 @@ class ProjectViewSets(ModelViewSet):
                     # Setting password for User (consultant)
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
-
-                    # util.send_join_notification()
+                    util.send_join_notification()
 
                 # Project Cancelled
                 elif prev_status_obj.status not in cancellation_status and new_status in cancellation_status:
@@ -700,7 +703,7 @@ class ProjectViewSets(ModelViewSet):
             else:
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
-
+           
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -958,14 +961,14 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     'consultant_name': consultant.name, 'consultant_email': consultant.email,
                 },
             }
-            
+
             mail_id = None
             from_mail = support.email
-            email_object = MapMail.objects.filter(content_type__model="project",object_id=project.id).first()
+            email_object = MapMail.objects.filter(content_type__model="project", object_id=project.id).first()
             if email_object:
                 mail_id = email_object.mail_id
-                from_mail = email_object.from_mail_id  
-            # need to work here
+                from_mail = email_object.from_mail_id
+                # need to work here
             if mail_id:
                 res, msg, mail_id = send_mail_in_thread(mail_data, from_mail, request, mail_id)
             else:
