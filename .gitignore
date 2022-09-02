@@ -24,3 +24,4 @@ archive_functions.py
 mailkey.json
 mailtoken.json
 calendar.json
+update_db.sh
