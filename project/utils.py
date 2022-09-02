@@ -6,7 +6,8 @@ from django.shortcuts import get_object_or_404
 from constance import config
 from employee.models import User
 from consultant.models import Consultant
-from utils_app.mailing import send_email
+# from utils_app.mailing import send_email
+from utils_app.thred_mail import send_email
 from project.models import Project, TimeSheet
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
@@ -358,7 +359,7 @@ def send_support_mail(project, support, request):
 
         res = "Development Server"
         if os.environ.get('ENV', 'local') == 'prod':
-            res, msg = send_email(mail_data, support.email, request=request)
+            res, msg, _ = send_email(mail_data, support.email, request=request)
             if not msg:
                 return res, "error"
         return res, "ok"
@@ -415,7 +416,7 @@ def support_assignment_mail(support, request):
                 'project_location': submission.lead.city, 'consultant_location': consultant.current_city,
             }
         }
-        res, msg = send_email(mail_data, request.user.email, request=request)
+        res, msg, _ = send_email(mail_data, request.user.email, request=request)
         if not msg:
             return res, "error"
         return res, "ok"
