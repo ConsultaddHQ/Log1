@@ -1269,10 +1269,14 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
         try:
             shifts = User.SHIFT_CHOICE
             eng_teams = Team.objects.filter(dept='Engineering')
-
+            inter_section = request.GET.get('inter_section', None)
+            
             if filters:
                 if "skills" in filters:
-                    queryset = queryset.filter(technology__overlap=filters['skills'])
+                    if inter_section == "true":
+                        queryset = queryset.filter(technology__contains=filters["skills"])
+                    else:
+                        queryset = queryset.filter(technology__overlap=filters['skills'])
                 if "shifts" in filters:
                     queryset = queryset.filter(shift__in=filters['shifts'])
                 if "teams" in filters:

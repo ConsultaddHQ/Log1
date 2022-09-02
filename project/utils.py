@@ -148,7 +148,7 @@ class ProjectUtil:
             self.employer = self.project.submission.employer
         marketer = self.project.submission.created_by
         marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
-        self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
+        self.activity_text = f"Project by *{marketer_name }* from *{marketer.team.name}*"
 
     def fetch_project_count(self, project_status):
         try:
@@ -187,7 +187,7 @@ class ProjectUtil:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             total, team_count, team = self.fetch_project_count("joined")
-            team_name = self.project.submission.created_by.team.name
+            # team_name = self.project.submission.created_by.team.name
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
@@ -203,11 +203,10 @@ class ProjectUtil:
             payload = {
                 "submission_id": self.project.submission.id, "project_id": self.project.id,
                 "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
-                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team_name, "team": team,
-                "submitted_on": datetime.strptime(str(self.project.submission.created), '%Y-%m-%d').strftime('%a, %d %B %Y'),
-            }
-            # MessageCard.consultant_joined_message_card(payload, self.request)
-
+                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team, "team": team_count,
+                "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0], '%Y-%m-%d').strftime('%a, %d %B %Y'),
+            }            
+            slack.consultant_joined_message_card(payload, self.request)
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
