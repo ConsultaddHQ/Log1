@@ -760,8 +760,8 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today()
 
-            data, counts, url = list(), list(), ""
-            total_bench = total_submissions = total_interviews = total_joined = total_offers = total_termination = 0
+            data, url = list(), ""
+            total_bench = total_submissions = total_interviews = total_joining = total_offers = total_termination = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
                 team_id = team.id
@@ -779,10 +779,10 @@ class MarketingReportViewSets(GenericViewSet):
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
                     submission__created_by__team__id=team_id,
-                    statuses__status__in=['received', 'on_boarded'],
+                    statuses__status__in=['new', 'received', 'on_boarded'],
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
-                joined_count = Project.objects.filter(
+                joining_count = Project.objects.filter(
                     statuses__status='joined',
                     submission__created_by__team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
@@ -800,26 +800,15 @@ class MarketingReportViewSets(GenericViewSet):
                     "id": team.id,
                     "team": team.name.title(),
                     "offer_count": offer_count,
-                    "joined_count": joined_count,
+                    "joined_count": joining_count,
                     "scrum_master": scrum_master,
                     "interview_count": interview_count,
                     "bench_consultant": bench_consultant,
                     "submission_count": submission_count,
                     "termination_count": termination_count,
                 })
-                counts.append({
-                    team.name: [
-                        {"display_name": "Offer Count", "count": offer_count},
-                        {"display_name": "Joined Count", "count": joined_count},
-                        {"display_name": "Bench Count", "count": bench_consultant},
-                        {"display_name": "Interview Count", "count": interview_count},
-                        {"display_name": "Submission Count", "count": submission_count},
-                        {"display_name": "Termination Count", "count": termination_count}
-                    ],
-                    f"Total": offer_count + joined_count + interview_count + submission_count + bench_consultant
-                })
                 total_offers += offer_count
-                total_joined += joined_count
+                total_joining += joining_count
                 total_bench += bench_consultant
                 total_interviews += interview_count
                 total_submissions += submission_count
@@ -829,11 +818,11 @@ class MarketingReportViewSets(GenericViewSet):
                 "team": "Total",
                 "scrum_master": "",
                 "offer_count": total_offers,
-                "joined_count": total_joined,
+                "joined_count": total_joining,
                 "bench_consultant": total_bench,
                 "interview_count": total_interviews,
                 "submission_count": total_submissions,
-                "total_termination": total_termination,
+                "termination_count": total_termination,
             })
 
             col_name = [
@@ -849,7 +838,53 @@ class MarketingReportViewSets(GenericViewSet):
                 url = export_to_csv(
                     data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
                 )
-            return Response({"data": data, "file_url": url, "counts": counts}, status=200)
+            return Response({"data": data, "file_url": url}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='team_data')
+    def team_data(self, request, pk):
+        try:
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
+            if not start:
+                start = date.today() - timedelta(days=30)
+            if not end:
+                end = date.today()
+
+            submission_count = Submission.objects.filter(
+                created_by__team__id=pk,
+                created__gte=start, created__lte=end,
+            ).exclude(status='draft').order_by('id').distinct('id').count()
+            interview_count = Interview.objects.filter(
+                created__gte=start, created__lte=end,
+                submission__created_by__team__id=pk
+            ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+            offer_count = Project.objects.filter(
+                submission__created_by__team__id=pk,
+                statuses__status__in=['received', 'on_boarded'],
+                statuses__created__gte=start, statuses__created__lte=end,
+            ).order_by('id').distinct('id').count()
+            joining_count = Project.objects.filter(
+                statuses__status='joined',
+                submission__created_by__team__id=pk,
+                statuses__created__gte=start, statuses__created__lte=end,
+            ).order_by('id').distinct('id').count()
+            termination_count = Project.objects.filter(
+                statuses__status__istartswith='terminated',
+                submission__created_by__team__id=pk,
+                statuses__created__gte=start, statuses__created__lte=end,
+            ).order_by('id').distinct('id').count()
+
+            counts_data = [
+                {"display_name": "Submission Count", "count": submission_count, "default": submission_count},
+                {"display_name": "Interview Count", "count": interview_count, "default": submission_count},
+                {"display_name": "Offer Count", "count": offer_count, "default": submission_count},
+                {"display_name": "Joining Count", "count": joining_count, "default": submission_count},
+                {"display_name": "Termination Count", "count": termination_count, "default": submission_count}
+            ]
+            return Response({"data": counts_data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -988,7 +1023,7 @@ class MarketingReportViewSets(GenericViewSet):
 
             interviews = Interview.objects.filter(supervisor_id__in=supervisors, created__gte=start, created__lte=end)\
                 .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).order_by('-round')
-            max_rounds = interviews.first().round
+            max_rounds = interviews.first().round if interviews else 0
             for sup_id in supervisors:
                 supervisor = get_object_or_404(User, id=sup_id)
                 queryset = interviews.filter(supervisor=supervisor).order_by('-round')
