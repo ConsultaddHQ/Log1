@@ -16,12 +16,12 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateMode
 
 from constance import config
 from marketing.utils import date_filter
-from utils_app.models import MapMail, ObjectGroup
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
 from marketing.models import Submission, User
 from attachment.models import create_attachment
+from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
@@ -186,8 +186,8 @@ class ProjectViewSets(ModelViewSet):
             return error, "error"
 
     def send_support_offer_mail(self, project, scrum_masters, request):
-        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         offer_res, offer_msg = self.send_offer_received_mail(project, scrum_masters, request)
+        support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         engineer = get_object_or_404(User, employee_id=request.data['engineer']) \
             if request.data.get('engineer', None) else None
         if engineer:
