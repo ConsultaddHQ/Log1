@@ -13,20 +13,20 @@ from django.template.loader import render_to_string
 # from google_auth_oauthlib.flow import InstalledAppFlow
 
 # SCOPES = ['https://mail.google.com/','https://www.googleapis.com/auth/gmail.readonly']
-SERVICE_ACCOUNT_FILE = 'service.json'
+# SERVICE_ACCOUNT_FILE = 'service.json'
 SCOPES = ['https://mail.google.com/']
 
 
 def cred(mail_id):
     if os.environ.get('ENV', 'local') != 'prod':
-        mail_id="suman.m@consultadd.com"
+        mail_id = "suman.m@consultadd.com"
         
     if mail_id == "product@consultadd.com":
-        mail_id="suman.m@consultadd.com"
-        
+        mail_id = "suman.m@consultadd.com"
+
     credentials = Credentials.from_service_account_file(
-        filename=SERVICE_ACCOUNT_FILE,
-        scopes = SCOPES,
+        filename="service.json",
+        scopes=SCOPES,
         subject=mail_id,
     )
     service = build('gmail', 'v1', credentials=credentials)
@@ -93,8 +93,9 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
 
 
 @shared_task
-def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=None):
+def send_mail_in_thread(mail_data, from_email, request, mail_id):
     try:
+        from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         email_data = service.users().messages().get(userId='me', id=mail_id).execute()
 
@@ -106,7 +107,7 @@ def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=N
         message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message) 
         message['In-Reply-To'] = get_field(email_data, 'Message-Id')
         message['References'] = get_field(email_data, 'Message-Id')
-        email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_string().encode('utf-8')).decode()}}
+        email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : base64.urlsafe_b64encode(message.as_bytes()).decode()}}
         draft = service.users().drafts().create(userId='me', body=email_body).execute()
         message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
         return message['id'], True, from_mail_id   
@@ -122,7 +123,8 @@ def send_mail_in_thread(mail_data, mail_id, from_email, reply_to=None, request=N
 @shared_task
 def send_email(mail_data, from_email, request=None):
     try:
-        service,from_mail_id = cred(from_email)
+        from_email = "product@consultadd.com"
+        service, from_mail_id = cred(from_email)
         msg = create_message(from_mail_id, mail_data)
         message = (service.users().messages().send(userId="me", body=msg).execute())
         return message['id'], True, from_mail_id
@@ -138,6 +140,7 @@ def send_email(mail_data, from_email, request=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
+        from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
@@ -178,13 +181,16 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
 @shared_task
 def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=None, reply_to=None):
     try:
+        from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         if mail_id is not None:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
             message = multipart.MIMEMultipart()
 
             subject = get_field(email_data, 'subject')
-            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message)            
+            message = set_mail_config(mail_data["to"], from_email, mail_data["cc"], mail_data["bcc"], subject, message)
+            if from_email == "suman.m@consultadd.com": 
+                message['from'] = 'product@consultadd.com'
             message['In-Reply-To'] = get_field(email_data, 'Message-Id')
             message['References'] = get_field(email_data, 'Message-Id')
 
@@ -201,13 +207,13 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
                 b64_string = b64_bytes.decode()
         
-            email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : b64_string}}
+            email_body = {'message': {'threadId' : email_data['threadId'], 'raw': b64_string}}
             draft = service.users().drafts().create(userId='me', body=email_body).execute()
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
             return message['id'], True, from_mail_id
         else:
             message = multipart.MIMEMultipart()
-            message['from'] = from_mail_id
+            from_mail_id = "product@consultadd.com"
             subject = mail_data["subject"]
             message = set_mail_config(mail_data["to"], from_mail_id, mail_data["cc"], mail_data["bcc"], subject, message) 
             

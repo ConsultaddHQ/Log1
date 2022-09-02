@@ -17,23 +17,22 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from marketing.utils import *
 from marketing.serializers import *
+from utils_app.models import MapMail
 from activity.models import Activity
 from employee.models import User, Team
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from utils_app.utils import delete_temp_file
-from utils_app.models import MapMail
-from activity.serializers import ActivitySerializer
 from utils_app.calendar import GoogleCalendar
+from django.contrib.auth.models import ContentType
+from activity.serializers import ActivitySerializer
 from attachment.models import Attachment, create_attachment
-# from utils_app.mailing import send_email_attachment_multiple
-from utils_app.thred_mail import send_email_attachment_multiple
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
+from utils_app.thred_mail import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
-from django.contrib.auth.models import ContentType
 
 
 # Route - /vendor_company/
@@ -473,6 +472,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def employer(self, request):
         try:
             consultadd_emp = Team.objects.get(name='Consultadd')
+            canada_emp = Team.objects.get(name='Consultadd Canada')
             if 'superadmin' in request.user.roles:
                 employers = Team.objects.filter(
                     Q(dept='Marketing') | Q(name='Consultadd')
@@ -481,6 +481,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
                 employers = [
                     {"id": request.user.team.id, "name": request.user.team.name},
                     {"id": consultadd_emp.id, "name": consultadd_emp.name},
+                    {"id": canada_emp.id, "name": canada_emp.name}
                 ]
             return Response({"data": employers}, status=200)
         except Exception as error:
@@ -604,7 +605,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
 
-            if 'superadmin' not in roles:
+            if ('superadmin' not in roles) and ('scrum_master' not in roles):
                 # Team submissions for Scrum master and Proxy Scrum Master
                 if 'admin' in roles or 'proxy' in roles:
                     consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
@@ -2250,7 +2251,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     'attachments': path
                 }
                 res, msg, from_mail = send_email_attachment_multiple(mail_data, created_by.email, request=request)
-
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"

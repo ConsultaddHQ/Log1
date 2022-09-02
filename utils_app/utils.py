@@ -41,7 +41,7 @@ def create_csv_file(payload):
         writer.writerow(['CTB', 'Round', 'Type', 'Start Time', 'Consultant', 'Client', 'Marketer', 'Job Position'])
         for data in row_data:
             writer.writerow(
-                [data.get('ctb'), data.get('round'), data.get('type'), data.get('start'), data.get('consultant'),
+                [data.get('ctb_name'), data.get('round'), data.get('type'), data.get('start'), data.get('consultant'),
                  data.get('client'), data.get('marketer'), data.get('position')]
             )
         file.close()

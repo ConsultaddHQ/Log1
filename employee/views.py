@@ -10,6 +10,7 @@ from django.db.models import Q, F, Value, CharField
 from django.contrib.auth.hashers import make_password
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
+from activity.models import Activity
 
 from rest_framework.mixins import *
 from rest_framework import exceptions
@@ -273,8 +274,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                     prev_team = user.team.name
                     team = get_object_or_404(Team, id=team_id)
                     user.team = team
-                    desc += f"{request.user.employee_name} changed team from {prev_team} to {team.name} "
-
+                    desc += f"{request.user.employee_name} changed {user.employee_name}'s team from {prev_team} to {team.name} "
                 if role_ids:
                     role_names = []
                     user.role.clear()
@@ -318,6 +318,22 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='profile_activity')
+    def profile_activity(self, request):
+        try:
+            user_id = request.GET.get('employee')
+            content_type = ContentType.objects.get(model='user')
+            activities = Activity.objects.filter(content_type=content_type, activity_type="updated", object_id=user_id
+                                                ).order_by('-created').values()
+            all_activities = []
+            for activity in activities:
+                if 's team from ' in activity['desc'] or 'changed role to ' in activity['desc']:
+                    all_activities.append(activity)
+
+            return Response({"data": all_activities}, status=200)
+        except Exception as error:
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)        
+    
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:

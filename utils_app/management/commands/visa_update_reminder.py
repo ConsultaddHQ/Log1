@@ -52,7 +52,6 @@ class Command(BaseCommand):
                     expiry_date = visa.visa_end
                     if expiry_date == fifteen_days or expiry_date == thirty_days:
                         data.append({'name': consultant.name.title(), 'end_date': expiry_date})
-
             if len(data) > 0:
                 mail_data = {
                     'cc': [], 'bcc': ['sarang.m@consultadd.com'],
@@ -64,6 +63,6 @@ class Command(BaseCommand):
                 res, ok, _ = send_email(mail_data, "product@consultadd.com")
                 if not ok:
                     create_cron_error(job, res)
-
+                    
         except Exception as error:
             create_cron_error(job, error)

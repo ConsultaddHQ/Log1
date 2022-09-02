@@ -113,7 +113,7 @@ def get_team_structure_xlsx(payload, counts, request):
         rows = []
         for data in payload:
             rows.append([data.get('employee_name'),
-                         ", ".join([i for i in data.get('technology', [])]) if data.get('technology', []) else None,
+                         ", ".join([i for i in data.get('technology', [])]) if data.get('technology', []) else [],
                          get_shift(data.get('shift'), request),
                          ", ".join([i['consultant'] for i in data['current_project']['project']])
                          if data.get('current_project') else None, data['team']])

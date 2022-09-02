@@ -6,7 +6,8 @@ from django.shortcuts import get_object_or_404
 from constance import config
 from employee.models import User
 from consultant.models import Consultant
-from utils_app.mailing import send_email
+# from utils_app.mailing import send_email
+from utils_app.thred_mail import send_email
 from project.models import Project, TimeSheet
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
@@ -148,7 +149,7 @@ class ProjectUtil:
             self.employer = self.project.submission.employer
         marketer = self.project.submission.created_by
         marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
-        self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
+        self.activity_text = f"Project by *{marketer_name }* from *{marketer.team.name}*"
 
     def fetch_project_count(self, project_status):
         try:
@@ -187,7 +188,7 @@ class ProjectUtil:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
             total, team_count, team = self.fetch_project_count("joined")
-            team_name = self.project.submission.created_by.team.name
+            # team_name = self.project.submission.created_by.team.name
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
 
@@ -203,11 +204,10 @@ class ProjectUtil:
             payload = {
                 "submission_id": self.project.submission.id, "project_id": self.project.id,
                 "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
-                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team_name, "team": team,
-                "submitted_on": datetime.strptime(str(self.project.submission.created), '%Y-%m-%d').strftime('%a, %d %B %Y'),
-            }
-            # MessageCard.consultant_joined_message_card(payload, self.request)
-
+                "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team, "team": team_count,
+                "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0], '%Y-%m-%d').strftime('%a, %d %B %Y'),
+            }            
+            slack.consultant_joined_message_card(payload, self.request)
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
         except Exception as error:
@@ -359,7 +359,7 @@ def send_support_mail(project, support, request):
 
         res = "Development Server"
         if os.environ.get('ENV', 'local') == 'prod':
-            res, msg = send_email(mail_data, support.email, request=request)
+            res, msg, _ = send_email(mail_data, support.email, request=request)
             if not msg:
                 return res, "error"
         return res, "ok"
@@ -416,7 +416,7 @@ def support_assignment_mail(support, request):
                 'project_location': submission.lead.city, 'consultant_location': consultant.current_city,
             }
         }
-        res, msg = send_email(mail_data, request.user.email, request=request)
+        res, msg, _ = send_email(mail_data, request.user.email, request=request)
         if not msg:
             return res, "error"
         return res, "ok"
