@@ -402,12 +402,14 @@ class ProjectViewSets(ModelViewSet):
         try:
             # search project by client and consultant
             if filter_for == 'my':
-                projects = Project.objects.filter(submission__created_by=request.user)
+                projects = Project.objects.filter(submission__created_by=request.user).exclude(
+                    submission__status='archive'
+                )
             elif filter_for == 'team':
                 projects = Project.objects.filter(Q(submission__marketing_team=request.user.team) |
                                                   Q(submission__marketing_team__in=request.user.associated_to.all()))
             else:
-                projects = Project.objects.all()
+                projects = Project.objects.exclude(submission__status='archive')
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -1246,7 +1248,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     id__in=list(consultant_ids),
                     projects__timesheets__is_active=True,
                     projects__timesheets__status__in=['submitted', 'updated'],
-                ).order_by('id').distinct('id')
+                ).exclude(projects__submission__status='archive').order_by('id').distinct('id')
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')

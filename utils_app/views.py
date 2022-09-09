@@ -123,7 +123,9 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
     @action(methods=['get'], detail=False, url_path='technology')
     def technology(self, request):
         try:
-            return Response({"data": TECHNOLOGIES}, status=200)
+            choices = Choice.objects.filter(field='technology', content_type__model='user').values('name')
+            technologies = [choice['name'] for choice in choices]
+            return Response({"data": technologies}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

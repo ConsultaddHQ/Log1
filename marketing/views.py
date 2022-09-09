@@ -22,10 +22,10 @@ from activity.models import Activity
 from employee.models import User, Team
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
-from utils_app.utils import delete_temp_file
 from utils_app.calendar import GoogleCalendar
 from django.contrib.auth.models import ContentType
 from activity.serializers import ActivitySerializer
+from utils_app.utils import delete_temp_file, export_to_csv
 from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
@@ -586,13 +586,14 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        export = json.loads(request.GET.get('export', 'false'))
         filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
             team = request.user.team
             roles = request.user.roles
             associated_teams = request.user.associated_to.all()
-            queryset = Submission.objects.exclude(status='draft')
+            queryset = Submission.objects.exclude(status__in=['draft', 'archive'])
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 queryset = queryset.filter(
@@ -669,12 +670,28 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
 
+            if export:
+                first, last = 0, len(queryset)
             data, sub_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
+            col_name = [
+                {"name": "consultant_name", "display_name": "Consultant Name"},
+                {"name": "marketer_name", "display_name": "Marketer Name"},
+                {"name": "employer", "display_name": "Employer"},
+                {"name": "client", "display_name": "Client"},
+                {"name": "company_name", "display_name": "Company Name"},
+                {"name": "vendor_contact", "display_name": "Vendor Contact"},
+                {"name": "city", "display_name": "City"},
+            ]
+            url = ""
+            if export:
+                url = export_to_csv(
+                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                )
 
             if sub_data == "error":
                 return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
 
-            return Response({"counts": sub_data, "data": data}, status=200)
+            return Response({"counts": sub_data, "data": data, "url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1079,7 +1096,7 @@ class InterviewViewSets(ModelViewSet):
             roles = request.user.roles
             team = request.user.team
             associated_teams = request.user.associated_to.all()
-            queryset = Interview.objects.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 if query.isnumeric():
@@ -2351,7 +2368,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         Q(submission__consultant_marketing__consultant__email__istartswith=query)
                     )
             else:
-                queryset = Test.objects.all()
+                queryset = Test.objects.exclude(status='archive')
 
             if filter_for == 'my':
                 if 'engineer' in roles:

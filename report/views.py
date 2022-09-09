@@ -971,8 +971,7 @@ class MarketingReportViewSets(GenericViewSet):
             if query:
                 supervisors = supervisors.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             data = []
-            if export:
-                first, last = 0, len(supervisors)
+
             for sup in supervisors:
                 interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end) \
                     .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).count()
