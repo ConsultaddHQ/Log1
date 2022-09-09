@@ -481,6 +481,20 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='associated_to')
+    def associated(self, request):
+        try:
+            assigned_teams = []
+            primary_team = request.user.team
+            associated_teams = request.user.associated_to.all().values('id', 'name')
+            if primary_team not in request.user.associated_to.all():
+                assigned_teams.append({"id": primary_team.id, "name": primary_team.name})
+            assigned_teams.extend(associated_teams)
+            return Response({"data": assigned_teams}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /password/
 class ResetPasswordViewSets(GenericViewSet):

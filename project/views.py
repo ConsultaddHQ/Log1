@@ -76,7 +76,7 @@ class ProjectViewSets(ModelViewSet):
     def send_offer_received_mail(project, scrum_masters, request):
         try:
             submission = project.submission
-            to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.created_by.team.email]
+            to = [config.RELATIONS, config.FINANCE, config.RECRUITMENT, submission.marketing_team.email]
 
             cc = [config.SUPERADMIN, submission.created_by.email] + scrum_masters
 
@@ -140,7 +140,7 @@ class ProjectViewSets(ModelViewSet):
             consultant = project.submission.consultant
             recruiter = consultant.recruiter
             retention = consultant.relation
-            cc = [config.RECRUITMENT, config.RELATIONS, submission.created_by.team.email, submission.created_by.email]
+            cc = [config.RECRUITMENT, config.RELATIONS, submission.marketing_team.email, submission.created_by.email]
             cc = cc + scrum_masters
 
             recruiter_name = "NA"
@@ -404,7 +404,8 @@ class ProjectViewSets(ModelViewSet):
             if filter_for == 'my':
                 projects = Project.objects.filter(submission__created_by=request.user)
             elif filter_for == 'team':
-                projects = Project.objects.filter(submission__created_by__team=request.user.team)
+                projects = Project.objects.filter(Q(submission__marketing_team=request.user.team) |
+                                                  Q(submission__marketing_team__in=request.user.associated_to.all()))
             else:
                 projects = Project.objects.all()
 

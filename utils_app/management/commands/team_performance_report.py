@@ -51,38 +51,38 @@ class Command(BaseCommand):
                 total_submission += submission_count
 
                 interview_count = Interview.objects.filter(
-                    submission__created_by__team=team,
+                    submission__marketing_team=team,
                     created__range=[start, end]
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 total_interview += interview_count
 
-                offer_count = projects.filter(created__range=[start, end], submission__created_by__team=team).count()
+                offer_count = projects.filter(created__range=[start, end], submission__marketing_team=team).count()
                 total_offer += offer_count
 
                 joined_count = projects.filter(
-                    statuses__status__iexact='joined', statuses__is_current=True, submission__created_by__team=team
+                    statuses__status__iexact='joined', statuses__is_current=True, submission__marketing_team=team
                 ).count()
                 total_joined += joined_count
 
                 cancelled_count = projects.filter(
-                    statuses__status__in=cancelled, statuses__is_current=True, submission__created_by__team=team
+                    statuses__status__in=cancelled, statuses__is_current=True, submission__marketing_team=team
                 ).count()
                 total_cancelled += cancelled_count
 
                 completed_count = projects.filter(
-                    statuses__status__iexact='completed', statuses__is_current=True, submission__created_by__team=team
+                    statuses__status__iexact='completed', statuses__is_current=True, submission__marketing_team=team
                 ).count()
                 total_complete += completed_count
 
                 on_roll_count = projects.filter(
                     statuses__is_current=True,
-                    submission__created_by__team=team,
+                    submission__marketing_team=team,
                     statuses__status__in=['received', 'on_boarded'],
                 ).count()
                 total_on_roll += on_roll_count
 
                 offers_not_joined = Project.objects.filter(
-                    start_date__range=[start, end], submission__created_by__team=team
+                    start_date__range=[start, end], submission__marketing_team=team
                 ).exclude(statuses__is_current=True, statuses__status__in=joined_or_terminated).count()
                 total_offer_not_joined += offers_not_joined
 

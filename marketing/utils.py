@@ -125,6 +125,7 @@ def create_submission(request, lead_id):
             client=request.data['client'],
             employer=request.data['employer'],
             consultant_marketing_id=request.data['marketing_id'],
+            marketing_team_id=request.data.get('marketing_team_id', request.user.team.id),
 
             other_link=profile.links,
             visa_end=profile.visa_end,
