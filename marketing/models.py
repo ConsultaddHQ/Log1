@@ -128,6 +128,7 @@ class Submission(TimeStampedModel):
     STATUS_CHOICES = (
         ('draft', 'Draft'),
         ('sub', 'Submitted'),
+        ('archive', 'Archive'),
         ('project', 'Project'),
         ('in_offer', 'In Offer'),
         ('interview', 'Interview'),
