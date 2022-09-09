@@ -48,7 +48,7 @@ class Command(BaseCommand):
                 this_week = today - timedelta(days=7)
                 queryset = list(Interview.objects.filter(
                     start_time__gte=this_week,
-                    submission__created_by__team=team
+                    submission__marketing_team=team
                 ).values_list('submission__created_by__employee_name', 'supervisor__employee_name', 'round',
                               'start_time', 'end_time', 'interview_mode', 'status', 'feedback'))
                 df = pd.DataFrame.from_records(queryset, columns=['Marketer', 'CTB', 'Start Time', 'End Time', 'Round',
@@ -58,7 +58,7 @@ class Command(BaseCommand):
                 scrum_masters = list(
                     User.objects.filter(team=team, role__name__in=['admin', 'proxy']).values_list('email', flat=True)
                 )
-                offers = Project.objects.filter(created__gte=today.replace(day=1), submission__created_by__team=team)
+                offers = Project.objects.filter(created__gte=today.replace(day=1), submission__marketing_team=team)
                 yesterday = today - timedelta(days=1)
                 mail_to_scrum(yesterday, this_week, scrum_masters, team.name, path, offers)
                 if os.path.exists(path):

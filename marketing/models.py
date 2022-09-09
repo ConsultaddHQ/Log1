@@ -5,7 +5,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 
-from employee.models import User
+from employee.models import User, Team
 from activity.models import Comment
 from attachment.models import Attachment
 from consultant.models import ConsultantMarketing
@@ -175,6 +175,12 @@ class Submission(TimeStampedModel):
         null=True, blank=True,
         related_name='submissions',
         verbose_name='Submission done by'
+    )
+    marketing_team = models.ForeignKey(
+        Team, on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='submissions',
+        verbose_name='team'
     )
 
     def save(self, *args, **kwargs):
