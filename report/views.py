@@ -54,13 +54,13 @@ class ScrumMeetingReport(GenericViewSet):
                     status='open'
                 ).distinct('consultant').order_by().count()
                 interviews = Interview.objects.filter(
-                    submission__created_by__team__name=team_name,
+                    submission__marketing_team__name=team_name,
                     created__gte=previous_meeting_date
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offers = Project.objects.filter(
                     statuses__status="received",
                     statuses__created__gte=previous_meeting_date,
-                    submission__created_by__team__name=team_name,
+                    submission__marketing_team__name=team_name,
                 ).count()
 
                 text += \
@@ -132,21 +132,21 @@ command - {command}\n
                 created__day=day,
                 created__year=year,
                 created__month=month,
-                submission__created_by__team__name__iexact=team.name
+                submission__marketing_team__name__iexact=team.name
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             offer_count = Project.objects.filter(
                 statuses__created__day=day,
                 statuses__created__year=year,
                 statuses__created__month=month,
                 statuses__status__in=['received', 'on_boarded'],
-                submission__created_by__team__name__iexact=team.name,
+                submission__marketing_team__name__iexact=team.name,
             ).count()
             joined_count = Project.objects.filter(
                 statuses__status='joined',
                 statuses__created__day=day,
                 statuses__created__year=year,
                 statuses__created__month=month,
-                submission__created_by__team__name__iexact=team.name,
+                submission__marketing_team__name__iexact=team.name,
             ).count()
             scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
             scrum_master = None
@@ -208,18 +208,18 @@ command - {command}\n
             ).exclude(status='draft').count()
             interview_count = Interview.objects.filter(
                 created__gte=start,
-                submission__created_by__team__name__iexact=team.name
+                submission__marketing_team__name__iexact=team.name
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             offer_count = Project.objects.filter(
                 statuses__created__gte=start,
                 statuses__status__in=['received', 'on_boarded'],
-                submission__created_by__team__name__iexact=team.name,
+                submission__marketing_team__name__iexact=team.name,
 
             ).count()
             joined_count = Project.objects.filter(
                 statuses__status='joined',
                 statuses__created__gte=start,
-                submission__created_by__team__name__iexact=team.name,
+                submission__marketing_team__name__iexact=team.name,
             ).count()
             scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
             scrum_master = None
@@ -268,21 +268,21 @@ command - {command}\n\n
 
             interview_count = Interview.objects.filter(
                 created__month=month, created__year=year,
-                submission__created_by__team__name__iexact=team.name
+                submission__marketing_team__name__iexact=team.name
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
 
             offer_count = Project.objects.filter(
                 statuses__created__year=year,
                 statuses__created__month=month,
                 statuses__status__in=['received', 'on_boarded'],
-                submission__created_by__team__name__iexact=team.name,
+                submission__marketing_team__name__iexact=team.name,
             ).count()
 
             joined_count = Project.objects.filter(
                 statuses__status='joined',
                 statuses__created__year=year,
                 statuses__created__month=month,
-                submission__created_by__team__name__iexact=team.name,
+                submission__marketing_team__name__iexact=team.name,
             ).count()
 
             scrum_masters = User.objects.filter(team__name=team.name, role__name='admin', is_active=True)
@@ -770,26 +770,26 @@ class MarketingReportViewSets(GenericViewSet):
                     marketing__status='open'
                 ).order_by('id').distinct('id').count()
                 submission_count = Submission.objects.filter(
-                    created_by__team__id=team_id,
+                    marketing_team__id=team_id,
                     created__gte=start, created__lte=end,
                 ).exclude(status='draft').order_by('id').distinct('id').count()
                 interview_count = Interview.objects.filter(
                     created__gte=start, created__lte=end,
-                    submission__created_by__team__id=team_id
+                    submission__marketing_team__id=team_id
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
-                    submission__created_by__team__id=team_id,
+                    submission__marketing_team__id=team_id,
                     statuses__status__in=['new', 'received', 'on_boarded'],
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
                 joining_count = Project.objects.filter(
                     statuses__status='joined',
-                    submission__created_by__team__id=team_id,
+                    submission__marketing_team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
                 termination_count = Project.objects.filter(
                     statuses__status__istartswith='terminated',
-                    submission__created_by__team__id=team_id,
+                    submission__marketing_team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
                 scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
@@ -859,21 +859,21 @@ class MarketingReportViewSets(GenericViewSet):
             ).exclude(status='draft').order_by('id').distinct('id').count()
             interview_count = Interview.objects.filter(
                 created__gte=start, created__lte=end,
-                submission__created_by__team__id=pk
+                submission__marketing_team__id=pk
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             offer_count = Project.objects.filter(
-                submission__created_by__team__id=pk,
+                submission__marketing_team__id=pk,
                 statuses__status__in=['new', 'received', 'on_boarded'],
                 statuses__created__gte=start, statuses__created__lte=end,
             ).order_by('id').distinct('id').count()
             joining_count = Project.objects.filter(
                 statuses__status='joined',
-                submission__created_by__team__id=pk,
+                submission__marketing_team__id=pk,
                 statuses__created__gte=start, statuses__created__lte=end,
             ).order_by('id').distinct('id').count()
             termination_count = Project.objects.filter(
                 statuses__status__istartswith='terminated',
-                submission__created_by__team__id=pk,
+                submission__marketing_team__id=pk,
                 statuses__created__gte=start, statuses__created__lte=end,
             ).order_by('id').distinct('id').count()
 
@@ -971,6 +971,7 @@ class MarketingReportViewSets(GenericViewSet):
             if query:
                 supervisors = supervisors.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             data = []
+
             for sup in supervisors:
                 interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end) \
                     .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).count()

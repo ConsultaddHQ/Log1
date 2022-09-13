@@ -77,7 +77,7 @@ class MessageCard:
                                     f"{get_display_choice(obj.interview_mode, 'interview_mode', request)} :: "
                                     f"{obj.start_time.date().strftime('%m/%d/%Y')} :: "
                                     f"{obj.start_time.time().strftime('%H:%M')} EST :: {obj.submission.client} :: "
-                                    f"{marketer_name} ::  {obj.submission.created_by.team.name}"
+                                    f"{marketer_name} ::  {obj.submission.marketing_team.name}"
                         }
                     }
                 ]
@@ -450,7 +450,7 @@ class MessageCard:
         return data
 
     @staticmethod
-    def consultant_joined_message_card(payload, request):
+    def consultant_joined_message_card(payload, request=None):
         try:
             data = {
                 "blocks": [
@@ -467,13 +467,6 @@ class MessageCard:
                         "text": {
                             "type": "mrkdwn",
                             "text": f"{payload.get('activity_title', 'NA')}\n{payload.get('activity_text', 'NA')}"
-                        }
-                    },
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": "*Umang Shamajibhai Jethwa* joined project at *AT&T* on `Mon, 12 August 2019` as a *Java Developer* \n Project by *Gaurav Tyagi* from *OC10*"
                         }
                     },
                     {

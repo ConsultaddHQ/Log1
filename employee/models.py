@@ -102,6 +102,7 @@ class User(AbstractUser, PermissionsMixin):
     is_superuser = models.BooleanField(default=False)
     role = models.ManyToManyField(Role, related_name='roles')
     employee_id = models.IntegerField(_('Employee ID'), unique=True)
+    associated_to = models.ManyToManyField(Team, related_name='associates')
     date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
     employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
     slack_id = models.CharField(_("Slack Id"), max_length=20, null=True, blank=True)
@@ -111,7 +112,6 @@ class User(AbstractUser, PermissionsMixin):
     shift = models.CharField(_('Shift Time'), choices=SHIFT_CHOICE, max_length=20, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name='employees', null=True, blank=True)
     technology = ArrayField(models.CharField(_('Technologies'), max_length=30, blank=True), blank=True, null=True)
-
     objects = UserManager()
 
     USERNAME_FIELD = 'employee_id'

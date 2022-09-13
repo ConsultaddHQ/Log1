@@ -153,7 +153,7 @@ class ProjectUtil:
 
     def fetch_project_count(self, project_status):
         try:
-            team = self.project.submission.created_by.team
+            team = self.project.submission.marketing_team
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
             total_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one
@@ -161,7 +161,7 @@ class ProjectUtil:
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
-                submission__created_by__team=team,
+                submission__marketing_team=team,
             ).count()
             return total_count, team_count, team.name
         except Exception as error:
@@ -169,14 +169,14 @@ class ProjectUtil:
 
     def fetch_project_termination_count(self):
         try:
-            team = self.project.submission.created_by.team
+            team = self.project.submission.marketing_team
             day_one = datetime.today().replace(day=1, hour=0, minute=0)
             total_count = Project.objects.filter(
                 statuses__status__istartswith="terminated", statuses__created__gte=day_one
             ).count()
             team_count = Project.objects.filter(
                 statuses__created__gte=day_one,
-                submission__created_by__team=team,
+                submission__marketing_team=team,
                 statuses__status__istartswith="terminated"
             ).count()
             return total_count, team_count, team.name
@@ -398,7 +398,7 @@ def support_assignment_mail(support, request):
         poc_emails = list(consultant.pocs.filter(end=None).values_list('poc__email', flat=True))
         support_emails = list(project.support.all().values_list('support__email', flat=True))
         marketing_poc = list(User.objects.filter(
-            team=submission.created_by.team, role__name='admin'
+            team=submission.marketing_team, role__name='admin'
         ).values_list('email', flat=True))
 
         mail_data = {

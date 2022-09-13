@@ -163,7 +163,13 @@ def post_msg_using_webhook(url, data):
         if os.environ.get("ENV", "local") == 'prod':
             resp = requests.post(url, headers=headers, data=data)
             return resp, "ok"
-        return "Message sent", "ok"
+        else:
+            if os.environ.get("ENV", "local") == 'local':
+                url = "https://hooks.slack.com/services/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"
+            else:
+                url = "https://hooks.slack.com/services/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"
+            resp = requests.post(url, headers=headers, data=data)
+            return resp, "ok"
     except Exception as error:
         write_exception(error)
         return error, "error"
