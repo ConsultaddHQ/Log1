@@ -220,7 +220,7 @@ class MessageCard:
                         "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
                                             f"***{interview.submission.consultant.name}*** ",
                         "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
-                                        f"***{interview.submission.created_by.team.name}***",
+                                        f"***{interview.submission.marketing_team.name}***",
                         "activityImage": profile_path,
                         "facts": [
                             {
@@ -265,7 +265,7 @@ class MessageCard:
                         "activitySubtitle": f"I-{interview.id} : Interview from ***{interview.submission.client}*** for "
                                             f" ***{interview.submission.consultant.name}*** ",
                         "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
-                                        f"***{interview.submission.created_by.team.name}***",
+                                        f"***{interview.submission.marketing_team.name}***",
                         "activityImage": profile_path,
                         "facts": [
                             {

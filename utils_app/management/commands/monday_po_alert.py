@@ -36,7 +36,7 @@ class Command(BaseCommand):
                 submission = project.submission
                 text += f"<tr>" \
                         f"<td style='padding:px 8px 0px 8px;'> {project.consultant.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.team.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.marketing_team.name} </td>" \
                         f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.client} </td>" \
                         f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.lead.vendor_company.name} </td>" \
                         f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.employee_name} </td>" \
@@ -82,7 +82,7 @@ class Command(BaseCommand):
                 submission = project.submission
                 text += f"<tr>" \
                         f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {project.consultant.name} </td>" \
-                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.team.name} </td>" \
+                        f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.marketing_team.name} </td>" \
                         f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.client} </td>" \
                         f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.lead.vendor_company.name} </td>" \
                         f"<td style='padding:5px 8px 5px 8px;font-size: 2.5em;'> {submission.created_by.employee_name} </td>" \

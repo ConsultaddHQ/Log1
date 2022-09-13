@@ -42,8 +42,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     team_name = request.user.team.name
                 sub = Submission.objects.filter(created_by__team__name=team_name)
                 consultant = Consultant.objects.filter(marketing__teams__name=team_name)
-                interviews = Interview.objects.filter(submission__created_by__team__name=team_name)
-                projects = Project.objects.filter(submission__created_by__team__name=team_name)
+                interviews = Interview.objects.filter(submission__marketing_team__name=team_name)
+                projects = Project.objects.filter(submission__marketing_team__name=team_name)
 
             else:
                 sub = Submission.objects.all()
@@ -213,11 +213,11 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 new_po = Project.objects.filter(
                     statuses__status='joined',
                     statuses__created__range=[first, last],
-                    submission__created_by__team__name=team_name,
+                    submission__marketing_team__name=team_name,
                 ).count()
 
                 offers_count = Project.objects.filter(
-                    submission__created__range=[first, last], submission__created_by__team__name=team_name
+                    submission__created__range=[first, last], submission__marketing_team__name=team_name
                 ).count()
 
                 submissions_count = Submission.objects.filter(
@@ -226,14 +226,14 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
                 interviews_count = Interview.objects.filter(
                     submission__created__range=[first, last],
-                    submission__created_by__team__name=team_name,
+                    submission__marketing_team__name=team_name,
                     status__in=['offer', 'failed', 'feedback_due'],
                 ).count()
 
                 joining_count = Project.objects.filter(
                     statuses__status='joined',
                     submission__created__range=[first, last],
-                    submission__created_by__team__name=team_name
+                    submission__marketing_team__name=team_name
                 ).count()
 
             else:
@@ -296,7 +296,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
-                projects = Project.objects.filter(submission__created_by__team__name=team_name)
+                projects = Project.objects.filter(submission__marketing_team__name=team_name)
             else:
                 projects = Project.objects.all()
 
@@ -341,7 +341,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 if not team_name:
                     team_name = request.user.team.name
                 tests = tests.filter(submission__created__team__name=team_name)
-                interviews = interviews.filter(submission__created_by__team__name=team_name)
+                interviews = interviews.filter(submission__marketing_team__name=team_name)
             data = {
                 "interviews": interviews.annotate(
                     marketer=F('submission__created_by__employee_name')
