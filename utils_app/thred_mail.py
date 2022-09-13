@@ -23,7 +23,7 @@ def cred(mail_id):
         
     if mail_id == "product@consultadd.com":
         mail_id = "suman.m@consultadd.com"
-        
+
     credentials = Credentials.from_service_account_file(
         filename="service.json",
         scopes=SCOPES,
@@ -207,13 +207,13 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
                 b64_string = b64_bytes.decode()
         
-            email_body = {'message' : {'threadId' : email_data['threadId'], 'raw' : b64_string}}
+            email_body = {'message': {'threadId': email_data['threadId'], 'raw': b64_string}}
             draft = service.users().drafts().create(userId='me', body=email_body).execute()
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
             return message['id'], True, from_mail_id
         else:
             message = multipart.MIMEMultipart()
-            message['from'] = from_mail_id
+            from_mail_id = "product@consultadd.com"
             subject = mail_data["subject"]
             message = set_mail_config(mail_data["to"], from_mail_id, mail_data["cc"], mail_data["bcc"], subject, message) 
             
