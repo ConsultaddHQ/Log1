@@ -133,7 +133,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             query = request.GET.get('query', '')
             teams = request.GET.get('teams', None)
             user_type = request.GET.get('type', None)
-            associate = request.GET.get('associate', False)
+            associate = json.loads(request.GET.get('associate', 'false'))
             users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
             if user_type:
                 users = users.filter(role__name__iexact=user_type)
