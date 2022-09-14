@@ -78,7 +78,7 @@ class Command(BaseCommand):
             mail_data = {
                 'cc': [],
                 'bcc': [],
-                'to': ['sarang.m@consultadd.com'],
+                'to': ['shreyas.k@consultadd.com'],
                 'subject': f"Consultant submission data {str(last_2_days.strftime('%m/%d/%Y'))} -"
                            f" {str(date.today().strftime('%m/%d/%Y'))}",
                 'template': '../templates/consultants_submissions_admin_report.html',

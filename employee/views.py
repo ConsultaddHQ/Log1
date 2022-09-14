@@ -133,6 +133,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             query = request.GET.get('query', '')
             teams = request.GET.get('teams', None)
             user_type = request.GET.get('type', None)
+            associate = request.GET.get('associate', False)
             users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
             if user_type:
                 users = users.filter(role__name__iexact=user_type)
@@ -140,6 +141,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 teams = teams.split(",")
                 if 'Consultadd' in teams and 'superadmin' in request.user.roles:
                     users = users.filter(role__name='marketer')
+                elif associate:
+                    users = users.filter(Q(team__name__in=teams) | Q(associated_to__name__in=teams))
                 else:
                     users = users.filter(team__name__in=teams)
             elif user_type == 'team':
