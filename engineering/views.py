@@ -52,6 +52,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 if 'client' in filters:
                     projects = projects.filter(submission__client__iexact=filters['client'])
 
+                if 'teams' in filters:
+                    projects = projects.filter(submission__marketing_team__iexact=filters['teams'])
+
                 if 'status' in filters:
                     projects = projects.filter(statuses__status=filters['status'], statuses__is_current=True)
 
@@ -1478,24 +1481,20 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['put'], detail=True, url_path='remove')
-    def remove(self, request, **kwargs):
+    @action(methods=['delete'], detail=True, url_path='remove_team')
+    def remove(self, request, pk):
         try:
-            team_id = kwargs.get('pk')
-            employee_ids = request.data.get('employee_ids', [])
-            if not employee_ids:
-                return Response({"message": "No employee selected"}, status=200)
-            for emp_id in employee_ids:
-                employee = get_object_or_404(User, id=emp_id, team_id=team_id)
-                employee.is_active = False
-                employee.account_login = False
-                employee.save()
+            team = get_object_or_404(Team, id=pk)
+            team_employees = User.objects.filter(team=team)
+            team_name = team.name
+            if team_employees:
+                return Response({"message": f"Some employees still associated to {team_name}"}, status=400)
+            team.delete()
 
             # Activity
-            desc = f"{request.user.employee_name} deactivated Employee Id-{employee_ids}"
-            create_activity(kwargs.get('pk'), 'team', request.user, desc, 'updated')
-
-            return Response({"message": "Employees Removed Successfully"}, status=202)
+            desc = f"{request.user.employee_name} removed team {team_name}"
+            create_activity(pk, 'team', request.user, desc, 'deleted')
+            return Response({"message": "Employees Removed Successfully"}, status=204)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)

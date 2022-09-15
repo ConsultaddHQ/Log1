@@ -45,7 +45,7 @@ class Command(BaseCommand):
                         }
                     )
                     count += 1
-                    users = User.objects.filter(team=submission.created_by.team, role__name__in=['admin', 'proxy'], is_active=True)
+                    users = User.objects.filter(team=submission.marketing_team, role__name__in=['admin', 'proxy'], is_active=True)
                     for user in users:
                         scrum_masters.append(user.email)
                     submission_ids.append(submission.id)
@@ -78,7 +78,7 @@ class Command(BaseCommand):
             mail_data = {
                 'cc': [],
                 'bcc': [],
-                'to': ['sarang.m@consultadd.com'],
+                'to': ['shreyas.k@consultadd.com'],
                 'subject': f"Consultant submission data {str(last_2_days.strftime('%m/%d/%Y'))} -"
                            f" {str(date.today().strftime('%m/%d/%Y'))}",
                 'template': '../templates/consultants_submissions_admin_report.html',
