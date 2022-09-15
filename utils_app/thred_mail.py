@@ -207,7 +207,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
                 b64_string = b64_bytes.decode()
         
-            email_body = {'message': {'threadId' : email_data['threadId'], 'raw': b64_string}}
+            email_body = {'message': {'threadId': email_data['threadId'], 'raw': b64_string}}
             draft = service.users().drafts().create(userId='me', body=email_body).execute()
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()
             return message['id'], True, from_mail_id

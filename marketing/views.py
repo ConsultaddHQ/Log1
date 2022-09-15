@@ -22,10 +22,10 @@ from activity.models import Activity
 from employee.models import User, Team
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
-from utils_app.utils import delete_temp_file
 from utils_app.calendar import GoogleCalendar
 from django.contrib.auth.models import ContentType
 from activity.serializers import ActivitySerializer
+from utils_app.utils import delete_temp_file, export_to_csv
 from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
@@ -472,17 +472,18 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def employer(self, request):
         try:
             consultadd_emp = Team.objects.get(name='Consultadd')
-            canada_emp = Team.objects.get(name='Consultadd Canada')
             if 'superadmin' in request.user.roles:
                 employers = Team.objects.filter(
                     Q(dept='Marketing') | Q(name='Consultadd')
                 ).order_by('name').values('id', 'name')
             else:
+                teams = request.user.associated_to.all()
                 employers = [
                     {"id": request.user.team.id, "name": request.user.team.name},
                     {"id": consultadd_emp.id, "name": consultadd_emp.name},
-                    {"id": canada_emp.id, "name": canada_emp.name}
                 ]
+                for emp in teams:
+                    employers.append({"id": emp.id, "name": emp.name})
             return Response({"data": employers}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -585,12 +586,14 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        export = json.loads(request.GET.get('export', 'false'))
         filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
             team = request.user.team
             roles = request.user.roles
-            queryset = Submission.objects.exclude(status='draft')
+            associated_teams = request.user.associated_to.all()
+            queryset = Submission.objects.exclude(status__in=['draft', 'archive'])
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 queryset = queryset.filter(
@@ -605,22 +608,22 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 queryset = queryset.exclude(consultant_marketing__consultant__status='terminated')
 
-            if ('superadmin' not in roles) and ('scrum_master' not in roles):
+            if ('superadmin' not in roles) and ('admin' not in roles):
                 # Team submissions for Scrum master and Proxy Scrum Master
-                if 'admin' in roles or 'proxy' in roles:
-                    consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
-                                     list(ConsultantMarketing.objects.filter(
-                                         in_pool=True, status='open').values_list('consultant_id'))
-                    queryset = queryset.filter(
-                        Q(created_by__team=team) |
-                        Q(consultant_marketing__teams=team) |
-                        Q(consultant_marketing__consultant__in=consultant_ids) |
-                        Q(consultant_marketing__consultant__pocs__poc=request.user,
-                          consultant_marketing__consultant__pocs__poc_type='recruiter')
-                    )
-
+                # if 'admin' in roles or 'proxy' in roles:
+                #     consultant_ids = list(Consultant.objects.filter(marketing__teams=team).values_list('id', flat=True)) + \
+                #                      list(ConsultantMarketing.objects.filter(
+                #                          in_pool=True, status='open').values_list('consultant_id'))
+                #     queryset = queryset.filter(
+                #         Q(created_by__team=team) |
+                #         Q(consultant_marketing__teams=team) |
+                #         Q(consultant_marketing__consultant__in=consultant_ids) |
+                #         Q(consultant_marketing__consultant__pocs__poc=request.user,
+                #           consultant_marketing__consultant__pocs__poc_type='recruiter')
+                #     )
+                #
                 # Submissions of a marketer and pool consultant submissions (except those are on project)
-                elif 'marketer' in roles:
+                if 'marketer' in roles:
                     consultant_ids = list(request.user.marketed.filter(status='open').values_list('consultant_id')) + \
                                      list(ConsultantMarketing.objects.filter(
                                          in_pool=True, status='open').values_list('consultant_id'))
@@ -633,13 +636,14 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     else:
                         queryset = queryset.filter(
                             Q(created_by=request.user) |
+                            Q(marketing_team__in=associated_teams) |
                             Q(consultant_marketing__consultant__in=consultant_ids)
                         )
 
             if filter_for == 'my':
                 queryset = queryset.filter(created_by=request.user)
             elif filter_for == 'team':
-                queryset = queryset.filter(created_by__team=team)
+                queryset = queryset.filter(Q(created_by__team=team) | Q(marketing_team__in=associated_teams))
 
             if filter_json:
                 filter_by_status = list()
@@ -666,15 +670,32 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
 
+            if export:
+                first, last = 0, len(queryset)
             data, sub_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
+            col_name = [
+                {"name": "consultant_name", "display_name": "Consultant Name"},
+                {"name": "marketer_name", "display_name": "Marketer Name"},
+                {"name": "employer", "display_name": "Employer"},
+                {"name": "client", "display_name": "Client"},
+                {"name": "company_name", "display_name": "Company Name"},
+                {"name": "vendor_contact", "display_name": "Vendor Contact"},
+                {"name": "city", "display_name": "City"},
+                {"name": "created", "display_name": "Submitted On"},
+            ]
+            url = ""
+            if export:
+                url = export_to_csv(
+                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                )
 
             if sub_data == "error":
-                return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(data), "url": ""}, status=400)
 
-            return Response({"counts": sub_data, "data": data}, status=200)
+            return Response({"counts": sub_data, "data": data, "url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error), "url": ""}, status=400)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -1075,7 +1096,8 @@ class InterviewViewSets(ModelViewSet):
             user_id = request.user.id
             roles = request.user.roles
             team = request.user.team
-            queryset = Interview.objects.all()
+            associated_teams = request.user.associated_to.all()
+            queryset = Interview.objects.exclude(submission__status='archive')
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 if query.isnumeric():
@@ -1103,7 +1125,8 @@ class InterviewViewSets(ModelViewSet):
                     queryset = queryset.filter(submission__created_by_id=user_id)
 
             elif filter_for == 'team':
-                queryset = queryset.filter(submission__created_by__team=team)
+                queryset = queryset.filter(Q(submission__marketing_team=team) |
+                                           Q(submission__marketing_team__in=associated_teams))
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -1166,6 +1189,7 @@ class InterviewViewSets(ModelViewSet):
             user_id = request.user.id
             roles = request.user.roles
             team = request.user.team
+            associated_teams = request.user.associated_to.all()
             queryset = Interview.objects.all()
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -1194,7 +1218,8 @@ class InterviewViewSets(ModelViewSet):
                     queryset = queryset.filter(submission__created_by_id=user_id)
 
             elif filter_for == 'team':
-                queryset = queryset.filter(submission__created_by__team=team)
+                queryset = queryset.filter(Q(submission__marketing_team=team) |
+                                           Q(submission__marketing_team__in=associated_teams))
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -2190,7 +2215,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             consultant = test.submission.consultant
             queryset = User.objects.filter(
-                team=test.submission.created_by.team, role__name__in=['admin', 'proxy'], is_active=True
+                team=test.submission.marketing_team, role__name__in=['admin', 'proxy'], is_active=True
             )
             path = []
             created_by = test.submission.created_by
@@ -2344,7 +2369,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         Q(submission__consultant_marketing__consultant__email__istartswith=query)
                     )
             else:
-                queryset = Test.objects.all()
+                queryset = Test.objects.exclude(status='archive')
 
             if filter_for == 'my':
                 if 'engineer' in roles:
@@ -2356,7 +2381,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if 'engineer' in roles:
                     queryset = queryset.filter(engineer__team=request.user.team)
                 else:
-                    queryset = queryset.filter(submission__created_by__team=request.user.team)
+                    queryset = queryset.filter(Q(submission__marketing_team__in=request.user.associated_to) |
+                                               Q(submission__marketing_team=request.user.team))
 
             # Test List according to role
             if ('admin' in roles and 'engineer' in roles) or 'superadmin' in roles:
