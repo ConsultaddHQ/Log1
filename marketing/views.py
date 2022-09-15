@@ -681,6 +681,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 {"name": "company_name", "display_name": "Company Name"},
                 {"name": "vendor_contact", "display_name": "Vendor Contact"},
                 {"name": "city", "display_name": "City"},
+                {"name": "created", "display_name": "Submitted On"},
             ]
             url = ""
             if export:
@@ -689,12 +690,12 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 )
 
             if sub_data == "error":
-                return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
+                return Response({"message": ERROR_MSG, "error": str(data), "url": ""}, status=400)
 
             return Response({"counts": sub_data, "data": data, "url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error), "url": ""}, status=400)
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
