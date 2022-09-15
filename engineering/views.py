@@ -52,6 +52,9 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 if 'client' in filters:
                     projects = projects.filter(submission__client__iexact=filters['client'])
 
+                if 'teams' in filters:
+                    projects = projects.filter(submission__marketing_team__iexact=filters['teams'])
+
                 if 'status' in filters:
                     projects = projects.filter(statuses__status=filters['status'], statuses__is_current=True)
 
