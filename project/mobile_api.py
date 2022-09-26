@@ -14,6 +14,7 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateMode
 from constance import config
 
 from employee.models import User
+from project.utils import check_days
 from log1.utils import write_exception
 from attachment.models import Attachment
 from consultant.models import Consultant
@@ -22,7 +23,7 @@ from utils_app.aws_utils import get_s3_object
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
-from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave
+from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
     ConsultantLeaveSerializer, LeaveSerializer
 
@@ -615,6 +616,74 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @action(methods=['POST'], detail=True, url_path='request')
+    def request_timesheet(self, request, pk):
+        try:
+            project = get_object_or_404(Project, id=pk)
+            start = request.data['start_date']
+            end = request.data['end_date']
+
+            available_timesheet = TimeSheet.objects.filter(project=project, end__gte=start).order_by('-created')
+            if available_timesheet:
+                timesheet = available_timesheet.first()
+                available_week = f"{timesheet.start} - {timesheet.end}"
+                return Response({"message": f"Timesheet available for week {available_week}"}, status=400)
+
+            pending_request = TimesheetRequest.objects.filter(project=project, start=start).order_by('-created')
+            if pending_request:
+                return Response({"message": f"Timesheet already requested for week {start} - {end}"}, status=400)
+
+            requested_week = TimesheetRequest.objects.create(
+                start=start, end=end, project=project, status='request', consultant_comment=request.data.get('comment')
+            )
+            content_type = ContentType.objects.get(model='timesheetrequest')
+            if request.FILES.get('file', None):
+                Attachment.objects.create(
+                    creator_id=1,
+                    object_id=requested_week.id,
+                    content_type=content_type,
+                    attachment_type='timesheet',
+                    attachment_file=request.FILES.get('file'),
+                )
+
+            user_list = User.objects.filter(Q(role__name='finance'))
+            title = f"{request.user.name} requested timesheet for the week end {str(requested_week.end)}"
+            data = {
+                "title": title,
+                "category": "alert",
+                "description": title,
+                "target_type": "request",
+                "target_id": request.user.id,
+                "sender_id": request.user.id,
+                "recipient_user_type": "user",
+                "sender_user_type": "consultant",
+            }
+            create_notification(user_list, data)
+
+            # Push Notification
+            message_body = {
+                "body": title,
+                "title": title,
+                "category": "alert",
+                "show_in_foreground": True,
+                "click_action": "https://app.log1.com/",
+                "data": {
+                    'is_read': False,
+                    'is_deleted': False,
+                    'target': 'request',
+                    'target_id': request.user.id,
+                    'timestamp': str(timezone.now()),
+                },
+            }
+            message = f"Timesheet Requested for project {project.submission.client} by {request.user.name}"
+            user_ids = list(user_list.values_list('id', flat=True))
+            push_notification(user_ids, message_body)
+
+            return Response({"message": "TimeSheet request sent"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
 
 # Route - /consultant_leave/
 class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
@@ -654,8 +723,11 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             elif data['duration_type'] == 'full':
                 leave.total_hours = 8
             else:
-                days = datetime.strptime(leave.to_date, "%Y-%m-%d") - datetime.strptime(leave.from_date, "%Y-%m-%d")
-                leave.total_hours = (days.days + 1)*8
+                end = datetime.strptime(leave.to_date, "%Y-%m-%d").date()
+                start = datetime.strptime(leave.from_date, "%Y-%m-%d").date()
+                total_days = check_days(start, end, request)
+                leave.total_hours = total_days * 8
+
             leave.status = 'availed'
             leave.save()
             leave_type.balance = leave_type.balance - leave.total_hours
@@ -677,9 +749,9 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             return Response({"error": str(error)}, status=400)
 
     @action(methods=['GET'], detail=True, url_path='history')
-    def history(self, request, pk):
+    def history(self, request, *args, **kwargs):
         try:
-            consultant = get_object_or_404(Consultant, id=pk)
+            consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
             leaves = Leave.objects.filter(leave_type__consultant=consultant, leave_type__is_expired=False)
             serial = LeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
