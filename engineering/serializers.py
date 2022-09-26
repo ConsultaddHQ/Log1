@@ -382,7 +382,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_support_info(obj):
         start = obj.project.support.all().order_by('start').first().start
-        start_date = obj.project.start
+        start_date = obj.project.start_date
         if date.today() > start_date:
             if obj.end:
                 diff = obj.end - start_date
