@@ -655,6 +655,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 if 'client' in filters and len(filters["client"]) > 0:
                     queryset = queryset.filter(client__in=filters['client'])
 
+                if 'teams' in filters and len(filters["teams"]) > 0:
+                    queryset = queryset.filter(marketing_team__name__in=filters['teams'])
+
                 if 'incomplete' in filters:
                     queryset = queryset.exclude(is_complete=filters['incomplete'])
 
@@ -681,7 +684,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 {"name": "company_name", "display_name": "Company Name"},
                 {"name": "vendor_contact", "display_name": "Vendor Contact"},
                 {"name": "city", "display_name": "City"},
-                {"name": "created", "display_name": "Submitted On"},
+                {"name": "created", "display_name": "Submitted On"}
             ]
             url = ""
             if export:

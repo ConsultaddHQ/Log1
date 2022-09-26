@@ -347,10 +347,16 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
                 "timezone": project_description.timezone
             }
         else:
+            lead = obj.project.submission.lead
+            if lead.position:
+                technology = lead.position.display_name
+            elif lead.job_title:
+                technology = lead.job_title
+            else:
+                technology = None
             return {
                 "timezone": None,
-                "technology": obj.project.submission.lead.position.display_name
-                if obj.project.submission.lead.position.display_name else None
+                "technology": technology
             }
 
     @staticmethod
@@ -375,7 +381,8 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_info(obj):
-        start_date = obj.project.support.all().order_by('start').first().start
+        start = obj.project.support.all().order_by('start').first().start
+        start_date = obj.project.start_date
         if date.today() > start_date:
             if obj.end:
                 diff = obj.end - start_date
@@ -388,7 +395,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             duration = months + weeks / 10
         else:
             duration = 0
-        return {"duration": duration, "start": start_date}
+        return {"duration": duration, "start": start}
 
     @staticmethod
     def get_is_remote(obj):

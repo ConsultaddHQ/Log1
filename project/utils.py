@@ -423,3 +423,16 @@ def support_assignment_mail(support, request):
     except Exception as error:
         write_exception(message=error)
         return error, "error"
+
+
+def check_days(start, end, request=None):
+    try:
+        days = 0
+        while end > start:
+            if start.weekday() <= 5:
+                days += 1
+            start = start + timedelta(days=1)
+        return days
+    except Exception as error:
+        write_exception(message=error, request=request)
+        return error, "error"

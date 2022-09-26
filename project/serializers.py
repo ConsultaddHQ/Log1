@@ -82,10 +82,11 @@ class PayrollScheduleSerializer(serializers.ModelSerializer):
 class ProjectTimeSheetSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    total_hours = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'client', 'start_date', 'employer', 'status')
+        fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours')
 
     @staticmethod
     def get_status(obj):
@@ -100,6 +101,14 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
         if obj.statuses.filter(is_current=True).first().status == 'joined':
             return obj.submission.client + ' (Active)'
         return obj.submission.client
+
+    @staticmethod
+    def get_total_hours(obj):
+        total_hours = 0
+        all_timesheet = TimeSheet.objects.filter(project=obj, hours__gt=0, status='approved')
+        for timesheet in all_timesheet:
+            total_hours = total_hours + int(timesheet.hours)
+        return f"{total_hours}hrs"
 
 
 class TimeSheetSerializer(serializers.ModelSerializer):
