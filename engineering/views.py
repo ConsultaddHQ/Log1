@@ -1494,7 +1494,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             # Activity
             desc = f"{request.user.employee_name} removed team {team_name}"
             create_activity(pk, 'team', request.user, desc, 'deleted')
-            return Response({"message": "Employees Removed Successfully"}, status=204)
+            return Response({"message": "Team Removed Successfully"}, status=204)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
