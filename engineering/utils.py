@@ -76,6 +76,9 @@ def get_engineer_detail_csv(payload, request):
         ])
         for data in payload:
             count = 0
+            if data['project']['bandwidth'] == 0:
+                writer.writerow([data.get('employee_name')])
+                continue
             while count < data['project']['bandwidth']:
                 project = data['project']['data'][count]
                 consultant = project.get('consultant')

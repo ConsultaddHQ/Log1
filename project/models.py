@@ -299,8 +299,8 @@ class Leave(TimeStampedModel):
     attachment = GenericRelation(Attachment)
     to_date = models.DateField(_("To Date"))
     from_date = models.DateField(_("From Date"))
+    applied_on = models.DateField(_("Leave Apply Date"))
     description = models.TextField(_('Description'), null=True, blank=True)
-    applied_on = models.DateField(_("Leave Apply Date"), default=date.today())
     status = models.CharField(_('Status'), max_length=30, null=True, blank=True)
     total_hours = models.FloatField(_('Total Hours'), max_length=30, null=True, blank=True)
     leave_type = models.ForeignKey(
@@ -316,3 +316,37 @@ class Leave(TimeStampedModel):
 
     def __str__(self):
         return f'{self.leave_type.consultant.name}'
+
+
+class TimesheetRequest(TimeStampedModel):
+    TIMESHEET_STATUS = (
+        ('reject', 'Reject'),
+        ('request', 'Request'),
+        ('accepted', 'Accepted'),
+    )
+    attachments = GenericRelation(Attachment)
+    end = models.DateField(_('End'), null=True, blank=True)
+    start = models.DateField(_('Start'), null=True, blank=True)
+    reviewer_comment = models.TextField(_('Reviewer Comment'), null=True, blank=True)
+    consultant_comment = models.TextField(_('Consultant Comment'), null=True, blank=True)
+    status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS, default='draft')
+    reviewed_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='timesheet_req',
+        verbose_name='Reviewed BY',
+        null=True, blank=True
+    )
+    project = models.ForeignKey(
+        Project, on_delete=models.PROTECT,
+        related_name='timesheet_requests',
+        verbose_name='Project'
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(TimesheetRequest, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.project.consultant.name} - {self.status}'
