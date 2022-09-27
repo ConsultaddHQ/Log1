@@ -76,9 +76,6 @@ def get_engineer_detail_csv(payload, request):
         ])
         for data in payload:
             count = 0
-            if data['project']['bandwidth'] == 0:
-                writer.writerow([data.get('employee_name')])
-                continue
             while count < data['project']['bandwidth']:
                 project = data['project']['data'][count]
                 consultant = project.get('consultant')
@@ -139,6 +136,29 @@ def get_team_structure_xlsx(payload, counts, request):
 
         writer.save()
         file_url = generate_s3_url(f'team_structure_{filename}.xlsx')
+        return file_url
+    except Exception as error:
+        write_exception(error, request)
+
+
+def get_remote_project_csv(payload, request):
+    try:
+        filename = f'{datetime.now()}'.replace(' ', '')
+        file = open(f"remote_project_report_{filename}.csv", "w")
+        writer = csv.writer(file)
+        writer.writerow([
+            "Remote Engineer", "Consultant Name", "Support Engineer", "Support Start Date", "Support Status",
+            "Project Start Date", "Support Duration", "Technology", "Client", "Timezone", "Project Status"
+        ])
+        for data in payload:
+            writer.writerow([
+                data['consultant']['remote_employee'], data['consultant']['name'], data['support_info']['name'],
+                data['support_info']['start_date'], data['support_info']['status'], data['start_date'],
+                data['support_info']['duration'], data['project_detail']['technology'],
+                data['project_detail']['client'], data['project_detail']['timezone'], data['project_detail']['status']
+            ])
+        file.close()
+        file_url = generate_s3_url(file.name)
         return file_url
     except Exception as error:
         write_exception(error, request)

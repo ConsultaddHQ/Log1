@@ -16,7 +16,7 @@ from employee.models import Team, Role
 from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
-from utils_app.utils import TECHNOLOGIES
+from utils_app.utils import TECHNOLOGIES, export_to_csv
 from activity.views import create_activity
 from employee.serializers import TeamSerializer
 from attachment.models import Attachment, create_attachment
@@ -950,7 +950,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
                 is_active=True, projects__end=None, projects__statuses__is_current=True,
                 projects__is_proxy_support=False
-            ).order_by('employee_id').distinct('employee_id')
+            ).exclude(role__name__iexact='us_employee').order_by('employee_id').distinct('employee_id')
             if consultant_type:
                 engineers = engineers.filter(projects__project__is_remote=True)
             if query:
@@ -974,14 +974,17 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             Q(projects__project__submission__lead__vendor_company__name__istartswith=query)
                         )
 
-            support = ProjectSupport.objects.exclude(project__statuses__is_current=True,
-                                                     project__statuses__status__istartswith='terminated')
+            support = ProjectSupport.objects.filter(support__is_active=True).exclude(
+                (Q(project__statuses__status__istartswith='terminated') |
+                 Q(project__statuses__status__istartswith='complete')), project__statuses__is_current=True) \
+                .order_by('project_id').distinct('project_id')
             if consultant_type:
                 support = support.filter(project__is_remote=True)
             counts = self.project_filter_counts(support)
-            total = counts['support_status']['total']['count']
-            independent = counts['support_status']['independent']['count']
-            counts['support_status']['total']['count'] = total - independent
+            counts['support_status']['total']['count'] = counts['support_status']['active']['count'] + \
+                                                         counts['support_status']['less_active']['count'] + \
+                                                         counts['support_status']['training']['count']
+
             counts['remote_count'] = support.filter(project__is_remote=True).count()
 
             context = {"frequency": frequency, "type": consultant_type}
@@ -1014,7 +1017,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
                 is_active=True, projects__end=None, projects__statuses__is_current=True,
                 projects__is_proxy_support=False
-            ).order_by('employee_id').distinct('employee_id')
+            ).exclude(role__name__iexact='us_employee').order_by('employee_id').distinct('employee_id')
             if consultant_type:
                 engineer = engineer.filter(projects__project__is_remote=True)
             if query:
@@ -1044,6 +1047,76 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 report_url = get_engineer_detail_csv(serializer.data, request)
                 return Response({"data": report_url}, status=200)
             return Response({"message": "No data found"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='remote_project')
+    def remote_project(self, request, *args, **kwargs):
+        try:
+            first, last = get_page_limits(request)
+            query = request.GET.get('query', None)
+            category = request.GET.get('category', None)
+            export = json.loads(request.GET.get('export', 'false'))
+
+            projects = Project.objects.filter(is_remote=True)
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if category:
+                    if category == 'support_name':
+                        projects = projects.filter(support__support__employee_name__istartswith=query)
+                    elif category == 'remote_consultant':
+                        projects = projects.filter(submission__consultant__name__istartswith=query)
+                    elif category == 'client':
+                        projects = projects.filter(submission__client__istartswith=query)
+                    elif category == 'vendor_name':
+                        projects = projects.filter(submission__lead__vendor_company__name__istartswith=query)
+                    elif category == 'consultant_name':
+                        projects = projects.filter(
+                            submission__consultant_marketing__consultant__name__istartswith=query
+                        )
+                    else:
+                        projects = projects.filter(
+                            Q(submission__client__istartswith=query) |
+                            Q(submission__consultant__name__istartswith=query) |
+                            Q(support__support__employee_name__istartswith=query) |
+                            Q(submission__lead__vendor_company__name__istartswith=query) |
+                            Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                        )
+            serializer = RemoteProjectSerializer(projects, many=True)
+
+            project_status_counts = [
+                {"name": "Total", "count": len(projects)},
+                {"name": "Active", "count": projects.filter(statuses__is_current=True,
+                                                            statuses__status__in=['new', 'received', 'on_boarded',
+                                                                                  'joined']).count()},
+                {"name": "Completed",
+                 "count": projects.filter(statuses__is_current=True, statuses__status='complete').count()},
+                {"name": "Terminated", "count": projects.filter(statuses__is_current=True,
+                                                                statuses__status__istartswith='terminated').count()}
+            ]
+
+            active = projects.filter(support__statuses__is_current=True, support__statuses__frequency='active').count()
+            less_active = projects.filter(
+                support__statuses__is_current=True, support__statuses__frequency='less_active'
+            ).count()
+            training = projects.filter(support__statuses__is_current=True, support__statuses__frequency='active',
+                                       start_date__gt=date.today()).count()
+            support_status_counts = [
+                {"name": "Total", "count": len(projects)},
+                {"name": "Active", "count": active},
+                {"name": "Less Active", "count": less_active},
+                {"name": "Training", "count": training},
+                {"name": "Independent", "count": len(projects) - active - less_active - training}
+            ]
+
+            # export
+            report_url = ""
+            if export and serializer.data:
+                report_url = get_remote_project_csv(serializer.data, request)
+
+            return Response({"url": report_url, "counts": support_status_counts,
+                             "data": serializer.data[first: last]}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -1273,7 +1346,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             shifts = User.SHIFT_CHOICE
             eng_teams = Team.objects.filter(dept='Engineering')
             inter_section = request.GET.get('inter_section', None)
-            
+
             if filters:
                 if "skills" in filters:
                     if inter_section == "true":
