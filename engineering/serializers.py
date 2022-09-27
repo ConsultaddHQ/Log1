@@ -336,10 +336,13 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     def get_description(obj):
         if hasattr(obj.project, 'description'):
             project_description = obj.project.description
+            lead = obj.project.submission.lead
             if project_description.technology:
                 technology = project_description.technology
-            elif obj.project.submission.lead.position:
+            elif lead.position:
                 technology = obj.project.submission.lead.position.display_name
+            elif lead.job_title:
+                technology = lead.job_title
             else:
                 technology = None
             return {
@@ -381,7 +384,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support_info(obj):
-        start = obj.project.support.all().order_by('start').first().start
+        start = obj.project.support.all().order_by('-start').first().start
         start_date = obj.project.start_date
         if date.today() > start_date:
             if obj.end:
@@ -535,3 +538,83 @@ class TeamStructureSerializer(serializers.ModelSerializer):
             }
             return data
         return []
+
+
+class RemoteProjectSerializer(serializers.ModelSerializer):
+    consultant = serializers.SerializerMethodField()
+    support_info = serializers.SerializerMethodField()
+    project_detail = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = ('id', 'consultant', 'support_info', 'start_date', 'project_detail')
+
+    @staticmethod
+    def get_consultant(obj):
+        consultant = obj.submission.consultant
+        remote_consultant = obj.consultant
+        data = {
+            "id": consultant.id, "name": consultant.name,
+            "remote_employee": remote_consultant.name
+        }
+        return data
+
+    @staticmethod
+    def get_support_info(obj):
+        status, duration = 'Independent', ''
+        support = obj.support.filter(is_proxy_support=False).order_by('-start')
+        start_date = obj.start_date
+
+        if date.today() > start_date:
+            diff = date.today() - start_date
+            if diff.days < 7:
+                duration = f"0.0.{diff.days}"
+            else:
+                months = int(diff.days) // 30
+                weeks = round(int(diff.days - months * 30) // 7, 0)
+                duration = months + weeks / 10
+        if support:
+            support_engineer = support.first()
+            support_status = support_engineer.statuses.filter(is_current=True).first()
+            if support_status:
+                if support_status.frequency in ['handover', 'terminated', 'independent']:
+                    status = 'independent'
+                else:
+                    status = support_status.frequency
+
+            data = {
+                "name": support_engineer.support.employee_name,
+                "start_date": support_engineer.start,
+                "status": status, "duration": duration
+            }
+        else:
+            data = {"name": "No Active Support", "start_date": "-", "status": status, "duration": duration}
+        return data
+
+    @staticmethod
+    def get_project_detail(obj):
+        timezone, technology, status = "NA", "NA", "NA"
+        client = obj.submission.client
+        statuses = obj.statuses.filter(is_current=True)
+        if statuses:
+            status = statuses.first().get_status_display()
+
+        if hasattr(obj, 'description'):
+            timezone = obj.description.timezone
+            technology = obj.description.technology
+            if not technology:
+                lead = obj.submission.lead
+                if lead.position:
+                    technology = obj.submission.lead.position.display_name
+                else:
+                    technology = obj.submission.lead.job_title
+        else:
+            lead = obj.submission.lead
+            if lead.position:
+                technology = obj.submission.lead.position.display_name
+            else:
+                technology = obj.submission.lead.job_title
+        data = {
+            "client": client, "timezone": timezone, "technology": technology, "status": status
+        }
+        return data
