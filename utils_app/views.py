@@ -124,7 +124,8 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
     def technology(self, request):
         try:
             choices = Choice.objects.filter(field='technology', content_type__model='user').values('name')
-            technologies = [choice['name'] for choice in choices].append('Other')
+            technologies = [choice['name'] for choice in choices]
+            technologies.append('Other')
             return Response({"data": technologies}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -137,7 +138,7 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
             content_type = ContentType.objects.get(model='user')
             for technology in technologies:
                 available_technology = Choice.objects.filter(
-                    field='technology', content_type=content_type, name__iextact=technology
+                    field='technology', content_type=content_type, name__iexact=technology
                 )
                 if not available_technology:
                     Choice.objects.create(
