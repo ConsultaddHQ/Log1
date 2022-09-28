@@ -1,17 +1,16 @@
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from utils_app.calendar import get_profile_picture
+# from utils_app.calendar import get_profile_picture
 from employee.models import User, Asset, Team, Role, Tagging, Handover
 
 
 class UserSerializer(serializers.ModelSerializer):
     team = serializers.SerializerMethodField()
-    avatar = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone',
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'team', 'roles', 'gender', 'phone', 'avatar',
                   'is_superuser', 'technology')
 
     @staticmethod
@@ -20,9 +19,9 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.team.name
         return None
 
-    @staticmethod
-    def get_avatar(obj):
-        return get_profile_picture(obj)
+    # @staticmethod
+    # def get_avatar(obj):
+    #     return get_profile_picture(obj)
 
 
 class UserDashboardSerializer(serializers.ModelSerializer):
@@ -80,7 +79,7 @@ class UserSerializerLogin(UserSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'avatar', 'team', 'roles', 'technology',
+        fields = ('id', 'employee_id', 'employee_name', 'email', 'token', 'team', 'roles', 'technology',
                   'shift', 'is_superuser')
 
     @staticmethod

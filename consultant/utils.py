@@ -674,6 +674,9 @@ def candidate_filter(request):
             if 'gender' in filters:
                 consultants = consultants.filter(gender=filters['gender'])
 
+            if 'city' in filters:
+                consultants = consultants.filter(current_city__in=filters['city'])
+
             if 'days_on_bench' in filters:
                 day_filter = marketing_days_filter(filters['days_on_bench'])
                 consultants = consultants.filter(**day_filter)
@@ -696,6 +699,11 @@ def candidate_filter(request):
             if 'visa' in filters:
                 consultants = consultants.filter(
                     work_auth__visa_type=filters['visa'], work_auth__is_current=True
+                )
+
+            if 'jobPosition' in filters:
+                consultants = consultants.filter(
+                    marketing__submissions__lead__position__in=filters['jobPosition'], status='on_project'
                 )
 
             if 'visa_end' in filters:

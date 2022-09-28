@@ -43,7 +43,14 @@ def get_users_and_attendees(request, interview):
             for user in scrum_masters:
                 user_list.append(user)
                 attendees.append({"email": user.email})
-
+        else:
+            scrum_masters = User.objects.filter(
+                team=interview.submission.marketing_team, role__name__in=['admin', 'proxy'], account_login=True
+            )
+            for user in scrum_masters:
+                user_list.append(user)
+                attendees.append({"email": user.email})
+                            
         for user in interview.guest.all():
             user_list.append(user)
             attendees.append({"email": user.email})
