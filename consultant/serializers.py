@@ -439,7 +439,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             else:
                 project = projects.latest('start_date')
 
-            queryset = project.support.all()
+            queryset = project.support.filter(is_proxy_support=False)
             if queryset:
                 queryset = queryset.latest('start')
                 poc = queryset.support
