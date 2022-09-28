@@ -2,7 +2,7 @@ import os
 
 from constance import config
 from log1.utils import write_exception, post_msg_using_webhook
-from utils_app.calendar import get_profile_picture
+# from utils_app.calendar import get_profile_picture
 
 
 def get_element(element_type, data={}):
@@ -180,7 +180,7 @@ class MessageCard:
                 title = f"{project.consultant.name} {text} {project.submission.client}"
             else:
                 title = feedback.consultant.name
-            profile_path = get_profile_picture(request.user)
+            # profile_path = get_profile_picture(request.user)
             data = {
                 "@type": "MessageCard",
                 "themeColor": "#0076D7",
@@ -190,7 +190,7 @@ class MessageCard:
                 "sections": [{
                     "activityTitle": f"***{title}*** ",
                     "activitySubtitle": f"***Engineering Issue feedback by {request.user.employee_name}***",
-                    "activityText": feedback.description, "activityImage": profile_path,
+                    "activityText": feedback.description, "activityImage": "",
                     "markdown": True}]}
 
             if feedback.feedback_type == 'engineering_issue':
@@ -207,7 +207,7 @@ class MessageCard:
         try:
             title = payload.get('title', 'NA')
             interview = payload.get('interview', 'NA')
-            profile_path = get_profile_picture(request.user)
+            # profile_path = get_profile_picture(request.user)
             data = {
                 "@type": "MessageCard",
 
@@ -221,7 +221,7 @@ class MessageCard:
                                             f"***{interview.submission.consultant.name}*** ",
                         "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
                                         f"***{interview.submission.marketing_team.name}***",
-                        "activityImage": profile_path,
+                        "activityImage": "",
                         "facts": [
                             {
                                 "name": f"Technology",
@@ -252,7 +252,7 @@ class MessageCard:
     @staticmethod
     def coder_assigned_card(interview, request):
         try:
-            profile_path = get_profile_picture(request.user)
+            # profile_path = get_profile_picture(request.user)
             coding_experts = ", ".join(interview.guest.all().values_list('employee_name', flat=True))
             data = {
                 "@type": "MessageCard",
@@ -266,7 +266,7 @@ class MessageCard:
                                             f" ***{interview.submission.consultant.name}*** ",
                         "activityText": f"Requested by ***{interview.submission.created_by.employee_name}*** from "
                                         f"***{interview.submission.marketing_team.name}***",
-                        "activityImage": profile_path,
+                        "activityImage": "",
                         "facts": [
                             {
                                 "name": "Technology",
@@ -303,7 +303,7 @@ class MessageCard:
     @staticmethod
     def test_received_card(payload, request):
         try:
-            profile_path = get_profile_picture(request.user)
+            # profile_path = get_profile_picture(request.user)
             data = {
                 "@type": "MessageCard",
                 "themeColor": "#0076D7",
@@ -312,7 +312,7 @@ class MessageCard:
                 "sections": [
                     {
                         "activitySubtitle": payload.get('subtitle', 'NA'),
-                        "activityImage": profile_path,
+                        "activityImage": "",
                         "activityText": payload.get('activity_text', 'NA'),
                         "activityTitle": "Test Received",
                         "facts": [
@@ -373,7 +373,7 @@ class MessageCard:
     @staticmethod
     def consultant_joined_message_card(payload, request):
         try:
-            profile_path = get_profile_picture(request.user)
+            # profile_path = get_profile_picture(request.user)
             data = {
                 "@type": "MessageCard",
                 "@context": "http://schema.org/extensions",
@@ -383,7 +383,7 @@ class MessageCard:
                     "activityTitle": "Project Joined",
                     "activitySubtitle": payload.get('activity_text', 'NA'),
                     "activityText": payload.get('activity_title', 'NA'),
-                    "activityImage": profile_path,
+                    "activityImage": "profile_path",
                     "facts": [
                         {
                             "name": f"Submitted On",
@@ -436,7 +436,7 @@ class MessageCard:
     @staticmethod
     def po_termination_message_card(payload, request):
         try:
-            profile_path = get_profile_picture(request.user)
+            # profile_path = get_profile_picture(request.user)
             data = {
                 "@type": "MessageCard",
                 "@context": "http://schema.org/extensions",
@@ -446,7 +446,7 @@ class MessageCard:
                     "activityTitle": "Project Termination Feedback",
                     "activitySubtitle": payload.get('activity_sub_title', ''),
                     "activityText": payload.get('activity_text', ''),
-                    "activityImage": profile_path,
+                    "activityImage": "",
                     "facts": [
                         {"name": f"Project duration", "value": f"{payload.get('months', 0)} months"},
                         {"name": f"Employer", "value": payload.get('employer', "NA")},
@@ -653,7 +653,7 @@ class MessageCard:
     @staticmethod
     def po_cancellation_message_card(payload, request):
         try:
-            profile_path = get_profile_picture(request.user)
+            # profile_path = get_profile_picture(request.user)
             data = {
                 "@type": "MessageCard",
                 "@context": "http://schema.org/extensions",
@@ -663,7 +663,7 @@ class MessageCard:
                     "activityTitle": "Offer Cancellation Feedback",
                     "activitySubtitle": payload.get('activity_sub_title', ''),
                     "activityText": payload.get('activity_text', ''),
-                    "activityImage": profile_path,
+                    "activityImage": "",
                     "facts": [
                         {"name": f"Employer", "value": payload.get('employer', 'NA')},
                         {"name": f"Location", "value": payload.get('city', 'NA')},
