@@ -701,9 +701,9 @@ def candidate_filter(request):
                     work_auth__visa_type=filters['visa'], work_auth__is_current=True
                 )
 
-            if 'position' in filters:
+            if 'jobPosition' in filters:
                 consultants = consultants.filter(
-                    marketing__submissions__lead__position__in=filters['position'], status='on_project'
+                    marketing__submissions__lead__position__in=filters['jobPosition'], status='on_project'
                 )
 
             if 'visa_end' in filters:
