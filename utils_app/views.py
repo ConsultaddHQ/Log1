@@ -63,9 +63,9 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            field = request.GET.get('field')
+            field = request.GET.get('field', None)
             model = request.GET.get('model', None)
-            queryset = self.queryset.filter(field=field)
+            queryset = self.queryset.filter(field=field) if field else self.queryset
             if model:
                 content_type = ContentType.objects.get(model=model)
                 queryset = queryset.filter(content_type=content_type)
@@ -125,7 +125,27 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
         try:
             choices = Choice.objects.filter(field='technology', content_type__model='user').values('name')
             technologies = [choice['name'] for choice in choices]
+            technologies.append('Other')
             return Response({"data": technologies}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=False, url_path='add_technology')
+    def add_technology(self, request):
+        try:
+            technologies = request.data['technology']
+            content_type = ContentType.objects.get(model='user')
+            for technology in technologies:
+                available_technology = Choice.objects.filter(
+                    field='technology', content_type=content_type, name__iexact=technology
+                )
+                if not available_technology:
+                    Choice.objects.create(
+                        field='technology', content_type=content_type,
+                        display_name=technology, name=technology
+                    )
+            return Response({"message": "updated technologies"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
