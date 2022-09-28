@@ -703,7 +703,7 @@ def candidate_filter(request):
 
             if 'position' in filters:
                 consultants = consultants.filter(
-                    marketing__submissions__lead__position__in=filters['position']
+                    marketing__submissions__lead__position__in=filters['position'], status='on_project'
                 )
 
             if 'visa_end' in filters:
