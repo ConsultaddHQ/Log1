@@ -1036,7 +1036,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     if category == 'support_name':
                         projects = projects.filter(support__support__employee_name__istartswith=query)
                     elif category == 'remote_consultant':
-                        projects = projects.filter(submission__consultant__name__istartswith=query)
+                        projects = projects.filter(consultant__name__istartswith=query)
                     elif category == 'client':
                         projects = projects.filter(submission__client__istartswith=query)
                     elif category == 'vendor_name':

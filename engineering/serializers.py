@@ -576,7 +576,7 @@ class RemoteProjectSerializer(serializers.ModelSerializer):
             data = {
                 "name": support_engineer.support.employee_name,
                 "start_date": support_engineer.start,
-                "status": status, "duration": duration
+                "status": status.lower(), "duration": duration
             }
         else:
             data = {"name": "", "start_date": "", "status": status.lower(), "duration": duration}
