@@ -410,7 +410,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
     def get_project(self, obj):
         frequency = self.context.get("frequency")
         projects = obj.projects.filter(end=None, project__is_remote__in=[False, None]).exclude(
-            project__statuses__is_current=True, project__statuses__status__istartswith='terminated',
+            project__statuses__is_current=True, project__statuses__status__istartswith='terminated'
         )
         if frequency == ['training']:
             projects = projects.filter(statuses__frequency='active', statuses__is_current=True,

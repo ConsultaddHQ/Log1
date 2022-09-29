@@ -72,7 +72,7 @@ def get_engineer_detail_csv(payload, request):
         writer = csv.writer(file)
         writer.writerow([
             "Engineer name", "Consultant Name", "Support Start Date", "Project Start Date", "Support Duration",
-            "Technology", "Client", "Modified at", "Timezone", "Status", "Remote",
+            "Technology", "Client", "Modified at", "Timezone", "Status", "Remote"
         ])
         for data in payload:
             count = 0
