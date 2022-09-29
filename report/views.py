@@ -973,13 +973,13 @@ class MarketingReportViewSets(GenericViewSet):
             data = []
 
             for sup in supervisors:
-                interview_count = Interview.objects.filter(supervisor=sup, created__gte=start, created__lte=end) \
+                interview_count = Interview.objects.filter(supervisor=sup, start_time__gte=start, start_time__lte=end) \
                     .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).count()
                 pass_count = Interview.objects.filter(
-                    supervisor=sup, created__gte=start, created__lte=end, status__in=['offer', 'next_round']
+                    supervisor=sup, start_time__gte=start, start_time__lte=end, status__in=['next_round', 'offer']
                 ).count()
                 fail_count = Interview.objects.filter(
-                    supervisor=sup, created__gte=start, created__lte=end, status='failed'
+                    supervisor=sup, start_time__gte=start, start_time__lte=end, status='failed'
                 ).count()
                 data.append({
                     "id": sup.id, "name": sup.employee_name, "interviews": interview_count, "email": sup.email,
@@ -1019,7 +1019,7 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today() + timedelta(days=1)
 
-            interviews = Interview.objects.filter(supervisor_id__in=supervisors, created__gte=start, created__lte=end)\
+            interviews = Interview.objects.filter(supervisor_id__in=supervisors, start_time__gte=start, start_time__lte=end)\
                 .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).order_by('-round')
             max_rounds = interviews.first().round if interviews else 0
             for sup_id in supervisors:
