@@ -226,11 +226,11 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                 if os.environ.get('ENV', 'local') == 'prod':
                     to = [consultant.email]
                 else:
-                    to = ['shreyas.k@consultadd.com']
+                    to = ['piyush.y@consultadd.com']
                 mail_data = {
                     'to': to,
                     'cc': [],
-                    'bcc': [],
+                    'bcc': ['shreyas.k@consultadd.com'],
                     'subject': 'Reset Log1 Password',
                     'template': '../templates/con_password_reset.html',
                     'context': {

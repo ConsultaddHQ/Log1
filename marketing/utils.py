@@ -71,7 +71,7 @@ def date_filter(queryset, timestamp, field_str):
         lte = timestamp.get('lte', None)
         gte = timestamp.get('gte', None)
         if lte:
-            filters[f"{field_str}__lt"] = lte
+            filters[f"{field_str}__lte"] = lte
         if gte:
             filters[f"{field_str}__gte"] = gte
     return queryset.filter(**filters)
