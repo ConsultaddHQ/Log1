@@ -1403,7 +1403,7 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             consultant = get_object_or_404(Consultant, id=consultant_id)
             queryset = self.queryset.filter(consultant=consultant).order_by('-leave_type__year')
             if year:
-                queryset = queryset.filter(year=year)
+                queryset = queryset.filter(leave_type__year=year)
             if status:
                 queryset = queryset.filter(status=status)
             if end:
