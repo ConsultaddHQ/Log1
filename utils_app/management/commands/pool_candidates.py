@@ -38,9 +38,11 @@ class Command(BaseCommand):
                     if con.start:
                         days = (date.today() - con.start).days
                     if con.primary_marketer:
-                        marketer = con.primary_marketer.employee_name
+                        marketer = f'<@{con.primary_marketer.slack_id}>' \
+                            if con.primary_marketer.slack_id else con.primary_marketer.employee_name
                     if con.recruiter:
-                        recruiter = con.consultant.recruiter.employee_name
+                        recruiter = f'<@{con.consultant.recruiter.slack_id}>' \
+                            if con.consultant.recruiter.slack_id else con.consultant.recruiter.employee_name
                     open_offer_count = con.consultant.projects.filter(
                         statuses__is_current=True, statuses__status__in=['on_boarding', 'received']
                     ).count()
