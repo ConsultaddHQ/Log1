@@ -14,6 +14,7 @@ class Command(BaseCommand):
         job = create_cron_object(name='pool_candidates')
         try:
             count = 1
+            slack_payload = []
             in_pool_con = ConsultantMarketing.objects.filter(
                 in_pool=True,
                 status='open'
@@ -37,9 +38,11 @@ class Command(BaseCommand):
                     if con.start:
                         days = (date.today() - con.start).days
                     if con.primary_marketer:
-                        marketer = con.primary_marketer.employee_name
+                        marketer = f'<@{con.primary_marketer.slack_id}>' \
+                            if con.primary_marketer.slack_id else con.primary_marketer.employee_name
                     if con.recruiter:
-                        recruiter = con.consultant.recruiter.employee_name
+                        recruiter = f'<@{con.consultant.recruiter.slack_id}>' \
+                            if con.consultant.recruiter.slack_id else con.consultant.recruiter.employee_name
                     open_offer_count = con.consultant.projects.filter(
                         statuses__is_current=True, statuses__status__in=['on_boarding', 'received']
                     ).count()
@@ -54,29 +57,33 @@ class Command(BaseCommand):
 <td style="padding:5px 8px 5px 8px;font-size: 2.5em;">{con.consultant.skills}</td>
 <td style="padding:5px 8px 5px 8px;font-size: 2.5em;text-align: center;">{open_offer_count}</td>
 </tr>\n"""
-
-                    if count % 35 == 0:
-                        data = {
-                            "title": "Pool Candidates &#127958;",
-                            "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
-                        }
-
-                        payload = {
-                            "data": data, "title": data.get('title'), "report_name": job.name,
-                        }
-                        # res2, msg2 = MessageCard.data_report(payload, config.slack_pool_channel_url)
-                        # if msg2 == 'error':
-                        #     create_cron_error(job, res2)
-                        text = f"""<tr>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">#</th>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Consultant</th>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Team</th>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Days</th>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Recruiter</th>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Marketer</th>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Skills</th>
-                                    <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Open Offer</th>
-                                    </tr>"""
+                    data = {
+                        "consultant": con.consultant.name, "team": team, "days": days, "marketer": marketer,
+                        "recruiter": recruiter, "skills": con.consultant.skills, "open_offer": open_offer_count
+                    }
+                    slack_payload.append(data)
+                    # if count % 35 == 0:
+                    #     data = {
+                    #         "title": "Pool Candidates &#127958;",
+                    #         "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
+                    #     }
+                    #
+                    #     payload = {
+                    #         "data": data, "title": data.get('title'), "report_name": job.name,
+                    #     }
+                    #     # res2, msg2 = MessageCard.data_report(payload, config.slack_pool_channel_url)
+                    #     # if msg2 == 'error':
+                    #     #     create_cron_error(job, res2)
+                    #     text = f"""<tr>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">#</th>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Consultant</th>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Team</th>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Days</th>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Recruiter</th>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Marketer</th>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Skills</th>
+                    #                 <th style="padding:5px 8px 5px 8px;font-size: 2.5em;">Open Offer</th>
+                    #                 </tr>"""
 
                     count += 1
             data = {
@@ -84,11 +91,9 @@ class Command(BaseCommand):
                 "text": f"""<table border='5' style='border-collapse:collapse; width:99vw; height:99vh'>{text}</table>"""
             }
 
-            payload = {
-                "data": data, "title": data.get('title'), "report_name": job.name,
-            }
-            # res, msg = MessageCard.data_report(payload, config.slack_pool_channel_url)
-            # if msg == 'error':
-            #     raise Exception(res)
+            payload = {"data": slack_payload, "report_name": job.name}
+            res, msg = MessageCard.pool_candidate_report(payload, config.slack_test_team_url)
+            if msg == 'error':
+                raise Exception(res)
         except Exception as error:
             create_cron_error(job, error)

@@ -844,7 +844,7 @@ class MessageCard:
             return str(error)
 
     @staticmethod
-    def data_report(payload, url):
+    def interview_data_report(payload, url):
         try:
             if payload.get('data') is None:
                 return "No data to display", "ok"
@@ -890,6 +890,77 @@ class MessageCard:
                             }
                         ]
                     },                    
+                )
+                sl += 1
+            card_data['blocks'].append(
+                {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": "Download CSV"
+                                },
+                                "style": "primary",
+                                "url": file_url,
+                                "value": "click_me_123",
+                                "action_id": "button-action"
+                            }
+                        ]
+                },
+            )
+            res, msg = post_msg_using_webhook(url, card_data)
+            return res, msg
+        except Exception as error:
+            return error, "error"
+
+    @staticmethod
+    def pool_candidate_report(payload, url):
+        try:
+            if payload.get('data') is None:
+                return "No data to display", "ok"
+            file_url = create_csv_file(payload)
+            card_data = {
+                "blocks": [
+                  {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":memo: Pool Candidate",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    },
+                ]
+            }
+            sl = 1
+            for data in payload['data']:
+                if sl<10:
+                    first_column = f"`{sl}.` *Consultant:* {data.get('consultant', None)}\n\t   " \
+                                   f"*Team:* {data.get('team')}\n\t   *Skills*: {data.get('skills')}"
+                else:
+                    first_column = f"`{sl}.` *Consultant:* {data.get('consultant', None)}\n\t    " \
+                                   f"*Team:* {data.get('team')}\n\t    *Skills*: {data.get('skills')}"
+
+                card_data['blocks'].append(
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": first_column
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"`Days` {data.get('days')}\n `Recruiter` {data.get('recruiter', None)} "
+                                        f"\n `Marketer` {data.get('marketer')}\n `Open Offer` {data.get('open_offer')}"
+                            }
+                        ]
+                    },
                 )
                 sl += 1
             card_data['blocks'].append(
