@@ -154,8 +154,8 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_submitted_at(obj):
-        if obj.sumitted_at:
-            return obj.sumitted_at.date()
+        if obj.submitted_at:
+            return obj.submitted_at.date()
         return None
 
     @staticmethod
