@@ -141,6 +141,7 @@ class TimeSheetSerializer(serializers.ModelSerializer):
 
 
 class FinanceSerializer(serializers.ModelSerializer):
+    submitted_at = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
@@ -150,6 +151,12 @@ class FinanceSerializer(serializers.ModelSerializer):
         model = TimeSheet
         fields = ('id', 'start', 'end', 'status', 'hours', 'additional_hours', 'submitted_at', 'status_updated_at',
                   'status_updated_by', 'modified', 'attachments', 'remark', 'project', 'con_comment')
+
+    @staticmethod
+    def get_submitted_at(obj):
+        if obj.sumitted_at:
+            return obj.sumitted_at.date()
+        return None
 
     @staticmethod
     def get_start(obj):
