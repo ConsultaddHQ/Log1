@@ -693,6 +693,6 @@ class MessageCard:
             return str(error)
 
     @staticmethod
-    def data_report(data, url):
+    def interview_data_report(data, url):
         res, msg = post_msg_using_webhook(url, data["data"])
         return res, msg

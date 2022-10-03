@@ -9,7 +9,7 @@ from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -177,10 +177,12 @@ class FinanceSerializer(serializers.ModelSerializer):
 class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
     ts_status = serializers.SerializerMethodField()
+    pending_leave = serializers.SerializerMethodField()
+    pending_request = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'ts_status', 'project')
+        fields = ('id', 'name', 'email', 'ts_status', 'project', 'pending_leave', 'pending_request')
 
     @staticmethod
     def get_project(obj):
@@ -207,6 +209,18 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         submitted_ts = True if queryset.filter(status__in=['submitted', 'updated']) else False
         rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
         return {'submitted': submitted_ts, 'rejected': rejected_ts}
+
+    @staticmethod
+    def get_pending_leave(obj):
+        leaves = obj.leaves.filter(leave_type__is_expired=False, status='applied').order_by('created')
+        if leaves:
+            return True
+        return False
+
+    @staticmethod
+    def get_pending_request(obj):
+        queryset = TimesheetRequest.objects.filter(project__consultant=obj)
+        return True if queryset.filter(status='applied') else False
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
@@ -359,7 +373,7 @@ class ConsultantLeaveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ConsultantLeave
-        fields = ('id', 'granted', 'balance', 'leave_type', 'year')
+        fields = ('id', 'granted', 'balance', 'leave_type', 'year', 'is_expired')
 
     @staticmethod
     def get_leave_type(obj):
