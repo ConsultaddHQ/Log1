@@ -182,7 +182,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'ts_status', 'project', 'pending_leave', 'pending_request', 'pending_request')
+        fields = ('id', 'name', 'email', 'ts_status', 'project', 'pending_leave', 'pending_request')
 
     @staticmethod
     def get_project(obj):
