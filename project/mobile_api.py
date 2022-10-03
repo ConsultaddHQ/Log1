@@ -627,11 +627,11 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             if available_timesheet:
                 timesheet = available_timesheet.first()
                 available_week = f"{timesheet.start} - {timesheet.end}"
-                return Response({"message": f"Timesheet available for week {available_week}"}, status=400)
+                return Response({"error": f"Timesheet available for week {available_week}"}, status=400)
 
             pending_request = TimesheetRequest.objects.filter(project=project, start=start).order_by('-created')
             if pending_request:
-                return Response({"message": f"Timesheet already requested for week {start} - {end}"}, status=400)
+                return Response({"error": f"Timesheet already requested for week {start} - {end}"}, status=400)
 
             requested_week = TimesheetRequest.objects.create(
                 start=start, end=end, project=project, status='request', consultant_comment=request.data.get('comment')
