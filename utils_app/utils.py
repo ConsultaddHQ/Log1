@@ -38,11 +38,11 @@ def create_csv_file(payload):
         file = open(f'{filename}.csv', 'w')
         writer = csv.writer(file)
         row_data = payload['data']
-        writer.writerow(['CTB', 'Round', 'Type', 'Start Time', 'Consultant', 'Client', 'Marketer', 'Job Position'])
+        writer.writerow(['Consultant', 'Marketer', 'Recruiter', 'Days', 'Team', 'Skills', 'Open Offer Count'])
         for data in row_data:
             writer.writerow(
-                [data.get('ctb_name'), data.get('round'), data.get('type'), data.get('start'), data.get('consultant'),
-                 data.get('client'), data.get('marketer'), data.get('position')]
+                [data.get('consultant'), data.get('marketer'), data.get('recruiter'), data.get('days'),
+                 data.get('team'), data.get('skills'), data.get('open_offer'), data.get('position')]
             )
         file.close()
         file_url = generate_s3_url(file.name)

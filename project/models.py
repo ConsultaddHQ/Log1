@@ -282,7 +282,7 @@ class ConsultantLeave(TimeStampedModel):
     leave_type = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name='type')
     consultant = models.ForeignKey(
         Consultant, on_delete=models.PROTECT,
-        related_name='leaves', verbose_name='Consultant'
+        related_name='leaves_balance', verbose_name='Consultant'
     )
 
     def save(self, *args, **kwargs):
@@ -296,16 +296,26 @@ class ConsultantLeave(TimeStampedModel):
 
 
 class Leave(TimeStampedModel):
+    LEAVE_STATUS = (
+        ('applied', 'Applied'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
     attachment = GenericRelation(Attachment)
     to_date = models.DateField(_("To Date"))
     from_date = models.DateField(_("From Date"))
     applied_on = models.DateField(_("Leave Apply Date"))
+    remarks = models.TextField(_('Remark'), null=True, blank=True)
     description = models.TextField(_('Description'), null=True, blank=True)
-    status = models.CharField(_('Status'), max_length=30, null=True, blank=True)
+    status = models.CharField(_('Status'), max_length=30, choices=LEAVE_STATUS)
     total_hours = models.FloatField(_('Total Hours'), max_length=30, null=True, blank=True)
     leave_type = models.ForeignKey(
         ConsultantLeave, on_delete=models.CASCADE,
         related_name='leaves', verbose_name='Leave'
+    )
+    consultant = models.ForeignKey(
+        Consultant, null=True, blank=True,
+        on_delete=models.PROTECT, related_name='leaves', verbose_name='Consultant'
     )
 
     def save(self, *args, **kwargs):
@@ -327,9 +337,9 @@ class TimesheetRequest(TimeStampedModel):
     attachments = GenericRelation(Attachment)
     end = models.DateField(_('End'), null=True, blank=True)
     start = models.DateField(_('Start'), null=True, blank=True)
+    status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS)
     reviewer_comment = models.TextField(_('Reviewer Comment'), null=True, blank=True)
     consultant_comment = models.TextField(_('Consultant Comment'), null=True, blank=True)
-    status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS, default='draft')
     reviewed_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='timesheet_req',
