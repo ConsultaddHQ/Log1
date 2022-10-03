@@ -30,11 +30,13 @@ from utils_app.thred_mail import send_email as send_email_, send_email_attachmen
 
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant
-from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus
+from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus, \
+    ConsultantLeave, Leave
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
-    ProjectSupportSerializer, ConsultantTimeSheetSerializer
+    ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
+    ConsultantLeaveSerializer
 
 
 # Route - /project/
@@ -1187,21 +1189,27 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         start = request.GET.get('start', None)
+        status = request.GET.get('status', None)
+        project_id = request.GET.get('project_id', None)
         end = request.GET.get('end', date.today().strftime('%Y-%m-%d'))
 
         try:
-            projects = Project.objects.filter(
-                Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
-                        Q(statuses__status__istartswith='terminated') |
-                        Q(statuses__status='complete') | Q(statuses__status='joined')
+            if project_id:
+                projects = Project.objects.get(id=project_id)
+            else:
+                projects = Project.objects.filter(
+                    Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
+                            Q(statuses__status__istartswith='terminated') |
+                            Q(statuses__status__in=['complete', 'joined', 'extended'])
+                    )
                 )
-            )
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                projects = projects.filter(
-                    Q(submission__client__istartswith=query) |
-                    Q(submission__lead__vendor_company__name__istartswith=query)
-                )
+
+                if query:
+                    query = query.lstrip().replace(':amp:', '&')
+                    projects = projects.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query)
+                    )
             if projects:
                 ids = list(projects.values_list('id', flat=True))
                 if start:
@@ -1213,6 +1221,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 else:
                     queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
 
+                if status == 'pending':
+                    queryset = queryset.filter(status__in=['submitted', 'updated'])
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"data": serializer.data, 'total': total}, status=200)
@@ -1337,6 +1347,181 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             queryset = TimeSheet.objects.filter(id=pk)
             serializer = self.serializer_class(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["get"], detail=True, url_name="projects")
+    def projects(self, request, *args, **kwargs):
+        try:
+            project_id = request.GET.get('project_id', None)
+
+            if not project_id:
+                projects = Project.objects.filter(
+                    Q(consultant_id=kwargs.get('pk'), statuses__is_current=True) & (
+                            Q(statuses__status='joined') |
+                            Q(statuses__status__istartswith='terminated') |
+                            Q(statuses__status__in=['complete', 'extended'])
+                    )
+                ).annotate(
+                    client=F('submission__client'),
+                    vendor=F('submission__lead__vendor_company__name'),
+                ).values('id', 'client', 'vendor').order_by('-start_date')
+                return Response({'result': projects}, status=200)
+
+            else:
+                project = get_object_or_404(Project, id=project_id, consultant_id=kwargs.get('pk'))
+                data = {
+                    "id": project.consultant.id, "project_id": project.id,
+                    "name": project.consultant.name, "email": project.consultant.email,
+                    "team": project.submission.marketing_team.name, "start_date": project.start_date,
+                    "client": project.submission.client, "marketer": project.submission.created_by.employee_name
+                }
+                return Response({'result': data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+
+# Route - /finance/<consultant_id>/leave/
+class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
+    queryset = Leave.objects.all()
+    serializer_class = LeaveSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        consultant_id = kwargs.get('consultant_id')
+
+        try:
+            end = request.GET.get('end')
+            year = request.GET.get('year')
+            start = request.GET.get('start')
+            status = request.GET.get('status')
+            leave_type = request.GET.get('leave_type')
+            consultant = get_object_or_404(Consultant, id=consultant_id)
+            queryset = self.queryset.filter(consultant=consultant).order_by('-leave_type__year')
+            if year:
+                queryset = queryset.filter(year=year)
+            if status:
+                queryset = queryset.filter(status=status)
+            if end:
+                queryset = queryset.filter(to_date__lte=end)
+            if start:
+                queryset = queryset.filter(from_date__gte=start)
+            if leave_type:
+                queryset = queryset.filter(leave_type__leave_type__id=leave_type)
+
+            serializer = LeaveSerializer(queryset, many=True)
+            return Response({"data": serializer.data[first: last], 'total': len(queryset)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
+
+        try:
+            status = request.data.get('status', None)
+            if not status:
+                return Response({"message": "No action selected"}, status=200)
+            leave = get_object_or_404(Leave, id=kwargs.get('pk'), consultant=consultant)
+            leave.status = status
+            leave.remarks = request.data.get('remarks', None)
+            leave.save()
+
+            sender_content_type = ContentType.objects.get(model='user')
+            target_content_type = ContentType.objects.get(model='leave')
+            recipient_content_type = ContentType.objects.get(model='consultant')
+            title = f"Leave {leave.status} for date {leave.from_date}"
+
+            Notification.objects.create(
+                category="info", recipient_content_type=recipient_content_type,
+                title=title, recipient_object_id=leave.consultant.id,
+                sender_content_type=sender_content_type, target_content_type=target_content_type,
+                description=title, target_object_id=leave.id, sender_object_id=request.user.id,
+            )
+
+            # Push Notification
+            message_body = {
+                "body": title, "title": title, "category": "info",
+                "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "data": {
+                    'target': 'timesheet', 'target_id': leave.id,
+                    'is_read': False, 'is_deleted': False, 'timestamp': str(timezone.now()),
+                },
+            }
+            object_ids = leave.consultant.consultant_token.all().values_list('key', flat=True)
+            registration_ids = list(
+                FCMDevice.objects.filter(
+                    object_id__in=list(object_ids), content_type__model='consultanttoken'
+                ).values_list('device_id', flat=True))
+            push_notification_consultant(registration_ids, message_body)
+
+            return Response({"message": "Leave updated successfully"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["get"], detail=False, url_name="balances")
+    def balances(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('consultant_id')
+            year = request.GET.get('year', date.today().year)
+            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
+            serializer = ConsultantLeaveSerializer(queryset, many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["put"], detail=True, url_name="update_balances")
+    def update_balances(self, request, *args, **kwargs):
+        try:
+            consultant_id = kwargs.get('consultant_id')
+            leave_type = get_object_or_404(ConsultantLeave, id=kwargs.get('pk'))
+            changed_balance = request.data.get('granted_leaves')
+            if not changed_balance:
+                return Response({"message": "No value entered"}, status=400)
+
+            prev_granted_balance = leave_type.granted
+            if prev_granted_balance == changed_balance:
+                return Response({"message": "No update in balance"}, status=400)
+            diff = changed_balance - prev_granted_balance
+            leave_type.granted = changed_balance
+            leave_type.balance = leave_type.balance + diff
+            leave_type.save()
+
+            sender_content_type = ContentType.objects.get(model='user')
+            target_content_type = ContentType.objects.get(model='leave')
+            recipient_content_type = ContentType.objects.get(model='consultant')
+            title = f"{leave_type.leave_type.display_name} balance updated"
+
+            Notification.objects.create(
+                title=title, recipient_object_id=consultant_id,
+                category="info", recipient_content_type=recipient_content_type,
+                sender_content_type=sender_content_type, target_content_type=target_content_type,
+                description=title, target_object_id=leave_type.id, sender_object_id=request.user.id,
+            )
+
+            # Push Notification
+            message_body = {
+                "body": title, "title": title, "category": "info",
+                "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "data": {
+                    'target': 'timesheet', 'target_id': leave_type.id,
+                    'is_read': False, 'is_deleted': False, 'timestamp': str(timezone.now()),
+                },
+            }
+            object_ids = leave_type.consultant.consultant_token.all().values_list('key', flat=True)
+            registration_ids = list(
+                FCMDevice.objects.filter(
+                    object_id__in=list(object_ids), content_type__model='consultanttoken'
+                ).values_list('device_id', flat=True))
+            push_notification_consultant(registration_ids, message_body)
+
+            return Response({"message": "Leave balance updated"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
