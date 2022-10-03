@@ -710,6 +710,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
             leave = Leave.objects.create(
                 leave_type=leave_type,
+                consultant=request.user,
                 applied_on=date.today(),
                 to_date=data.get('to_date'),
                 from_date=data.get('from_date'),
@@ -728,7 +729,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                 total_days = check_days(start, end, request)
                 leave.total_hours = total_days * 8
 
-            leave.status = 'availed'
+            leave.status = 'applied'
             leave.save()
             leave_type.balance = leave_type.balance - leave.total_hours
             leave_type.save()
