@@ -432,8 +432,8 @@ class ProjectViewSets(ModelViewSet):
                 if 'client' in filters and len(filters["client"]) > 0:
                     projects = projects.filter(submission__client=filters['client'])
 
-                if 'w2' in filters:
-                    projects = projects.filter(submission__lead__is_w2=filters['w2'])
+                if 'work_type' in filters:
+                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     projects = projects.filter(submission__created_by_id__in=filters['marketer'])
@@ -470,8 +470,8 @@ class ProjectViewSets(ModelViewSet):
                     projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
                     projects = (projects | not_joined).distinct('id')
             else:
-                if filter_by_lead == 'w2':
-                    projects = projects.filter(submission__lead__is_w2=True)
+                if filter_by_lead:
+                    projects = projects.filter(submission__work_type=filter_by_lead)
 
                 if filter_by_time:
                     projects = get_time_filter(projects, filter_by_time)

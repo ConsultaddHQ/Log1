@@ -51,7 +51,7 @@ class LeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = ('id', 'job_desc', 'job_title', 'primary_skill', 'city', 'vendor_company_id', 'vendor_company_name',
-                  'owner', 'status', 'created', 'modified', 'is_w2', 'position_name')
+                  'owner', 'status', 'created', 'modified', 'is_w2', 'position_name', 'position_type')
 
 
 class SubmissionCreateSerializer(serializers.ModelSerializer):
@@ -378,7 +378,7 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer')
+                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type')
 
     @staticmethod
     def get_vendor_layer(obj):
@@ -402,7 +402,7 @@ class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Submission
         fields = ('id', 'lead', 'rate', 'client', 'employer', 'email', 'phone', 'status', 'is_active', 'vendor_contact',
-                  'marketer_name', 'is_complete', 'vendor_layer')
+                  'marketer_name', 'is_complete', 'vendor_layer', 'work_type')
 
     @staticmethod
     def get_marketer_name(obj):
