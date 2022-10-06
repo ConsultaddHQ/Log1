@@ -1373,6 +1373,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 project = get_object_or_404(Project, id=project_id, consultant_id=kwargs.get('pk'))
                 data = {
                     "id": project.consultant.id, "project_id": project.id,
+                    "vendor": project.submission.lead.vendor_company.name,
                     "name": project.consultant.name, "email": project.consultant.email,
                     "team": project.submission.marketing_team.name, "start_date": project.start_date,
                     "client": project.submission.client, "marketer": project.submission.created_by.employee_name
