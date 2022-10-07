@@ -26,13 +26,15 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserDashboardSerializer(serializers.ModelSerializer):
     team = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
+    display_roles = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'roles', 'gender', 'phone',
-                  'is_superuser', 'technology', 'shift', 'project')
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'gender', 'phone', 'roles',
+                  'is_superuser', 'technology', 'shift', 'project', 'display_roles')
 
     @staticmethod
     def get_team(obj):
@@ -48,6 +50,16 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     def get_avatar(obj):
         if obj.avatar:
             return obj.avatar.url
+
+    @staticmethod
+    def get_roles(obj):
+        if obj.role.all():
+            return obj.role.all().values_list('name', flat=True)
+
+    @staticmethod
+    def get_display_roles(obj):
+        if obj.role.all():
+            return obj.role.all().values_list('display_name', flat=True)
 
     @staticmethod
     def get_project(obj):
@@ -107,7 +119,7 @@ class RoleSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_name(obj):
-        return obj.name.title().replace("_", " ")
+        return obj.display_name
 
 
 class UserDirectorySerializer(serializers.ModelSerializer):
