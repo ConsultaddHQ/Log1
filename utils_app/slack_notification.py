@@ -928,7 +928,7 @@ class MessageCard:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": ":memo: Pool Candidate",
+                            "text": ":memo: Pool Candidates",
                             "emoji": True
                         }
                     },
