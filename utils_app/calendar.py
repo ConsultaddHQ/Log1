@@ -2,6 +2,7 @@ import os
 import json
 import os.path
 import requests
+from google.auth.exceptions import RefreshError
 from googleapiclient import discovery
 from google.oauth2.service_account import Credentials
 from log1.utils import write_exception, write_info
@@ -10,6 +11,7 @@ from log1.utils import write_exception, write_info
 
 SCOOPS = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/admin.directory.user']
 SERVICE_ACCOUNT_FILE = 'calendar.json'
+
 
 class GoogleCalendar:
 
@@ -91,26 +93,36 @@ class GoogleCalendar:
             },
         }
 
-    def book_calendar(self, data, calendar_id):
+    def book_calendar(self, data, calendar_id, request=None):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
                 calendar_id = "suman.m@consultadd.com"
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
-            event = service.events().insert(calendarId=calendar_id, body=event, sendUpdates='all').execute()
+            try:
+                event = service.events().insert(calendarId=calendar_id, body=event, sendUpdates='all').execute()
+            except RefreshError:
+                calendar = Calendar(request=request)
+                cal_res, msg = calendar.book_ms_calendar(data)
+                return cal_res, msg
             return event, "ok"
         except Exception as error:
             write_info(message=error, function='book_calendar')
             return str(error), "error"
 
-    def update_calendar(self, event_id, data, calendar_id):
+    def update_calendar(self, event_id, data, calendar_id, request=None):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
                 calendar_id = "suman.m@consultadd.com"
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
-            updated_event = service.events().update(calendarId=calendar_id, eventId=event_id, body=event,
-                                                    sendUpdates='all').execute()
+            try:
+                updated_event = service.events().update(calendarId=calendar_id, eventId=event_id, body=event,
+                                                        sendUpdates='all').execute()
+            except RefreshError:
+                calendar = Calendar(request=request)
+                cal_res, msg = calendar.update_ms_calendar(calendar_id, data)
+                return cal_res, msg
             return updated_event, 'ok'
         except Exception as error:
             write_info(message=error, function='update_calendar')
@@ -141,8 +153,178 @@ class GoogleCalendar:
         try:
             if os.environ.get('ENV', 'local') != 'prod':
                 calendar_id = "suman.m@consultadd.com"
-            service.events().delete(calendarId=calendar_id, eventId=event_id, sendUpdates='all').execute()
+            service = self.calendar_con(calendar_id)
+            try:
+                service.events().delete(calendarId=calendar_id, eventId=event_id, sendUpdates='all').execute()
+            except RefreshError:
+                calendar = Calendar(request=request)
+                cal_res, msg = calendar.delete_ms_calendar(calendar_id)
+                return cal_res, msg
             return True, "ok"
         except Exception as error:
             write_exception(message=error, request=request)
+            return str(error), "error"
+
+
+class Calendar:
+    def __init__(self, request=None):
+        self.request = request
+        self.headers = self.get_ms_header(request)
+
+    @staticmethod
+    def get_ms_header(request=None):
+        try:
+            tenant_id = os.environ.get('tenant_id')
+            client_id = os.environ.get('client_id')
+            client_secret = os.environ.get('client_secret')
+            scope = 'https%3A//graph.microsoft.com/.default'
+
+            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+            url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+            payload = f'client_id={client_id}&client_secret={client_secret}&scope={scope}&grant_type=client_credentials'
+
+            response = requests.request("POST", url, headers=headers, data=payload)
+            data = json.loads(response.text.encode('utf8'))
+
+            access_token = None
+            if response.status_code == 200:
+                access_token = data["access_token"]
+
+            headers = {
+                "Authorization": "bearer " + access_token if access_token else "bearer ",
+                "Content-Type": "application/json"
+            }
+            return headers
+        except Exception as error:
+            write_exception(message=error, request=request)
+            return None
+
+    @staticmethod
+    def calendar_ms_description(data):
+        description = f'''
+
+        <div><Strong>Calling Details</Strong></div> 
+            {data.get('call_details', 'Not mentioned')} </br></br>
+
+        <div><Strong>Marketer Name -</Strong> {data["user"].employee_name}</div> 
+        <div><Strong>Employer - </Strong>{data["submission"].employer}</div> </br>
+
+        <div><Strong>consultant Details:</Strong> </div>
+
+           <Strong> Name -</Strong> {data["consultant"].name}  </br>
+           <Strong> DOB - </Strong>{data["submission"].date_of_birth}</br> 
+            <Strong>SSN -</Strong> {data["consultant"].ssn} </br>
+            <Strong>VISA - </Strong>{data["submission"].visa_type}</br> 
+            <Strong>Visa Start -</Strong> {data["submission"].visa_start}</br> 
+            <Strong>Visa End -</Strong>{data["submission"].visa_end}</br>
+
+           <Strong> Skype id </Strong>- {data["consultant"].skype}</br>
+
+            <Strong>Education </Strong>- {data["submission"].education}</br></br>
+
+        <div><Strong>Position Details:</Strong></div>
+
+           <Strong> Location - </Strong>{data["lead"].city}</br>
+           <Strong> Job Title - </Strong>{data["lead"].job_title}</br>
+           <Strong> Client Name - </Strong>{data["submission"].client}</br></br>
+
+        <div><Strong>Extra details:</Strong> </div>
+            {data["description"]}</br></br>
+
+        <div><Strong>Job Description:</Strong></div>
+            {data["lead"].job_desc}</br></br>
+
+        '''
+        return description
+
+    def get_ms_body(self, data):
+        description = self.calendar_ms_description(data)
+        attendees = []
+        for i in data['attendees']:
+            attendees.append({
+                "EmailAddress": {
+                    "Address": i['email'],
+                },
+            })
+        return json.dumps({
+            "Subject": data["summary"],
+            "Body": {
+                "ContentType": "HTML",
+                "Content": description
+            },
+            "Start": {
+                "DateTime": str(data["start"]),
+                "TimeZone": "Eastern Standard Time"
+            },
+            "End": {
+                "DateTime": str(data["end"]),
+                "TimeZone": "Eastern Standard Time"
+            },
+            "Attendees": attendees
+        })
+
+    def book_ms_calendar(self, data):
+        try:
+            if os.environ.get('ENV', 'local') == 'prod':
+                if not self.headers:
+                    return False, "error"
+                event = self.get_ms_body(data)
+
+                url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/"
+                response = requests.post(url, headers=self.headers, data=event)
+                data = json.loads(response.text.encode('utf-8'))
+                if response.status_code == 201:
+                    return data, "ok"
+                else:
+                    write_info(message=data, function='book_ms_calendar', request=self.request)
+                    return str(data), "error"
+            return {"id": "Calendar ID"}, "ok"
+        except Exception as error:
+            write_exception(message=error, request=self.request)
+            return str(error), "error"
+
+    def update_ms_calendar(self, event_id, data):
+        try:
+            if os.environ.get('ENV', 'local') == 'prod':
+                if not self.headers:
+                    return False, "error"
+
+                event = self.get_ms_body(data)
+                url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
+                response = requests.patch(url, headers=self.headers, data=event)
+                response_data = json.loads(response.text.encode('utf-8'))
+                if response.status_code == 200:
+                    return response_data, "updated"
+                if response.status_code == 404:
+                    response_data, msg = self.book_ms_calendar(data)
+                    if msg == 'ok':
+                        return response_data, "booked"
+                    else:
+                        write_info(message=response_data, function='update_ms_calendar', request=self.request)
+                        return str(response_data), "error"
+                else:
+                    write_info(message=response_data, function='update_ms_calendar', request=self.request)
+                    return str(response_data), "error"
+            return {"id": "Calendar ID"}, "booked"
+        except Exception as error:
+            write_exception(message=error, request=self.request)
+            return str(error), "error"
+
+    def delete_ms_calendar(self, event_id):
+        try:
+            if os.environ.get('ENV', 'local') == 'prod':
+                if not self.headers:
+                    return False, "error"
+
+                url = f"https://graph.microsoft.com/v1.0/Users/{os.environ.get('user_id')}/events/{event_id}/"
+                response = requests.delete(url, headers=self.headers)
+                if response.status_code == 204:
+                    return True, "ok"
+                else:
+                    response_data = json.loads(response.text.encode('utf-8'))
+                    write_info(message=response_data, function='delete_ms_calendar', request=self.request)
+                    return False, "error"
+            return True, "ok"
+        except Exception as error:
+            write_exception(message=error, request=self.request)
             return str(error), "error"

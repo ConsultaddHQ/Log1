@@ -373,6 +373,7 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     vendor_contact = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     vendor_layer = serializers.SerializerMethodField()
+    work_type = serializers.SerializerMethodField()
     lead = LeadSerializer(read_only=True)
 
     class Meta:
@@ -392,10 +393,15 @@ class SubmissionV2Serializer(serializers.ModelSerializer):
     def get_marketer_name(obj):
         return obj.created_by.employee_name
 
+    @staticmethod
+    def get_work_type(obj):
+        return obj.get_work_type_display()
+
 
 class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     vendor_layer = VendorLayerSerializer(read_only=True)
     marketer_name = serializers.SerializerMethodField()
+    work_type = serializers.SerializerMethodField()
     vendor_contact = VendorContactSerializer()
     lead = LeadSerializer(read_only=True)
 
@@ -407,6 +413,10 @@ class SubmissionV2DetailSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_marketer_name(obj):
         return obj.created_by.employee_name
+
+    @staticmethod
+    def get_work_type(obj):
+        return obj.get_work_type_display()
 
 
 class SubmissionConProfile(serializers.ModelSerializer):
