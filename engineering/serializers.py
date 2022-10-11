@@ -335,6 +335,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
     def get_description(obj):
         if hasattr(obj.project, 'description'):
             project_description = obj.project.description
+            remarks = obj.project.description.remark
             lead = obj.project.submission.lead
             if project_description.technology:
                 technology = project_description.technology
@@ -345,6 +346,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             else:
                 technology = None
             return {
+                "remarks": remarks,
                 "technology": technology,
                 "timezone": project_description.timezone
             }
@@ -357,6 +359,7 @@ class EngineerProjectSerializer(serializers.ModelSerializer):
             else:
                 technology = None
             return {
+                "remarks": "",
                 "timezone": None,
                 "technology": technology
             }
@@ -583,13 +586,14 @@ class RemoteProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_project_detail(obj):
-        timezone, technology, status = "", "", ""
+        timezone, technology, status, remarks = "", "", "", ""
         client = obj.submission.client
         statuses = obj.statuses.filter(is_current=True)
         if statuses:
             status = statuses.first().get_status_display()
 
         if hasattr(obj, 'description'):
+            remarks = obj.description.remark
             timezone = obj.description.timezone
             technology = obj.description.technology
             if not technology:
@@ -605,6 +609,6 @@ class RemoteProjectSerializer(serializers.ModelSerializer):
             else:
                 technology = obj.submission.lead.job_title
         data = {
-            "client": client, "timezone": timezone, "technology": technology, "status": status
+            "client": client, "timezone": timezone, "technology": technology, "status": status, "remarks": remarks
         }
         return data

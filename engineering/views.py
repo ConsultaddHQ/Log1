@@ -996,8 +996,6 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                                                          counts['support_status']['less_active']['count'] + \
                                                          counts['support_status']['training']['count']
 
-            counts['remote_count'] = support.filter(project__is_remote=True).count()
-
             support_list = []
             if engineers:
                 context = {"frequency": frequency, "type": consultant_type}
@@ -1027,7 +1025,8 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             query = request.GET.get('query', None)
             category = request.GET.get('category', None)
             export = json.loads(request.GET.get('export', 'false'))
-            project_status = request.GET.get('project_status', None)
+            support_status = json.loads(request.GET.get('support_status', '[]'))
+            project_status = json.loads(request.GET.get('project_status', '[]'))
 
             projects = Project.objects.filter(is_remote=True)
             if query:
@@ -1081,7 +1080,28 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             }
 
             if project_status:
-                projects = self.filter_project_status(projects, project_status)
+                if project_status == ['terminated']:
+                    projects = projects.filter(statuses__is_current=True, statuses__status__istartswith='terminated')
+                else:
+                    projects = projects.filter(statuses__is_current=True, statuses__status__in=project_status)
+
+            if support_status:
+                projects = projects.filter(support__statuses__is_current=True)
+                if support_status == ['training']:
+                    projects = projects.filter(
+                        support__statuses__frequency=support_status[0], start_date__gt=date.today(),
+                        support__statuses__is_current=True
+                    )
+                elif support_status == ['active'] or support_status == ['less_active']:
+                    projects = projects.filter(
+                        support__statuses__frequency=support_status[0], support__end=None,
+                        support__statuses__is_current=True
+                    )
+                else:
+                    projects = projects.filter(
+                        support__statuses__frequency=support_status[0], support__statuses__is_current=True
+                    )
+
             serializer = RemoteProjectSerializer(projects, many=True)
 
             # export
