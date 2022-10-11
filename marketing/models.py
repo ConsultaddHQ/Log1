@@ -142,7 +142,7 @@ class Submission(TimeStampedModel):
     WORK_CHOICES = (
         ('w2', 'W2'),
         ('c2c', 'C2C'),
-        ('full_time', 'FullTime'),
+        ('full_time', 'Full Time'),
     )
     attachments = GenericRelation(Attachment)
     rank = models.IntegerField(_('Rank'), default=0)
