@@ -131,6 +131,8 @@ def create_submission(request, lead_id):
             phone=request.data['phone'],
             client=request.data['client'],
             employer=request.data['employer'],
+            work_type=request.data['work_type'],
+
             consultant_marketing_id=request.data['marketing_id'],
             marketing_team_id=request.data.get('marketing_team_id', request.user.team.id),
 

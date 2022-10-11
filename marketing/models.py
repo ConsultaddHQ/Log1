@@ -80,12 +80,18 @@ class Lead(TimeStampedModel):
         ('sub', 'Submitted'),
         ('archived', 'Archived'),
     )
+    POSITION_CHOICES = (
+        ('w2', 'W2'),
+        ('c2c', 'C2C'),
+        ('full_time', 'Full Time'),
+    )
     is_w2 = models.BooleanField(default=False)
     job_desc = models.TextField(_('Job Description'))
     city = models.CharField(_('City'), max_length=50, blank=True, null=True)
     job_title = models.CharField(_('Job Title'), max_length=100, blank=True, null=True)
     primary_skill = models.CharField(_('Primary Skill'), max_length=50, blank=True, null=True)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='new')
+    position_type = models.CharField(_('Status'), max_length=20, choices=POSITION_CHOICES, default='c2c')
     secondary_skills = ArrayField(models.CharField(_('Secondary Skills'), max_length=30), blank=True, null=True)
 
     position = models.ForeignKey(
@@ -133,6 +139,11 @@ class Submission(TimeStampedModel):
         ('in_offer', 'In Offer'),
         ('interview', 'Interview'),
     )
+    WORK_CHOICES = (
+        ('w2', 'W2'),
+        ('c2c', 'C2C'),
+        ('full_time', 'FullTime'),
+    )
     attachments = GenericRelation(Attachment)
     rank = models.IntegerField(_('Rank'), default=0)
     employer = models.CharField(_('Employer'), max_length=50)
@@ -144,6 +155,7 @@ class Submission(TimeStampedModel):
     client = models.CharField(_('Client'), max_length=100, null=True, blank=True)
     phone = models.CharField(_('Marketing Phone'), max_length=30, null=True, blank=True)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='sub')
+    work_type = models.CharField(_('Work Type'), max_length=20, choices=WORK_CHOICES, default='c2c')
 
     # Consultant Profile
     visa_end = models.DateField(_('Visa End Date'), blank=True, null=True)

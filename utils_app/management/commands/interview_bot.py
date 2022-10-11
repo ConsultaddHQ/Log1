@@ -68,7 +68,7 @@ class Command(BaseCommand):
                 "title": data.get('title'),
                 "report_name": "interview_scheduled",
             }
-            res, msg = slack.data_report(payload, config.slack_announcement_url)
+            res, msg = slack.interview_data_report(payload, config.slack_announcement_url)
             if msg == 'error':
                 raise Exception(res)
         except Exception as error:

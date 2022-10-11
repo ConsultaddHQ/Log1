@@ -432,8 +432,8 @@ class ProjectViewSets(ModelViewSet):
                 if 'client' in filters and len(filters["client"]) > 0:
                     projects = projects.filter(submission__client=filters['client'])
 
-                if 'w2' in filters:
-                    projects = projects.filter(submission__lead__is_w2=filters['w2'])
+                if 'work_type' in filters:
+                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     projects = projects.filter(submission__created_by_id__in=filters['marketer'])
@@ -470,8 +470,8 @@ class ProjectViewSets(ModelViewSet):
                     projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
                     projects = (projects | not_joined).distinct('id')
             else:
-                if filter_by_lead == 'w2':
-                    projects = projects.filter(submission__lead__is_w2=True)
+                if filter_by_lead:
+                    projects = projects.filter(submission__work_type=filter_by_lead)
 
                 if filter_by_time:
                     projects = get_time_filter(projects, filter_by_time)
@@ -1373,6 +1373,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 project = get_object_or_404(Project, id=project_id, consultant_id=kwargs.get('pk'))
                 data = {
                     "id": project.consultant.id, "project_id": project.id,
+                    "vendor": project.submission.lead.vendor_company.name,
                     "name": project.consultant.name, "email": project.consultant.email,
                     "team": project.submission.marketing_team.name, "start_date": project.start_date,
                     "client": project.submission.client, "marketer": project.submission.created_by.employee_name
