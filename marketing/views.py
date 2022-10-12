@@ -927,6 +927,14 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='work_type')
+    def work_type(self, request):
+        try:
+            return Response({"data": Submission.WORK_CHOICES}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /vendor_layer/
 class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin, GenericViewSet):
