@@ -62,7 +62,7 @@ class TeamAdmin(ExportActionModelAdmin):
 @admin.register(Role)
 class RoleAdmin(ExportActionModelAdmin):
     search_fields = ('name',)
-    list_display = ('id', 'name')
+    list_display = ('id', 'name', 'display_name')
 
 
 @admin.register(ResetPasswordToken)
