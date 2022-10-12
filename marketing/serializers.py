@@ -31,6 +31,7 @@ class LeadCreateSerializer(serializers.ModelSerializer):
 
 class LeadSerializer(serializers.ModelSerializer):
     owner = serializers.SerializerMethodField()
+    position_type = serializers.SerializerMethodField()
     position_name = serializers.SerializerMethodField()
     vendor_company_name = serializers.SerializerMethodField()
 
@@ -41,6 +42,10 @@ class LeadSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_owner(obj):
         return obj.owner.employee_name
+
+    @staticmethod
+    def get_position_type(obj):
+        return obj.get_position_type_display()
 
     @staticmethod
     def get_position_name(obj):
