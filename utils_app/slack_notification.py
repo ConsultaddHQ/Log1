@@ -618,7 +618,7 @@ class MessageCard:
             }
 
             # Sending message on Messaging Tool
-            post_msg_using_webhook(config.slack_joined_url, data)
+            post_msg_using_webhook(config.slack_engineering_private_url, data)
             return "ok"
         except Exception as error:
             write_exception(message=error, request=request)
