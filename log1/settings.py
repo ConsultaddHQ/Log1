@@ -278,6 +278,7 @@ NOTIFICATIONS_CHANNELS = {
 CONSTANCE_BACKEND = 'constance.backends.database.DatabaseBackend'
 
 CONSTANCE_CONFIG = OrderedDict([
+    ('VERSION', ('R2022.10.2', 'Version')),
     ('APP_URL', ('https://app.log1.com/', 'Log1 URL')),
     ('IPHONE_APP_LINK', ('https://apps.apple.com/us/app/consultadd-time-track/id1498377728', 'Iphone App Link')),
     ('ANDROID_APP_LINK', ('https://play.google.com/store/apps/details?id=com.consultadd.consultant_timesheet_app',
@@ -327,6 +328,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_offer_failure_url', ('URL', 'Slack Offer Failure Channel')),
     ('slack_interview_feedback_url', ('URL', 'Slack Interview Feedback')),
     ('slack_exit_interview_url', ('URL', 'Slack Exit Interview Channel')),
+    ('slack_engineering_private_url', ('URL', 'Slack Engineering Private')),
     ('slack_project_termination_url', ('URL', 'Slack Project Terminations')),
     ('slack_candidate_feedback_url', ('URL', 'Slack Candidate Feedback Channel')),
     ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
@@ -335,7 +337,7 @@ CONSTANCE_CONFIG = OrderedDict([
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
-        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK'
+        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',
@@ -349,7 +351,8 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'slack_engineering_url', 'slack_test_team_url', 'slack_offer_url', 'slack_announcement_url',
         'slack_interview_feedback_url', 'slack_project_termination_url', 'slack_loud_speakers_url',
         'slack_joined_url', 'slack_marketing_report_url', 'slack_general_url', 'slack_offer_failure_url',
-        'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url', 'slack_joined_url',
+        'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url',
         'slack_recruitment_url', 'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
+        'slack_engineering_private_url'
     ),
 }
