@@ -1039,7 +1039,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             if data.get('status') == "independent":
                 emplyee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
                 payload = {
-                    "activity_title":f"{emplyee_name} make support independent of `Project Id - {project_id}`",
+                    "activity_title":f"{emplyee_name} make support independent",
                     "activity_text":"",
                     "project_id":project_id,
                     "support_start_date":data.get('start'),
