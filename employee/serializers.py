@@ -1,3 +1,4 @@
+from constance import config
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
@@ -27,6 +28,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDashboardSerializer(serializers.ModelSerializer):
     team = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
+    version = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     display_roles = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
@@ -34,7 +36,7 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'gender', 'phone', 'roles',
-                  'is_superuser', 'technology', 'shift', 'project', 'display_roles')
+                  'is_superuser', 'technology', 'shift', 'project', 'display_roles', 'version')
 
     @staticmethod
     def get_team(obj):
@@ -50,6 +52,10 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     def get_avatar(obj):
         if obj.avatar:
             return obj.avatar.url
+
+    @staticmethod
+    def get_version(obj):
+        return config.VERSION
 
     @staticmethod
     def get_roles(obj):

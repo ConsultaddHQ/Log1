@@ -760,9 +760,19 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def update(self, request, *args, **kwargs):
         try:
             submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by=request.user)
-            serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
+            if submission:
+                submission.client = request.data['client']
+                submission.email = request.data['email']
+                submission.employer = request.data['employer']
+                submission.phone = request.data['phone']
+                submission.rate = request.data['rate']
+                submission.work_type = request.data['work_type'].lower() if request.data['work_type'] != 'Full Time' else "full_time"
+                submission.save()
+
+
+                serializer = SubmissionCreateSerializer(submission)
+            # if serializer.is_valid():
+            #     serializer.save()
 
                 # Activity
                 fields = []
