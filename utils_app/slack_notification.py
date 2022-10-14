@@ -243,9 +243,11 @@ class MessageCard:
                 ]
             }
             if feedback.feedback_type == 'engineering_issue':
-                post_msg_using_webhook(config.slack_candidate_feedback_url, data)
+                post_msg_using_webhook(
+                    config.slack_candidate_feedback_url, data)
             if feedback.feedback_type == 'pre_joining':
-                post_msg_using_webhook(config.slack_pre_joining_feedback_url, data)
+                post_msg_using_webhook(
+                    config.slack_pre_joining_feedback_url, data)
             return "ok"
         except Exception as error:
             write_exception(message=error, request=request)
@@ -526,7 +528,95 @@ class MessageCard:
                     }
                 ]
             }
-            
+
+            # Sending message on Messaging Tool
+            post_msg_using_webhook(config.slack_joined_url, data)
+            return "ok"
+        except Exception as error:
+            write_exception(message=error, request=request)
+            return str(error)
+
+    @staticmethod
+    def consultant_independent_message_card(payload, request=None):
+        try:
+            data = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":white_check_mark:  Support Independent",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"{payload.get('activity_title', 'NA')}\n{payload.get('activity_text', 'NA')}"
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Client Name:* {payload.get('client_name', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Consultant Name:* {payload.get('consultant_name', 'NA')}"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Support Start Date:* `{payload.get('support_start_date', 'NA')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Support End Date:* `{payload.get('support_end_date', 'NA')}`"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Updated Date:* `{payload.get('support_update_date', 'NA')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Support Duration:* `{payload.get('support_duration', 'NA')}`"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": "View in Log1"
+                                },
+                                "style": "primary",
+                                "url": f"https://app.log1.com/#/project/{payload.get('project_id')}/",
+                                "value": "click_me_123"
+                            }
+                        ]
+                    }
+                ]
+            }
+
             # Sending message on Messaging Tool
             post_msg_using_webhook(config.slack_joined_url, data)
             return "ok"
@@ -851,7 +941,7 @@ class MessageCard:
             file_url = create_csv_file(payload)
             card_data = {
                 "blocks": [
-                  {
+                    {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
@@ -889,13 +979,13 @@ class MessageCard:
                                         f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
                             }
                         ]
-                    },                    
+                    },
                 )
                 sl += 1
             card_data['blocks'].append(
                 {
-                        "type": "actions",
-                        "elements": [
+                    "type": "actions",
+                    "elements": [
                             {
                                 "type": "button",
                                 "text": {
@@ -908,7 +998,7 @@ class MessageCard:
                                 "value": "click_me_123",
                                 "action_id": "button-action"
                             }
-                        ]
+                    ]
                 },
             )
             res, msg = post_msg_using_webhook(url, card_data)
@@ -924,7 +1014,7 @@ class MessageCard:
             file_url = create_csv_file(payload)
             card_data = {
                 "blocks": [
-                  {
+                    {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
@@ -939,7 +1029,7 @@ class MessageCard:
             }
             sl = 1
             for data in payload['data']:
-                if sl<10:
+                if sl < 10:
                     first_column = f"`{sl}.` *Consultant:* {data.get('consultant', None)}\n\t   " \
                                    f"*Team:* {data.get('team')}\n\t   *Skills*: {data.get('skills')}"
                 else:
@@ -965,8 +1055,8 @@ class MessageCard:
                 sl += 1
             card_data['blocks'].append(
                 {
-                        "type": "actions",
-                        "elements": [
+                    "type": "actions",
+                    "elements": [
                             {
                                 "type": "button",
                                 "text": {
@@ -979,7 +1069,7 @@ class MessageCard:
                                 "value": "click_me_123",
                                 "action_id": "button-action"
                             }
-                        ]
+                    ]
                 },
             )
             res, msg = post_msg_using_webhook(url, card_data)
