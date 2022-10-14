@@ -1013,7 +1013,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             if export and support_list:
                 report_url = get_engineer_detail_csv(support_list, request)
             return Response({"data": support_list[first: last], "counts": counts, "url": report_url,
-                             "total": engineers.count()}, status=200)
+                             "total": len(support_list)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -1101,7 +1101,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     projects = projects.filter(
                         support__statuses__frequency=support_status[0], support__statuses__is_current=True
                     )
-
+            projects = projects.distinct('id').order_by('id', 'statuses__status')
             serializer = RemoteProjectSerializer(projects, many=True)
 
             # export
