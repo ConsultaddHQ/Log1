@@ -919,14 +919,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         return first, last
 
     @staticmethod
-    def filter_project_status(queryset, status):
-        if status == 'active':
+    def filter_project_status(queryset, project_status):
+        if project_status == 'active':
             queryset = queryset.filter(statuses__is_current=True, statuses__status__in=[
                 'new', 'joined', 'on_boarded', 'received', 'joined'
             ])
-        elif status == 'complete':
+        elif project_status == 'complete':
             queryset = queryset.filter(statuses__is_current=True, statuses__status='complete')
-        elif status == 'terminated':
+        elif project_status == 'terminated':
             queryset = queryset.filter(statuses__is_current=True, statuses__status__istartswith='terminated')
         return queryset
 
