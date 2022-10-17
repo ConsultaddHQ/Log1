@@ -1021,6 +1021,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path='remote_project')
     def remote_project(self, request, *args, **kwargs):
         try:
+            final_list = []
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             category = request.GET.get('category', None)
@@ -1078,7 +1079,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     }
                 },
             }
-
+            projects = projects.distinct('id').order_by('id', 'statuses__status')
             if project_status:
                 if project_status == ['terminated']:
                     projects = projects.filter(statuses__is_current=True, statuses__status__istartswith='terminated')
@@ -1101,7 +1102,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     projects = projects.filter(
                         support__statuses__frequency=support_status[0], support__statuses__is_current=True
                     )
-            projects = projects.distinct('id').order_by('id', 'statuses__status')
+
+                for obj in projects:
+                    if not obj.support.filter(support__employee_name=obj.consultant.name):
+                        final_list.append(obj)
+
+            if final_list:
+                projects = final_list
             serializer = RemoteProjectSerializer(projects, many=True)
 
             # export
