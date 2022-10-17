@@ -92,7 +92,7 @@ class Command(BaseCommand):
             }
 
             payload = {"data": slack_payload, "report_name": job.name}
-            res, msg = MessageCard.pool_candidate_report(payload, config.slack_test_team_url)
+            res, msg = MessageCard.pool_candidate_report(payload, config.slack_pool_channel_url)
             if msg == 'error':
                 raise Exception(res)
         except Exception as error:
