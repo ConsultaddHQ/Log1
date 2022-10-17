@@ -37,6 +37,8 @@ from project.utils import ProjectUtil, create_remote_consultant, set_consultant_
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
     ConsultantLeaveSerializer
+from utils_app.slack_notification import MessageCard as slack
+from datetime import datetime
 
 
 # Route - /project/
@@ -109,7 +111,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
             res, msg, mail_id = send_email_(mail_data, submission.created_by.email, request=request)
-            
+
             if not msg:
                 return res, "error"
             content_type = ContentType.objects.get(model="project")
@@ -708,7 +710,7 @@ class ProjectViewSets(ModelViewSet):
             else:
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
-           
+
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -1032,9 +1034,25 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             serializer = ProjectSupportSerializer(support, data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-
             desc = f"{request.user.employee_name} updated {msg.get('var2', '')} support {msg.get('var1', 'details')} "
             create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
+            # need to add slack card here
+            if data.get('status') == "independent":
+                emplyee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
+                payload = {
+                    "activity_title": f"{emplyee_name} make support as independent",
+                    "activity_text": "",
+                    "project_id": project_id,
+                    "support_start_date": data.get('start'),
+                    "support_end_date": data.get('end'),
+                    "support_update_date": data.get('change_date'),
+                    "client_name": support.project.submission.client,
+                    "consultant_name": support.project.consultant.name,
+                    "support_duration":
+                        str(datetime.strptime(data['end'], "%Y-%m-%d") - datetime.strptime(data['start'],
+                                                                                           "%Y-%m-%d")).split(",")[0],
+                }
+                slack.consultant_independent_message_card(payload, self.request)
             return Response({"message": "Support detail is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
