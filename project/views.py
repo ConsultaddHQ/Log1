@@ -112,7 +112,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
             res, msg, mail_id = send_email_(mail_data, submission.created_by.email, request=request)
-            
+
             if not msg:
                 return res, "error"
             content_type = ContentType.objects.get(model="project")
@@ -711,7 +711,7 @@ class ProjectViewSets(ModelViewSet):
             else:
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
-           
+
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
