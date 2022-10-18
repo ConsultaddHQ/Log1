@@ -6,6 +6,8 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
+from consultant.serializers import FeedbackSerializer
+from consultant.utils import create_and_send_notification
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -30,7 +32,7 @@ from utils_app.thred_mail import send_email as send_email_, send_email_attachmen
 
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant
-from project.models import Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus, \
+from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus, \
     ConsultantLeave, Leave
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail
@@ -39,6 +41,7 @@ from project.serializers import ProjectSerializer, ProjectGetSerializer, Project
     ConsultantLeaveSerializer
 from utils_app.slack_notification import MessageCard as slack
 from datetime import datetime
+
 
 # Route - /project/
 class ProjectViewSets(ModelViewSet):
@@ -110,7 +113,7 @@ class ProjectViewSets(ModelViewSet):
                 },
             }
             res, msg, mail_id = send_email_(mail_data, submission.created_by.email, request=request)
-            
+
             if not msg:
                 return res, "error"
             content_type = ContentType.objects.get(model="project")
@@ -709,7 +712,7 @@ class ProjectViewSets(ModelViewSet):
             else:
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
-           
+
             return Response({"data": serializer.data, "error": err, "message": "Project updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
@@ -1035,19 +1038,57 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             serializer.save()
             desc = f"{request.user.employee_name} updated {msg.get('var2', '')} support {msg.get('var1', 'details')} "
             create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
+            
             # need to add slack card here
             if data.get('status') == "independent":
-                emplyee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
+                # adding consultant update here    
+                user_list = []
+                feedback = ConsultantFeedback.objects.create(
+                    created_by=request.user,
+                    department='engineering',
+                    project_id=request.data.get('project'),
+                    rating=request.data.get('rating', None),
+                    verdict=request.data.get('verdict', None),
+                    consultant_id=request.data.get('consultant_id'),
+                    description=request.data.get('description'),
+                    feedback_type=request.data.get('feedback_type'),
+                )
+
+                consultant = feedback.consultant
+                emp_name = request.user.employee_name
+                feedback_type = feedback.get_feedback_type_display()
+                
+                tags = request.data.get('tagged_user', [])
+                if len(tags) > 0:
+                    for tag in tags:
+                        user = get_object_or_404(User, id=tag)
+                        user_list.append(user)
+
+                title = f"{emp_name} tagged you in a {consultant.name}'s {feedback_type} feedback."
+                create_and_send_notification(consultant, feedback, title, user_list, request)              
+
+                # POC Notification
+                pocs = consultant.pocs.all()
+                user_list = [user.poc for user in pocs]
+                title = f"{feedback_type} feedback added for {consultant.name} by {emp_name} from {feedback.department}."
+                create_and_send_notification(consultant, feedback, title, user_list, request)
+
+                # Activity
+                desc = f"{emp_name} added {feedback_type} feedback"
+                create_activity(consultant.id, 'consultant', request.user, desc, 'created')
+
+                employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
                 payload = {
-                    "activity_title":f"{emplyee_name} make support independent",
-                    "activity_text":"",
-                    "project_id":project_id,
-                    "support_start_date":data.get('start'),
-                    "support_end_date":data.get('end'),
-                    "support_update_date":data.get('change_date'),
-                    "client_name":support.project.submission.client,
-                    "consultant_name":support.project.consultant.name,
-                    "support_duration":str(datetime.strptime(data['end'],"%Y-%m-%d")-datetime.strptime(data['start'],"%Y-%m-%d")).split(",")[0],
+                    "activity_title": f"{employee_name} make support as independent",
+                    "project_id": project_id,
+                    "support_end_date": data.get('end'),
+                    "rating": request.data.get('rating'),
+                    "feedback": request.data.get('description'),
+                    "client_name": support.project.submission.client,
+                    "project_start_date": support.project.start_date,
+                    "consultant_name": support.project.consultant.name,
+                    "support_duration":
+                        str(support.project.start_date - datetime.strptime(data['start'], "%Y-%m-%d")).split(",")[0],
                 }
                 slack.consultant_independent_message_card(payload, self.request)
             return Response({"message": "Support detail is updated"}, status=202)

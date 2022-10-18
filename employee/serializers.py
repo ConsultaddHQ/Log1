@@ -28,10 +28,10 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDashboardSerializer(serializers.ModelSerializer):
     team = serializers.SerializerMethodField()
     roles = serializers.SerializerMethodField()
-    version = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
-    display_roles = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
+    version = serializers.SerializerMethodField()
+    display_roles = serializers.SerializerMethodField()
 
     class Meta:
         model = User
