@@ -37,7 +37,7 @@ class Command(BaseCommand):
                             'body': f"{consultant.name} {visa.get_visa_type_display()} is expiring on {expiry_date} "
                                     f"Please Update the work authorisation on log1."
                         }
-                        res, ok, _  = send_email_without_template(mail_data, "product@consultadd.com")
+                        res, ok, _ = send_email_without_template(mail_data, "product@consultadd.com")
                         if not ok:
                             mail_error.append((consultant.id, res))
             if len(mail_error) > 0:

@@ -42,6 +42,7 @@ from project.serializers import ProjectSerializer, ProjectGetSerializer, Project
 from utils_app.slack_notification import MessageCard as slack
 from datetime import datetime
 
+
 # Route - /project/
 class ProjectViewSets(ModelViewSet):
     queryset = Project.objects.all()
@@ -1044,17 +1045,15 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 user_list = []
                 feedback = ConsultantFeedback.objects.create(
                     created_by=request.user,
+                    department='engineering',
                     project_id=request.data.get('project'),
                     rating=request.data.get('rating', None),
                     verdict=request.data.get('verdict', None),
                     consultant_id=request.data.get('consultant_id'),
                     description=request.data.get('description'),
                     feedback_type=request.data.get('feedback_type'),
-                    department=request.data.get('department', None),
-                )            
-                if feedback.feedback_type in ['engineering_issue', '2_week', 'independent']:
-                    setattr(feedback, 'department', 'engineering')
-                    feedback.save()            
+                )
+
                 consultant = feedback.consultant
                 emp_name = request.user.employee_name
                 feedback_type = feedback.get_feedback_type_display()
@@ -1078,22 +1077,21 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 desc = f"{emp_name} added {feedback_type} feedback"
                 create_activity(consultant.id, 'consultant', request.user, desc, 'created')
 
-                serializer = FeedbackSerializer(feedback)                       
-                
-                emplyee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
+                employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
                 payload = {
-                    "activity_title":f"{emplyee_name} make support independent",
-                    "project_id":project_id,
-                    "project_start_date":support.project.start_date,
-                    "support_end_date":data.get('end'),
-                    "feedback":request.data.get('rating'),
-                    "feedback":request.data.get('description'),
-                    "client_name":support.project.submission.client,
-                    "consultant_name":support.project.consultant.name,
-                    "support_duration":str(support.project.start_date - datetime.strptime(data['start'],"%Y-%m-%d")).split(",")[0],
+                    "activity_title": f"{employee_name} make support as independent",
+                    "project_id": project_id,
+                    "support_end_date": data.get('end'),
+                    "rating": request.data.get('rating'),
+                    "feedback": request.data.get('description'),
+                    "client_name": support.project.submission.client,
+                    "project_start_date": support.project.start_date,
+                    "consultant_name": support.project.consultant.name,
+                    "support_duration":
+                        str(support.project.start_date - datetime.strptime(data['start'], "%Y-%m-%d")).split(",")[0],
                 }
                 slack.consultant_independent_message_card(payload, self.request)
-            return Response({"message": "Support detail is updated and Feedback added successfully" }, status=202)
+            return Response({"message": "Support detail is updated"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
