@@ -1079,16 +1079,17 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
                 employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
                 payload = {
-                    "activity_title": f"{employee_name} make support as independent",
+                    "activity_title": f"Support Marked independent by {employee_name} for project id - {project_id}",
                     "project_id": project_id,
                     "support_end_date": data.get('end'),
                     "rating": request.data.get('rating'),
                     "feedback": request.data.get('description'),
                     "client_name": support.project.submission.client,
-                    "project_start_date": support.project.start_date,
+                    "project_start_date": str(support.project.start_date),
                     "consultant_name": support.project.consultant.name,
                     "support_duration":
-                        str(support.project.start_date - datetime.strptime(data['start'], "%Y-%m-%d")).split(",")[0],
+                        str(datetime.strptime(data['end'], "%Y-%m-%d") - datetime.strptime(str(support.project.start_date), "%Y-%m-%d")).split(",")[0],
+
                 }
                 slack.consultant_independent_message_card(payload, self.request)
             return Response({"message": "Support detail is updated"}, status=202)
