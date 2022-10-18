@@ -17,7 +17,6 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from marketing.utils import *
 from marketing.serializers import *
-from utils_app.mailing import send_email_without_template, send_email
 from utils_app.models import MapMail
 from activity.models import Activity
 from employee.models import User, Team
@@ -787,7 +786,6 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     submission.is_complete = False
 
                 submission.save()
-
                 return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
             else:
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
