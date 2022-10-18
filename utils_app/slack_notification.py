@@ -553,6 +553,109 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
+                            "text": f"{payload.get('activity_title', 'NA')}"
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Client Name:* {payload.get('client_name', 'NA')}"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Consultant Name:* {payload.get('consultant_name', 'NA')}"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Project Start Date:* `{payload.get('project_start_date', 'NA')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Support End Date:* `{payload.get('support_end_date', 'NA')}`"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Rating :* `{payload.get('rating', 'NA')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Support Duration:* `{payload.get('support_duration', 'NA')}`"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Feedback By Engineer",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"{payload.get('feedback', 'NA')}"
+                        }
+                    },                                    
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "emoji": True,
+                                    "text": "View in Log1"
+                                },
+                                "style": "primary",
+                                "url": f"https://app.log1.com/#/project/{payload.get('project_id')}/",
+                                "value": "click_me_123"
+                            }
+                        ]
+                    }
+                ]
+            }
+
+            # Sending message on Messaging Tool
+            post_msg_using_webhook(config.slack_joined_url, data)
+            return "ok"
+        except Exception as error:
+            write_exception(message=error, request=request)
+            return str(error)
+
+    @staticmethod
+    def consultant_independent_message_card(payload, request=None):
+        try:
+            data = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":white_check_mark:  Support Independent",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
                             "text": f"{payload.get('activity_title', 'NA')}\n{payload.get('activity_text', 'NA')}"
                         }
                     },
