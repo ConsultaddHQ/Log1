@@ -553,7 +553,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"{payload.get('activity_title', 'NA')}\n{payload.get('activity_text', 'NA')}"
+                            "text": f"{payload.get('activity_title', 'NA')}"
                         }
                     },
                     {
@@ -577,7 +577,7 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Support Start Date:* `{payload.get('support_start_date', 'NA')}`"
+                                "text": f"*Project Start Date:* `{payload.get('project_start_date', 'NA')}`"
                             },
                             {
                                 "type": "mrkdwn",
@@ -590,14 +590,25 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Updated Date:* `{payload.get('support_update_date', 'NA')}`"
-                            },
-                            {
-                                "type": "mrkdwn",
                                 "text": f"*Support Duration:* `{payload.get('support_duration', 'NA')}`"
                             }
                         ]
                     },
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "Feedback By Engineer",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"{payload.get('feedback', 'NA')}"
+                        }
+                    },                                    
                     {
                         "type": "actions",
                         "elements": [
@@ -618,7 +629,7 @@ class MessageCard:
             }
 
             # Sending message on Messaging Tool
-            post_msg_using_webhook(config.slack_engineering_private_url, data)
+            post_msg_using_webhook(config.slack_joined_url, data)
             return "ok"
         except Exception as error:
             write_exception(message=error, request=request)
