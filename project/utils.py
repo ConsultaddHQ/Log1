@@ -443,18 +443,20 @@ def send_employer_change_notification(project, data, request):
     try:
         project.submission.employer = project.employer
         project.submission.save()
-        consultant = project.submission.consultant.name
+        client = project.submission.client
         marketer_email = request.user.email
+        consultant = project.submission.consultant.name
         mail_data = {
             'bcc': [],
             'cc': [config.SUPERADMIN],
             'to': [config.FINANCE, config.RELATIONS, "marketing@consultadd.com"],
             'template': "../templates/update_employer.html",
             'context': {
+                'submission_id': project.submission.id, 'client': client,
                 'consultant_name': consultant, 'prev_employer': data['prev_employer'],
-                'new_employer': data['new_employer'], 'project_id': project.id, 'marketer_name': project.marketer_name
+                'new_employer': data['new_employer'], 'marketer_name': project.marketer_name,
             },
-            'subject': f"Employer is changed for {consultant}'s submission"
+            'subject': f"Employer is updated for project {consultant} :: {client}"
         }
         desc = f"Employer changed from  {data['prev_employer']} to {data['new_employer']}"
         create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
