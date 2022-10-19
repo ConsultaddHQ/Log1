@@ -590,10 +590,6 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Rating :* `{payload.get('rating', 'NA')}`"
-                            },
-                            {
-                                "type": "mrkdwn",
                                 "text": f"*Support Duration:* `{payload.get('support_duration', 'NA')}`"
                             }
                         ]
