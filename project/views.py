@@ -1086,10 +1086,9 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
                 employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
                 payload = {
-                    "activity_title": f"Support marked independent by {employee_name} for project id - {project_id}",
+                    "activity_title": f"Support marked independent by {employee_name} for below mentioned project",
                     "project_id": project_id,
                     "support_end_date": data.get('end'),
-                    "rating": request.data.get('rating'),
                     "feedback": request.data.get('description'),
                     "client_name": support.project.submission.client,
                     "project_start_date": str(support.project.start_date),
