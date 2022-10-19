@@ -35,7 +35,7 @@ from notification.utils import push_notification_consultant
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus, \
     ConsultantLeave, Leave
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
     ConsultantLeaveSerializer
@@ -604,6 +604,7 @@ class ProjectViewSets(ModelViewSet):
             err = None
             new_status = request.data.get('status', None)
             project = get_object_or_404(Project, id=project_id)
+            prev_employer = project.employer
             prev_status_obj = project.statuses.get(is_current=True)
             prev_rate, prev_start_date = project.rate, project.start_date
             all_status, cancellation_status, termination_status = fetch_project_status()
@@ -629,6 +630,10 @@ class ProjectViewSets(ModelViewSet):
                 project.consultant = consultant
             project.is_remote = request.data.get('is_remote', False)
             project.save()
+
+            if prev_employer != project.employer and request.data['status'] not in ['new', 'received', 'on_boarded']:
+                data = {"prev_employer": prev_employer, "new_employer": project.employer}
+                send_employer_change_notification(project, data, request)
 
             util = ProjectUtil(project, request)
             desc = f"Purchase order is updated"
@@ -702,14 +707,16 @@ class ProjectViewSets(ModelViewSet):
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
                     util.send_completion_notification()
 
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+
             # Activity
             if prev_rate != project.rate:
                 desc = f"Purchase order rate is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif prev_start_date != project.start_date:
+            elif prev_start_date != str(project.start_date):
                 desc = f"Purchase order start_date is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            else:
+            elif desc == f"Purchase order is updated" and prev_employer == project.employer:
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
@@ -1079,7 +1086,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
 
                 employee_name = f"<@{request.user.slack_id}>" if request.user.slack_id else request.user.employee_name
                 payload = {
-                    "activity_title": f"Support Marked independent by {employee_name} for project id - {project_id}",
+                    "activity_title": f"Support marked independent by {employee_name} for project id - {project_id}",
                     "project_id": project_id,
                     "support_end_date": data.get('end'),
                     "rating": request.data.get('rating'),

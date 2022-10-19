@@ -6,9 +6,10 @@ from django.shortcuts import get_object_or_404
 from constance import config
 from employee.models import User
 from consultant.models import Consultant
-# from utils_app.mailing import send_email
+from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from project.models import Project, TimeSheet
+from utils_app.mailing import send_email as mail
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
 from utils_app.slack_notification import MessageCard as slack
@@ -433,6 +434,31 @@ def check_days(start, end, request=None):
                 days += 1
             start = start + timedelta(days=1)
         return days
+    except Exception as error:
+        write_exception(message=error, request=request)
+        return error, "error"
+
+
+def send_employer_change_notification(project, data, request):
+    try:
+        project.submission.employer = project.employer
+        project.submission.save()
+        consultant = project.submission.consultant.name
+        marketer_email = request.user.email
+        mail_data = {
+            'bcc': [],
+            'cc': [config.SUPERADMIN],
+            'to': [config.FINANCE, config.RELATIONS, "marketing@consultadd.com"],
+            'template': "../templates/update_employer.html",
+            'context': {
+                'consultant_name': consultant, 'prev_employer': data['prev_employer'],
+                'new_employer': data['new_employer'], 'project_id': project.id, 'marketer_name': project.marketer_name
+            },
+            'subject': f"Employer is changed for {consultant}'s submission"
+        }
+        desc = f"Employer changed from  {data['prev_employer']} to {data['new_employer']}"
+        create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+        mail(mail_data, marketer_email, request=request)
     except Exception as error:
         write_exception(message=error, request=request)
         return error, "error"

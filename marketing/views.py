@@ -17,7 +17,6 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from marketing.utils import *
 from marketing.serializers import *
-from utils_app.mailing import send_email_without_template, send_email
 from utils_app.models import MapMail
 from activity.models import Activity
 from employee.models import User, Team
@@ -760,15 +759,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     def update(self, request, *args, **kwargs):
         try:
-            emp_updated = False
             submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by=request.user)
-            prev_employer = submission.employer
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                new_employer = serializer.data['employer']
-                if prev_employer != new_employer:
-                    emp_updated = True
 
                 # Activity
                 fields = []
@@ -792,28 +786,6 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     submission.is_complete = False
 
                 submission.save()
-
-                if emp_updated:
-                    consultant = submission.consultant.name
-                    marketer_email = request.user.email
-                    mail_data = {
-                        'bcc': [],
-                        'cc': [config.SUPERADMIN],
-                        'to': [config.FINANCE, config.RELATIONS],
-                        'template': "../templates/update_employer.html",
-                        'context': {
-                            'consultant_name': consultant, 'prev_employer': prev_employer, 'new_employer': new_employer,
-                            'submission_id': submission.id, 'marketer_name': submission.created_by.employee_name
-                        },
-                        'subject': f"Employer is changed for {consultant}'s submission"
-                    }
-
-                    msg, res = send_email(mail_data, marketer_email, request=request)
-                    if res:
-                        return Response(
-                            {"data": serializer.data, "message": "Submission updated and employer update mail sent"},
-                            status=202
-                        )
                 return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
             else:
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
