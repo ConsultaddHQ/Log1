@@ -207,7 +207,7 @@ class GoogleCalendar:
             # for email in items:
             #     if "errors" in res['calendars'][email]:
 
-            return res['calendar'], 'ok'
+            return res['calendars'], 'ok'
         except Exception as error:
             write_exception(message=error, request=request)
             return str(error), "error"
