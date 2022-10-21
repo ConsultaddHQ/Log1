@@ -2,14 +2,11 @@ import os
 import json
 import os.path
 import requests
-from datetime import datetime
-from O365 import Account, MSGraphProtocol
+
 from google.auth.exceptions import RefreshError
 from googleapiclient import discovery
 from google.oauth2.service_account import Credentials
 from log1.utils import write_exception, write_info
-# from google.auth.transport.requests import Request
-# from google_auth_oauthlib.flow import InstalledAppFlow
 
 SCOOPS = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/admin.directory.user']
 SERVICE_ACCOUNT_FILE = 'calendar.json'
