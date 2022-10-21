@@ -1,7 +1,9 @@
+import os
 import json
 from itertools import chain
 from datetime import timedelta, datetime
 
+from dateutil import tz
 from django.utils import timezone
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
@@ -23,11 +25,13 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from api_key.models import APIKey
 from project.models import Project, ProjectSupport
 from consultant.models import Consultant
+from utils_app.calendar import GoogleCalendar
 from utils_app.thred_mail import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
-from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time
+from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time, \
+    DefaultCalendar
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer
 
@@ -845,6 +849,45 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['put'], detail=False, url_path='calendar_info')
+    def calendar_info(self, request):
+        try:
+            data = request.query_params.get('data')
+            if data:
+                json_data = json.loads(data)
+                if 'emails' not in json_data:
+                    return Response({"message": "Please select user"}, status=400)
+                if len(json_data["emails"]) < 1:
+                    return Response({"message": "Please select user"}, status=400)
+
+                # 2021-02-11T09:00:00 datetime format (EST)
+                tz_est = tz.gettz('US/Eastern')
+                if json_data.get('start', None):
+                    start = f"{datetime.strptime(json_data['start'], '%Y-%m-%d').strftime('%Y-%m-%dT00:00:00Z')}"
+                else:
+                    start = f"{datetime.now().astimezone(tz_est).strftime('%Y-%m-%dT00:00:00Z')}"
+
+                if json_data.get('end'):
+                    end = f"{datetime.strptime(json_data['end'], '%Y-%m-%d').strftime('%Y-%m-%dT23:59:59Z')}"
+                elif json_data.get('start'):
+                    end = f"{datetime.strptime(json_data['start'], '%Y-%m-%d').strftime('%Y-%m-%dT23:59:59Z')}"
+                else:
+                    end = f"{datetime.now().astimezone(tz_est).strftime('%Y-%m-%dT23:59:59Z')}"
+            else:
+                return Response({"message": "Provide correct input"}, status=400)
+
+            payload = {
+                "start": start, "end": end, "user_emails": json_data["emails"]
+            }
+            calendar = GoogleCalendar()
+            resp, msg = calendar.get_calendar_schedule(payload, request)
+            if msg != 'error':
+                return Response({"data": resp}, status=200)
+            return Response({"message": resp['message'], "error": resp['error']['error']}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /handover/
 class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, DestroyModelMixin):
@@ -1071,3 +1114,34 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /calendar_info/
+class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
+    serializer_class = UserSerializer
+    queryset = DefaultCalendar.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            if type(request.data['emails']) is list and request.data['emails']:
+                obj, msg = DefaultCalendar.objects.get_or_create(user=request.user)
+                obj.emails = request.data['emails']
+                obj.save()
+                return Response({"message": "Emails set as default"}, status=200)
+
+            return Response({"message": "No emails provided to set set default"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='get_default')
+    def default(self, request, *args, **kwargs):
+        try:
+            default = get_object_or_404(DefaultCalendar, user=request.user)
+            data = {"emails": default.emails}
+            return Response({"data": data}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)

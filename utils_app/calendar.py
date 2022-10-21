@@ -2,6 +2,8 @@ import os
 import json
 import os.path
 import requests
+from datetime import datetime
+from O365 import Account, MSGraphProtocol
 from google.auth.exceptions import RefreshError
 from googleapiclient import discovery
 from google.oauth2.service_account import Credentials
@@ -161,6 +163,54 @@ class GoogleCalendar:
                 cal_res, msg = calendar.delete_ms_calendar(calendar_id)
                 return cal_res, msg
             return True, "ok"
+        except Exception as error:
+            write_exception(message=error, request=request)
+            return str(error), "error"
+
+    @staticmethod
+    def get_ms_token():
+        client_id = "beb85707-a33b-4aab-becb-ad0788abc399"
+        grant_type = 'client_credentials'
+        client_secret = "5mpE234L_hTKe__iq97YqPiwZtzE-2bEL4"
+        # client_secret = "5mpE234L_hTKe__iq97YqPiwZtzE-2bEL4"
+        scope = 'https%3A//graph.microsoft.com/.default'
+        url = f"https://login.microsoftonline.com/2646e092-48b1-46c2-aea1-02db36a98d68/oauth2/v2.0/token"
+        payload = f'client_id={client_id}&client_secret={client_secret}&scope={scope}&grant_type={grant_type}'
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+
+        response = requests.request("POST", url, headers=headers, data=payload)
+
+        data = json.loads(response.text.encode('utf8'))
+        access_token = None
+        if response.status_code == 200:
+            access_token = data["access_token"]
+        return access_token
+
+    def get_calendar_schedule(self, data, request=None):
+        try:
+            items = []
+            end = data['end']
+            start = data['start']
+            user_emails = data['user_emails']
+            for email in user_emails:
+                data = {"id": email}
+                items.append(data)
+
+            service = self.calendar_con("suman.m@consultadd.com")
+            time_min = start
+            time_max = end
+
+            free_busy_query = {
+                "items": items,
+                "timeMin": time_min,
+                "timeMax": time_max,
+                "timeZone": "America/New_York"
+            }
+            res = service.freebusy().query(body=free_busy_query).execute()
+            # for email in items:
+            #     if "errors" in res['calendars'][email]:
+
+            return res['calendar'], 'ok'
         except Exception as error:
             write_exception(message=error, request=request)
             return str(error), "error"

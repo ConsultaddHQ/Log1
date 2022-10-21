@@ -277,3 +277,20 @@ class Handover(TimeStampedModel):
             self.created = timezone.now()
         self.modified = timezone.now()
         return super(Handover, self).save(*args, **kwargs)
+
+
+class DefaultCalendar(TimeStampedModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='calendar')
+    emails = ArrayField(models.CharField(_('Emails'), max_length=30, blank=True), blank=True, null=True)
+
+    class Meta:
+        ordering = ('-user__employee_name',)
+
+    def __str__(self):
+        return f"{self.user}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(DefaultCalendar, self).save(*args, **kwargs)
