@@ -849,7 +849,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['put'], detail=False, url_path='calendar_info')
+    @action(methods=['get'], detail=False, url_path='calendar_info')
     def calendar_info(self, request):
         try:
             data = request.query_params.get('data')
