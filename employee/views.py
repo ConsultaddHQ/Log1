@@ -1141,7 +1141,7 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
         try:
             default = get_object_or_404(DefaultCalendar, user=request.user)
             data = {"emails": default.emails}
-            return Response({"data": data}, status=400)
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)

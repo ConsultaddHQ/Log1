@@ -31,14 +31,15 @@ from utils_app.utils import delete_temp_file, export_to_csv
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
-from notification.utils import push_notification_consultant
-from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, SupportStatus, \
-    ConsultantLeave, Leave
+from notification.utils import push_notification_consultant, push_notification, create_notification
+from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
+    SupportStatus, \
+    ConsultantLeave, Leave, TimesheetRequest
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer
+    ConsultantLeaveSerializer, TimesheetRequestSerializer
 from utils_app.slack_notification import MessageCard as slack
 from datetime import datetime
 
@@ -1442,6 +1443,62 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     "client": project.submission.client, "marketer": project.submission.created_by.employee_name
                 }
                 return Response({'result': data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    @action(methods=["GET", "PUT"], detail=False, url_name="request_timesheet")
+    def request_timesheet(self, request, *args, **kwargs):
+        try:
+            if request.method == 'GET':
+                consultant_id = kwargs.get('consultant_id')
+                requested_timesheets = TimesheetRequest.objects.filter(project__consultant_id=consultant_id)
+                serializer = TimesheetRequestSerializer(requested_timesheets, many=True)
+                return Response({"data": serializer.data}, status=200)
+
+            elif request.method == 'PUT':
+                request_id = request.data['request_id']
+                timesheet = get_object_or_404(TimesheetRequest, id=request_id)
+
+                available_timesheet = TimeSheet.objects.filter(project=timesheet.project, end__gte=timesheet.start
+                                                               ).order_by('-created')
+                if available_timesheet:
+                    timesheet = available_timesheet.first()
+                    available_week = f"{timesheet.start} - {timesheet.end}"
+                    return Response({"error": f"Timesheet available for week {available_week}"}, status=400)
+
+                timesheet.reviewed_by = request.user
+                timesheet.status = request.data.get('status', timesheet.status)
+                timesheet.reviewer_comment = request.data.get('reviewer_comment')
+                timesheet.save()
+
+                if timesheet.status == "accepted":
+                    new_ts, created = TimeSheet.objects.get_or_create(
+                        project=timesheet.project, start=timesheet.start, end=timesheet.end
+                    )
+                    if created:
+                        new_ts.hours = 0
+                        new_ts.save()
+
+                title = f"{request.user.name} {timesheet.status} the timesheet request for week " \
+                        f"{str(timesheet.start)} - {str(timesheet.end)}"
+
+                message_body = {
+                    "body": title, "title": title, "category": "rejected",
+                    "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                    "data": {
+                        'target': 'timesheet', 'target_id': timesheet.id,
+                        'is_read': False, 'is_deleted': False, 'timestamp': str(timezone.now()),
+                    },
+                }
+                object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
+                registration_ids = list(
+                    FCMDevice.objects.filter(
+                        object_id__in=list(object_ids), content_type__model='consultanttoken'
+                    ).values_list('device_id', flat=True))
+                push_notification_consultant(registration_ids, message_body)
+
+                return Response({"message": f"TimeSheet request {timesheet.get_status_display()}"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
