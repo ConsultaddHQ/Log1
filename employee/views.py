@@ -1125,7 +1125,7 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
 
     def create(self, request, *args, **kwargs):
         try:
-            if type(request.data['emails']) is list and request.data['emails']:
+            if type(request.data['emails']) is list:
                 obj, msg = DefaultCalendar.objects.get_or_create(user=request.user)
                 obj.emails = request.data['emails']
                 obj.save()
@@ -1139,9 +1139,22 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
     @action(methods=['get'], detail=False, url_path='get_default')
     def default(self, request, *args, **kwargs):
         try:
-            default = get_object_or_404(DefaultCalendar, user=request.user)
+            default = DefaultCalendar.objects.filter(user=request.user).first()
+            if not default:
+                return Response({"data": []}, status=200)
+            if not default.emails:
+                return Response({"data": []}, status=200)
             data = {"emails": default.emails}
-            return Response({"data": data}, status=400)
+            start = f"{datetime.now().astimezone(tz.gettz('US/Eastern')).strftime('%Y-%m-%dT00:00:00Z')}"
+            end = f"{datetime.now().astimezone(tz.gettz('US/Eastern')).strftime('%Y-%m-%dT23:59:59Z')}"
+            payload = {
+                "start": start, "end": end, "user_emails": data['emails']
+            }
+            calendar = GoogleCalendar()
+            resp, msg = calendar.get_calendar_schedule(payload, request)
+            if msg != 'error':
+                return Response({"data": resp}, status=200)
+            return Response({"message": resp['message'], "error": resp['error']['error']}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
