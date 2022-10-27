@@ -426,3 +426,56 @@ class LeaveSerializer(serializers.ModelSerializer):
             return 'Multi Day'
         elif obj.total_hours:
             return 'Hourly'
+
+
+class TimesheetRequestSerializer(serializers.ModelSerializer):
+    submitted_at = serializers.SerializerMethodField()
+    reviewed_by = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimesheetRequest
+        fields = ('id', 'start', 'end', 'status', 'submitted_at', 'attachments', 'project', 'reviewer_comment',
+                  'consultant_comment', 'reviewed_by')
+
+    @staticmethod
+    def get_submitted_at(obj):
+        if obj.created:
+            return obj.created.date()
+        return None
+
+    @staticmethod
+    def get_reviewed_by(obj):
+        if obj.reviewed_by:
+            return obj.reviewed_by.employee_name
+        return None
+
+    @staticmethod
+    def get_start(obj):
+        return obj.start.strftime("%m/%d/%Y")
+
+    @staticmethod
+    def get_end(obj):
+        return obj.end.strftime("%m/%d/%Y")
+
+    @staticmethod
+    def get_status(obj):
+        return obj.get_status_display()
+
+    @staticmethod
+    def get_attachments(obj):
+        return AttachmentURLSerializer(obj.attachments.filter(is_active=True), many=True).data
+
+    @staticmethod
+    def get_project(obj):
+        return {
+            'id': obj.project.id,
+            'employer': obj.project.employer,
+            'start_date': obj.project.start_date,
+            'client': obj.project.submission.client,
+            'vendor': obj.project.submission.lead.vendor_company.name,
+        }
