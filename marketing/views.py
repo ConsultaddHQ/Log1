@@ -212,7 +212,7 @@ class LeadViewSets(ModelViewSet):
                     queryset = queryset.filter(position_id__in=filters["position"])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    queryset = queryset.filter(vendor_company_id__in=filters["vendor"])
+                    queryset = queryset.filter(vendor_company__name__in=filters["vendor"])
 
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
@@ -665,10 +665,12 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     queryset = queryset.filter(created_by_id__in=filters['marketer'])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    queryset = queryset.filter(lead__vendor_company_id__in=filters['vendor'])
+                    queryset = queryset.filter(lead__vendor_company__name__in=filters['vendor'])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    queryset = queryset.filter(consultant_marketing__consultant_id__in=filters['consultant'])
+                    queryset = queryset.filter(
+                        consultant_marketing__consultant__name__in=filters['consultant']
+                    )
 
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
@@ -1170,11 +1172,11 @@ class InterviewViewSets(ModelViewSet):
                     queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters["vendor"])
+                    queryset = queryset.filter(submission__lead__vendor_company__name__in=filters["vendor"])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     queryset = queryset.filter(
-                        submission__consultant_marketing__consultant_id__in=filters["consultant"]
+                        submission__consultant_marketing__consultant__name__in=filters["consultant"]
                     )
 
                 start_time = filters.get('start_time', None)
@@ -2435,11 +2437,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     queryset = queryset.filter(submission__created_by_id__in=filters['marketer'])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters['vendor'])
+                    queryset = queryset.filter(submission__lead__vendor_company__name__in=filters['vendor'])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     queryset = queryset.filter(
-                        submission__consultant_marketing__consultant_id__in=filters['consultant'])
+                        submission__consultant_marketing__consultant__name__in=filters['consultant'])
 
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
