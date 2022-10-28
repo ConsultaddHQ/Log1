@@ -962,7 +962,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             engineers = User.objects.filter(
                 projects__statuses__frequency__in=frequency if frequency[0] != 'training' else ['active'],
                 is_active=True, projects__end=None, projects__statuses__is_current=True,
-                projects__is_proxy_support=False, projects__project__is_remote__in=[False, None]
+                projects__is_proxy_support=False
             ).exclude(role__name__iexact='usa_employee').order_by('employee_id').distinct('employee_id')
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -985,12 +985,12 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                             Q(projects__project__submission__lead__vendor_company__name__istartswith=query)
                         )
 
-            support = ProjectSupport.objects.filter(support__is_active=True, project__is_remote__in=[False, None])\
-                .exclude((Q(project__statuses__status__istartswith='terminated') |
-                          Q(project__statuses__status__istartswith='complete')), project__statuses__is_current=True)\
-                .order_by('project_id').distinct('project_id')
-            if consultant_type:
-                support = support.filter(project__is_remote=True)
+            support = ProjectSupport.objects.filter(support__is_active=True)\
+                .exclude((Q(project__statuses__status__istartswith='terminated')
+                          | Q(project__statuses__status__istartswith='cancelled') | Q(project__statuses__status='complete')),
+                         project__statuses__is_current=True).order_by('project_id').distinct('project_id')
+            # if consultant_type:
+            #     support = support.filter(project__is_remote=True)
             counts = self.project_filter_counts(support)
             counts['support_status']['total']['count'] = counts['support_status']['active']['count'] + \
                                                          counts['support_status']['less_active']['count'] + \
@@ -1021,12 +1021,10 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     @action(methods=['get'], detail=False, url_path='remote_project')
     def remote_project(self, request, *args, **kwargs):
         try:
-            final_list = []
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             category = request.GET.get('category', None)
             export = json.loads(request.GET.get('export', 'false'))
-            support_status = json.loads(request.GET.get('support_status', '[]'))
             project_status = json.loads(request.GET.get('project_status', '[]'))
 
             projects = Project.objects.filter(is_remote=True)
@@ -1059,23 +1057,25 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     "active": {
                         "display_name": "Active",
                         "count": projects.filter(
-                            statuses__is_current=True, statuses__status__in=['joined', 'new', 'on_boarded', 'received']
+                            statuses__is_current=True, statuses__status__in=['joined', 'extended']
                         ).count(),
                     },
-                    "complete": {
-                        "display_name": "Complete",
-                        "count": projects.filter(statuses__is_current=True, statuses__status='complete').count(),
-                    },
-                    "terminated": {
-                        "display_name": "Terminated",
+                    "training": {
+                        "display_name": "Training",
                         "count": projects.filter(
-                            statuses__is_current=True,
-                            statuses__status__istartswith='terminated').count(),
+                            statuses__is_current=True, statuses__status__in=['new', 'received', 'on_boarded']
+                        ).count(),
+                    },
+                    "closed": {
+                        "display_name": "Closed",
+                        "count": projects.filter((
+                                Q(statuses__status__istartswith='terminated') |
+                                Q(statuses__status__istartswith='cancelled') | Q(statuses__status='complete')
+                        ), statuses__is_current=True).count(),
                     },
                     "total": {
                         "display_name": "Total",
-                        "count": projects.filter(statuses__is_current=True).exclude(
-                            statuses__is_current=True, statuses__status__istartswith='cancelled').count(),
+                        "count": projects.filter(statuses__is_current=True).count(),
                     }
                 },
             }
@@ -1086,29 +1086,35 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 else:
                     projects = projects.filter(statuses__is_current=True, statuses__status__in=project_status)
 
-            if support_status:
-                projects = projects.filter(support__statuses__is_current=True)
-                if support_status == ['training']:
-                    projects = projects.filter(
-                        support__statuses__frequency=support_status[0], start_date__gt=date.today(),
-                        support__statuses__is_current=True
-                    )
-                elif support_status == ['active'] or support_status == ['less_active']:
-                    projects = projects.filter(
-                        support__statuses__frequency=support_status[0], support__end=None,
-                        support__statuses__is_current=True
-                    )
-                else:
-                    projects = projects.filter(
-                        support__statuses__frequency=support_status[0], support__statuses__is_current=True
-                    )
+            else:
+                projects = projects.filter(
+                    statuses__is_current=True,
+                    statuses__status__in=['joined', 'new', 'on_boarded', 'received', 'extended']
+                )
 
-                for obj in projects:
-                    if not obj.support.filter(support__employee_name=obj.consultant.name):
-                        final_list.append(obj)
+            # if support_status:
+            #     projects = projects.filter(support__statuses__is_current=True)
+            #     if support_status == ['training']:
+            #         projects = projects.filter(
+            #             support__statuses__frequency=support_status[0], start_date__gt=date.today(),
+            #             support__statuses__is_current=True
+            #         )
+            #     elif support_status == ['active'] or support_status == ['less_active']:
+            #         projects = projects.filter(
+            #             support__statuses__frequency=support_status[0], support__end=None,
+            #             support__statuses__is_current=True
+            #         )
+            #     else:
+            #         projects = projects.filter(
+            #             support__statuses__frequency=support_status[0], support__statuses__is_current=True
+            #         )
 
-            if final_list:
-                projects = final_list
+            #     for obj in projects:
+            #         if not obj.support.filter(support__employee_name=obj.consultant.name):
+            #             final_list.append(obj)
+            #
+            # if final_list:
+            #     projects = final_list
             serializer = RemoteProjectSerializer(projects, many=True)
 
             # export

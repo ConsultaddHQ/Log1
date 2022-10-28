@@ -329,7 +329,7 @@ class Leave(TimeStampedModel):
 
 
 class TimesheetRequest(TimeStampedModel):
-    TIMESHEET_STATUS = (
+    TIMESHEET_REQUEST_STATUS = (
         ('reject', 'Reject'),
         ('request', 'Request'),
         ('accepted', 'Accepted'),
@@ -337,7 +337,7 @@ class TimesheetRequest(TimeStampedModel):
     attachments = GenericRelation(Attachment)
     end = models.DateField(_('End'), null=True, blank=True)
     start = models.DateField(_('Start'), null=True, blank=True)
-    status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_STATUS)
+    status = models.CharField(_("Status"), max_length=30, choices=TIMESHEET_REQUEST_STATUS)
     reviewer_comment = models.TextField(_('Reviewer Comment'), null=True, blank=True)
     consultant_comment = models.TextField(_('Consultant Comment'), null=True, blank=True)
     reviewed_by = models.ForeignKey(
