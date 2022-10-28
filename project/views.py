@@ -33,8 +33,7 @@ from utils_app.thred_mail import send_email as send_email_, send_email_attachmen
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant, push_notification, create_notification
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, \
-    ConsultantLeave, Leave, TimesheetRequest
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
@@ -444,12 +443,12 @@ class ProjectViewSets(ModelViewSet):
                     projects = projects.filter(submission__created_by_id__in=filters['marketer'])
 
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    projects = projects.filter(submission__lead__vendor_company_id__in=filters['vendor'])
+                    projects = projects.filter(submission__lead__vendor_company__name__in=filters['vendor'])
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     projects = projects.filter(
-                        Q(submission__consultant_marketing__consultant_id__in=filters['consultant']) |
-                        Q(consultant_id__in=filters['consultant'])
+                        Q(submission__consultant_marketing__consultant__name__in=filters['consultant']) |
+                        Q(consultant__name__in=filters['consultant'])
                     )
 
                 created = filters.get('created', None)
@@ -577,20 +576,7 @@ class ProjectViewSets(ModelViewSet):
                 desc = f"Purchase order created with start date of {project.start_date} and support mail is sent"
                 create_activity(sub.id, 'submission', request.user, desc, 'created')
 
-                # Assign Support Person
-                engineer = get_object_or_404(User, employee_id=request.data['engineer']) \
-                    if request.data.get('engineer', None) else None
-                if engineer:
-                    support = ProjectSupport.objects.create(
-                        project=project, start=project.start_date, support=engineer
-                    )
-                    SupportStatus.objects.create(
-                        frequency='active', support=support, is_current=True
-                    )
-                    desc = f"{request.user.employee_name} added {engineer.employee_name} as support person while " \
-                           f"creating PO"
-                    create_activity(project.id, 'projectsupport', request.user, desc, 'created')
-                    # support_assignment_mail(support, request)
+                # support_assignment_mail(support, request)
                 message, error_msg = self.send_support_offer_mail(project, self.fetch_scrum_masters(request), request)
                 serializer = self.serializer_class(project)
                 return Response({"message": message, "data": serializer.data, "exception": error_msg}, status=201)
@@ -863,6 +849,20 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
             support_person = get_object_or_404(User, id=request.data.get('support', None))
             supports = project.support.filter(end=None, is_proxy_support=False)
+            proxy_start_date = request.data.get('proxy_start_date', None)
+            proxy_support_person = request.data.get('proxy_support_person', None)
+            if proxy_support_person and proxy_start_date:
+                proxy_support_person = get_object_or_404(User, id=proxy_support_person)
+                if supports.filter(support=proxy_support_person, statuses__frequency="active",
+                                   statuses__is_current=True, project=project):
+                    return Response(
+                        {"message": "Proxy support person should be different than active support person"}, status=400
+                    )
+                if {'support_id': proxy_support_person.id} in supports.values('support_id'):
+                    return Response({"message": "Support person is already active for this support"}, status=400)
+                ProjectSupport.objects.create(
+                    project=project, is_proxy_support=True, start=proxy_start_date, support=proxy_support_person
+                )
 
             if is_proxy_support and supports.filter(support=support_person, statuses__frequency="active",
                                                     statuses__is_current=True, project=project):
@@ -1018,6 +1018,25 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             data = request.data
             support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
             prev_support = support.statuses.filter(is_current=True).first()
+
+            project = support.project
+            proxy_start_date = request.data.get('proxy_start_date', None)
+            proxy_support_person = request.data.get('proxy_support_person', None)
+            supports = project.support.filter(end=None, is_proxy_support=False)
+            if proxy_support_person and proxy_start_date:
+                proxy_support_person = get_object_or_404(User, id=proxy_support_person)
+                if supports.filter(support=proxy_support_person, statuses__frequency="active",
+                                   statuses__is_current=True, project=project):
+                    return Response(
+                        {"message": "Proxy support person should be different than active support person"}, status=400
+                    )
+                if {'support_id': proxy_support_person.id} in supports.values('support_id'):
+                    return Response({"message": "Support person is already active for this support"}, status=400)
+                ProjectSupport.objects.create(
+                    project=project, is_proxy_support=True, start=proxy_start_date, support=proxy_support_person
+                )
+                desc = f"{request.user.employee_name} added proxy support details"
+                create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
 
             if support.is_proxy_support is True and support.support.id != data.get('support'):
                 supports = ProjectSupport.objects.filter(
@@ -1451,7 +1470,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def request_timesheet(self, request, *args, **kwargs):
         try:
             if request.method == 'GET':
-                consultant_id = kwargs.get('consultant_id')
+                consultant_id = request.GET.get('consultant_id')
                 requested_timesheets = TimesheetRequest.objects.filter(project__consultant_id=consultant_id)
                 serializer = TimesheetRequestSerializer(requested_timesheets, many=True)
                 return Response({"data": serializer.data}, status=200)
@@ -1463,6 +1482,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 available_timesheet = TimeSheet.objects.filter(project=timesheet.project, end__gte=timesheet.start
                                                                ).order_by('-created')
                 if available_timesheet:
+                    timesheet.status = 'reject'
+                    timesheet.save()
                     timesheet = available_timesheet.first()
                     available_week = f"{timesheet.start} - {timesheet.end}"
                     return Response({"error": f"Timesheet available for week {available_week}"}, status=400)

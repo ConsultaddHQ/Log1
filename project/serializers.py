@@ -227,7 +227,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_pending_request(obj):
         queryset = TimesheetRequest.objects.filter(project__consultant=obj)
-        return True if queryset.filter(status='applied') else False
+        return True if queryset.filter(status='request') else False
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
