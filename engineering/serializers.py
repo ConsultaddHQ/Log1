@@ -412,7 +412,7 @@ class EngineerReportSerializer(serializers.ModelSerializer):
 
     def get_project(self, obj):
         frequency = self.context.get("frequency")
-        projects = obj.projects.filter(end=None, project__is_remote__in=[False, None]).exclude(
+        projects = obj.projects.filter(end=None).exclude(
             project__statuses__is_current=True, project__statuses__status__istartswith='terminated'
         )
         if frequency == ['training']:
@@ -581,7 +581,7 @@ class RemoteProjectSerializer(serializers.ModelSerializer):
                 "status": status.lower(), "duration": duration
             }
         else:
-            data = {"name": "", "start_date": "", "status": status.lower(), "duration": duration}
+            data = {"name": "Support not Required", "start_date": "", "status": status.lower(), "duration": duration}
         return data
 
     @staticmethod
@@ -591,6 +591,10 @@ class RemoteProjectSerializer(serializers.ModelSerializer):
         statuses = obj.statuses.filter(is_current=True)
         if statuses:
             status = statuses.first().get_status_display()
+            if status in ['Joined', 'Extended']:
+                status = 'Active'
+            elif status in ['New', 'Received', 'On Boarded']:
+                status = 'Training'
 
         if hasattr(obj, 'description'):
             remarks = obj.description.remark
