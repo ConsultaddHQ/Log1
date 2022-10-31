@@ -1346,7 +1346,7 @@ class InterviewViewSets(ModelViewSet):
                     "description": interview.description, "call_details": interview.call_details,
                 }
 
-                # Booking MS calendar
+                # Booking Calendar
                 try:
                     # Booking Google calendar
                     calendar = GoogleCalendar()
