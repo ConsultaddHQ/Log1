@@ -675,7 +675,6 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     'timestamp': str(timezone.now()),
                 },
             }
-            message = f"Timesheet Requested for project {project.submission.client} by {request.user.name}"
             user_ids = list(user_list.values_list('id', flat=True))
             push_notification(user_ids, message_body)
 
