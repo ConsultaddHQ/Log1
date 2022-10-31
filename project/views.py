@@ -1471,7 +1471,11 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         try:
             if request.method == 'GET':
                 consultant_id = request.GET.get('consultant_id')
+                end = request.GET.get('end', None)
+                start = request.GET.get('start', None)
                 requested_timesheets = TimesheetRequest.objects.filter(project__consultant_id=consultant_id)
+                if start and end:
+                    requested_timesheets = requested_timesheets.filter(start__gte=start, end__lte=end)
                 serializer = TimesheetRequestSerializer(requested_timesheets, many=True)
                 return Response({"data": serializer.data}, status=200)
 
