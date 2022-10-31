@@ -5,10 +5,10 @@ import requests
 
 from rest_framework.response import Response
 
-from google.auth.exceptions import RefreshError
 from googleapiclient import discovery
-from google.oauth2.service_account import Credentials
+from google.auth.exceptions import RefreshError
 from log1.utils import write_exception, write_info
+from google.oauth2.service_account import Credentials
 
 SCOOPS = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/admin.directory.user']
 SERVICE_ACCOUNT_FILE = 'calendar.json'
