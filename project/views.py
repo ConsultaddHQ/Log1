@@ -1470,10 +1470,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def request_timesheet(self, request, *args, **kwargs):
         try:
             if request.method == 'GET':
-                consultant_id = request.GET.get('consultant_id')
                 end = request.GET.get('end', None)
                 start = request.GET.get('start', None)
+                query = request.GET.get('query', None)
+                consultant_id = request.GET.get('consultant_id')
                 requested_timesheets = TimesheetRequest.objects.filter(project__consultant_id=consultant_id)
+                if query:
+                    requested_timesheets = requested_timesheets.filter(
+                        Q(project__submission__client__istartswith=query) |
+                        Q(project__submission__lead__vendor_company__name__istartswith=query)
+                    )
                 if start and end:
                     requested_timesheets = requested_timesheets.filter(start__gte=start, end__lte=end)
                 serializer = TimesheetRequestSerializer(requested_timesheets, many=True)
@@ -1505,7 +1511,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         new_ts.hours = 0
                         new_ts.save()
 
-                title = f"{request.user.name} {timesheet.status} the timesheet request for week " \
+                title = f"{request.user.employee_name} {timesheet.status} the timesheet request for week " \
                         f"{str(timesheet.start)} - {str(timesheet.end)}"
 
                 message_body = {

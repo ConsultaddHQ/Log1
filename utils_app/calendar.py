@@ -199,18 +199,16 @@ class GoogleCalendar:
                         continue
                     else:
                         for item in ms_res.json()['value'][0]['scheduleItems']:
-                            res['calendars'][email].pop('errors')
                             res['calendars'][email]['busy'].append(
                                 {
                                     "start": self.formate_date(item.get('start')),
                                     "end": self.formate_date(item.get('end'))
                                 }
                             )
-
             return res['calendars'], 'ok'
         except Exception as error:
             write_exception(message=error, request=request)
-            return str(error), "error"
+            return {"message": str(error)}, "error"
 
 
 class Calendar:
@@ -382,7 +380,7 @@ class Calendar:
             if not headers:
                 return {"message": "Something went wrong", "error": "Unable to fetch calendar Token", "code": 400}
             payload = {
-                "Schedules": ['product@consultadd.com'],
+                "Schedules": data['emails'],
                 "StartTime": {
                     "dateTime": data['start'],
                     "timeZone": "Eastern Standard Time"
