@@ -196,9 +196,9 @@ class ProjectViewSets(ModelViewSet):
         support_res, support_msg = self.send_support_mail(project, scrum_masters, request)
         engineer = get_object_or_404(User, employee_id=request.data['engineer']) \
             if request.data.get('engineer', None) else None
-        if engineer:
-            support = get_object_or_404(ProjectSupport, project=project, support=engineer)
-            support_assignment_mail(support, request)
+        # if engineer:
+        #     support = get_object_or_404(ProjectSupport, project=project, support=engineer)
+        #     support_assignment_mail(support, request)
         message = "Project created"
         exception_msg = "Mail sent"
         if support_msg == 'error' and offer_msg == 'error':
