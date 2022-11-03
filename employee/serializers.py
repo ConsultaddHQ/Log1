@@ -3,7 +3,7 @@ from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
 # from utils_app.calendar import get_profile_picture
-from employee.models import User, Asset, Team, Role, Tagging, Handover
+from employee.models import User, Asset, Team, Role, Tagging, Handover, CertificateInfo
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -216,3 +216,9 @@ class HandoverSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_name(obj):
         return obj.user.employee_name
+
+
+class CertificateInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CertificateInfo
+        fields = '__all__'

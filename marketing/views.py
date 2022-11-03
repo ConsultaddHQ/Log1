@@ -636,6 +636,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     else:
                         queryset = queryset.filter(
                             Q(created_by=request.user) |
+                            Q(marketing_team=request.user.team) |
                             Q(marketing_team__in=associated_teams) |
                             Q(consultant_marketing__consultant__in=consultant_ids)
                         )
