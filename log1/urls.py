@@ -44,7 +44,7 @@ router.register(r'employee', EmployeeViewSets)
 router.register(r'handover', HandoverViewSets)
 router.register(r'password', ResetPasswordViewSets)
 router.register(r'calendar_info', DefaultCalendarViewSets)
-router.register(r'employee/(?P<employee_id>[0-9]+)/certificate', CertificateViewSets)
+router.register(r'employee_certificate', CertificateViewSets)
 
 
 router.register(r'attachment', AttachmentView)

@@ -1160,7 +1160,7 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
             return Response({"message": str(error)}, status=400)
 
 
-# Route - /employee/<employee_id>/certificate/
+# Route - /employee_certificate/
 class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
     permission_classes = (IsAuthenticated,)
     queryset = CertificateInfo.objects.all()
@@ -1169,7 +1169,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
 
     def list(self, request, *args, **kwargs):
         try:
-            certificates = CertificateInfo.objects.filter(employee=kwargs.get('employee_id'))
+            certificates = CertificateInfo.objects.filter(employee=request.user)
             serializer = self.serializer_class(certificates, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -1178,12 +1178,15 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
 
     def create(self, request, *args, **kwargs):
         try:
-            certificate = Certificate.objects.filter(id=request.data.get('certificate_id', None)).first()
+            certificate_name = request.data.get('certificate_name', None)
+            organization = request.data.get('organization', None)
+            certificate = Certificate.objects.filter(name=certificate_name, issued_by=organization).first()
             if not certificate:
-                certificate_name = request.data.get('certificate_name', None)
-                organization = request.data.get('organization', None)
-                if not (certificate_name and organization):
-                    return Response({"message": "No Certificate Selected"}, status=400)
+                available_certificate = Certificate.objects.filter(
+                    name__icontains=certificate_name, issued_by=organization
+                )
+                if available_certificate:
+                    return Response({"message": "Certificate Info Already Exists"}, status=400)
                 certificate = Certificate.objects.create(name=certificate_name, issued_by=organization)
             CertificateInfo.objects.create(
                 expiry_date=request.data.get('expiry_date', None), issued_date=request.data.get('issued_date'),
@@ -1197,7 +1200,6 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
 
     def update(self, request, *args, **kwargs):
         try:
-            breakpoint()
             certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
             serializer = self.serializer_class(certificate_info, data=request.data, partial=True)
             if serializer.is_valid():
@@ -1221,9 +1223,18 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
     def get_all(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query', None)
+            organization = json.loads(request.GET.get('organization', 'false'))
+            organization_name = request.GET.get('organization_name', 'false')
             certificates = Certificate.objects.all()
+            if organization:
+                certificates = certificates.filter().order_by('issued_by')\
+                    .distinct('issued_by').values_list('issued_by', flat=True)
+                return Response({"data": certificates}, status=200)
+
+            if organization_name:
+                certificates = certificates.filter(issued_by=organization_name)
             if query:
-                certificates = certificates.filter(name__istartswith=query.lstrip().replace(':amp:', '&'))
+                certificates = certificates.filter(name__icontains=query.lstrip().replace(':amp:', '&'))
             certificates = certificates.filter().values('id', 'name', 'issued_by')
             return Response({"data": certificates}, status=200)
         except Exception as error:
