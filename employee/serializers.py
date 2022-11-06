@@ -219,6 +219,14 @@ class HandoverSerializer(serializers.ModelSerializer):
 
 
 class CertificateInfoSerializer(serializers.ModelSerializer):
+    certificate = serializers.SerializerMethodField()
+
     class Meta:
         model = CertificateInfo
         fields = '__all__'
+
+    @staticmethod
+    def get_certificate(obj):
+        return {
+            "name": obj.certificate.name, "organization": obj.certificate.issued_by
+        }
