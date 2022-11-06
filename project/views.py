@@ -527,7 +527,8 @@ class ProjectViewSets(ModelViewSet):
                 {"name": "duration", "display_name": "Duration"},
                 {"name": "city", "display_name": "City"},
                 {"name": "is_remote", "display_name": "Remote"},
-                {"name": "status", "display_name": "Status"}
+                {"name": "status", "display_name": "Status"},
+                {"name": "rate", "display_name": "Rate"}
             ]
             if export:
                 url = export_to_csv(
@@ -1343,6 +1344,64 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     projects__timesheets__status__in=['submitted', 'updated'],
                 ).exclude(projects__submission__status='archive').order_by('id').distinct('id')
 
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                consultants = Consultant.objects.filter(
+                    Q(name__istartswith=query) |
+                    Q(projects__employer__startswith=query) |
+                    Q(projects__submission__client__icontains=query) |
+                    Q(projects__submission__lead__vendor_company__name__icontains=query)
+                ).order_by('id').distinct('id')
+
+            queryset = consultants.order_by('name').distinct('name')
+            total = queryset.count()
+            serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
+            return Response({"data": serializer.data, 'total': total}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["get"], detail=False, url_name="consultant")
+    def consultant(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        query = request.GET.get('query', None)
+        consultant_id = request.GET.get('consultant', None)
+        leave_status = request.GET.get('leave_status', [])
+        consultant_name = request.GET.get('consultant_name', None)
+        timesheet_status = request.GET.get('timesheet_status', [])
+
+        try:
+            project_status = [
+                'terminated-fired_performance_issue', 'terminated-fired_security_issue',
+                'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
+                'terminated-fired_budget_issue', 'terminated-resigned_location_issue', 'complete',
+                'joined', 'terminated', 'terminated-resigned', 'terminated-resigned_location_issue',
+            ]
+
+            if consultant_id:
+                consultants = Consultant.objects.filter(id=consultant_id)
+            elif consultant_name:
+                consultants = Consultant.objects.filter(name__istartswith=consultant_name)
+            else:
+                consultant_ids = Project.objects.filter(
+                    statuses__status__in=project_status, statuses__is_current=True
+                ).values_list('consultant', flat=True)
+
+                consultants = Consultant.objects.filter(
+                    id__in=list(consultant_ids),
+                ).exclude(projects__submission__status='archive').order_by('id').distinct('id')
+
+            if timesheet_status:
+                if timesheet_status == 'pending_for_approval':
+                    consultants = consultants.filter(
+                        projects__timesheets__status__in=['submitted', 'updated'], projects__timesheets__is_active=True
+                    )
+                else:
+                    consultants = consultants.filter(
+                        projects__timesheets__status=timesheet_status, projects__timesheets__is_active=True
+                    )
+            if leave_status:
+                consultants = consultants.filter(leaves__status__in=leave_status)
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 consultants = Consultant.objects.filter(
