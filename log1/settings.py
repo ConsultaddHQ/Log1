@@ -58,6 +58,7 @@ PROJECT_APPS = [
     'impersonate.apps.ImpersonateConfig',
     'messaging.apps.MessagingConfig',
     'engineering.apps.EngineeringConfig',
+    'dynamic_reports.apps.DynamicReportsConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS

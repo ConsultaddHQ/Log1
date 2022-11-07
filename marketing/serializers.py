@@ -281,6 +281,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
 class TestListSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
+    # test_link = serializers.SerializerMethodField()
     job_title = serializers.SerializerMethodField()
     marketer_id = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
@@ -288,13 +289,13 @@ class TestListSerializer(serializers.ModelSerializer):
     submitted_by = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
+    # additional_details = serializers.SerializerMethodField()
     engineer_associated = serializers.SerializerMethodField()
-
     class Meta:
         model = Test
         fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id', 'client',
                   'consultant_name', 'submitted_by', 'job_title', 'skills', 'created', 'modified', 'assigned_to',
-                  'engineer_associated')
+                  'engineer_associated','link','additional_details')
 
     @staticmethod
     def get_client(obj):
