@@ -25,7 +25,7 @@ from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceT
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
     TrainingCheckListViewSet, EngineerReportViewSet, TeamStructureViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
-    AllUsersViewSet, HandoverViewSets, LoginViewSet, DefaultCalendarViewSets
+    AllUsersViewSet, HandoverViewSets, LoginViewSet, DefaultCalendarViewSets, CertificateViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
@@ -44,6 +44,7 @@ router.register(r'employee', EmployeeViewSets)
 router.register(r'handover', HandoverViewSets)
 router.register(r'password', ResetPasswordViewSets)
 router.register(r'calendar_info', DefaultCalendarViewSets)
+router.register(r'employee_certificate', CertificateViewSets)
 
 
 router.register(r'attachment', AttachmentView)

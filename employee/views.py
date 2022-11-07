@@ -31,9 +31,9 @@ from notification.models import FCMDevice
 from activity.views import create_activity
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time, \
-    DefaultCalendar
+    DefaultCalendar, CertificateInfo, Certificate
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
-    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer
+    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer
 
 
 # Route - /auth/
@@ -1155,6 +1155,88 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
             if msg != 'error':
                 return Response({"data": resp}, status=200)
             return Response({"message": resp['message'], "error": resp['error']['error']}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+
+# Route - /employee_certificate/
+class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModelMixin, DestroyModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = CertificateInfo.objects.all()
+    serializer_class = CertificateInfoSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            certificates = CertificateInfo.objects.filter(employee=request.user)
+            serializer = self.serializer_class(certificates, many=True)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            certificate_name = request.data.get('certificate_name', None)
+            organization = request.data.get('organization', None)
+            certificate = Certificate.objects.filter(name=certificate_name, issued_by=organization).first()
+            if not certificate:
+                available_certificate = Certificate.objects.filter(
+                    name__icontains=certificate_name, issued_by=organization
+                )
+                if available_certificate:
+                    return Response({"message": "Certificate Info Already Exists"}, status=400)
+                certificate = Certificate.objects.create(name=certificate_name, issued_by=organization)
+            CertificateInfo.objects.create(
+                expiry_date=request.data.get('expiry_date', None), issued_date=request.data.get('issued_date'),
+                credential_id=request.data.get('credential_id', None), has_expiry=request.data.get('has_expiry'),
+                certificate=certificate, employee=request.user, credential_url=request.data.get('credential_url', None)
+            )
+            return Response({"message": "Certificate Added"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
+            serializer = self.serializer_class(certificate_info, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"message": "Certificate Info Updated"}, status=202)
+            return Response({"message": "Please provide correct certificate info"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
+            certificate_info.delete()
+            return Response({"message": "Certificate Removed"}, status=204)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    @action(['GET'], detail=False, url_path='get_all')
+    def get_all(self, request, *args, **kwargs):
+        try:
+            query = request.GET.get('query', None)
+            organization = json.loads(request.GET.get('organization', 'false'))
+            organization_name = request.GET.get('organization_name', 'false')
+            certificates = Certificate.objects.all()
+            if organization:
+                certificates = certificates.filter().order_by('issued_by')\
+                    .distinct('issued_by').values_list('issued_by', flat=True)
+                return Response({"data": certificates}, status=200)
+
+            if organization_name:
+                certificates = certificates.filter(issued_by=organization_name)
+            if query:
+                certificates = certificates.filter(name__icontains=query.lstrip().replace(':amp:', '&'))
+            certificates = certificates.filter().values('id', 'name', 'issued_by')
+            return Response({"data": certificates}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
