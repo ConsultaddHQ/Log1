@@ -1422,7 +1422,7 @@ class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
 
     def create(self, request, *args, **kwargs):
         try:
-            if 'superadmin' not in request.user.roles:
+            if 'superadmin' not in request.user.roles and 'scrum_master' not in request.user.roles:
                 return Response({"message": "You don't have access"}, status=400)
 
             data = request.data

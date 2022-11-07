@@ -82,6 +82,14 @@ class Role(models.Model):
         return self.name
 
 
+class Certificate(models.Model):
+    name = models.CharField(_('Certificate Name'), max_length=150)
+    issued_by = models.CharField(_('Issued Organization Name'), max_length=200, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class User(AbstractUser, PermissionsMixin):
     """
     Custom employee realization based on Django AbstractUser and PermissionMixin.
@@ -153,6 +161,25 @@ class User(AbstractUser, PermissionsMixin):
             self.first_name = self.employee_name.split()[0]
             self.last_name = self.employee_name.split()[1] if len(self.employee_name.split()) > 1 else ""
         return super(User, self).save(*args, **kwargs)
+
+
+class CertificateInfo(TimeStampedModel):
+    has_expiry = models.BooleanField(_('Has Expiry'), default=False)
+    issued_date = models.DateField(_('Issue Date'), default=timezone.now)
+    expiry_date = models.DateField(_('Expiry Date'), null=True, blank=True)
+    employee = models.ForeignKey(User, on_delete=models.CASCADE, related_name='certificates')
+    credential_id = models.CharField(_('Credential Id'), max_length=200, null=True, blank=True)
+    certificate = models.ForeignKey(Certificate, on_delete=models.PROTECT, related_name='info')
+    credential_url = models.CharField(_('Credential Url'), max_length=200, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(CertificateInfo, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.employee.employee_name}-{self.certificate.name}'
 
 
 class ResetPasswordToken(models.Model):
