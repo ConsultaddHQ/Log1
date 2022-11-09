@@ -13,7 +13,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         job = create_cron_object(name='assign_consultant_leave')
         try:
-            assigned, already = 0, 0
+            count, created, assigned, already = 0, 0, 0, 0
             content_type = ContentType.objects.get(model='consultantleave')
             # leave_types = {
             #     'Sick leave': 'sick_leave',
@@ -37,43 +37,44 @@ class Command(BaseCommand):
             leave_types = Choice.objects.filter(content_type=content_type, field='leave').exclude(
                 name__in=[sick_Leave.name, pto_leave.name]
             )
-            file = open('consultant_leave .csv', 'r')
+            file = open('consultant_leave.csv', 'r')
             reader = csv.reader(file)
             resp_file = open('assignment_resp .csv', 'w')
             writer = csv.writer(resp_file)
             writer.writerow(['Consultant Name', 'Name of Company'])
+            resp_file = open('already_resp .csv', 'w')
+            writer_el = csv.writer(resp_file)
+            writer_el.writerow(['serial_number', 'Consultant Name', 'Name of Company', 'leave_type', 'Leave Count'])
             i=0
             prev_consultant = ''
             cl = ConsultantLeave.objects.exclude(consultant_id=420)
             cl.delete()
             for item in reader:
+                count = count + 1
                 if i == 0:
                     i += 1
                     continue
-
-                consultant = Consultant.objects.filter(name__iexact=item[0]).first()
+                name = item[0].replace(" ", "").split(',')
+                consultant_name = " ".join([name[1], name[0]])
+                consultant = Consultant.objects.filter(name__iexact=consultant_name).first()
                 if consultant:
                     if item[2] in ['Sick', 'Paid Time Off']:
                         choice = pto_leave if item[2] == 'Paid Time Off' else sick_Leave
-                        assigned_leave = ConsultantLeave.objects.filter(
-                            consultant=consultant, leave_type=choice, is_expired=False
+                        ConsultantLeave.objects.create(
+                            year=2022, balance=item[3], granted=item[3],
+                            is_expired=False, leave_type=choice, consultant=consultant
                         )
-                        if assigned_leave:
-                            already += 1
-                            continue
+                        assigned += 1
 
-                    if item[2] == 'Sick':
-                        ConsultantLeave.objects.create(
-                            year=2022, balance=item[3], granted=item[3],
-                            is_expired=False, leave_type=sick_Leave, consultant=consultant
-                        )
-                        assigned += 1
-                    elif item[2] == 'Paid Time Off':
-                        ConsultantLeave.objects.create(
-                            year=2022, balance=item[3], granted=item[3],
-                            is_expired=False, leave_type=pto_leave, consultant=consultant
-                        )
-                        assigned += 1
+                        # assigned_leave = ConsultantLeave.objects.filter(
+                        #     consultant=consultant, leave_type=choice, is_expired=False
+                        # )
+                        # if assigned_leave:
+                        #     writer_el.writerow([count, consultant_name, item[1], choice.name, item[3]])
+                        #     already += 1
+                        #     continue
+                        # else:
+
                     if prev_consultant == consultant:
                         i+=1
                         continue
@@ -84,6 +85,7 @@ class Command(BaseCommand):
                                 consultant=consultant, leave_type=choice, is_expired=False
                             )
                             if assigned_leave:
+                                writer_el.writerow([count, consultant_name, item[1], choice.name, item[3]])
                                 already += 1
                                 continue
 
@@ -94,9 +96,11 @@ class Command(BaseCommand):
                         pass
                     i += 1
                     continue
-                writer.writerow([item[0], item[1]])
+                writer.writerow([count, consultant_name, item[1]])
             print(i-1)
             print(f"Assigned leaves = {assigned}")
             print(f"Already = {already}")
+            print(f"Created = {created}")
+            print(f"Count = {count}")
         except Exception as error:
             print(error)
