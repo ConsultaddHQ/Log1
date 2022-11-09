@@ -1365,8 +1365,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def consultant(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
+        leave_status = request.GET.get('leave_status', '')
         consultant_id = request.GET.get('consultant', None)
-        leave_status = request.GET.get('leave_status', [])
         consultant_name = request.GET.get('consultant_name', None)
         timesheet_status = request.GET.get('timesheet_status', [])
 
@@ -1401,10 +1401,13 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         projects__timesheets__status=timesheet_status, projects__timesheets__is_active=True
                     )
             if leave_status:
-                consultants = consultants.filter(leaves__status__in=leave_status)
+                if leave_status == 'pending':
+                    consultants = consultants.filter(leaves__status='applied')
+                elif leave_status == 'not_pending':
+                    consultants = consultants.exclude(leaves__status='applied')
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                consultants = Consultant.objects.filter(
+                consultants = consultants.filter(
                     Q(name__istartswith=query) |
                     Q(projects__employer__startswith=query) |
                     Q(projects__submission__client__icontains=query) |
