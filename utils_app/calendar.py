@@ -3,10 +3,12 @@ import json
 import os.path
 import requests
 
-from google.auth.exceptions import RefreshError
+from rest_framework.response import Response
+
 from googleapiclient import discovery
 from google.auth.exceptions import RefreshError
 from log1.utils import write_exception, write_info
+from google.oauth2.service_account import Credentials
 
 SCOOPS = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/admin.directory.user']
 SERVICE_ACCOUNT_FILE = 'calendar.json'
@@ -198,7 +200,7 @@ class GoogleCalendar:
                     if ms_res.status_code != 200:
                         continue
                     else:
-                        for item in ms_res.json()['value'][0]['scheduleItems']:
+                        for item in ms_res.json()['value'][0].get('scheduleItems', []):
                             res['calendars'][email]['busy'].append(
                                 {
                                     "start": self.formate_date(item.get('start')),
@@ -396,4 +398,5 @@ class Calendar:
 
             return response
         except Exception as error:
-            return {"message": "Something went wrong", "error": {"error": str(error)}, "code": 400}
+            write_exception(message=error, request=self.request)
+            return Response({"message": "Email not found"}, status=400)

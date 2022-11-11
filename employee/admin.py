@@ -6,7 +6,8 @@ from django.utils.translation import ugettext_lazy as _
 from import_export.admin import ExportActionModelAdmin
 
 from utils_app.admin import ExportCsvMixin
-from employee.models import User, Role, Team, ResetPasswordToken, Asset, Tagging, Handover, DefaultCalendar
+from employee.models import User, Role, Team, ResetPasswordToken, Asset, Tagging, Handover, DefaultCalendar, \
+    Certificate, CertificateInfo
 
 admin.site.site_header = "Log1"
 
@@ -93,3 +94,15 @@ class HandoverAdmin(admin.ModelAdmin):
 class DefaultCalendarAdmin(admin.ModelAdmin):
     search_fields = ('user__employee_name', )
     list_display = ('id', 'user', 'emails')
+
+
+@admin.register(Certificate)
+class CertificateAdmin(admin.ModelAdmin):
+    search_fields = ('name', )
+    list_display = ('id', 'name', 'issued_by')
+
+
+@admin.register(CertificateInfo)
+class CertificateInfoAdmin(admin.ModelAdmin):
+    search_fields = ('employee__employee_name', 'certificate__name')
+    list_display = ('id', 'employee', 'certificate', 'issued_date', 'expiry_date', 'has_expiry')
