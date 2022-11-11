@@ -1193,6 +1193,10 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
                 credential_id=request.data.get('credential_id', None), has_expiry=request.data.get('has_expiry'),
                 certificate=certificate, employee=request.user, credential_url=request.data.get('credential_url', None)
             )
+            user = User.objects.filter(id = request.user.id).first()
+            if user:
+                user.have_cirtificate = True
+                user.save()
             return Response({"message": "Certificate Added"}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -1215,6 +1219,18 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
             certificate_info.delete()
             return Response({"message": "Certificate Removed"}, status=204)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    @action(['PUT'], detail=False, url_path='mark_certificate')
+    def mark_certificate(self, request, *args, **kwargs):
+        try:
+            user = User.objects.filter(id = request.user.id).first()
+            if user is not None:
+                user.have_cirtificate = request.data.get('have_cirtificate')
+                user.save()
+            return Response({"data": "Data updated successfully"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
