@@ -25,7 +25,7 @@ from activity.views import create_activity
 from utils_app.calendar import GoogleCalendar, Calendar
 from django.contrib.auth.models import ContentType
 from activity.serializers import ActivitySerializer
-from utils_app.utils import delete_temp_file, export_to_csv
+from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url
 from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
@@ -2354,6 +2354,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
+        export = json.loads(request.GET.get('export', 'false'))
         filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
@@ -2451,12 +2452,30 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 queryset = date_filter(queryset, deadline, 'deadline')
 
             queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
-
             if counts == 'error':
                 return Response({"error": str(queryset)}, status=400)
 
+            url = ""
+            if export:
+                file_name = f"test_report_{datetime.now().strftime('%d-%B-%Y')}.csv"
+                file = open(file_name, 'w')
+                writer = csv.writer(file)
+                writer.writerow(['Consultant Name', 'Marketer Name', 'Client', 'Job Title', 'Company Name', 'Link',
+                                 'Created At', 'Deadline', 'Skills', 'Submitted By', 'Status', 'Engineer Associated'])
+                for obj in queryset:
+                    engineer_associated = [obj.employee_name for obj in obj.engineer.all()]
+                    writer.writerow([
+                        obj.submission.consultant.name, obj.submission.created_by.employee_name, obj.submission.client,
+                        obj.submission.lead.job_title,  obj.submission.lead.vendor_company.name, obj.link,
+                        obj.created.date(), obj.deadline, obj.skills,
+                        obj.submitted_by.employee_name if obj.submitted_by else None, obj.get_status_display(),
+                        engineer_associated
+                    ])
+                file.close()
+                url = generate_s3_url(file_name)
+
             data = TestListSerializer(queryset[first:last], many=True).data
-            return Response({"counts": counts, "data": data}, status=200)
+            return Response({"counts": counts, "data": data, "url": url}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -2499,9 +2518,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 deadline=data['deadline'],
                 is_video=data['is_video'],
                 is_offline=data['is_offline'],
+                platform=request.data.get('platform', None),
                 additional_details=data['additional_details'],
             )
 
+            test_content_type = ContentType.objects.get(model='test')
+            available_platforms = Choice.objects.filter(
+                content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
+            )
+            if not available_platforms.first() and test.platform != 'Not Available':
+                Choice.objects.create(
+                    content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
+                )
             # Activity
             if is_video:
                 desc = f"Video test created with deadline {str(test.deadline)}"

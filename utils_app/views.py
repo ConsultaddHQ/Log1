@@ -8,7 +8,6 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from django.contrib.contenttypes.models import ContentType
 
-from utils_app.utils import TECHNOLOGIES
 from utils_app.models import City, Choice
 from log1.utils import write_exception, ERROR_MSG
 
