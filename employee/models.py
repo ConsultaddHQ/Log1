@@ -110,7 +110,7 @@ class User(AbstractUser, PermissionsMixin):
     account_login = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
     role = models.ManyToManyField(Role, related_name='roles')
-    have_cirtificate = models.BooleanField(null=True, blank=True)
+    have_certificate = models.BooleanField(null=True, blank=True)
     employee_id = models.IntegerField(_('Employee ID'), unique=True)
     date_joined = models.DateTimeField(_('date joined'), default=timezone.now)
     employee_name = models.CharField(_("Full Name"), max_length=100, blank=True)
