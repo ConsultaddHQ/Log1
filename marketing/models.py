@@ -326,6 +326,7 @@ class Test(TimeStampedModel):
     feedback = models.TextField(_('Test Feedback'), null=True, blank=True)
     deadline = models.DateField(_('Test Deadline'), null=True, blank=True)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES)
+    platform = models.CharField(_('PlatForm'), max_length=30, null=True, blank=True)
     cancel_reason = models.TextField(_('Cancellation Reason'), null=True, blank=True)
     engineer_remarks = models.TextField(_("Engineer Remarks"), null=True, blank=True)
     submit_date = models.DateTimeField(_('Test Submission Date'), null=True, blank=True)
