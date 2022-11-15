@@ -634,7 +634,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 return Response({"error": f"Timesheet already requested for week {start} - {end}"}, status=400)
 
             requested_week = TimesheetRequest.objects.create(
-                start=start, end=end, project=project, status='request', consultant_comment=request.data.get('comment')
+                start=start, end=end, project=project, status='request', consultant_comment=request.data.get('description')
             )
             content_type = ContentType.objects.get(model='timesheetrequest')
             if request.FILES.get('file', None):

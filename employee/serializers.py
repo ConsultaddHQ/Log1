@@ -36,7 +36,7 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'gender', 'phone', 'roles',
-		   'is_superuser', 'technology', 'shift', 'project', 'display_roles', 'version')
+                  'is_superuser', 'technology', 'shift', 'project', 'display_roles', 'version', 'have_certificate')
 
     @staticmethod
     def get_team(obj):
