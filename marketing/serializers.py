@@ -294,7 +294,7 @@ class TestListSerializer(serializers.ModelSerializer):
         model = Test
         fields = ('id', 'status', 'deadline', 'company_name', 'submission_id', 'marketer_name', 'marketer_id', 'client',
                   'consultant_name', 'submitted_by', 'job_title', 'skills', 'created', 'modified', 'assigned_to',
-                  'engineer_associated', 'link', 'additional_details')
+                  'engineer_associated', 'link', 'additional_details', 'platform')
 
     @staticmethod
     def get_client(obj):
@@ -450,6 +450,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     supervisor = serializers.SerializerMethodField()
     guest = UserDetailSerializer(many=True)
     permission = serializers.SerializerMethodField()
+    marketer_name = serializers.SerializerMethodField()
     guest_feedback = serializers.SerializerMethodField()
     attachment_link = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
@@ -471,6 +472,10 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         if obj.attachment_link:
             return obj.attachment_link.split('/')[-1]
         return None
+
+    @staticmethod
+    def get_marketer_name(obj):
+        return obj.submission.created_by.employee_name
 
     @staticmethod
     def get_allow_status_change(obj):
@@ -564,7 +569,7 @@ class TestGetSerializer(serializers.ModelSerializer):
         model = Test
         fields = ('id', 'status', 'deadline', 'is_offline', 'feedback', 'link', 'additional_details', 'submit_date',
                   'engineer_remarks', 'is_video', 'skills', 'engineers', 'submitted_by', 'created', 'attachments',
-                  'cancel_reason', 'assigned_to', 'permission', 'engineer_feedback')
+                  'cancel_reason', 'assigned_to', 'permission', 'engineer_feedback', 'platform')
 
     @staticmethod
     def get_engineers(obj):
