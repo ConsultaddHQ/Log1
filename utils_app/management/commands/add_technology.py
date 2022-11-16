@@ -9,16 +9,12 @@ from utils_app.models import Choice, ContentType
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        job = create_cron_object(name='add_technology')
+        job = create_cron_object(name='add_platform')
         try:
-            i = 0
-            file = open('certification_list.csv', 'r')
-            data = csv.reader(file)
-            for item in data:
-                if i == 0:
-                    i += 1
-                    continue
-                Certificate.objects.create(name=item[0], issued_by=item[1])
-                i += 1
+            content_type = ContentType.objects.get(model='test')
+            platforms = ['CoderByte', 'Codility', 'Coderpad', 'CodeSignal', 'Amcat', 'Glider', 'FilteredAI', 'Kenexa',
+                         'Hackerrank', 'Interview Mocha', 'Hirevue', 'Ikm', 'Mettl', 'PluralSight', 'LeetCode']
+            for item in platforms:
+                Choice.objects.create(name=item, display_name=item, content_type=content_type, field='platform')
         except Exception as error:
             print(error)
