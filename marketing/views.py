@@ -2524,7 +2524,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             test_content_type = ContentType.objects.get(model='test')
             available_platforms = Choice.objects.filter(
-                content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
+                name__icontains=test.platform, field='platform',
+                content_type=test_content_type, display_name__icontains=test.platform
             )
             if not available_platforms.first() and test.platform != 'Not Available':
                 Choice.objects.create(
@@ -2565,6 +2566,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def update(self, request, *args, **kwargs):
         try:
             test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            prev_platform = test.platform
+            new_platform = request.data['platform']
+            if prev_platform != new_platform:
+                test_content_type = ContentType.objects.get(model='test')
+                available_platforms = Choice.objects.filter(
+                    content_type=test_content_type, field='platform',
+                    display_name__icontains=test.platform, name__icontains=test.platform
+                )
+                if not available_platforms.first() and test.platform != 'Not Available':
+                    Choice.objects.create(
+                        content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
+                    )
             serializer = TestUpdateSerializer(test, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()

@@ -1,5 +1,6 @@
 import csv
 import json
+from pytz import timezone
 from django.http import HttpResponse
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
@@ -80,8 +81,11 @@ def date_filter(queryset, timestamp, field_str):
 # Change status of scheduled and rescheduled Interviews to feedback_due
 def change_to_feedback_due():
     try:
-        now = datetime.now() - timedelta(hours=4)
-        previous_interviews = Interview.objects.filter(start_time__lte=now, status__in=['scheduled', 'rescheduled'])
+        tz = timezone('EST')
+        time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
+        previous_interviews = Interview.objects.filter(
+            start_time__lte=time_est, status__in=['scheduled', 'rescheduled']
+        )
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()

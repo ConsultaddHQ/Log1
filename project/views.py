@@ -1387,9 +1387,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     statuses__status__in=project_status, statuses__is_current=True
                 ).values_list('consultant', flat=True)
 
-                consultants = Consultant.objects.filter(
-                    id__in=list(consultant_ids),
-                ).exclude(projects__submission__status='archive').order_by('id').distinct('id')
+                consultants = Consultant.objects.filter(id__in=list(consultant_ids)).order_by('id').distinct('id')
 
             if timesheet_status:
                 if timesheet_status == 'pending_for_approval':

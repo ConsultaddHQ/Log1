@@ -306,10 +306,10 @@ class ProjectUtil:
         try:
             start_date = datetime.strptime(str(self.project.start_date), '%Y-%m-%d')
             week_day = start_date.weekday()
-            if week_day == 6:
+            if week_day == 0:
                 end_date = start_date + timedelta(days=6)
             else:
-                end_date = start_date + timedelta(days=5 - week_day)
+                end_date = start_date + timedelta(days=6 - week_day)
 
             for i in range(2):
                 TimeSheet.objects.get_or_create(
