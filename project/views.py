@@ -661,6 +661,9 @@ class ProjectViewSets(ModelViewSet):
                     # Creating first week Timesheet on project status change to joined
                     util.create_timesheet()
 
+                    # Creating first week Timesheet on project status change to joined
+                    util.assign_leave()
+
                     # Setting password for User (consultant)
                     password, new_user = set_consultant_password(project.consultant)
                     resp, err = self.consultant_mail_on_joining(project, password, new_user, request)
