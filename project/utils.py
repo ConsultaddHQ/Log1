@@ -7,8 +7,9 @@ from constance import config
 from employee.models import User
 from consultant.models import Consultant
 from activity.views import create_activity
+from utils_app.models import Choice
 from utils_app.thred_mail import send_email
-from project.models import Project, TimeSheet
+from project.models import Project, TimeSheet, ConsultantLeave
 from utils_app.mailing import send_email as mail
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
@@ -306,10 +307,10 @@ class ProjectUtil:
         try:
             start_date = datetime.strptime(str(self.project.start_date), '%Y-%m-%d')
             week_day = start_date.weekday()
-            if week_day == 6:
+            if week_day == 0:
                 end_date = start_date + timedelta(days=6)
             else:
-                end_date = start_date + timedelta(days=5 - week_day)
+                end_date = start_date + timedelta(days=6 - week_day)
 
             for i in range(2):
                 TimeSheet.objects.get_or_create(
@@ -320,6 +321,22 @@ class ProjectUtil:
                 end_date = end_date + timedelta(days=7)
         except Exception as error:
             write_exception(message=error, request=self.request)
+
+    def assign_leave(self):
+        try:
+            consultant = self.project.consultant
+            already_assigned = ConsultantLeave.objects.filter(consultant=consultant)
+            if already_assigned:
+                return None
+            choices = Choice.objects.filter(content_type__model='consultantleave', field='leave')
+            for choice in choices:
+                ConsultantLeave.objects.create(
+                    consultant=consultant, leave_type=choice, granted=0.0, balance=0.0, is_expired=False, year=2022
+                )
+            return "leave Assigned"
+        except Exception as error:
+            write_exception(message=error, request=self.request)
+            return error, "error"
 
 
 def fetch_scrum_masters(user):
