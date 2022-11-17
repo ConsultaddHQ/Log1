@@ -668,7 +668,8 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Question
-        fields = ("id", "title", "category", "answer_type", "position", "is_required", "options", "dependent")
+        fields = ("id", "title", "category", "answer_type", "position", "is_required", "options", "dependent",
+                  "update_options")
 
     @staticmethod
     def get_dependent(obj):
