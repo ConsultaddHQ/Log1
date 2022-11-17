@@ -13,7 +13,7 @@ class Command(BaseCommand):
         try:
             content_type = ContentType.objects.get(model='test')
             platforms = ['CoderByte', 'Codility', 'Coderpad', 'CodeSignal', 'Amcat', 'Glider', 'FilteredAI', 'Kenexa',
-                        'Hackerrank', 'Interviewmocha', 'Hirevue', 'Ikm', 'Mettl', 'PluralSight', 'LeetCode']
+                         'Hackerrank', 'Interview Mocha', 'Hirevue', 'Ikm', 'Mettl', 'PluralSight', 'LeetCode']
             for item in platforms:
                 Choice.objects.create(name=item, display_name=item, content_type=content_type, field='platform')
         except Exception as error:
