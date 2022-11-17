@@ -256,6 +256,19 @@ def create_answer(request, obj, model):
             if question.answer_type in ['no_remark', 'yes_remark', 'yes_attachment', 'no_attachment'] \
                     and data.get('comment') is not None:
                 value = f'{data.get("answer")}: {data.get("comment")}'
+            elif question.answer_type == 'multi_select':
+                available_sets = set(question.options)
+                answer = set(data.get("answer").replace(', ', ',').split(','))
+                if answer.issubset(available_sets):
+                    value = data.get("answer", None)
+                else:
+                    new_options = answer - available_sets
+                    for option in new_options: question.options.append(option)
+                    question.options.remove('None')
+                    question.options.remove('Other')
+                    question.options.extend(['Other', 'None'])
+                    question.save()
+                    value = data.get("answer", None)
             else:
                 value = data.get("answer", None)
 
