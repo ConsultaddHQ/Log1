@@ -265,8 +265,7 @@ def create_answer(request, obj, model):
                     new_options = answer - available_sets
                     for option in new_options: question.options.append(option)
                     question.options.remove('None')
-                    question.options.remove('Other')
-                    question.options.extend(['Other', 'None'])
+                    question.options.extend(['None'])
                     question.save()
                     value = data.get("answer", None)
             else:
