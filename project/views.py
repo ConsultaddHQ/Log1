@@ -63,7 +63,8 @@ class ProjectViewSets(ModelViewSet):
             mail_data = {
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
-                'to': [project.consultant.email], 'cc': [config.FINANCE], 'bcc': ['shreyas.k@consultadd.com'],
+                'to': [project.consultant.email], 'cc': [config.FINANCE, 'yash.j@consultadd.com'],
+                'bcc': ['shreyas.k@consultadd.com'],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK, 'android_link': config.ANDROID_APP_LINK,
                     'password': password, 'new_user': new_user, 'consultant_name': project.consultant.name,
