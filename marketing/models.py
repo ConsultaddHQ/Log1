@@ -254,6 +254,7 @@ class Question(TimeStampedModel):
     placeholder = models.TextField(_('Field Placeholder'), null=True, blank=True)
     answer_type = models.CharField(_('Type'), max_length=20, choices=QUESTION_TYPE)
     description = models.TextField(_('Question Description'), null=True, blank=True)
+    update_options = models.BooleanField(_('Can Add Value to Options'), default=False)
     form_name = models.CharField(_('Form Name'), max_length=100, null=True, blank=True)
     options = ArrayField(models.CharField(_('Choices'), max_length=80, blank=True), blank=True)
 
