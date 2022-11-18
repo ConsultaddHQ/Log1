@@ -268,6 +268,12 @@ def create_answer(request, obj, model):
                     question.options.extend(['None'])
                     question.save()
                     value = data.get("answer", None)
+            elif question.answer_type == 'option':
+                value = data.get("answer")
+                available_option = question.options
+                if value not in available_option:
+                    question.options.append(value)
+                    question.save()
             else:
                 value = data.get("answer", None)
 
