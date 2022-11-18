@@ -63,7 +63,8 @@ class ProjectViewSets(ModelViewSet):
             mail_data = {
                 'template': '../templates/consultant_account_creation.html',
                 'subject': f'Your account created on Consultadd Time Track App',
-                'to': [project.consultant.email], 'cc': [config.FINANCE], 'bcc': ['shreyas.k@consultadd.com'],
+                'to': [project.consultant.email], 'cc': [config.FINANCE, 'yash.j@consultadd.com'],
+                'bcc': ['shreyas.k@consultadd.com'],
                 'context': {
                     'iphone_link': config.IPHONE_APP_LINK, 'android_link': config.ANDROID_APP_LINK,
                     'password': password, 'new_user': new_user, 'consultant_name': project.consultant.name,
@@ -660,6 +661,9 @@ class ProjectViewSets(ModelViewSet):
 
                     # Creating first week Timesheet on project status change to joined
                     util.create_timesheet()
+
+                    # Creating first week Timesheet on project status change to joined
+                    util.assign_leave()
 
                     # Setting password for User (consultant)
                     password, new_user = set_consultant_password(project.consultant)
@@ -1387,9 +1391,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     statuses__status__in=project_status, statuses__is_current=True
                 ).values_list('consultant', flat=True)
 
-                consultants = Consultant.objects.filter(
-                    id__in=list(consultant_ids),
-                ).exclude(projects__submission__status='archive').order_by('id').distinct('id')
+                consultants = Consultant.objects.filter(id__in=list(consultant_ids)).order_by('id').distinct('id')
 
             if timesheet_status:
                 if timesheet_status == 'pending_for_approval':
