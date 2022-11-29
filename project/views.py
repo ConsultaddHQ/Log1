@@ -881,8 +881,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             start = request.data.get('start', None)
             if not start:
                 return Response({"message": "Start date can not be empty"}, status=400)
-
-            support_qs = project.support.exists()
+            
+            support_qs = True if len(project.support.all())>1 else False
             project_support = ProjectSupport.objects.create(
                 project=project, is_proxy_support=request.data.get('is_proxy_support', False),
                 support=support_person, start=start, end=end, feedback=request.data.get('feedback', None),
@@ -904,13 +904,18 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     desc = f"{request.user.employee_name} added {support_person.employee_name} as support person"
             create_activity(project.id, 'projectsupport', request.user, desc, 'created')
 
+            message = ""
             if not support_qs:
                 message, exception_msg = support_assignment_mail(project_support, request)
                 if exception_msg != 'Mail sent':
-                    return Response(
-                        {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400
-                    )
-            return Response({"message": "Support is added"}, status=201)
+                    message = "Unable to send support assignment mail & "
+                    # return Response(
+                    #     {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400
+                    # )
+                else:
+                    message = "support assignment mail send & "
+                    
+            return Response({"message": message + "Support is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
