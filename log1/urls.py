@@ -31,6 +31,8 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
+from dynamic_report.views import ReportsViewSets
+
 
 
 router = DefaultRouter()
@@ -71,6 +73,7 @@ router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
 
 router.register(r'project', ProjectViewSets)
+router.register(r'dynamic_reports', ReportsViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'project_order', ProjectOrderViewSet)
 router.register(r'team_structure', TeamStructureViewSet)
