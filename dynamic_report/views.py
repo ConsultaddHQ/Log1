@@ -119,37 +119,19 @@ class ReportsViewSets(ModelViewSet):
     @action(methods=['get'], detail=False, url_path="return_qury")
     def return_qury(self, request):
         try:
-            # table = request.GET.get('table')
-            # app = request.GET.get('app')
-            request_params = {
-                "Submission" : ["id", "client", "visa_end", {"vendor_contact":["name","email"]}, {"created_by": ["employee_name"]}]
-            }
-            # breakpoint()
-            keys = list(request_params.keys())
-            # bindFunction("suman")("Hello deom")
-            # globals()[f"suman"] = 10
-            response = {}
-            for key in keys:
-                db = DBTable.objects.get(name=key)
-                model = apps.get_model(db.app_name, db.name)
-                objs = model.objects.all()
-                # breakpoint()
-                tableSerializer = getGenericSerializer(model, request_params[key])
-                res_data = tableSerializer(objs[0:500], many=True)
-                response = res_data.data
-                # return Response({"data":res_data.data}, status=200)
-                # response[db] = [res_data.data[0]]
-                
-                
-            # kwargs = {
-            #     'statuses__status': 'received',
-            #     'statuses__is_current': True
-            # } 
-
-            
-            # table_instance = DBTable.objects.filter(**kwargs).first()
-            
-            return Response({"data":response}, status=200)
+            request_params = request.GET.get('filter_json', None)
+            if request_params:
+                keys = list(request_params.keys())
+                response = {}
+                for key in keys:
+                    db = DBTable.objects.get(name=key)
+                    model = apps.get_model(db.app_name, db.name)
+                    objs = model.objects.all()
+                    tableSerializer = getGenericSerializer(model, request_params[key])
+                    res_data = tableSerializer(objs[0:500], many=True)
+                    response = res_data.data
+                return Response({"data":response}, status=200)
+            return Response({"message": ERROR_MSG, "error": "filter_json not provided"}, status=402)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
