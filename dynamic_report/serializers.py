@@ -40,14 +40,24 @@ def getGenericSerializer(model_arg, fields_arg):
 
 
 class FrontRefSerializer(serializers.ModelSerializer):
-    ref = serializers.SerializerMethodField()
+    children = serializers.SerializerMethodField()
+    title = serializers.SerializerMethodField()
+    key = serializers.SerializerMethodField()
 
     class Meta:
         model = Structure
-        fields = ('id', 'field_name', 'display_name', 'model_name', 'ref')
+        fields = ('id', 'field_name', "title", 'model_name', 'children', 'key')
 
     @staticmethod
-    def get_ref(obj):
+    def get_key(obj):
+        return obj.id
+
+    @staticmethod
+    def get_title(obj):
+        return obj.display_name
+
+    @staticmethod
+    def get_children(obj):
         if obj.front_ref:
             fields = Structure.objects.filter(db_table__name=obj.model_name)
             return FrontRefSerializer(fields, many=True).data
