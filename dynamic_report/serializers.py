@@ -25,7 +25,11 @@ def getGenericSerializer(model_arg, fields_arg):
             ret = super().to_representation(instance)
             for attr in field_mapper:
                 objs = getattr(instance, attr)
-                if objs is not None:
+                if '_many_to_many_' in str(type(objs)):
+                    model = objs.__dict__['model']
+                    getSerializer = getGenericSerializer(model,field_mapper[attr])
+                    ret[attr] =  getSerializer(objs.all(), many=True).data
+                elif objs is not None:
                     db_name = str(type(objs)).split(".")[-1].split("'")[0]
                     db = DBTable.objects.get(name=db_name)
                     model = apps.get_model(db.app_name, db.name)
