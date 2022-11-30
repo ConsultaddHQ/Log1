@@ -1,3 +1,4 @@
+import json
 from django.apps import apps
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -122,6 +123,7 @@ class ReportsViewSets(ModelViewSet):
         try:
             request_params = request.GET.get('filter_json', None)
             if request_params:
+                request_params = json.loads(request_params)
                 keys = list(request_params.keys())
                 response = {}
                 for key in keys:
@@ -129,7 +131,7 @@ class ReportsViewSets(ModelViewSet):
                     model = apps.get_model(db.app_name, db.name)
                     objs = model.objects.all()
                     tableSerializer = getGenericSerializer(model, request_params[key])
-                    res_data = tableSerializer(objs[0:500], many=True)
+                    res_data = tableSerializer(objs[0:300], many=True)
                     response = res_data.data
                 return Response({"data":response}, status=200)
             return Response({"message": ERROR_MSG, "error": "filter_json not provided"}, status=402)
