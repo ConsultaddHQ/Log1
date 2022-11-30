@@ -62,6 +62,7 @@ class ReportsViewSets(ModelViewSet):
         try:
             table = request.GET.get('table')
             app = request.GET.get('app')
+            # breakpoint()
             db_table = DBTable.objects.get(name=table, app_name=app)
             fields = Structure.objects.filter(db_table=db_table)
             front_serial = FrontRefSerializer(fields, many=True)
