@@ -234,6 +234,7 @@ class ConsultantPetitionToken(models.Model):
 
 class WorkAuth(TimeStampedModel):
     VISA_CHOICES = (
+        ('j2', 'J-2'),
         ('j1', 'J-1'),
         ('tps', 'TPS'),
         ('h1b', 'H-1B'),

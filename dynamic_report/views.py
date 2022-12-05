@@ -6,12 +6,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from .serializers import getGenericSerializer, FrontRefSerializer, DBTableSerializer
-from .utils import DFS, get_models_list
+from .utils import DFS, NotEqual, get_models_list
 
-from log1.utils import write_exception, ERROR_MSG
+from log1.utils import write_exception
 from rest_framework.decorators import action
 from .models import DBTable, Field, Structure
 from log1.utils import write_exception, ERROR_MSG
+from django.db.models import Field as Fi
+
+
+Fi.register_lookup(NotEqual)
 
 def get_model_nodes(model):
     response = {}
@@ -110,29 +114,56 @@ class ReportsViewSets(ModelViewSet):
                                 response[models.name] = []
                                 flag[models.name] = []
                                 flag[models.name].append(field.id)
-                                response[models.name].append({"id":field.id,"field_name":field.field_name,"display_name":field.display_name,"type":field.field_type.name})   
-            # breakpoint()                    
+                                response[models.name].append({"id":field.id,"field_name":field.field_name,"display_name":field.display_name,"type":field.field_type.name})                    
             return Response({"data":response}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
         
         
+        
     @action(methods=['get'], detail=False, url_path="return_qury")
     def return_qury(self, request):
         try:
+            # gte lte equ ne
             request_params = request.GET.get('filter_json', None)
             if request_params:
                 request_params = json.loads(request_params)
+                # request_params = {
+                #     "Submission":{
+                #         "data":["id", "client",{"lead":{
+                            
+                #             "data": ["job_desc","job_title","is_w2"],
+                #             "filter": [{"element":"is_w2", "value":True, "condition":"equ"}]
+                #             }}],
+                #         "filter":[{"element":"created", "value":"2021-01-16", "condition":"gte"}]
+                #     }
+                # }              
                 keys = list(request_params.keys())
-                response = {}
+                response = []
                 for key in keys:
                     db = DBTable.objects.get(name=key)
                     model = apps.get_model(db.app_name, db.name)
+                    # here need to check the filter
                     objs = model.objects.all()
-                    tableSerializer = getGenericSerializer(model, request_params[key])
-                    res_data = tableSerializer(objs[0:300], many=True)
-                    response = res_data.data
+                    if len(request_params[key]['filter']) > 0:
+                        for filter_element in request_params[key]['filter']:
+                            if filter_element['condition'] == 'equ':
+                                kwargs={
+                                    f"{filter_element['element']}":f"{filter_element['value']}",
+                                }
+                            else:
+                                kwargs={
+                                    f"{filter_element['element']}__{filter_element['condition']}":f"{filter_element['value']}",
+                                }
+                            objs = objs.filter(**kwargs)
+                            
+                    tableSerializer = getGenericSerializer(model, request_params[key]["data"])
+                    res_data = tableSerializer(objs, many=True)
+                    for data in res_data.data:
+                        if data:
+                            response.append(data)
+                    
                 return Response({"data":response}, status=200)
             return Response({"message": ERROR_MSG, "error": "filter_json not provided"}, status=402)
         except Exception as error:
