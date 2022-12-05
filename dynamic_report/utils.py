@@ -1,5 +1,5 @@
 from .models import DBTable, Field, Structure
-
+from django.db.models import Lookup
 
 
 def dynamic_filter(instance, filters, need_first = True):
@@ -49,3 +49,24 @@ def DFS(model):
                 data[model.name].append({"id":field.id,"field_name":field.field_name,"display_name":field.display_name,"type":field.field_type.name})
     mapper_list[model.name] = data
     return data
+
+
+class NotEqual(Lookup):
+    lookup_name = 'ne'
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        params = lhs_params + rhs_params
+        return '%s <> %s' % (lhs, rhs), params
+    
+    
+def check_conditions(con,value):
+    if con['condition'] == 'equ' and value != con['value']:
+        return False
+    if con['condition'] == 'lte' and value > con['value']:
+        return False
+    if con['condition'] == 'get' and value < con['value']:
+        return False
+    if con['condition'] == 'ne' and value == con['value']:
+        return False
