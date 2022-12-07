@@ -446,8 +446,8 @@ def support_assignment_mail(support, request):
 def check_days(start, end, request=None):
     try:
         days = 0
-        while end > start:
-            if start.weekday() <= 5:
+        while end >= start:
+            if start.weekday() < 5:
                 days += 1
             start = start + timedelta(days=1)
         return days
