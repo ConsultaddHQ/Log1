@@ -883,7 +883,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             if not start:
                 return Response({"message": "Start date can not be empty"}, status=400)
 
-            support_qs = project.support.exists()
+            support_qs = True if len(project.support.all()) > 1 else False
             project_support = ProjectSupport.objects.create(
                 project=project, is_proxy_support=request.data.get('is_proxy_support', False),
                 support=support_person, start=start, end=end, feedback=request.data.get('feedback', None),
@@ -1346,7 +1346,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     id__in=list(consultant_ids),
                     projects__timesheets__is_active=True,
                     projects__timesheets__status__in=['submitted', 'updated'],
-                ).exclude(projects__submission__status='archive').order_by('id').distinct('id')
+                    projects__submission__status__in=['draft', 'sub', 'project', 'in_offer', 'interview']
+                ).order_by('id').distinct('id')
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -1396,7 +1397,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             if timesheet_status:
                 if timesheet_status == 'pending_for_approval':
                     consultants = consultants.filter(
-                        projects__timesheets__status__in=['submitted', 'updated'], projects__timesheets__is_active=True
+                        projects__timesheets__status__in=['submitted', 'updated'], projects__timesheets__is_active=True,
+                        projects__submission__status__in=['draft', 'sub', 'project', 'in_offer', 'interview']
                     )
                 else:
                     consultants = consultants.filter(
@@ -1643,10 +1645,28 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             if not status:
                 return Response({"message": "No action selected"}, status=200)
             leave = get_object_or_404(Leave, id=kwargs.get('pk'), consultant=consultant)
-            leave.status = status
             leave.remarks = request.data.get('remarks', None)
             leave.save()
 
+            if not status or status == leave.status:
+                return Response({"message": "Status Not Updated"}, status=200)
+
+            if status.upper() == "REJECTED":
+                consultant_leave = get_object_or_404(
+                    ConsultantLeave, leave_type=leave.leave_type.leave_type, consultant=consultant
+                )
+                consultant_leave.balance += leave.total_hours
+                consultant_leave.save()
+
+            elif status.upper() == "APPROVED" and leave.status.upper() == "REJECTED":
+                consultant_leave = get_object_or_404(
+                    ConsultantLeave, leave_type=leave.leave_type.leave_type, consultant=consultant
+                )
+                consultant_leave.balance -= leave.total_hours
+                consultant_leave.save()
+
+            leave.status = status
+            leave.save()
             sender_content_type = ContentType.objects.get(model='user')
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')
@@ -1697,16 +1717,12 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         try:
             consultant_id = kwargs.get('consultant_id')
             leave_type = get_object_or_404(ConsultantLeave, id=kwargs.get('pk'))
-            changed_balance = request.data.get('granted_leaves')
-            if not changed_balance:
-                return Response({"message": "No value entered"}, status=400)
-
-            prev_granted_balance = leave_type.granted
-            if prev_granted_balance == changed_balance:
-                return Response({"message": "No update in balance"}, status=400)
-            diff = changed_balance - prev_granted_balance
-            leave_type.granted = changed_balance
-            leave_type.balance = leave_type.balance + diff
+            updated_balance = request.data.get('granted_leaves')
+            if updated_balance > leave_type.granted:
+                diff = updated_balance - leave_type.granted
+                leave_type.granted += diff
+                leave_type.save()
+            leave_type.balance = updated_balance
             leave_type.save()
 
             sender_content_type = ContentType.objects.get(model='user')

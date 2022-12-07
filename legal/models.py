@@ -13,6 +13,7 @@ from activity.models import Comment, ConsultantComment
 
 PETITION_TYPES = (
     ('gc', 'Green Card'),
+    ('j2_visa', 'J2 visa'),
     ('h1b_fresh', 'H1B New'),
     ('h1b_transfer', 'H1B Transfer'),
     ('h1b_extension', 'H1B Extension'),
