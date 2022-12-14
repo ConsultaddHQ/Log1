@@ -123,6 +123,15 @@ class ConsultantAuthViewSet(GenericViewSet):
         write_info(message=email, function='ConsultantAuthViewSet_login', request=request)
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='app_version')
+    def app_version(self, request):
+        try:
+            app_version = config.APP_VERSION
+            return Response({"result": app_version}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
 
 # Route - /consultant_app/
 class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
