@@ -107,7 +107,7 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
         total_hours = 0
         all_timesheet = TimeSheet.objects.filter(project=obj, hours__gt=0, status='approved')
         for timesheet in all_timesheet:
-            total_hours = total_hours + int(timesheet.hours)
+            total_hours = total_hours + int(timesheet.hours) + int(timesheet.additional_hours)
         return f"{total_hours}hrs"
 
 
