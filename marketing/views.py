@@ -3,6 +3,7 @@ import pytz
 import difflib
 from datetime import date
 
+from django.http import HttpResponse
 from django.conf import settings
 from django.db import transaction
 from django.db.models.functions import Lower
@@ -1286,6 +1287,141 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @staticmethod
+    def get_interview_details(obj):
+        iter_count = 0
+        start_time = obj.start_time.strftime('%b %d, %Y, %I %p')
+        work_auth = obj.consultant.work_auth.filter(is_current=True).first()
+        supervisor_remark = Answer.objects.filter(object_id=obj.id, question_id=50)
+        interview_answer_qs = Answer.objects.filter(
+            object_id=obj.id, question__form_name='interview').order_by('question__position')
+        coding_answer_qs = Answer.objects.filter(
+            object_id=obj.id, question__form_name='coding').order_by('question__position')
+        supervisor_feedback, guest_feedback = '', ''
+        for answer_obj in interview_answer_qs:
+            if iter_count == 0:
+                supervisor_feedback = f'(Q){answer_obj.question.title} ---> {answer_obj.answer}'
+                iter_count += 1
+                continue
+            supervisor_feedback += f', (Q){answer_obj.question.title} ---> {answer_obj.answer}'
+        iter_count = 0
+        for answer_obj in coding_answer_qs:
+            if iter_count == 0:
+                guest_feedback = f'(Q){answer_obj.question.title} ---> {answer_obj.answer}'
+                iter_count += 1
+                continue
+            guest_feedback += f', (Q){answer_obj.question.title} ---> {answer_obj.answer}'
+
+        details = [
+            obj.id, start_time, obj.marketer.employee_name, obj.consultant.name,
+            work_auth.get_visa_type_display() if work_auth else '', obj.supervisor.employee_name,
+            obj.submission.lead.job_title, obj.submission.client, obj.submission.vendor.name, obj.status,
+            obj.feedback, obj.failure_reason, obj.coding_present,
+            supervisor_remark.first().answer if supervisor_remark else '', obj.guest_remark, supervisor_feedback,
+            guest_feedback
+        ]
+        return details
+
+    @action(methods=['get'], detail=False, url_path='export_detail')
+    def export_detail(self, request, *args, **kwargs):
+        query = request.GET.get('query', None)
+        filter_for = request.GET.get('filter_for', 'all')
+        filter_json = request.GET.get('filter_json', None)
+
+        try:
+            user_id = request.user.id
+            roles = request.user.roles
+            team = request.user.team
+            associated_teams = request.user.associated_to.all()
+            queryset = Interview.objects.all()
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                if query.isnumeric():
+                    queryset = queryset.filter(
+                        Q(id=query) |
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+                else:
+                    queryset = queryset.filter(
+                        Q(submission__client__istartswith=query) |
+                        Q(submission__created_by__employee_name__istartswith=query) |
+                        Q(submission__lead__vendor_company__name__istartswith=query) |
+                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
+                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
+                    )
+
+            if filter_for == 'my':
+                if 'interviewee' in roles:
+                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
+                else:
+                    queryset = queryset.filter(submission__created_by_id=user_id)
+
+            elif filter_for == 'team':
+                queryset = queryset.filter(Q(submission__marketing_team=team) |
+                                           Q(submission__marketing_team__in=associated_teams))
+
+            if filter_json:
+                filters = json.loads(filter_json)
+
+                if 'assignment' in filters:
+                    if filters["assignment"] == 'assigned':
+                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
+                    if filters["assignment"] == 'unassigned':
+                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
+
+                if 'coding_interview' in filters:
+                    if filters["coding_interview"] == 'yes':
+                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                    elif filters["coding_interview"] == 'no':
+                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+
+                if 'status' in filters and len(filters["status"]) > 0:
+                    queryset = queryset.filter(status__in=filters["status"])
+
+                if 'position' in filters and len(filters["position"]) > 0:
+                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
+
+                if 'ctb' in filters and len(filters["ctb"]) > 0:
+                    queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
+
+                if 'client' in filters and len(filters["client"]) > 0:
+                    queryset = queryset.filter(submission__client__in=filters["client"])
+
+                if 'marketer' in filters and len(filters["marketer"]) > 0:
+                    queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
+
+                if 'vendor' in filters and len(filters["vendor"]) > 0:
+                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters["vendor"])
+
+                if 'consultant' in filters and len(filters["consultant"]) > 0:
+                    queryset = queryset.filter(
+                        submission__consultant_marketing__consultant_id__in=filters["consultant"]
+                    )
+
+                start_time = filters.get('start_time', None)
+                queryset = date_filter(queryset, start_time, "start_time")
+
+            queryset = queryset.order_by('id').distinct('id')
+            response = HttpResponse('application/text')
+            writer = csv.writer(response)
+            writer.writerow(
+                ['Interview Id', 'Interview Time', 'Marketer Name', 'Consultant Name', 'Work Auth', 'Supervisor',
+                 'Job Title', 'Client', 'Vendor', 'Interview Status', 'Interview Feedback', 'Failure Reason',
+                 'Coding Present', 'Supervisor Remark', 'Coders Remark', 'Supervisor Feedback', 'Coder Feedback']
+            )
+            response['Content-Disposition'] = "attachment; filename=InterviewFeedbackReport.csv"
+            for obj in queryset:
+                data = self.get_interview_details(obj)
+                writer.writerow(data)
+            return response
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     def create(self, request, *args, **kwargs):
         try:
             # Change status of past Interview to feedback due
@@ -2460,16 +2596,17 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 file_name = f"test_report_{datetime.now().strftime('%d-%B-%Y')}.csv"
                 file = open(file_name, 'w')
                 writer = csv.writer(file)
-                writer.writerow(['Consultant Name', 'Marketer Name', 'Client', 'Job Title', 'Company Name', 'Link',
-                                 'Created At', 'Deadline', 'Skills', 'Submitted By', 'Status', 'Engineer Associated'])
+                writer.writerow(['Test Id', 'Consultant Name', 'Marketer Name', 'Client', 'Job Title', 'Company Name',
+                                 'Link', 'Created At', 'Deadline', 'Skills', 'Submitted By', 'Status',
+                                 'Marketer Feedback', 'Engineer Associated'])
                 for obj in queryset:
                     engineer_associated = [obj.employee_name for obj in obj.engineer.all()]
                     writer.writerow([
-                        obj.submission.consultant.name, obj.submission.created_by.employee_name, obj.submission.client,
-                        obj.submission.lead.job_title,  obj.submission.lead.vendor_company.name, obj.link,
-                        obj.created.date(), obj.deadline, obj.skills,
+                        obj.id, obj.submission.consultant.name, obj.submission.created_by.employee_name,
+                        obj.submission.client, obj.submission.lead.job_title,  obj.submission.lead.vendor_company.name,
+                        obj.link, obj.created.date(), obj.deadline, obj.skills,
                         obj.submitted_by.employee_name if obj.submitted_by else None, obj.get_status_display(),
-                        engineer_associated
+                        obj.feedback, engineer_associated
                     ])
                 file.close()
                 url = generate_s3_url(file_name)
