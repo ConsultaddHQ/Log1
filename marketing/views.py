@@ -2585,7 +2585,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 queryset = date_filter(queryset, created, 'created')
 
                 deadline = filters.get('deadline', None)
-                queryset = date_filter(queryset, deadline, 'deadline')
+                queryset = queryset.filter(deadline__lte=deadline)
 
             queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
             if counts == 'error':
