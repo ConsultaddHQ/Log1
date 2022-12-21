@@ -722,11 +722,11 @@ def candidate_filter(request):
             if 'dob' in filters:
                 if 'lte' in filters['dob']:
                     consultants = consultants.filter(
-                        date_of_birth__year__lte=filters['dob']['lte']
+                        date_of_birth__lte=filters['dob']['lte']
                     )
                 elif 'gte' in filters['dob']:
                     consultants = consultants.filter(
-                        date_of_birth__year__gte=filters['dob']['gte']
+                        date_of_birth__gte=filters['dob']['gte']
                     )
 
         if query:
