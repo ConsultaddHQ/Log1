@@ -1271,7 +1271,7 @@ class InterviewViewSets(ModelViewSet):
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     queryset = queryset.filter(
-                        submission__consultant_marketing__consultant_id__in=filters["consultant"]
+                        submission__consultant_marketing__consultant__name__in=filters["consultant"]
                     )
 
                 start_time = filters.get('start_time', None)
@@ -1399,7 +1399,7 @@ class InterviewViewSets(ModelViewSet):
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     queryset = queryset.filter(
-                        submission__consultant_marketing__consultant_id__in=filters["consultant"]
+                        submission__consultant_marketing__consultant__name__in=filters["consultant"]
                     )
 
                 start_time = filters.get('start_time', None)
@@ -2577,15 +2577,15 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if 'vendor' in filters and len(filters["vendor"]) > 0:
                     queryset = queryset.filter(submission__lead__vendor_company__name__in=filters['vendor'])
 
+                if 'deadline' in filters and filters.get('deadline', None):
+                    queryset = queryset.filter(deadline__lte=filters.get('deadline'))
+
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     queryset = queryset.filter(
                         submission__consultant_marketing__consultant__name__in=filters['consultant'])
 
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
-
-                deadline = filters.get('deadline', None)
-                queryset = queryset.filter(deadline__lte=deadline)
 
             queryset, counts = self.get_count_and_queryset(queryset, filter_by_status, sort_by)
             if counts == 'error':
