@@ -435,7 +435,7 @@ class ProjectViewSets(ModelViewSet):
                     projects = projects.filter(is_remote=filters['remote'])
 
                 if 'client' in filters and len(filters["client"]) > 0:
-                    projects = projects.filter(submission__client=filters['client'])
+                    projects = projects.filter(submission__client__in=filters['client'])
 
                 if 'work_type' in filters:
                     projects = projects.filter(submission__work_type__in=filters['work_type'])
