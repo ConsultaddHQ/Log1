@@ -724,7 +724,7 @@ def candidate_filter(request):
                     consultants = consultants.filter(
                         date_of_birth__lte=filters['dob'].get('lte', None)
                     )
-                elif 'gte' in filters['dob']:
+                if 'gte' in filters['dob']:
                     consultants = consultants.filter(
                         date_of_birth__gte=filters['dob'].get('gte', None)
                     )
