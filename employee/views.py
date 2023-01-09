@@ -1217,7 +1217,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
         try:
             certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
             certificate_info.delete()
-            return Response({"message": "Certificate Removed"}, status=204)
+            return Response(status=204)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
