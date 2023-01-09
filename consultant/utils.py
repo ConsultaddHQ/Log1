@@ -722,7 +722,7 @@ def candidate_filter(request):
             if 'dob' in filters:
                 if 'lte' in filters['dob'] and filters['dob'].get('lte'):
                     lte = (datetime.strptime(
-                        filters['dob']['lte'], '%Y-%m-%d').date() + timedelta(days=1)).strftime("%y-%m-%d")
+                        filters['dob']['lte'], '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
                     consultants = consultants.filter(date_of_birth__lte=lte)
                 if 'gte' in filters['dob']:
                     consultants = consultants.filter(
