@@ -1620,8 +1620,8 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             leave_type = request.GET.get('leave_type')
             consultant = get_object_or_404(Consultant, id=consultant_id)
             queryset = self.queryset.filter(consultant=consultant).order_by('-created')
-            if year:
-                queryset = queryset.filter(leave_type__year=year)
+            # if year:
+            #     queryset = queryset.filter(leave_type__year=year)
             if status:
                 queryset = queryset.filter(status=status)
             if end:
@@ -1705,7 +1705,8 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         try:
             consultant_id = kwargs.get('consultant_id')
             year = request.GET.get('year', date.today().year)
-            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
+            # queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
+            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id)
             serializer = ConsultantLeaveSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:

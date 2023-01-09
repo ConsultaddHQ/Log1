@@ -419,7 +419,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def balance(self, request, pk):
         try:
             year = date.today().year
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year, is_expired=False)
+            # leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year, is_expired=False)
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk)
             serial = ConsultantLeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
         except Exception as error:
@@ -430,7 +431,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def apply(self, request, pk, *args, **kwargs):
         try:
             data = request.data
-            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
+            # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
+            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
             leave = Leave.objects.create(
                 leave_type=leave_type,
                 consultant=request.user,
@@ -476,7 +478,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def history(self, request, *args, **kwargs):
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
-            leaves = Leave.objects.filter(leave_type__consultant=consultant, leave_type__is_expired=False)
+            # leaves = Leave.objects.filter(leave_type__consultant=consultant, leave_type__is_expired=False)
+            leaves = Leave.objects.filter(leave_type__consultant=consultant)
             serial = LeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
         except Exception as error:

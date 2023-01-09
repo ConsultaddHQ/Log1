@@ -71,8 +71,7 @@ class GoogleCalendar:
     def get_body(self, data):
         description = self.calendar_description(data)
         if os.environ.get('ENV', 'local') != 'prod':
-            data['attendees'] = [{'email': 'shivam.k@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'},
-                                 {'email': 'product@consultadd.com'}]
+            data['attendees'] = [{'email': 'shivam.k@consultadd.com'}, {'email': 'shreyas.k@consultadd.com'}]
         return {
             'summary': data["summary"],
             'description': description,
@@ -99,7 +98,7 @@ class GoogleCalendar:
     def book_calendar(self, data, calendar_id, request=None):
         try:
             if os.environ.get('ENV', 'local') != 'prod':
-                calendar_id = "product@consultadd.com"
+                calendar_id = "suman.m@consultadd.com"
             service = self.calendar_con(calendar_id)
             event = self.get_body(data)
             try:

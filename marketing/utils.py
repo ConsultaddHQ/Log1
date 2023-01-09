@@ -69,7 +69,11 @@ def get_users_and_attendees(request, interview):
 def date_filter(queryset, timestamp, field_str):
     filters = dict()
     if timestamp and type(timestamp) == dict:
-        lte = timestamp.get('lte', None)
+        lte_date = timestamp.get('lte', None)
+        if lte_date:
+            lte_date = (
+                    datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        lte = lte_date
         gte = timestamp.get('gte', None)
         if lte:
             filters[f"{field_str}__lte"] = lte

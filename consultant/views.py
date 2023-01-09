@@ -123,7 +123,7 @@ class ConsultantV2ViewSets(ModelViewSet):
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
 
-            if sort_by in ['name', 'created']:
+            if sort_by in ['name', '-created']:
                 consultants = consultants.order_by(sort_by)
             data = list()
             for i in consultants.exclude(status='terminated'):
@@ -1248,13 +1248,9 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             poc_type = request.data['poc_type']
             if poc_type == 'relation':
                 poc_type = 'retention'
-                queryset = ConsultantPOC.objects.filter(
-                    poc_type='retention', consultant=request.data['consultant'], end=None
-                )
-            else:
-                queryset = ConsultantPOC.objects.filter(
-                    poc_type='recruiter', consultant=request.data['consultant'], end=None
-                )
+
+            queryset = ConsultantPOC.objects.filter(poc_type=poc_type, consultant=request.data['consultant'], end=None)
+
             if queryset:
                 previous_poc = queryset.first()
                 previous_poc.end = date.today()
