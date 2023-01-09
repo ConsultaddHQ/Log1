@@ -211,13 +211,14 @@ class ConsultantViewSets(ModelViewSet):
 
             data = queryset.annotate(
                 client=F('submission__client'),
+                work_type=F('submission__work_type'),
                 consultant_name=F('consultant__name'),
                 job_title=F('submission__lead__job_title'),
                 status=Subquery(project_status.values('status')[:1]),
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
             ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
-                     'status', 'employer', 'start_date', 'end_date', 'job_title')
+                     'status', 'employer', 'start_date', 'end_date', 'job_title', 'is_remote', 'work_type')
             return data, data_counts
         except Exception as error:
             write_exception(message=error)
