@@ -123,7 +123,7 @@ class ConsultantV2ViewSets(ModelViewSet):
                 "marketing_candidate": status_obj['marketing_candidate'].count(),
             }
 
-            if sort_by in ['name', 'created']:
+            if sort_by in ['name', '-created']:
                 consultants = consultants.order_by(sort_by)
             data = list()
             for i in consultants.exclude(status='terminated'):
@@ -211,13 +211,14 @@ class ConsultantViewSets(ModelViewSet):
 
             data = queryset.annotate(
                 client=F('submission__client'),
+                work_type=F('submission__work_type'),
                 consultant_name=F('consultant__name'),
                 job_title=F('submission__lead__job_title'),
                 status=Subquery(project_status.values('status')[:1]),
                 company_name=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
             ).values('id', 'consultant_name', 'city', 'company_name', 'client', 'rate', 'marketer_name', 'created',
-                     'status', 'employer', 'start_date', 'end_date', 'job_title')
+                     'status', 'employer', 'start_date', 'end_date', 'job_title', 'is_remote', 'work_type')
             return data, data_counts
         except Exception as error:
             write_exception(message=error)
@@ -1248,13 +1249,9 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             poc_type = request.data['poc_type']
             if poc_type == 'relation':
                 poc_type = 'retention'
-                queryset = ConsultantPOC.objects.filter(
-                    poc_type='retention', consultant=request.data['consultant'], end=None
-                )
-            else:
-                queryset = ConsultantPOC.objects.filter(
-                    poc_type='recruiter', consultant=request.data['consultant'], end=None
-                )
+
+            queryset = ConsultantPOC.objects.filter(poc_type=poc_type, consultant=request.data['consultant'], end=None)
+
             if queryset:
                 previous_poc = queryset.first()
                 previous_poc.end = date.today()

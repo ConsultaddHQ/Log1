@@ -16,7 +16,7 @@ from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
-from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, TimeSheetV2ViewSet, ConsultantLeaveViewSet
+from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
@@ -114,7 +114,6 @@ router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
 router.register(r'timesheet', TimeSheetViewSet)
 router.register(r'payroll', PayrollScheduleViewSet)
-router.register(r'timesheet_v2', TimeSheetV2ViewSet)
 router.register(r'consultant_leave', ConsultantLeaveViewSet)
 
 router.register(r'utility', UtilityViewSet)

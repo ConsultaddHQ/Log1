@@ -69,7 +69,11 @@ def get_users_and_attendees(request, interview):
 def date_filter(queryset, timestamp, field_str):
     filters = dict()
     if timestamp and type(timestamp) == dict:
-        lte = timestamp.get('lte', None)
+        lte_date = timestamp.get('lte', None)
+        if lte_date:
+            lte_date = (
+                    datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        lte = lte_date
         gte = timestamp.get('gte', None)
         if lte:
             filters[f"{field_str}__lte"] = lte
@@ -265,10 +269,15 @@ def create_answer(request, obj, model):
                     new_options = answer - available_sets
                     for option in new_options: question.options.append(option)
                     question.options.remove('None')
-                    question.options.remove('Other')
-                    question.options.extend(['Other', 'None'])
+                    question.options.extend(['None'])
                     question.save()
                     value = data.get("answer", None)
+            elif question.answer_type == 'option':
+                value = data.get("answer")
+                available_option = question.options
+                if value not in available_option:
+                    question.options.append(value)
+                    question.save()
             else:
                 value = data.get("answer", None)
 

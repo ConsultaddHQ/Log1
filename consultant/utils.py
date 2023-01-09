@@ -720,13 +720,13 @@ def candidate_filter(request):
                 consultants = consultants.filter(reduce(or_, [Q(skills__icontains=q) for q in filters['skill']]))
 
             if 'dob' in filters:
-                if 'lte' in filters['dob']:
+                if 'lte' in filters['dob'] and filters['dob'].get('lte'):
+                    lte = (datetime.strptime(
+                        filters['dob']['lte'], '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
+                    consultants = consultants.filter(date_of_birth__lte=lte)
+                if 'gte' in filters['dob']:
                     consultants = consultants.filter(
-                        date_of_birth__year__lte=filters['dob']['lte']
-                    )
-                elif 'gte' in filters['dob']:
-                    consultants = consultants.filter(
-                        date_of_birth__year__gte=filters['dob']['gte']
+                        date_of_birth__gte=filters['dob'].get('gte', None)
                     )
 
         if query:

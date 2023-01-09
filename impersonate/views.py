@@ -41,7 +41,7 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     def users(self, request):
         try:
             if request.user.is_superuser:
-                users = User.objects.exclude(role__name='consultant')
+                users = User.objects.exclude(role__name='consultant').exclude(is_active=False)
                 serializer = HandoverUserSerializer(users, many=True)
             else:
                 handovers = Handover.objects.filter(handover_to=request.user)

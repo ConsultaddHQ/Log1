@@ -236,6 +236,7 @@ class WorkAuth(TimeStampedModel):
     VISA_CHOICES = (
         ('j2', 'J-2'),
         ('j1', 'J-1'),
+        ('j2', 'J-2'),
         ('tps', 'TPS'),
         ('h1b', 'H-1B'),
         ('opt', 'OPT-EAD'),
@@ -447,7 +448,7 @@ class ConsultantRateRevision(TimeStampedModel):
 class ConsultantPOC(TimeStampedModel):
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
     end = models.DateField(_('Rate End Date'), default=None, blank=True, null=True)
-    poc_type = models.CharField(_('Recruiter Or Retention'), max_length=20, blank=True, null=True)
+    poc_type = models.CharField(_('Recruiter Or Retention Or marketer'), max_length=20, blank=True, null=True)
     poc = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='consultants',

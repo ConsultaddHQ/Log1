@@ -17,6 +17,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     created = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
+    work_type = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
@@ -26,7 +27,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
                   'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote', 'support', 'employer')
+                  'is_remote', 'support', 'employer', 'work_type')
 
     @staticmethod
     def get_created(obj):
@@ -35,6 +36,10 @@ class ProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_client(obj):
         return obj.submission.client
+
+    @staticmethod
+    def get_work_type(obj):
+        return obj.submission.get_work_type_display()
 
     @staticmethod
     def get_check_list(obj):
@@ -107,7 +112,7 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
         total_hours = 0
         all_timesheet = TimeSheet.objects.filter(project=obj, hours__gt=0, status='approved')
         for timesheet in all_timesheet:
-            total_hours = total_hours + int(timesheet.hours)
+            total_hours = total_hours + int(timesheet.hours) + int(timesheet.additional_hours)
         return f"{total_hours}hrs"
 
 
