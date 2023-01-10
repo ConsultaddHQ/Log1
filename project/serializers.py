@@ -17,6 +17,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     created = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
+    work_type = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
@@ -26,7 +27,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
                   'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote', 'support', 'employer')
+                  'is_remote', 'support', 'employer', 'work_type')
 
     @staticmethod
     def get_created(obj):
@@ -35,6 +36,10 @@ class ProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_client(obj):
         return obj.submission.client
+
+    @staticmethod
+    def get_work_type(obj):
+        return obj.submission.get_work_type_display()
 
     @staticmethod
     def get_check_list(obj):
@@ -59,11 +64,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_consultant_name(obj):
         if obj.consultant:
             if obj.is_remote:
-                if obj.created.date() < date(2022, 8, 3):
-                    firstname = obj.consultant.name.split(' ')[0]
-                    return f"{obj.submission.consultant.name} ({firstname})"
-                else:
-                    return f"{obj.submission.consultant.name} (Remote)"
+                firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Remote'
+                return f"{obj.submission.consultant.name} ({firstname})"
             else:
                 return obj.consultant.name
         return None
