@@ -64,11 +64,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_consultant_name(obj):
         if obj.consultant:
             if obj.is_remote:
-                if obj.created.date() < date(2022, 8, 3):
-                    firstname = obj.consultant.name.split(' ')[0]
-                    return f"{obj.submission.consultant.name} ({firstname})"
-                else:
-                    return f"{obj.submission.consultant.name} (Remote)"
+                firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Remote'
+                return f"{obj.submission.consultant.name} ({firstname})"
             else:
                 return obj.consultant.name
         return None

@@ -574,7 +574,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 consultant_name=F('consultant_marketing__consultant__name'),
             ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
                      'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact',
-                     'is_complete')
+                     'is_complete', 'work_type')
 
             return data, data_counts
         except Exception as error:
