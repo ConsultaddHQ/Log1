@@ -555,6 +555,9 @@ class ProjectViewSets(ModelViewSet):
             else:
                 consultant = sub.consultant
 
+            if request.data.get('project_type') and request.data.get('project_type', sub.work_type) != sub.work_type:
+                sub.work_type = request.data.get('project_type')
+                sub.save()
             serializer = self.serializer_class(data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
