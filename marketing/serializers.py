@@ -231,6 +231,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
             "id": submission.id,
             "client": submission.client,
             "marketer_id": obj.marketer.id,
+            "work_type": submission.work_type,
             "job_title": submission.lead.job_title,
             "marketer_name": obj.marketer.employee_name,
             "vendor": submission.lead.vendor_company.name,
