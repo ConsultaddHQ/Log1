@@ -400,8 +400,8 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             fields, group = [], None
             submission = get_object_or_404(Submission, id=pk)
-
-            if submission.created_by.id == request.user.id:
+            user_ids = get_authenticated_users(request, get_id=True)
+            if submission.created_by.id in user_ids:
                 group = ObjectGroup.objects.filter(name='owner', model='submission', status=submission.status)
 
             if group:
@@ -763,7 +763,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     def update(self, request, *args, **kwargs):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by=request.user)
+            users = get_authenticated_users(request)
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by__in=users)
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -1087,8 +1088,9 @@ class InterviewViewSets(ModelViewSet):
             change_to_feedback_due()
             permission = {"update": False}
             interview = get_object_or_404(Interview, id=kwargs.get('pk'))
-
-            if request.user in [interview.marketer, interview.supervisor]:
+            users = get_authenticated_users(request)
+            # if request.user in [interview.marketer, interview.supervisor]:
+            if (interview.marketer in users) or (interview.supervisor in users):
                 permission['update'] = True
 
             serializer = InterviewDetailSerializer(interview)
@@ -1136,6 +1138,8 @@ class InterviewViewSets(ModelViewSet):
             if filter_for == 'my':
                 if 'interviewee' in roles:
                     queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
+                elif 'engineer' in roles:
+                    queryset = queryset.filter(Q(guest__id=user_id))
                 else:
                     queryset = queryset.filter(submission__created_by_id=user_id)
 
@@ -1297,6 +1301,15 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='interview').order_by('question__position')
         coding_answer_qs = Answer.objects.filter(
             object_id=obj.id, question__form_name='coding').order_by('question__position')
+        coder_names = obj.guest.all()
+        coders = ''
+        n= 0
+        for name in coder_names:
+            if n == 0:
+                coders = name.employee_name
+                n += 1
+            else:
+                coders = coders + ', ' + name.employee_name
         supervisor_feedback, guest_feedback = '', ''
         for answer_obj in interview_answer_qs:
             if iter_count == 0:
@@ -1316,7 +1329,7 @@ class InterviewViewSets(ModelViewSet):
             obj.id, start_time, obj.marketer.employee_name, obj.consultant.name,
             work_auth.get_visa_type_display() if work_auth else '', obj.supervisor.employee_name,
             obj.submission.lead.job_title, obj.submission.client, obj.submission.vendor.name, obj.status,
-            obj.feedback, obj.failure_reason, obj.coding_present,
+            obj.feedback, obj.failure_reason, obj.coding_present, coders,
             supervisor_remark.first().answer if supervisor_remark else '', obj.guest_remark, supervisor_feedback,
             guest_feedback
         ]
@@ -1411,7 +1424,8 @@ class InterviewViewSets(ModelViewSet):
             writer.writerow(
                 ['Interview Id', 'Interview Time', 'Marketer Name', 'Consultant Name', 'Work Auth', 'Supervisor',
                  'Job Title', 'Client', 'Vendor', 'Interview Status', 'Interview Feedback', 'Failure Reason',
-                 'Coding Present', 'Supervisor Remark', 'Coders Remark', 'Supervisor Feedback', 'Coder Feedback']
+                 'Coding Present', 'Coders', 'Supervisor Remark', 'Coders Remark', 'Supervisor Feedback',
+                 'Coder Feedback']
             )
             response['Content-Disposition'] = "attachment; filename=InterviewFeedbackReport.csv"
             for obj in queryset:
@@ -1427,8 +1441,9 @@ class InterviewViewSets(ModelViewSet):
             # Change status of past Interview to feedback due
             change_to_feedback_due()
 
+            users = get_authenticated_users(request)
             submission_id = request.data.get('submission', None)
-            submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
+            submissions = Submission.objects.filter(id=submission_id, created_by__in=users)
             if not submissions:
                 return Response({"message": 'This is not your submission'}, status=400)
 
@@ -1552,8 +1567,8 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled."}, status=400)
-
-            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=400)
 
@@ -1666,8 +1681,8 @@ class InterviewViewSets(ModelViewSet):
         try:
             # Change status of past Screening to feedback due
             change_to_feedback_due()
-
-            interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            interview = get_object_or_404(Interview, id=interview_id, submission__created_by__in=users)
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
@@ -1729,8 +1744,8 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
-
-            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
 
@@ -1799,7 +1814,8 @@ class InterviewViewSets(ModelViewSet):
         # Change status of past Screening to feedback due
         change_to_feedback_due()
         try:
-            queryset = Interview.objects.filter(id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            queryset = Interview.objects.filter(id=pk, submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "This is not your Interview"}, status=404)
 
@@ -1922,7 +1938,8 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['put'], detail=True, url_path='cancel_interview')
     def cancel_interview(self, request, pk):
         try:
-            qs = Interview.objects.filter(id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            qs = Interview.objects.filter(id=pk, submission__created_by__in=users)
             if not qs:
                 return Response({"message": "You don't have access"}, status=404)
             interview = qs.first()
@@ -1984,10 +2001,11 @@ class InterviewViewSets(ModelViewSet):
             fields, group = list(), None
             interview = get_object_or_404(Interview, id=pk)
 
-            if interview.submission.created_by.id == request.user.id:
+            user_ids = get_authenticated_users(request, get_id=True)
+            if interview.submission.created_by.id in user_ids:
                 group = ObjectGroup.objects.filter(name='owner', model='interview', status=interview.status)
 
-            elif interview.supervisor.id == request.user.id:
+            elif interview.supervisor.id in user_ids:
                 group = ObjectGroup.objects.filter(name='supervisor', model='interview', status=interview.status)
 
             if group:
@@ -2619,7 +2637,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def create(self, request, *args, **kwargs):
         try:
-            submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
+            users = get_authenticated_users(request)
+            submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by__in=users)
             if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
             if submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
@@ -2703,7 +2722,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def update(self, request, *args, **kwargs):
         try:
-            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by__in=users)
             prev_platform = test.platform
             new_platform = request.data.get('platform', prev_platform)
             if prev_platform != new_platform:
@@ -2737,14 +2757,20 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
             fields, group = [], None
 
-            if test.submission.created_by.id == request.user.id:
-                group = ObjectGroup.objects.filter(name='owner', model='test', status=test.status)
-
-            if request.user in [test.submitted_by] + [test.assign_to.all()] + [test.engineer.all()]:
+            authenticated_users = list()
+            authenticated_users.append(test.submitted_by)
+            authenticated_users.extend(test.engineer.all())
+            authenticated_users.extend(test.assign_to.all())
+            result = set(users).intersection(set(authenticated_users))
+            if result:
                 group = ObjectGroup.objects.filter(name='assigned', model='test', status=test.status)
+
+            if test.submission.created_by in users:
+                group = ObjectGroup.objects.filter(name='owner', model='test', status=test.status)
 
             if group:
                 fields = group.first().fields.all().values_list('name', flat=True)
@@ -2877,7 +2903,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @action(methods=['put'], detail=True, url_path='feedback')
     def submit_test_feedback(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.submitted_by = request.user
