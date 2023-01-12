@@ -383,6 +383,21 @@ def interview_feedback_card(obj, request):
         write_exception(error, request)
 
 
+def get_authenticated_users(request, get_id=False):
+    try:
+        authenticated_users = list()
+        authenticated_users.append(request.user)
+        if get_id:
+            authenticated_users.append(request.user.id)
+            authenticated_users.extend(request.user.handovers.all().value_list('id', flat=True))
+        elif request.user.handovers.all():
+            for handover in request.user.handovers.all():
+                authenticated_users.append(handover.user)
+        return authenticated_users
+    except Exception as error:
+        write_exception(error, request)
+
+
 def get_interview_report(payload, request):
     try:
         response = HttpResponse(content_type='text/csv')
