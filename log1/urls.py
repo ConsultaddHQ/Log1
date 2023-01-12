@@ -33,7 +33,6 @@ from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, Consul
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
 
 
-
 router = DefaultRouter()
 schema_view = get_swagger_view(title='Log1')
 
