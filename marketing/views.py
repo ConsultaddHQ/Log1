@@ -1087,8 +1087,14 @@ class InterviewViewSets(ModelViewSet):
             change_to_feedback_due()
             permission = {"update": False}
             interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+            authenticated_users = []
+            authenticated_users.append(request.user)
+            if request.user.handovers.all():
+                for handover in request.user.handovers.all():
+                    authenticated_users.append(handover.user)
 
-            if request.user in [interview.marketer, interview.supervisor]:
+            # if request.user in [interview.marketer, interview.supervisor]:
+            if (interview.marketer in authenticated_users) or (interview.supervisor in authenticated_users):
                 permission['update'] = True
 
             serializer = InterviewDetailSerializer(interview)
@@ -1984,10 +1990,13 @@ class InterviewViewSets(ModelViewSet):
             fields, group = list(), None
             interview = get_object_or_404(Interview, id=pk)
 
-            if interview.submission.created_by.id == request.user.id:
+            authenticated_users = []
+            authenticated_users.append(request.user.id)
+            authenticated_users.extend(request.user.handovers.all().value_list('id', flat=True))
+            if interview.submission.created_by.id in authenticated_users:
                 group = ObjectGroup.objects.filter(name='owner', model='interview', status=interview.status)
 
-            elif interview.supervisor.id == request.user.id:
+            elif interview.supervisor.id in authenticated_users:
                 group = ObjectGroup.objects.filter(name='supervisor', model='interview', status=interview.status)
 
             if group:
@@ -2619,7 +2628,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def create(self, request, *args, **kwargs):
         try:
-            submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
+            authenticated_users = []
+            authenticated_users.append(request.user)
+            if request.user.handovers.all():
+                for handover in request.user.handovers.all():
+                    authenticated_users.append(handover.user)
+            submission = get_object_or_404(
+                Submission, id=request.data.get('submission'), created_by__in=authenticated_users)
             if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
             if submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
@@ -2703,7 +2718,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def update(self, request, *args, **kwargs):
         try:
-            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            authenticated_users = []
+            authenticated_users.append(request.user)
+            if request.user.handovers.all():
+                for handover in request.user.handovers.all():
+                    authenticated_users.append(handover.user)
+            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by__in=authenticated_users)
             prev_platform = test.platform
             new_platform = request.data.get('platform', prev_platform)
             if prev_platform != new_platform:

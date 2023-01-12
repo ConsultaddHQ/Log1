@@ -274,7 +274,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             user_id = request.data.get('user_id')
             role_ids = request.data.get('role_id', [])
             team_id = request.data.get('team_id', None)
-            if request.user.is_superuser:
+            if 'superadmin' in request.user.roles:
                 user = get_object_or_404(User, id=user_id)
                 desc = ""
                 if team_id:
