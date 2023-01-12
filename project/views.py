@@ -912,12 +912,12 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             if not support_qs:
                 message, exception_msg = support_assignment_mail(project_support, request)
                 if exception_msg != 'Mail sent':
-                    message = "Unable to send support assignment mail & "
+                    message = "Unable to send support assignment mail"
                     # return Response(
                     #     {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400
                     # )
                 else:
-                    message = "support assignment mail send & "
+                    message = "support assignment mail send"
                     
             return Response({"message": message + "Support is added"}, status=201)
         except Exception as error:
