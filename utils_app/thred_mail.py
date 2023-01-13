@@ -88,7 +88,9 @@ def set_mail_config(to, from_mail, cc, bcc, subject, obj):
     else:
         obj['cc'] = ''
         obj['bcc'] = ''
-        obj['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+        obj['to'] = ','.join(
+            ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@consultadd.com']
+        )
     return obj
 
 
@@ -162,7 +164,9 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
                 message['bcc'] = ','.join(mail_data["bcc"])
                 
             else:
-                message['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+                message['to'] = ','.join(
+                    ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@consultadd.com']
+                )
                 message['cc'] = ''
                 message['bcc'] = ''
             message['from'] = 'product@consultadd.com'
