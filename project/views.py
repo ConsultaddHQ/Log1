@@ -414,6 +414,7 @@ class ProjectViewSets(ModelViewSet):
                 )
             elif filter_for == 'handover':
                 users = get_authenticated_users(request)
+                users.remove(request.user)
                 projects = Project.objects.filter(submission__created_by__in=users)
             elif filter_for == 'team':
                 projects = Project.objects.filter(Q(submission__marketing_team=request.user.team) |

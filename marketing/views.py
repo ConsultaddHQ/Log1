@@ -648,6 +648,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 queryset = queryset.filter(Q(created_by__team=team) | Q(marketing_team__in=associated_teams))
             elif filter_for == 'handover':
                 users = get_authenticated_users(request)
+                users.remove(request.user)
                 queryset = queryset.filter(created_by__in=users)
 
             if filter_json:
@@ -1131,6 +1132,7 @@ class InterviewViewSets(ModelViewSet):
 
             elif filter_for == 'handover':
                 users = get_authenticated_users(request)
+                users.remove(request.user)
                 queryset = queryset.filter(submission__created_by__in=users)
 
             if filter_json:
@@ -2428,6 +2430,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             elif filter_for == 'handover':
                 users = get_authenticated_users(request)
+                users.remove(request.user)
                 queryset = queryset.filter(submission__created_by__in=users)
 
             elif filter_for == 'team' and 'admin' in roles:
