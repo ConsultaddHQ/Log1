@@ -17,7 +17,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from constance import config
-from marketing.utils import date_filter
+from marketing.utils import date_filter, get_authenticated_users
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -412,6 +412,10 @@ class ProjectViewSets(ModelViewSet):
                 projects = Project.objects.filter(submission__created_by=request.user).exclude(
                     submission__status='archive'
                 )
+            elif filter_for == 'handover':
+                users = get_authenticated_users(request)
+                users.remove(request.user)
+                projects = Project.objects.filter(submission__created_by__in=users)
             elif filter_for == 'team':
                 projects = Project.objects.filter(Q(submission__marketing_team=request.user.team) |
                                                   Q(submission__marketing_team__in=request.user.associated_to.all()))
@@ -544,7 +548,8 @@ class ProjectViewSets(ModelViewSet):
     def create(self, request, *args, **kwargs):
         sub_id = request.data.get('submission')
         try:
-            sub = get_object_or_404(Submission, id=sub_id, created_by=request.user)
+            users = get_authenticated_users(request)
+            sub = get_object_or_404(Submission, id=sub_id, created_by__in=users)
             if hasattr(sub, 'project'):
                 return Response({"message": "Project already exist"}, status=406)
 
