@@ -353,12 +353,14 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 available_week = f"{timesheet.start} - {timesheet.end}"
                 return Response({"error": f"Timesheet available for week {available_week}"}, status=400)
 
-            pending_request = TimesheetRequest.objects.filter(project=project, start=start).order_by('-created')
+            pending_request = TimesheetRequest.objects.filter(
+                project=project, start=start).exclude(status='reject').order_by('-created')
             if pending_request:
                 return Response({"error": f"Timesheet already requested for week {start} - {end}"}, status=400)
 
             requested_week = TimesheetRequest.objects.create(
-                start=start, end=end, project=project, status='request', consultant_comment=request.data.get('description')
+                start=start, end=end, project=project, status='request',
+                consultant_comment=request.data.get('description')
             )
             content_type = ContentType.objects.get(model='timesheetrequest')
             if request.FILES.get('file', None):
