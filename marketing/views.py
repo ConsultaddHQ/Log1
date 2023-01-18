@@ -369,8 +369,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             permission = {"update": False}
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
+            users = get_authenticated_users(request)
 
-            if sub.created_by == request.user:
+            if sub.created_by in users:
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
@@ -400,7 +401,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             fields, group = [], None
             submission = get_object_or_404(Submission, id=pk)
-            user_ids = get_authenticated_users(request, get_id=True)
+            user_ids = get_authenticated_users(request=request, get_id=True)
             if submission.created_by.id in user_ids:
                 group = ObjectGroup.objects.filter(name='owner', model='submission', status=submission.status)
 
@@ -1131,9 +1132,9 @@ class InterviewViewSets(ModelViewSet):
                                            Q(submission__marketing_team__in=associated_teams))
 
             elif filter_for == 'handover':
-                users = get_authenticated_users(request)
-                users.remove(request.user)
-                queryset = queryset.filter(submission__created_by__in=users)
+                users = get_authenticated_users(request, get_id=True)
+                users.remove(request.user.id)
+                queryset = queryset.filter(Q(submission__created_by_id__in=users) | Q(supervisor_id__in=users))
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -1511,10 +1512,10 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'booked'
                         interview.save()
                     else:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id = "suman.m@consultadd.com"
-                            
+
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         if msg == 'booked':
                             interview.calendar_id = res['id']
@@ -1571,7 +1572,7 @@ class InterviewViewSets(ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         calendar = GoogleCalendar()
@@ -1754,7 +1755,7 @@ class InterviewViewSets(ModelViewSet):
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                 else:
                     try:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
@@ -1830,7 +1831,7 @@ class InterviewViewSets(ModelViewSet):
             interview = qs.first()
             try:
                 if interview.calendar_id:
-                    calendar_mail_id = interview.submission.created_by.email 
+                    calendar_mail_id = interview.submission.created_by.email
                     if interview.if_previous_calendar:
                         calendar_mail_id="suman.m@consultadd.com"
                     calendar = GoogleCalendar()
@@ -2104,7 +2105,7 @@ class InterviewViewSets(ModelViewSet):
                         interview.save()
                     else:
                         booking_res = 'updated'
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
@@ -2424,7 +2425,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_for == 'my':
                 if 'engineer' in roles:
-                    queryset = queryset.filter(Q(engineer=request.user) | Q(assign_to=request.user))
+                    queryset = queryset.filter(
+                        Q(engineer=request.user) | Q(assign_to=request.user) | Q(submission__created_by=request.user)
+                    )
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
 
