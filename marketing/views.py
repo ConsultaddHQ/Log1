@@ -1133,7 +1133,7 @@ class InterviewViewSets(ModelViewSet):
             elif filter_for == 'handover':
                 users = get_authenticated_users(request)
                 users.remove(request.user)
-                queryset = queryset.filter(submission__created_by__in=users)
+                queryset = queryset.filter(submission__created_by__in=users | Q(supervisor_in=users))
 
             if filter_json:
                 filters = json.loads(filter_json)

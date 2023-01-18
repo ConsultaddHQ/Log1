@@ -1627,7 +1627,7 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
         try:
             end = request.GET.get('end')
-            year = request.GET.get('year')
+            # year = request.GET.get('year')
             start = request.GET.get('start')
             status = request.GET.get('status')
             leave_type = request.GET.get('leave_type')
