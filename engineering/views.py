@@ -382,7 +382,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
 
     def create(self, request, *args, **kwargs):
         try:
-            data = request.data
+            data = request.data.copy()
             data['update_by'] = request.user.id
             data['project'] = kwargs.get('project_id')
             serializer = self.serializer_class(data=data, partial=True)

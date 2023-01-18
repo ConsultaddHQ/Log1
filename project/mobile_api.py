@@ -353,12 +353,14 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 available_week = f"{timesheet.start} - {timesheet.end}"
                 return Response({"error": f"Timesheet available for week {available_week}"}, status=400)
 
-            pending_request = TimesheetRequest.objects.filter(project=project, start=start).order_by('-created')
+            pending_request = TimesheetRequest.objects.filter(
+                project=project, start=start).exclude(status='reject').order_by('-created')
             if pending_request:
                 return Response({"error": f"Timesheet already requested for week {start} - {end}"}, status=400)
 
             requested_week = TimesheetRequest.objects.create(
-                start=start, end=end, project=project, status='request', consultant_comment=request.data.get('description')
+                start=start, end=end, project=project, status='request',
+                consultant_comment=request.data.get('description')
             )
             content_type = ContentType.objects.get(model='timesheetrequest')
             if request.FILES.get('file', None):
@@ -419,8 +421,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def balance(self, request, pk):
         try:
             year = date.today().year
-            # leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year, is_expired=False)
-            leaves = ConsultantLeave.objects.filter(consultant_id=pk)
+            leaves = ConsultantLeave.objects.filter(consultant_id=pk, year=year, is_expired=False)
+            # leaves = ConsultantLeave.objects.filter(consultant_id=pk)
             serial = ConsultantLeaveSerializer(leaves, many=True)
             return Response({"result": serial.data}, status=200)
         except Exception as error:
@@ -431,8 +433,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def apply(self, request, pk, *args, **kwargs):
         try:
             data = request.data
-            # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
-            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
+            leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
+            # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
             leave = Leave.objects.create(
                 leave_type=leave_type,
                 consultant=request.user,

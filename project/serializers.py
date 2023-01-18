@@ -221,7 +221,8 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_pending_leave(obj):
-        leaves = obj.leaves.filter(leave_type__is_expired=False, status='applied').order_by('created')
+        # leaves = obj.leaves.filter(leave_type__is_expired=False, status='applied').order_by('created')
+        leaves = obj.leaves.filter(status='applied').order_by('created')
         if leaves:
             return True
         return False

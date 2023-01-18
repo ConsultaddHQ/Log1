@@ -351,7 +351,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     @action(methods=['get'], detail=False, url_path='role')
     def role(self, request):
         try:
-            roles = Role.objects.all().values('id', 'name')
+            roles = Role.objects.all().values('id', 'name', 'display_name')
             return Response({"data": roles}, status=200)
         except Exception as error:
             write_exception(error, request)
