@@ -369,8 +369,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             permission = {"update": False}
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
+            users = get_authenticated_users(request)
 
-            if sub.created_by == request.user:
+            if sub.created_by in users:
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
