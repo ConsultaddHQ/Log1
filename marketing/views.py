@@ -2424,7 +2424,9 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_for == 'my':
                 if 'engineer' in roles:
-                    queryset = queryset.filter(Q(engineer=request.user) | Q(assign_to=request.user))
+                    queryset = queryset.filter(
+                        Q(engineer=request.user) | Q(assign_to=request.user) | Q(submission__created_by=request.user)
+                    )
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
 
