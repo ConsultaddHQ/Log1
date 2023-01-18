@@ -400,7 +400,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             fields, group = [], None
             submission = get_object_or_404(Submission, id=pk)
-            user_ids = get_authenticated_users(request, get_id=True)
+            user_ids = get_authenticated_users(request=request, get_id=True)
             if submission.created_by.id in user_ids:
                 group = ObjectGroup.objects.filter(name='owner', model='submission', status=submission.status)
 
@@ -1131,9 +1131,9 @@ class InterviewViewSets(ModelViewSet):
                                            Q(submission__marketing_team__in=associated_teams))
 
             elif filter_for == 'handover':
-                users = get_authenticated_users(request)
-                users.remove(request.user)
-                queryset = queryset.filter(submission__created_by__in=users | Q(supervisor_in=users))
+                users = get_authenticated_users(request, get_id=True)
+                users.remove(request.user.id)
+                queryset = queryset.filter(Q(submission__created_by_id__in=users) | Q(supervisor_id__in=users))
 
             if filter_json:
                 filters = json.loads(filter_json)
