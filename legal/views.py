@@ -424,7 +424,7 @@ class PetitionViewSets(ModelViewSet):
                 Document.objects.create(
                     file=file,
                     verified=True,
-                    petition_id=pk,
+                    petition=petition,
                     creator=request.user,
                     doc_type_id=doc_type_id,
                 )
