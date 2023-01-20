@@ -319,9 +319,10 @@ class LeadViewSets(ModelViewSet):
     def fields(self, request, pk):
         try:
             fields, group = [], None
-            lead = get_object_or_404(Lead, id=pk, owner=request.user)
+            users = get_authenticated_users(request=request)
+            lead = get_object_or_404(Lead, id=pk, owner__in=users)
 
-            if lead.owner.id == request.user.id:
+            if lead.owner in users:
                 group = ObjectGroup.objects.filter(name='owner', model='lead', status=lead.status)
 
             if group:
@@ -1091,13 +1092,13 @@ class InterviewViewSets(ModelViewSet):
     @staticmethod
     def filter_interview_data(queryset, filter_dict, request):
         try:
+            filter_by_status = None
             query = filter_dict.get('query', None)
             filter_for = filter_dict.get('filter_for', None)
             filter_json = filter_dict.get('filter_json', None)
 
             team = request.user.team
             user_id = request.user.id
-            roles = request.user.roles
             associated_teams = request.user.associated_to.all()
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -1120,12 +1121,9 @@ class InterviewViewSets(ModelViewSet):
                     )
 
             if filter_for == 'my':
-                if 'interviewee' in roles:
-                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
-                elif 'engineer' in roles:
-                    queryset = queryset.filter(Q(guest__id=user_id))
-                else:
-                    queryset = queryset.filter(submission__created_by_id=user_id)
+                queryset = queryset.filter(
+                    Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guest__id=user_id)
+                )
 
             elif filter_for == 'team':
                 queryset = queryset.filter(Q(submission__marketing_team=team) |
@@ -1177,10 +1175,10 @@ class InterviewViewSets(ModelViewSet):
                 start_time = filters.get('start_time', None)
                 queryset = date_filter(queryset, start_time, "start_time")
 
-            return queryset
+            return queryset, filter_by_status
         except Exception as error:
             write_exception(message=error, request=request)
-            return queryset
+            return queryset, filter_by_status
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -1213,7 +1211,7 @@ class InterviewViewSets(ModelViewSet):
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
-            queryset = self.filter_interview_data(queryset, filter_dict, request)
+            queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
             data, screen_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
             if screen_data == 'error':
@@ -1235,7 +1233,7 @@ class InterviewViewSets(ModelViewSet):
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
-            queryset = self.filter_interview_data(queryset, filter_dict, request)
+            queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
             queryset = queryset.order_by('id').distinct('id')
             serializer = InterviewListSerializer(queryset, many=True)
@@ -1302,7 +1300,7 @@ class InterviewViewSets(ModelViewSet):
             filter_dict = {
                 "query": query, "filter_for": filter_for, "filter_json": filter_json
             }
-            queryset = self.filter_interview_data(queryset, filter_dict, request)
+            queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
             queryset = queryset.order_by('id').distinct('id')
             response = HttpResponse('application/text')
@@ -2654,11 +2652,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
             fields, group = [], None
 
-            authenticated_users = list()
-            authenticated_users.append(test.submitted_by)
-            authenticated_users.extend(test.engineer.all())
-            authenticated_users.extend(test.assign_to.all())
-            result = set(users).intersection(set(authenticated_users))
+            authentic_users = list()
+            authentic_users.append(test.submitted_by)
+            authentic_users.extend(test.engineer.all())
+            authentic_users.extend(test.assign_to.all())
+            result = set(users).intersection(set(authentic_users))
             if result:
                 group = ObjectGroup.objects.filter(name='assigned', model='test', status=test.status)
 
