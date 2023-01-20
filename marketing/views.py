@@ -1510,10 +1510,10 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'booked'
                         interview.save()
                     else:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id = "suman.m@consultadd.com"
-                            
+
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         if msg == 'booked':
                             interview.calendar_id = res['id']
@@ -1570,7 +1570,7 @@ class InterviewViewSets(ModelViewSet):
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         calendar = GoogleCalendar()
@@ -1753,7 +1753,7 @@ class InterviewViewSets(ModelViewSet):
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                 else:
                     try:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
@@ -1829,7 +1829,7 @@ class InterviewViewSets(ModelViewSet):
             interview = qs.first()
             try:
                 if interview.calendar_id:
-                    calendar_mail_id = interview.submission.created_by.email 
+                    calendar_mail_id = interview.submission.created_by.email
                     if interview.if_previous_calendar:
                         calendar_mail_id="suman.m@consultadd.com"
                     calendar = GoogleCalendar()
@@ -2103,7 +2103,7 @@ class InterviewViewSets(ModelViewSet):
                         interview.save()
                     else:
                         booking_res = 'updated'
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
