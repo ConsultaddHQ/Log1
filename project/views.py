@@ -1661,20 +1661,15 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             leave.remarks = request.data.get('remarks', None)
             leave.save()
 
+            consultant_leave = leave.leave_type
             if not status or status == leave.status:
                 return Response({"message": "Status Not Updated"}, status=200)
 
             if status.upper() == "REJECTED":
-                consultant_leave = get_object_or_404(
-                    ConsultantLeave, leave_type=leave.leave_type.leave_type, consultant=consultant
-                )
                 consultant_leave.balance += leave.total_hours
                 consultant_leave.save()
 
             elif status.upper() == "APPROVED" and leave.status.upper() == "REJECTED":
-                consultant_leave = get_object_or_404(
-                    ConsultantLeave, leave_type=leave.leave_type.leave_type, consultant=consultant
-                )
                 consultant_leave.balance -= leave.total_hours
                 consultant_leave.save()
 

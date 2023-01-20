@@ -21,7 +21,7 @@ from notification.utils import create_notification, push_notification
 from log1.utils import get_page_limits, write_exception, DONT_HAVE_ACCESS
 from consultant.authentication import ConsultantPetitionTokenAuthentication
 from activity.serializers import ConsultantComment, ConsultantCommentGetSerializer
-from legal.models import Types, Petition, Reason, Document, DocumentList, PETITION_TYPES
+from legal.models import Types, Petition, Reason, Document, DocumentList, PETITION_TYPES, PETITION_STATUSES
 from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer, \
     PetitionTypeSerializer
 
@@ -74,6 +74,9 @@ class PetitionViewSets(ModelViewSet):
         try:
             query = request.GET.get('query', None)
             filter_for = request.GET.get('filter', 'all')
+            petition_type = request.GET.get('type', None)
+            employer = request.GET.get('employer', None)
+            petition_status = request.GET.get('status', None)
             consultants = Consultant.objects.filter(petitions__is_active=True)
             if filter_for == 'my':
                 consultants = consultants.filter(petitions__assigned_to=request.user)
@@ -83,6 +86,12 @@ class PetitionViewSets(ModelViewSet):
                     Q(petitions__assigned_to__employee_name=query) |
                     Q(petitions__beneficiary__name__istartswith=query)
                 )
+            if petition_type:
+                consultants = consultants.filter(petitions__petition_type=petition_type)
+            if employer:
+                consultants = consultants.filter(petitions__employer=employer)
+            if petition_status:
+                consultants = consultants.filter(petitions__status=petition_status)
             total = consultants.count()
             data = []
             for consultant in consultants.distinct('id')[first:last]:
@@ -261,6 +270,14 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='petition_status')
+    def petition_status(self, request):
+        try:
+            return Response({"result": PETITION_STATUSES}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
     @action(methods=['post'], detail=False, url_path='upload_doc')
     def upload_doc(self, request):
         try:
@@ -407,7 +424,7 @@ class PetitionViewSets(ModelViewSet):
                 Document.objects.create(
                     file=file,
                     verified=True,
-                    petition_id=pk,
+                    petition=petition,
                     creator=request.user,
                     doc_type_id=doc_type_id,
                 )
