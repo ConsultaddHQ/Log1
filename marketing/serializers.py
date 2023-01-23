@@ -463,10 +463,13 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     def get_permission(self, obj):
         user = self.context.get('user')
-        update = False
         if user in [obj.marketer, obj.supervisor]:
-            update = True
-        return {'update': update}
+            return {'update': True}
+        authentic_user_id = []
+        authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
+        if obj.marketer.id in authentic_user_id or obj.supervisor.id in authentic_user_id:
+            return {"update": True}
+        return {"update": False}
 
     @staticmethod
     def get_attachment_link(obj):
@@ -593,10 +596,13 @@ class TestGetSerializer(serializers.ModelSerializer):
 
     def get_permission(self, obj):
         user = self.context.get('user')
-        update = False
         if user == obj.marketer:
-            update = True
-        return {'update': update}
+            return {'update': True}
+        authentic_user_id = []
+        authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
+        if obj.marketer.id in authentic_user_id:
+            return {"update": True}
+        return {"update": False}
 
     @staticmethod
     def get_engineer_feedback(obj):
@@ -650,10 +656,13 @@ class ProjectV2Serializer(serializers.ModelSerializer):
 
     def get_permission(self, obj):
         user = self.context.get('user')
-        update = False
         if user == obj.submission.created_by or 'finance' in user.roles:
-            update = True
-        return {'update': update}
+            return {'update': True}
+        authentic_user_id = []
+        authentic_user_id.extend(user.handovers.all().values_list('user__id', flat=True))
+        if obj.submission.created_by.id in authentic_user_id:
+            return {"update": True}
+        return {"update": False}
 
     @staticmethod
     def get_attachments(obj):

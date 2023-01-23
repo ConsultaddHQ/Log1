@@ -351,7 +351,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     @action(methods=['get'], detail=False, url_path='role')
     def role(self, request):
         try:
-            roles = Role.objects.all().values('id', 'name')
+            roles = Role.objects.all().values('id', 'name', 'display_name')
             return Response({"data": roles}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -405,6 +405,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             if 'superadmin' in request.user.roles:
                 query = request.GET.get('query', None)
+                team = request.GET.get('team', None)
+                role = request.GET.get('roles', None)
                 users = User.objects.all().exclude(role__name='consultant')
                 if query:
                     query = query.lstrip().replace(':amp:', '&')
@@ -412,6 +414,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                         Q(employee_name__icontains=query) |
                         Q(email__iexact=query)
                     )
+                if team:
+                    users = users.filter(team__id=team)
+                if role:
+                    users = users.filter(role__id=role)
                 total = users.count()
                 serializer = UserDirectorySerializer(users[first:last], many=True)
                 return Response({"data": serializer.data, "total": total}, status=200)

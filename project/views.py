@@ -17,7 +17,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from constance import config
-from marketing.utils import date_filter
+from marketing.utils import date_filter, get_authenticated_users
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -412,6 +412,10 @@ class ProjectViewSets(ModelViewSet):
                 projects = Project.objects.filter(submission__created_by=request.user).exclude(
                     submission__status='archive'
                 )
+            elif filter_for == 'handover':
+                users = get_authenticated_users(request)
+                users.remove(request.user)
+                projects = Project.objects.filter(submission__created_by__in=users)
             elif filter_for == 'team':
                 projects = Project.objects.filter(Q(submission__marketing_team=request.user.team) |
                                                   Q(submission__marketing_team__in=request.user.associated_to.all()))
@@ -544,7 +548,8 @@ class ProjectViewSets(ModelViewSet):
     def create(self, request, *args, **kwargs):
         sub_id = request.data.get('submission')
         try:
-            sub = get_object_or_404(Submission, id=sub_id, created_by=request.user)
+            users = get_authenticated_users(request)
+            sub = get_object_or_404(Submission, id=sub_id, created_by__in=users)
             if hasattr(sub, 'project'):
                 return Response({"message": "Project already exist"}, status=406)
 
@@ -908,13 +913,18 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     desc = f"{request.user.employee_name} added {support_person.employee_name} as support person"
             create_activity(project.id, 'projectsupport', request.user, desc, 'created')
 
+            message = ""
             if not support_qs:
                 message, exception_msg = support_assignment_mail(project_support, request)
                 if exception_msg != 'Mail sent':
-                    return Response(
-                        {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400
-                    )
-            return Response({"message": "Support is added"}, status=201)
+                    message = "Unable to send support assignment mail &"
+                    # return Response(
+                    #     {"exception": exception_msg, "message": "Unable to send support assignment mail"}, status=400
+                    # )
+                else:
+                    message = "Support assignment mail send &"
+                    
+            return Response({"message": message + "Support is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1617,7 +1627,7 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
         try:
             end = request.GET.get('end')
-            year = request.GET.get('year')
+            # year = request.GET.get('year')
             start = request.GET.get('start')
             status = request.GET.get('status')
             leave_type = request.GET.get('leave_type')
@@ -1651,20 +1661,15 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             leave.remarks = request.data.get('remarks', None)
             leave.save()
 
+            consultant_leave = leave.leave_type
             if not status or status == leave.status:
                 return Response({"message": "Status Not Updated"}, status=200)
 
             if status.upper() == "REJECTED":
-                consultant_leave = get_object_or_404(
-                    ConsultantLeave, leave_type=leave.leave_type.leave_type, consultant=consultant
-                )
                 consultant_leave.balance += leave.total_hours
                 consultant_leave.save()
 
             elif status.upper() == "APPROVED" and leave.status.upper() == "REJECTED":
-                consultant_leave = get_object_or_404(
-                    ConsultantLeave, leave_type=leave.leave_type.leave_type, consultant=consultant
-                )
                 consultant_leave.balance -= leave.total_hours
                 consultant_leave.save()
 
@@ -1708,8 +1713,8 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         try:
             consultant_id = kwargs.get('consultant_id')
             year = request.GET.get('year', date.today().year)
-            # queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
-            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id)
+            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
+            # queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id)
             serializer = ConsultantLeaveSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:

@@ -42,6 +42,7 @@ def create_remote_consultant(request):
                     return None
                 user = qs.first()
                 consultant, _ = Consultant.objects.get_or_create(email=user.email)
+                consultant.is_active = True
                 consultant.remote_only = True
                 consultant.gender = user.gender
                 consultant.name = user.employee_name

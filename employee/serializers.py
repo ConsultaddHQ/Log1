@@ -1,4 +1,5 @@
 from constance import config
+from django.db.models import F
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
@@ -31,12 +32,13 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     avatar = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
     version = serializers.SerializerMethodField()
+    handover = serializers.SerializerMethodField()
     display_roles = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'gender', 'phone', 'roles',
-                  'is_superuser', 'technology', 'shift', 'project', 'display_roles', 'version', 'have_certificate')
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'avatar', 'team', 'gender', 'phone', 'roles', 'shift',
+                  'is_superuser', 'technology', 'handover', 'project', 'display_roles', 'version', 'have_certificate')
 
     @staticmethod
     def get_team(obj):
@@ -66,6 +68,11 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     def get_display_roles(obj):
         if obj.role.all():
             return obj.role.all().values_list('display_name', flat=True)
+
+    @staticmethod
+    def get_handover(obj):
+        if obj.handovers.all():
+            return obj.handovers.all().values(name=F('user__employee_name'), employee_id=F('user__employee_id'))
 
     @staticmethod
     def get_project(obj):
