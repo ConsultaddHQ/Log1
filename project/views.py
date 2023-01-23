@@ -1713,8 +1713,8 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         try:
             consultant_id = kwargs.get('consultant_id')
             year = request.GET.get('year', date.today().year)
-            # queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
-            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id)
+            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
+            # queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id)
             serializer = ConsultantLeaveSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
