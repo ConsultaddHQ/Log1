@@ -319,9 +319,10 @@ class LeadViewSets(ModelViewSet):
     def fields(self, request, pk):
         try:
             fields, group = [], None
-            lead = get_object_or_404(Lead, id=pk, owner=request.user)
+            users = get_authenticated_users(request=request)
+            lead = get_object_or_404(Lead, id=pk, owner__in=users)
 
-            if lead.owner.id == request.user.id:
+            if lead.owner in users:
                 group = ObjectGroup.objects.filter(name='owner', model='lead', status=lead.status)
 
             if group:
@@ -369,8 +370,9 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             permission = {"update": False}
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
+            users = get_authenticated_users(request)
 
-            if sub.created_by == request.user:
+            if sub.created_by in users:
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
@@ -400,8 +402,8 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         try:
             fields, group = [], None
             submission = get_object_or_404(Submission, id=pk)
-
-            if submission.created_by.id == request.user.id:
+            user_ids = get_authenticated_users(request=request, get_id=True)
+            if submission.created_by.id in user_ids:
                 group = ObjectGroup.objects.filter(name='owner', model='submission', status=submission.status)
 
             if group:
@@ -646,6 +648,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 queryset = queryset.filter(created_by=request.user)
             elif filter_for == 'team':
                 queryset = queryset.filter(Q(created_by__team=team) | Q(marketing_team__in=associated_teams))
+            elif filter_for == 'handover':
+                users = get_authenticated_users(request)
+                users.remove(request.user)
+                queryset = queryset.filter(created_by__in=users)
 
             if filter_json:
                 filter_by_status = list()
@@ -763,7 +769,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     def update(self, request, *args, **kwargs):
         try:
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by=request.user)
+            users = get_authenticated_users(request)
+            submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by__in=users)
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -1082,37 +1089,17 @@ class InterviewViewSets(ModelViewSet):
             write_exception(message=error)
             return error, 'error'
 
-    def retrieve(self, request, *args, **kwargs):
+    @staticmethod
+    def filter_interview_data(queryset, filter_dict, request):
         try:
-            change_to_feedback_due()
-            permission = {"update": False}
-            interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+            filter_by_status = None
+            query = filter_dict.get('query', None)
+            filter_for = filter_dict.get('filter_for', None)
+            filter_json = filter_dict.get('filter_json', None)
 
-            if request.user in [interview.marketer, interview.supervisor]:
-                permission['update'] = True
-
-            serializer = InterviewDetailSerializer(interview)
-            return Response({"data": serializer.data, "permission": permission}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    def list(self, request, *args, **kwargs):
-        first, last = get_page_limits(request)
-        query = request.GET.get('query', None)
-        sort_by = request.GET.get('sort_by', None)
-        filter_for = request.GET.get('filter_for', 'all')
-        filter_json = request.GET.get('filter_json', None)
-        filter_by_status = request.GET.get('filter_by_status', None)
-
-        try:
-            # Change status of past Interview to feedback due
-            change_to_feedback_due()
-            user_id = request.user.id
-            roles = request.user.roles
             team = request.user.team
+            user_id = request.user.id
             associated_teams = request.user.associated_to.all()
-            queryset = Interview.objects.exclude(submission__status='archive')
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 if query.isnumeric():
@@ -1134,14 +1121,18 @@ class InterviewViewSets(ModelViewSet):
                     )
 
             if filter_for == 'my':
-                if 'interviewee' in roles:
-                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
-                else:
-                    queryset = queryset.filter(submission__created_by_id=user_id)
+                queryset = queryset.filter(
+                    Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guest__id=user_id)
+                )
 
             elif filter_for == 'team':
                 queryset = queryset.filter(Q(submission__marketing_team=team) |
                                            Q(submission__marketing_team__in=associated_teams))
+
+            elif filter_for == 'handover':
+                users = get_authenticated_users(request, get_id=True)
+                users.remove(request.user.id)
+                queryset = queryset.filter(Q(submission__created_by_id__in=users) | Q(supervisor_id__in=users))
 
             if filter_json:
                 filters = json.loads(filter_json)
@@ -1184,8 +1175,45 @@ class InterviewViewSets(ModelViewSet):
                 start_time = filters.get('start_time', None)
                 queryset = date_filter(queryset, start_time, "start_time")
 
-            data, screen_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
+            return queryset, filter_by_status
+        except Exception as error:
+            write_exception(message=error, request=request)
+            return queryset, filter_by_status
 
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            change_to_feedback_due()
+            permission = {"update": False}
+            interview = get_object_or_404(Interview, id=kwargs.get('pk'))
+            users = get_authenticated_users(request)
+            # if request.user in [interview.marketer, interview.supervisor]:
+            if (interview.marketer in users) or (interview.supervisor in users):
+                permission['update'] = True
+
+            serializer = InterviewDetailSerializer(interview)
+            return Response({"data": serializer.data, "permission": permission}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        query = request.GET.get('query', None)
+        sort_by = request.GET.get('sort_by', None)
+        filter_for = request.GET.get('filter_for', 'all')
+        filter_json = request.GET.get('filter_json', None)
+        filter_by_status = request.GET.get('filter_by_status', None)
+
+        try:
+            # Change status of past Interview to feedback due
+            change_to_feedback_due()
+            queryset = Interview.objects.exclude(submission__status='archive')
+            filter_dict = {
+                "query": query, "filter_for": filter_for, "filter_json": filter_json
+            }
+            queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
+
+            data, screen_data = self.get_count_and_queryset(queryset, filter_by_status, sort_by, first, last)
             if screen_data == 'error':
                 return Response({"message": ERROR_MSG, "error": str(data)}, status=400)
 
@@ -1201,81 +1229,11 @@ class InterviewViewSets(ModelViewSet):
         filter_json = request.GET.get('filter_json', None)
 
         try:
-            user_id = request.user.id
-            roles = request.user.roles
-            team = request.user.team
-            associated_teams = request.user.associated_to.all()
             queryset = Interview.objects.all()
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                if query.isnumeric():
-                    queryset = queryset.filter(
-                        Q(id=query) |
-                        Q(submission__client__istartswith=query) |
-                        Q(submission__created_by__employee_name__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith=query) |
-                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                    )
-                else:
-                    queryset = queryset.filter(
-                        Q(submission__client__istartswith=query) |
-                        Q(submission__created_by__employee_name__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith=query) |
-                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                    )
-
-            if filter_for == 'my':
-                if 'interviewee' in roles:
-                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
-                else:
-                    queryset = queryset.filter(submission__created_by_id=user_id)
-
-            elif filter_for == 'team':
-                queryset = queryset.filter(Q(submission__marketing_team=team) |
-                                           Q(submission__marketing_team__in=associated_teams))
-
-            if filter_json:
-                filters = json.loads(filter_json)
-
-                if 'assignment' in filters:
-                    if filters["assignment"] == 'assigned':
-                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
-                    if filters["assignment"] == 'unassigned':
-                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
-
-                if 'coding_interview' in filters:
-                    if filters["coding_interview"] == 'yes':
-                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
-                    elif filters["coding_interview"] == 'no':
-                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
-
-                if 'status' in filters and len(filters["status"]) > 0:
-                    queryset = queryset.filter(status__in=filters["status"])
-
-                if 'position' in filters and len(filters["position"]) > 0:
-                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
-
-                if 'ctb' in filters and len(filters["ctb"]) > 0:
-                    queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
-
-                if 'client' in filters and len(filters["client"]) > 0:
-                    queryset = queryset.filter(submission__client__in=filters["client"])
-
-                if 'marketer' in filters and len(filters["marketer"]) > 0:
-                    queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
-
-                if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters["vendor"])
-
-                if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    queryset = queryset.filter(
-                        submission__consultant_marketing__consultant__name__in=filters["consultant"]
-                    )
-
-                start_time = filters.get('start_time', None)
-                queryset = date_filter(queryset, start_time, "start_time")
+            filter_dict = {
+                "query": query, "filter_for": filter_for, "filter_json": filter_json
+            }
+            queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
             queryset = queryset.order_by('id').distinct('id')
             serializer = InterviewListSerializer(queryset, many=True)
@@ -1297,6 +1255,15 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='interview').order_by('question__position')
         coding_answer_qs = Answer.objects.filter(
             object_id=obj.id, question__form_name='coding').order_by('question__position')
+        coder_names = obj.guest.all()
+        coders = ''
+        n= 0
+        for name in coder_names:
+            if n == 0:
+                coders = name.employee_name
+                n += 1
+            else:
+                coders = coders + ', ' + name.employee_name
         supervisor_feedback, guest_feedback = '', ''
         for answer_obj in interview_answer_qs:
             if iter_count == 0:
@@ -1316,7 +1283,7 @@ class InterviewViewSets(ModelViewSet):
             obj.id, start_time, obj.marketer.employee_name, obj.consultant.name,
             work_auth.get_visa_type_display() if work_auth else '', obj.supervisor.employee_name,
             obj.submission.lead.job_title, obj.submission.client, obj.submission.vendor.name, obj.status,
-            obj.feedback, obj.failure_reason, obj.coding_present,
+            obj.feedback, obj.failure_reason, obj.coding_present, coders,
             supervisor_remark.first().answer if supervisor_remark else '', obj.guest_remark, supervisor_feedback,
             guest_feedback
         ]
@@ -1329,81 +1296,11 @@ class InterviewViewSets(ModelViewSet):
         filter_json = request.GET.get('filter_json', None)
 
         try:
-            user_id = request.user.id
-            roles = request.user.roles
-            team = request.user.team
-            associated_teams = request.user.associated_to.all()
             queryset = Interview.objects.all()
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                if query.isnumeric():
-                    queryset = queryset.filter(
-                        Q(id=query) |
-                        Q(submission__client__istartswith=query) |
-                        Q(submission__created_by__employee_name__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith=query) |
-                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                    )
-                else:
-                    queryset = queryset.filter(
-                        Q(submission__client__istartswith=query) |
-                        Q(submission__created_by__employee_name__istartswith=query) |
-                        Q(submission__lead__vendor_company__name__istartswith=query) |
-                        Q(submission__consultant_marketing__consultant__email__iexact=query) |
-                        Q(submission__consultant_marketing__consultant__name__istartswith=query)
-                    )
-
-            if filter_for == 'my':
-                if 'interviewee' in roles:
-                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
-                else:
-                    queryset = queryset.filter(submission__created_by_id=user_id)
-
-            elif filter_for == 'team':
-                queryset = queryset.filter(Q(submission__marketing_team=team) |
-                                           Q(submission__marketing_team__in=associated_teams))
-
-            if filter_json:
-                filters = json.loads(filter_json)
-
-                if 'assignment' in filters:
-                    if filters["assignment"] == 'assigned':
-                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
-                    if filters["assignment"] == 'unassigned':
-                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
-
-                if 'coding_interview' in filters:
-                    if filters["coding_interview"] == 'yes':
-                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
-                    elif filters["coding_interview"] == 'no':
-                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
-
-                if 'status' in filters and len(filters["status"]) > 0:
-                    queryset = queryset.filter(status__in=filters["status"])
-
-                if 'position' in filters and len(filters["position"]) > 0:
-                    queryset = queryset.filter(submission__lead__position_id__in=filters["position"])
-
-                if 'ctb' in filters and len(filters["ctb"]) > 0:
-                    queryset = queryset.filter(supervisor__employee_id__in=filters["ctb"])
-
-                if 'client' in filters and len(filters["client"]) > 0:
-                    queryset = queryset.filter(submission__client__in=filters["client"])
-
-                if 'marketer' in filters and len(filters["marketer"]) > 0:
-                    queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
-
-                if 'vendor' in filters and len(filters["vendor"]) > 0:
-                    queryset = queryset.filter(submission__lead__vendor_company_id__in=filters["vendor"])
-
-                if 'consultant' in filters and len(filters["consultant"]) > 0:
-                    queryset = queryset.filter(
-                        submission__consultant_marketing__consultant__name__in=filters["consultant"]
-                    )
-
-                start_time = filters.get('start_time', None)
-                queryset = date_filter(queryset, start_time, "start_time")
+            filter_dict = {
+                "query": query, "filter_for": filter_for, "filter_json": filter_json
+            }
+            queryset, filter_by_status = self.filter_interview_data(queryset, filter_dict, request)
 
             queryset = queryset.order_by('id').distinct('id')
             response = HttpResponse('application/text')
@@ -1411,7 +1308,8 @@ class InterviewViewSets(ModelViewSet):
             writer.writerow(
                 ['Interview Id', 'Interview Time', 'Marketer Name', 'Consultant Name', 'Work Auth', 'Supervisor',
                  'Job Title', 'Client', 'Vendor', 'Interview Status', 'Interview Feedback', 'Failure Reason',
-                 'Coding Present', 'Supervisor Remark', 'Coders Remark', 'Supervisor Feedback', 'Coder Feedback']
+                 'Coding Present', 'Coders', 'Supervisor Remark', 'Coders Remark', 'Supervisor Feedback',
+                 'Coder Feedback']
             )
             response['Content-Disposition'] = "attachment; filename=InterviewFeedbackReport.csv"
             for obj in queryset:
@@ -1427,8 +1325,9 @@ class InterviewViewSets(ModelViewSet):
             # Change status of past Interview to feedback due
             change_to_feedback_due()
 
+            users = get_authenticated_users(request)
             submission_id = request.data.get('submission', None)
-            submissions = Submission.objects.filter(id=submission_id, created_by=request.user)
+            submissions = Submission.objects.filter(id=submission_id, created_by__in=users)
             if not submissions:
                 return Response({"message": 'This is not your submission'}, status=400)
 
@@ -1552,8 +1451,8 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled."}, status=400)
-
-            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=400)
 
@@ -1611,10 +1510,10 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'booked'
                         interview.save()
                     else:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id = "suman.m@consultadd.com"
-                            
+
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         if msg == 'booked':
                             interview.calendar_id = res['id']
@@ -1666,12 +1565,12 @@ class InterviewViewSets(ModelViewSet):
         try:
             # Change status of past Screening to feedback due
             change_to_feedback_due()
-
-            interview = get_object_or_404(Interview, id=interview_id, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            interview = get_object_or_404(Interview, id=interview_id, submission__created_by__in=users)
             if os.environ.get('ENV', 'local') == 'prod':
                 try:
                     if interview.calendar_id:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         calendar = GoogleCalendar()
@@ -1729,8 +1628,8 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
-
-            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
 
@@ -1799,7 +1698,8 @@ class InterviewViewSets(ModelViewSet):
         # Change status of past Screening to feedback due
         change_to_feedback_due()
         try:
-            queryset = Interview.objects.filter(id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            queryset = Interview.objects.filter(id=pk, submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "This is not your Interview"}, status=404)
 
@@ -1853,7 +1753,7 @@ class InterviewViewSets(ModelViewSet):
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                 else:
                     try:
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
@@ -1922,13 +1822,14 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['put'], detail=True, url_path='cancel_interview')
     def cancel_interview(self, request, pk):
         try:
-            qs = Interview.objects.filter(id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            qs = Interview.objects.filter(id=pk, submission__created_by__in=users)
             if not qs:
                 return Response({"message": "You don't have access"}, status=404)
             interview = qs.first()
             try:
                 if interview.calendar_id:
-                    calendar_mail_id = interview.submission.created_by.email 
+                    calendar_mail_id = interview.submission.created_by.email
                     if interview.if_previous_calendar:
                         calendar_mail_id="suman.m@consultadd.com"
                     calendar = GoogleCalendar()
@@ -1984,10 +1885,11 @@ class InterviewViewSets(ModelViewSet):
             fields, group = list(), None
             interview = get_object_or_404(Interview, id=pk)
 
-            if interview.submission.created_by.id == request.user.id:
+            user_ids = get_authenticated_users(request, get_id=True)
+            if interview.submission.created_by.id in user_ids:
                 group = ObjectGroup.objects.filter(name='owner', model='interview', status=interview.status)
 
-            elif interview.supervisor.id == request.user.id:
+            elif interview.supervisor.id in user_ids:
                 group = ObjectGroup.objects.filter(name='supervisor', model='interview', status=interview.status)
 
             if group:
@@ -2201,7 +2103,7 @@ class InterviewViewSets(ModelViewSet):
                         interview.save()
                     else:
                         booking_res = 'updated'
-                        calendar_mail_id = interview.submission.created_by.email 
+                        calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
                             calendar_mail_id="suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
@@ -2521,9 +2423,16 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             if filter_for == 'my':
                 if 'engineer' in roles:
-                    queryset = queryset.filter(Q(engineer=request.user) | Q(assign_to=request.user))
+                    queryset = queryset.filter(
+                        Q(engineer=request.user) | Q(assign_to=request.user) | Q(submission__created_by=request.user)
+                    )
                 else:
                     queryset = queryset.filter(submission__created_by=request.user)
+
+            elif filter_for == 'handover':
+                users = get_authenticated_users(request)
+                users.remove(request.user)
+                queryset = queryset.filter(submission__created_by__in=users)
 
             elif filter_for == 'team' and 'admin' in roles:
                 if 'engineer' in roles:
@@ -2619,7 +2528,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def create(self, request, *args, **kwargs):
         try:
-            submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by=request.user)
+            users = get_authenticated_users(request)
+            submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by__in=users)
             if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
             if submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
@@ -2703,7 +2613,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def update(self, request, *args, **kwargs):
         try:
-            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by__in=users)
             prev_platform = test.platform
             new_platform = request.data.get('platform', prev_platform)
             if prev_platform != new_platform:
@@ -2737,14 +2648,20 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
             fields, group = [], None
 
-            if test.submission.created_by.id == request.user.id:
-                group = ObjectGroup.objects.filter(name='owner', model='test', status=test.status)
-
-            if request.user in [test.submitted_by] + [test.assign_to.all()] + [test.engineer.all()]:
+            authentic_users = list()
+            authentic_users.append(test.submitted_by)
+            authentic_users.extend(test.engineer.all())
+            authentic_users.extend(test.assign_to.all())
+            result = set(users).intersection(set(authentic_users))
+            if result:
                 group = ObjectGroup.objects.filter(name='assigned', model='test', status=test.status)
+
+            if test.submission.created_by in users:
+                group = ObjectGroup.objects.filter(name='owner', model='test', status=test.status)
 
             if group:
                 fields = group.first().fields.all().values_list('name', flat=True)
@@ -2877,7 +2794,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     @action(methods=['put'], detail=True, url_path='feedback')
     def submit_test_feedback(self, request, pk):
         try:
-            test = get_object_or_404(Test, id=pk, submission__created_by=request.user)
+            users = get_authenticated_users(request)
+            test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.submitted_by = request.user
