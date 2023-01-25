@@ -17,6 +17,7 @@ QUESTION_TYPE = (
         ('note', 'Note'),
         ('rate', 'Rate'),
         ('child', 'Child'),
+        ('slider', 'Slider'),
         ('option', 'Option'),
         ('integer', 'Integer'),
         ('boolean', 'Boolean'),

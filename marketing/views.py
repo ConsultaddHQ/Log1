@@ -2670,6 +2670,14 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='test_status')
+    def petition_status(self, request):
+        try:
+            return Response({"result": Test.STATUS_CHOICES}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
     @action(methods=['put'], detail=True, url_path='assign')
     def assign_test(self, request, pk):
         try:

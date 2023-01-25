@@ -1158,8 +1158,15 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
             category = request.GET.get('category', None)
+            start = request.GET.get('start', None)
+            end = request.GET.get('end', None)
+            test_status = request.GET.get('status', None)
             test = Test.objects.filter(engineer=kwargs.get('pk'))
-
+            
+            if test_status:
+                test = test.filter(status=test_status)
+            if start and end:
+                test = test.filter(created__range=[start, end])
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 if category:
@@ -1262,7 +1269,13 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def summary(self, request, **kwargs):
         try:
             duration = request.GET.get('filter_by', 'this_month')
-            first, last = self.filter_by_time(duration)
+            start = request.GET.get('start', None)
+            end = request.GET.get('end', None)
+            if duration == 'custom' and start and end:
+                first = start
+                last = end
+            else:
+                first, last = self.filter_by_time(duration)
 
             projects = ProjectSupport.objects.filter(
                 support__id=kwargs.get('pk'), statuses__created__range=[first, last]
