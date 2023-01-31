@@ -1,5 +1,6 @@
 import csv
 import json
+import pandas as pd
 from pytz import timezone
 from django.http import HttpResponse
 from datetime import datetime, timedelta
@@ -10,9 +11,11 @@ from constance import config
 from employee.models import User
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
+from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from marketing.models import Submission, Interview, Question, Answer
+from utils_app.utils import generate_s3_url
 
 
 def vendor_account_manager(vendor_company):
@@ -394,6 +397,40 @@ def get_authenticated_users(request, get_id=False):
             for handover in request.user.handovers.all():
                 authenticated_users.append(handover.user)
         return authenticated_users
+    except Exception as error:
+        write_exception(error, request)
+
+
+def get_team_structure_xlsx(payload, counts, request):
+    try:
+        columns = ['marketer Name', 'SkillSet', 'Shift', 'assign Consultant', 'Team Name']
+        rows = []
+        for data in payload:
+            rows.append([data.get('employee_name'),
+                         ", ".join([i for i in data.get('technology', [])]) if data.get('technology', []) else [],
+                         get_shift(data.get('shift'), request),
+                         ", ".join([i['consultant_name'] for i in data['assign Consultant']['consultant']])
+                         if data.get('current_offer') else None, data['team']])
+        df1 = pd.DataFrame(rows, columns=columns)
+
+        frames = []
+        for count_type in counts:
+            columns = [None, count_type.capitalize(), 'Count', None]
+            rows = []
+            for data in counts[count_type]:
+                rows.append([None, data['display_name'], data['count'], None])
+            df2 = pd.DataFrame(rows, columns=columns)
+            frames.append(df2)
+        result = pd.concat(frames, axis=1)
+
+        filename = f'{datetime.now()}'.replace(' ', '')
+        writer = pd.ExcelWriter(f'marketing_team_{filename}.xlsx', engine='xlsxwriter')
+        df1.to_excel(writer, sheet_name='Marketing Team', index=None)
+        result.to_excel(writer, sheet_name='Count', index=None)
+
+        writer.save()
+        file_url = generate_s3_url(f'marketing_team_{filename}.xlsx')
+        return file_url
     except Exception as error:
         write_exception(error, request)
 
