@@ -3199,7 +3199,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     @action(methods=['put'], detail=True, url_path='update_scrum')
     def update_scrum(self, request, **kwargs):
         try:
-            breakpoint();
             team_id = kwargs.get('pk')
             employee_id = request.data.get('employee_id', None)
             if not employee_id:

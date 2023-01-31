@@ -33,12 +33,13 @@ from utils_app.thred_mail import send_email as send_email_, send_email_attachmen
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant, push_notification, create_notification
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
+    get_event_feedback_xlsx
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, TimesheetRequestSerializer
+    ConsultantLeaveSerializer, TimesheetRequestSerializer, TimesheetEventSerializer
 from utils_app.slack_notification import MessageCard as slack
 from datetime import datetime
 
@@ -1766,3 +1767,165 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /timesheet_event/
+class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
+    queryset = TimesheetEvent.objects.all()
+    serializer_classes = TimesheetEventSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            query = TimesheetEvent.objects.all()
+            serializer = TimesheetEventSerializer(query, many=True)
+            return Response({'result': serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            end_datatime = request.data.get('end')
+            start_datetime = request.data.get('start')
+            consultants_id = request.data.get('consultants', [])
+
+            if start_datetime or consultants_id:
+                event = TimesheetEvent.objects.create(
+                    start=start_datetime,
+                    end=end_datatime,
+                    created_by=request.user,
+                    title=request.data.get('title', None),
+                    image=request.FILES.get('image', None),
+                    feedback_type=request.data.get('feedback_type'),
+                    event_type=request.data.get('event_type', None),
+                    description=request.data.get('description', None),
+                    action_link=request.data.get('action_link', None),
+                )
+                for consultant_id in consultants_id:
+                    consultant = get_object_or_404(Consultant, id=consultant_id)
+                    event.consultants.add(consultant)
+
+                event.save()
+                # data = {
+                #     "title": event.title,
+                #     "category": "alert",
+                #     "description": event.description,
+                #     "target_type": "timesheet",
+                #     "target_id": request.user.id,
+                #     "sender_id": request.user.id,
+                #     "recipient_user_type": "user",
+                #     "sender_user_type": "consultant",
+                # }
+                # create_notification(event.consultants, data)
+
+                # Push Notification
+                # message_body = {
+                #     "body": event.description,
+                #     "title": event.title,
+                #     "category": "alert",
+                #     "image": event.image,
+                #     "show_in_foreground": True,
+                #     "click_action": event.action_link,
+                #     "data": {
+                #         'is_read': False,
+                #         'is_deleted': False,
+                #         'target': 'timesheet',
+                #         'target_id': request.user.id,
+                #         'timestamp': str(timezone.now()),
+                #     },
+                # }
+                # consultant_ids = list(event.consultants.values_list('id', flat=True))
+                # push_notification(consultant_ids, message_body)
+            return Response({"message": "event created successfully"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            event = get_object_or_404(TimesheetEvent, id=kwargs.get('pk', None))
+            if event.created_by == request.user or 'superadmin' | 'admin' in request.user.roles:
+                event.is_active = False
+                event.save()
+                return Response({"message": "delete the event successfully"}, status=202)
+            return Response({"message": "You don't have permission to delete the event"}, status=403)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            event = get_object_or_404(
+                TimesheetEvent, id=kwargs.get('pk', None),
+            )
+            if event.created_by == request.user or 'superadmin' | 'admin' in request.user.roles:
+                event.start = request.data.get('start')
+                if request.data.get('start') and request.data.get('end'):
+                    event.start = request.data.get('start')
+                    event.end = request.data.get('end')
+                if request.data.get('image'):
+                    event.title = request.data.get('image')
+                if request.data.get('description'):
+                    event.title = request.data.get('description')
+                if request.data.get('title'):
+                    event.title = request.data.get('title')
+                if request.data.get('action_link'):
+                    event.title = request.data.get('action_link')
+                if request.data.get('feedback_type'):
+                    event.title = request.data.get('feedback_type')
+                event.save()
+            else:
+                return Response({"message": "You don't have permission to update the event"}, status=403)
+
+            # data = {
+            #     "title": event.title,
+            #     "category": "alert",
+            #     "description": event.description,
+            #     "target_type": "timesheet",
+            #     "target_id": request.user.id,
+            #     "sender_id": request.user.id,
+            #     "recipient_user_type": "user",
+            #     "sender_user_type": "consultant",
+            # }
+            # create_notification(event.consultant, data)
+            #
+            # # Push Notification
+            # message_body = {
+            #     "body": event.description,
+            #     "title": event.title,
+            #     "category": "alert",
+            #     "image":event.image,
+            #     "show_in_foreground": True,
+            #     "click_action": event.action_link,
+            #     "data": {
+            #         'is_read': False,
+            #         'is_deleted': False,
+            #         'target': 'timesheet',
+            #         'target_id': request.user.id,
+            #         'timestamp': str(timezone.now()),
+            #     },
+            # }
+            # consultant_ids = list(event.consultants.values_list('id', flat=True))
+            # push_notification(consultant_ids. message_body)
+
+            serializer = TimesheetEventSerializer(event)
+            return Response({"result": serializer.data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='Feedback_export')
+    def export(self, request, **kwargs):
+        try:
+            query = TimesheetEvent.objects.all()
+            serializer = TimesheetEventSerializer(query, many=True)
+            if serializer.data:
+                file_url = get_event_feedback_xlsx(serializer.data,query.count(),request)
+                return Response({"data": file_url}, status=200)
+            return Response({"message": "No Data to export"}, status=400)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
