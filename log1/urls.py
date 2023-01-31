@@ -21,13 +21,13 @@ from notification.views import EmployeeNotificationViewSet, ConsultantNotificati
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
-    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets
+    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimeSheetEventViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
-    TrainingCheckListViewSet, EngineerReportViewSet, TeamStructureViewSet
+    TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet, DefaultCalendarViewSets, CertificateViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets
+    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets, MarketingTeamViewSet
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
@@ -69,11 +69,12 @@ router.register(r'vendor_layer', VendorLayerViewSets)
 router.register(r'dashboard', MarketingDashboardViewSet)
 router.register(r'vendor_company', VendorCompanyViewSets)
 router.register(r'vendor_contact', VendorContactViewSets)
+router.register(r'marketing_team', MarketingTeamViewSet)
 
 router.register(r'project', ProjectViewSets)
 router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'project_order', ProjectOrderViewSet)
-router.register(r'team_structure', TeamStructureViewSet)
+router.register(r'eng_team', EngineeringTeamViewSet)
 router.register(r'engineer_report', EngineerReportViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'project/(?P<project_id>[0-9]+)/updates', ProjectUpdateViewSet)
@@ -110,6 +111,7 @@ router.register(r'consultant_auth', ConsultantAuthViewSet)
 router.register(r'consultant_password', ConsultantResetPasswordViewSet)
 
 router.register(r'timesheet', TimeSheetViewSet)
+router.register(r'timesheet_event', TimeSheetEventViewSet)
 router.register(r'payroll', PayrollScheduleViewSet)
 router.register(r'consultant_leave', ConsultantLeaveViewSet)
 

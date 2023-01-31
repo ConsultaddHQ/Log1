@@ -9,7 +9,7 @@ from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -388,6 +388,26 @@ class ConsultantLeaveSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_leave_type(obj):
         return obj.leave_type.display_name
+
+
+class TimesheetEventSerializer(serializers.ModelSerializer):
+    consultants = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimesheetEvent
+        fields = ('id', 'start', 'end', 'title', 'description', 'action_link', 'event_type', 'image',
+                  'feedback_type', 'consultants', 'is_active')
+
+    @staticmethod
+    def get_consultants(obj):
+        consultants = obj.consultants.all()
+        if consultants:
+            data = [{
+               "id": consultant.id,
+               "name": consultant.name,
+            } for consultant in consultants]
+            return data
+        return None
 
 
 class LeaveSerializer(serializers.ModelSerializer):
