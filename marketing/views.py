@@ -2671,7 +2671,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['get'], detail=False, url_path='test_status')
-    def petition_status(self, request):
+    def test_status(self, request):
         try:
             return Response({"result": Test.STATUS_CHOICES}, status=200)
         except Exception as error:
