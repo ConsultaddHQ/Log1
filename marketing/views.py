@@ -18,6 +18,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from marketing.utils import *
 from marketing.serializers import *
+from utils_app.mailing import send_email_without_template
 from utils_app.models import MapMail
 from activity.models import Activity
 from employee.models import User, Team
@@ -372,7 +373,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
             users = get_authenticated_users(request)
 
-            if sub.created_by in users:
+            if (sub.created_by in users) or request.user.employee_id == 5693:
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
@@ -770,7 +771,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def update(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
-            submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by__in=users)
+            if request.user.employee_id == 5693:
+                submission = get_object_or_404(Submission, id=kwargs.get('pk'))
+            else:
+                submission = get_object_or_404(Submission, id=kwargs.get('pk'), created_by__in=users)
+            prev_work_type = submission.work_type
             serializer = SubmissionCreateSerializer(submission, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -778,8 +783,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 # Activity
                 fields = []
                 sub_fields = {
-                    "client": "Client", "employer": "Employer",
-                    "rate": "Rate", "email": "Email", "phone": "Phone Number",
+                    "client": "Client", "employer": "Employer", "rate": "Rate",
+                    "work_type": "Work Type", "email": "Email", "phone": "Phone Number",
                 }
                 sub_fields_keys = sub_fields.keys()
                 for field in request.data.keys():
@@ -797,6 +802,21 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                     submission.is_complete = False
 
                 submission.save()
+                project = Project.objects.filter(submission=submission)
+                if project and prev_work_type != serializer.data['work_type']:
+                    status = project.first().statuses.filter(is_current=True, status='joined')
+                    if status:
+                        scrum_master = User.objects.filter(team=submission.created_by.team, role__name__in=['admin', 'proxy'])
+                        to = [submission.created_by.email, 'finance@consultadd.com']
+                        to.extend(scrum_master)
+                        cc = ['arun.k@consultadd.com']
+                        mail_data = {
+                            'subject': "Project Type Updated",
+                            'to': to, 'cc': cc, 'bcc': [],
+                            'body': f"Hello Team,\n{request.user.employee_name} changed the {submission.consultant.name}"
+                                    f"project's project type for to {submission.get_work_type_display()}\n\nThanks\nRegards\nThe Log1 Team"
+                        }
+                        send_email_without_template(mail_data, request.user.email, request=request)
                 return Response({"data": serializer.data, "message": "Submission updated"}, status=202)
             else:
                 return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
