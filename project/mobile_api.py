@@ -416,13 +416,10 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             event = get_object_or_404(
                 TimesheetEvent, id=request.data.get("event_id")
             )
-            consultant = get_object_or_404(
-                Consultant, id=request.data.get("consultant_id"),
-            )
 
             TimesheetEventFeedback.objects.create(
                 feedback=request.data.get("feedback", None),
-                consultant=consultant,
+                consultant=request.user,
                 TimesheetEvent=event
             ).save()
             return Response({"data": "event feedback submitted"}, status=200)
