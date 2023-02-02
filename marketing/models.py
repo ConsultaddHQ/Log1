@@ -82,8 +82,8 @@ class Lead(TimeStampedModel):
         ('archived', 'Archived'),
     )
     POSITION_CHOICES = (
-        ('w2', 'W2'),
         ('c2c', 'C2C'),
+        ('w2', 'W2(Contract)'),
         ('full_time', 'Full Time'),
     )
     is_w2 = models.BooleanField(default=False)
@@ -141,8 +141,8 @@ class Submission(TimeStampedModel):
         ('interview', 'Interview'),
     )
     WORK_CHOICES = (
-        ('w2', 'W2'),
         ('c2c', 'C2C'),
+        ('w2', 'W2(Contract)'),
         ('full_time', 'Full Time'),
     )
     attachments = GenericRelation(Attachment)
