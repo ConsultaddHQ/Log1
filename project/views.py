@@ -1,3 +1,4 @@
+import csv
 import json
 from datetime import datetime, date
 
@@ -6,7 +7,6 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
-from consultant.serializers import FeedbackSerializer
 from consultant.utils import create_and_send_notification
 
 from rest_framework.response import Response
@@ -17,7 +17,6 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from constance import config
-from marketing.utils import date_filter, get_authenticated_users
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -27,21 +26,21 @@ from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
-from utils_app.utils import delete_temp_file, export_to_csv
+from marketing.utils import date_filter, get_authenticated_users
+from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from notification.utils import push_notification_consultant, push_notification, create_notification
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent, TimesheetEventFeedback
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    get_event_feedback_xlsx
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, TimesheetRequestSerializer, TimesheetEventSerializer
+    ConsultantLeaveSerializer, TimesheetRequestSerializer, TimesheetEventSerializer, TimesheetEventFeedbackSerializer
 from utils_app.slack_notification import MessageCard as slack
-from datetime import datetime
+
 
 
 # Route - /project/
@@ -1837,6 +1836,8 @@ class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, 
                 # }
                 # consultant_ids = list(event.consultants.values_list('id', flat=True))
                 # push_notification(consultant_ids, message_body)
+            desc = f"{request.user.employee_name} is created event"
+            create_activity(kwargs.get('pk'), 'TimesheetEvent', request.user, desc, 'create')
             return Response({"message": "event created successfully"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -1916,13 +1917,25 @@ class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, 
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='Feedback_export')
+    @action(methods=['get'], detail=False, url_path='export')
     def export(self, request, **kwargs):
         try:
-            query = TimesheetEvent.objects.all()
-            serializer = TimesheetEventSerializer(query, many=True)
+            feedbacks = TimesheetEventFeedback.objects.all()
+            serializer = TimesheetEventFeedbackSerializer(feedbacks, many=True)
             if serializer.data:
-                file_url = get_event_feedback_xlsx(serializer.data,query.count(),request)
+                filename = f'{datetime.now()}'.replace(' ', '')
+                rows = []
+                for feedback in serializer.data:
+                    rows.append(
+                        [feedback.get('feedback', None), feedback['consultant'].get('name', None),
+                         feedback['event'].get('title', None), feedback['event'].get('description', None),
+                         feedback['event'].get('feedback_type', None)
+                    ])
+                with open(f'event_feedback_{filename}.csv', 'w') as csvfile:
+                    csvwriter = csv.writer(csvfile)
+                    csvwriter.writerow(['feedback', 'consultants', 'title', 'description', 'feedback_type'])
+                    csvwriter.writerows(rows)
+                file_url = generate_s3_url(f'event_feedback_{filename}.csv')
                 return Response({"data": file_url}, status=200)
             return Response({"message": "No Data to export"}, status=400)
         except Exception as error:

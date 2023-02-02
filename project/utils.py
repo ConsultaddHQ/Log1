@@ -484,34 +484,3 @@ def send_employer_change_notification(project, data, request):
     except Exception as error:
         write_exception(message=error, request=request)
         return error, "error"
-
-
-def get_event_feedback_xlsx(payload, counts, request):
-    try:
-        columns = ['schedule time', 'title', 'description']
-        rows = []
-        for data in payload:
-            rows.append([data.get('start')+data.get('end'), data.get('title', None),data.get('description', None)
-                        ])
-        df1 = pd.DataFrame(rows, columns=columns)
-
-        frames = []
-        for count_type in counts:
-            columns = [None, count_type.capitalize(), 'Count', None]
-            rows = []
-            for data in counts[count_type]:
-                rows.append([None, data['display_name'], data['count'], None])
-            df2 = pd.DataFrame(rows, columns=columns)
-            frames.append(df2)
-        result = pd.concat(frames, axis=1)
-
-        filename = f'{datetime.now()}'.replace(' ', '')
-        writer = pd.ExcelWriter(f'event_feedback_{filename}.xlsx', engine='xlsxwriter')
-        df1.to_excel(writer, sheet_name='Marketing Team', index=None)
-        result.to_excel(writer, sheet_name='Count', index=None)
-
-        writer.save()
-        file_url = generate_s3_url(f'event_feedback_{filename}.xlsx')
-        return file_url
-    except Exception as error:
-        write_exception(error, request)

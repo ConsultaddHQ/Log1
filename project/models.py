@@ -365,9 +365,8 @@ class TimesheetRequest(TimeStampedModel):
 
 class TimesheetEvent(TimeStampedModel):
     FEEDBACK_TYPE = (
-        ('text', 'Text'),
-        ('boolean ', 'Boolean'),
         ('external', 'External'),
+        ('internal ', 'Internal'),
         ('feedback_not_required', 'Not Required')
     )
     end = models.DateField(_('End'), null=True, blank=True)
@@ -375,7 +374,7 @@ class TimesheetEvent(TimeStampedModel):
     is_active = models.BooleanField(_('Is active'), default=True)
     description = models.TextField(_('description'), null=True, blank=True)
     action_link = models.TextField(_('action_link'), null=True, blank=True)
-    event_type = models.CharField(_('event_type'),max_length=30, null=True, blank=True)
+    event_type = models.CharField(_('event_type'), max_length=30, null=True, blank=True)
     title = models.CharField(_('title'), max_length=80, null=True, blank=True)
     feedback_type = models.CharField(_("Status"), max_length=30, choices=FEEDBACK_TYPE)
     image = models.ImageField(_("event Picture"), upload_to='Timesheet_event/', blank=True, null=True)

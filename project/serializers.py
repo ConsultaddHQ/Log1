@@ -9,7 +9,7 @@ from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent, TimesheetEventFeedback
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -401,11 +401,43 @@ class TimesheetEventSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_consultants(obj):
         consultants = obj.consultants.all()
+        data = []
         if consultants:
-            data = [{
-               "id": consultant.id,
-               "name": consultant.name,
-            } for consultant in consultants]
+             for consultant in consultants:
+                 data.append(consultant.name)
+             return data
+        return None
+
+
+class TimesheetEventFeedbackSerializer(serializers.ModelSerializer):
+    event = serializers.SerializerMethodField()
+    consultant = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimesheetEventFeedback
+        fields = ('feedback', 'consultant', 'event')
+
+    @staticmethod
+    def get_consultant(obj):
+        if obj.consultant:
+            data = {
+               "id": obj.consultant.id,
+               "name": obj.consultant.name,
+            }
+            return data
+        return None
+
+    @staticmethod
+    def get_event(obj):
+        event = obj.TimesheetEvent
+        if event:
+            data = {
+                "end": event.end,
+                "start": event.start,
+                "title": event.title,
+                "Description": event.description,
+                "feedback_type": event.feedback_type,
+            }
             return data
         return None
 

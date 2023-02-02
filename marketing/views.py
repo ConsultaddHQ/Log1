@@ -3012,15 +3012,15 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             inter_section = request.GET.get('inter_section', None)
 
             if filters:
+                if "shifts" in filters:
+                    queryset = queryset.filter(shift__in=filters['shifts'])
+                if "teams" in filters:
+                    queryset = queryset.filter(team__id__in=filters['teams'])
                 if "skills" in filters:
                     if inter_section == "true":
                         queryset = queryset.filter(technology__contains=filters["skills"])
                     else:
                         queryset = queryset.filter(technology__overlap=filters['skills'])
-                if "shifts" in filters:
-                    queryset = queryset.filter(shift__in=filters['shifts'])
-                if "teams" in filters:
-                    queryset = queryset.filter(team__id__in=filters['teams'])
             counts = {
                 "shift": [
                     {
@@ -3111,24 +3111,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='export')
-    def export(self, request, **kwargs):
-        try:
-            query = request.GET.get('query', None)
-            filters = json.loads(request.GET.get('filter_json', '{}'))
-            marketers = User.objects.filter(role__name='marketer', is_active=True)
-            if query:
-                marketers = marketers.filter(employee_name__istartswith=query)
-            marketers, counts = self.filter_engineer(marketers, filters, request)
-            serializer = TeamStructureSerializer(marketers, many=True)
-            if serializer.data:
-                file_url = get_team_structure_xlsx(serializer.data, counts, request)
-                return Response({"data": file_url}, status=200)
-            return Response({"message": "No Data to export"}, status=400)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
     @action(methods=['put'], detail=False, url_path='update_shift')
     def shift(self, request, **kwargs):
         try:
@@ -3158,8 +3140,26 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 data = {
                     "count": team.employees.filter(is_active=True).count(),
                     "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
+                    "employee": team.employees.filter(is_active=True).values('id', 'employee_name'),
                     "scrum_master": team.employees.filter(role__name='scrum_master', is_active=True).values(
                         'id', 'employee_name')
+                }
+                team_data.append(data)
+
+            return Response({"data": team_data, "total": len(teams)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='compare_teams')
+    def teams(self, request, **kwargs):
+        try:
+            team_data = []
+            teams = Team.objects.filter(dept='Marketing', id__in=request.get("team_ids",[])).order_by('-id')
+            for team in teams:
+                data = {
+                    "team_name": team.name,
+                    "employee": team.employees.filter(is_active=True).values('id', 'employee_name'),
                 }
                 team_data.append(data)
 

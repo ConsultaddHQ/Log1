@@ -15,7 +15,7 @@ from constance import config
 
 from employee.models import User
 from project.utils import check_days
-from log1.utils import write_exception
+from log1.utils import write_exception, ERROR_MSG
 from attachment.models import Attachment
 from consultant.models import Consultant
 from utils_app.mailing import send_email
@@ -23,7 +23,8 @@ from utils_app.aws_utils import get_s3_object
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
-from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest
+from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, \
+    TimesheetEvent, TimesheetEventFeedback
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
     ConsultantLeaveSerializer, LeaveSerializer
 
@@ -409,6 +410,26 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @action(methods=['put'], detail=False, url_path='feedback')
+    def feedback(self, request, **kwargs):
+        try:
+            event = get_object_or_404(
+                TimesheetEvent, id=request.data.get("event_id")
+            )
+            consultant = get_object_or_404(
+                Consultant, id=request.data.get("consultant_id"),
+            )
+
+            TimesheetEventFeedback.objects.create(
+                feedback=request.data.get("feedback", None),
+                consultant=consultant,
+                TimesheetEvent=event
+            ).save()
+            return Response({"data": "event feedback submitted"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
 
 # Route - /consultant_leave/
 class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
@@ -500,3 +521,4 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
+
