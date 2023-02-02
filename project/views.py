@@ -1846,7 +1846,7 @@ class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, 
     def destroy(self, request, *args, **kwargs):
         try:
             event = get_object_or_404(TimesheetEvent, id=kwargs.get('pk', None))
-            if event.created_by == request.user or 'superadmin' | 'admin' in request.user.roles:
+            if event.created_by == request.user or 'admin' in request.user.roles:
                 event.is_active = False
                 event.save()
                 return Response({"message": "delete the event successfully"}, status=202)
@@ -1861,7 +1861,7 @@ class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, 
             event = get_object_or_404(
                 TimesheetEvent, id=kwargs.get('pk', None),
             )
-            if event.created_by == request.user or 'superadmin' | 'admin' in request.user.roles:
+            if event.created_by == request.user or 'admin' in request.user.roles:
                 event.start = request.data.get('start')
                 if request.data.get('start') and request.data.get('end'):
                     event.start = request.data.get('start')
