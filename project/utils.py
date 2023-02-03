@@ -1,22 +1,21 @@
-import json
 import os
+import json
+from pytz import timezone
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
-import pandas as pd
+from utils_app.models import Choice
 from consultant.models import Consultant
 from activity.views import create_activity
-from utils_app.models import Choice
 from utils_app.thred_mail import send_email
-from project.models import Project, TimeSheet, ConsultantLeave
 from utils_app.mailing import send_email as mail
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from engineering.models import TrainingCheckList, ProjectDescription
-from utils_app.utils import generate_s3_url
+from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent
 
 
 def set_consultant_password(consultant):
@@ -486,32 +485,14 @@ def send_employer_change_notification(project, data, request):
         return error, "error"
 
 
-def get_event_feedback_xlsx(payload, counts, request):
+def mark_in_active():
     try:
-        columns = ['schedule time', 'title', 'description']
-        rows = []
-        for data in payload:
-            rows.append([data.get('start')+data.get('end'), data.get('title', None),data.get('description', None)
-                        ])
-        df1 = pd.DataFrame(rows, columns=columns)
-
-        frames = []
-        for count_type in counts:
-            columns = [None, count_type.capitalize(), 'Count', None]
-            rows = []
-            for data in counts[count_type]:
-                rows.append([None, data['display_name'], data['count'], None])
-            df2 = pd.DataFrame(rows, columns=columns)
-            frames.append(df2)
-        result = pd.concat(frames, axis=1)
-
-        filename = f'{datetime.now()}'.replace(' ', '')
-        writer = pd.ExcelWriter(f'event_feedback_{filename}.xlsx', engine='xlsxwriter')
-        df1.to_excel(writer, sheet_name='Marketing Team', index=None)
-        result.to_excel(writer, sheet_name='Count', index=None)
-
-        writer.save()
-        file_url = generate_s3_url(f'event_feedback_{filename}.xlsx')
-        return file_url
+        tz = timezone('EST')
+        time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
+        events = TimetrackEvent.objects.filter(is_active=True, end__lte=time_est)
+        for event in events:
+            event.is_active = False
+            event.save()
     except Exception as error:
-        write_exception(error, request)
+        write_exception(message=error)
+        return None

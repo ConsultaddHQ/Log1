@@ -1203,7 +1203,6 @@ class InterviewViewSets(ModelViewSet):
         sort_by = request.GET.get('sort_by', None)
         filter_for = request.GET.get('filter_for', 'all')
         filter_json = request.GET.get('filter_json', None)
-        filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
             # Change status of past Interview to feedback due
@@ -3032,7 +3031,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 ],
                 "team": [
                     {
-                        "id":team.id,
+                        "id": team.id,
                         "display_name": team.name,
                         "count": queryset.filter(team=team).exclude(team=None).count()
                     }
@@ -3052,7 +3051,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
     def list(self, request, **kwargs):
-
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
@@ -3072,7 +3070,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             team = get_object_or_404(Team, id=kwargs.get('pk'))
             data = {
                 "count": team.employees.filter(is_active=True).count(),
-                "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
+                "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing
             }
             return Response({"data": data}, status=200)
         except Exception as error:
@@ -3081,7 +3079,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
 
     def create(self, request, *args, **kwargs):
         try:
-            if 'superadmin' not in request.user.roles and 'scrum_master' not in request.user.roles:
+            if 'superadmin' not in request.user.roles and 'admin' not in request.user.roles:
                 return Response({"message": "You don't have access"}, status=400)
 
             data = request.data
@@ -3111,23 +3109,23 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='export')
-    def export(self, request, **kwargs):
-        try:
-            query = request.GET.get('query', None)
-            filters = json.loads(request.GET.get('filter_json', '{}'))
-            marketers = User.objects.filter(role__name='marketer', is_active=True)
-            if query:
-                marketers = marketers.filter(employee_name__istartswith=query)
-            marketers, counts = self.filter_engineer(marketers, filters, request)
-            serializer = TeamStructureSerializer(marketers, many=True)
-            if serializer.data:
-                file_url = get_team_structure_xlsx(serializer.data, counts, request)
-                return Response({"data": file_url}, status=200)
-            return Response({"message": "No Data to export"}, status=400)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+    # @action(methods=['get'], detail=False, url_path='export')
+    # def export(self, request, **kwargs):
+    #     try:
+    #         query = request.GET.get('query', None)
+    #         filters = json.loads(request.GET.get('filter_json', '{}'))
+    #         marketers = User.objects.filter(role__name='marketer', is_active=True)
+    #         if query:
+    #             marketers = marketers.filter(employee_name__istartswith=query)
+    #         marketers, counts = self.filter_marketers(marketers, filters, request)
+    #         serializer = TeamStructureSerializer(marketers, many=True)
+    #         if serializer.data:
+    #             file_url = get_team_structure_xlsx(serializer.data, counts, request)
+    #             return Response({"data": file_url}, status=200)
+    #         return Response({"message": "No Data to export"}, status=400)
+    #     except Exception as error:
+    #         write_exception(error, request)
+    #         return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
     @action(methods=['put'], detail=False, url_path='update_shift')
     def shift(self, request, **kwargs):
@@ -3158,8 +3156,28 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 data = {
                     "count": team.employees.filter(is_active=True).count(),
                     "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
-                    "scrum_master": team.employees.filter(role__name='scrum_master', is_active=True).values(
+                    "scrum_master": team.employees.filter(role__name='admin', is_active=True).values(
                         'id', 'employee_name')
+                }
+                team_data.append(data)
+
+            return Response({"data": team_data, "total": len(teams)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='compare_teams')
+    def compare_team(self, request):
+        try:
+            team_data = []
+            team_ids = request.GET.get("team_ids", '')
+            if team_ids:
+                team_ids = team_ids.split(',')
+            teams = Team.objects.filter(dept='Marketing', id__in=team_ids).order_by('-id')
+            for team in teams:
+                data = {
+                    "id": team.id, "team_name": team.name,
+                    "employee": team.employees.filter(is_active=True).values('id', 'employee_name'),
                 }
                 team_data.append(data)
 
@@ -3179,7 +3197,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             scrum_masters, employee_added = [], []
             for emp_id in employee_ids:
                 employee = get_object_or_404(User, id=emp_id)
-                if employee.role.filter(name='scrum_master'):
+                if employee.role.filter(name='admin'):
                     scrum_masters.append(employee.employee_name)
                     continue
                 employee_added.append(employee.employee_name)
@@ -3199,11 +3217,13 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     @action(methods=['put'], detail=True, url_path='update_scrum')
     def update_scrum(self, request, **kwargs):
         try:
+            if 'superadmin' not in request.user.roles():
+                return Response({"message": "You do not have access to perform this action"}, status=200)
             team_id = kwargs.get('pk')
             employee_id = request.data.get('employee_id', None)
             if not employee_id:
                 return Response({"message": "No employee selected"}, status=200)
-            scrum_role = Role.objects.get(name='scrum_master')
+            scrum_role = Role.objects.get(name='admin')
             employee = get_object_or_404(User, id=employee_id, team_id=kwargs.get('pk'))
             prev_scrum = User.objects.filter(team_id=team_id, role=scrum_role)
             if prev_scrum:
@@ -3214,8 +3234,9 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             desc = f"{request.user.employee_name} made {employee.employee_name} as scrum master for {employee.team.name}"
             create_activity(kwargs.get('pk'), 'team', request.user, desc, 'updated')
 
-            return Response({"message": f"{employee.employee_name} appointed as scrum master for {employee.team.name}"},
-                            status=202)
+            return Response(
+                {"message": f"{employee.employee_name} appointed as scrum master for {employee.team.name}"}, status=202
+            )
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
