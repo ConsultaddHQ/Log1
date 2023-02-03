@@ -401,40 +401,6 @@ def get_authenticated_users(request, get_id=False):
         write_exception(error, request)
 
 
-def get_team_structure_xlsx(payload, counts, request):
-    try:
-        columns = ['marketer Name', 'SkillSet', 'Shift', 'assign Consultant', 'Team Name']
-        rows = []
-        for data in payload:
-            rows.append([data.get('employee_name'),
-                         ", ".join([i for i in data.get('technology', [])]) if data.get('technology', []) else [],
-                         get_shift(data.get('shift'), request),
-                         ", ".join([i['consultant_name'] for i in data['assign Consultant']['consultant']])
-                         if data.get('current_offer') else None, data['team']])
-        df1 = pd.DataFrame(rows, columns=columns)
-
-        frames = []
-        for count_type in counts:
-            columns = [None, count_type.capitalize(), 'Count', None]
-            rows = []
-            for data in counts[count_type]:
-                rows.append([None, data['display_name'], data['count'], None])
-            df2 = pd.DataFrame(rows, columns=columns)
-            frames.append(df2)
-        result = pd.concat(frames, axis=1)
-
-        filename = f'{datetime.now()}'.replace(' ', '')
-        writer = pd.ExcelWriter(f'marketing_team_{filename}.xlsx', engine='xlsxwriter')
-        df1.to_excel(writer, sheet_name='Marketing Team', index=None)
-        result.to_excel(writer, sheet_name='Count', index=None)
-
-        writer.save()
-        file_url = generate_s3_url(f'marketing_team_{filename}.xlsx')
-        return file_url
-    except Exception as error:
-        write_exception(error, request)
-
-
 def get_interview_report(payload, request):
     try:
         response = HttpResponse(content_type='text/csv')

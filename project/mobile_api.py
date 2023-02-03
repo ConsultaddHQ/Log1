@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, F, Max, Subquery, OuterRef
+from django.db.models import Q, Max
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -14,18 +14,19 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateMode
 from constance import config
 
 from employee.models import User
-from project.utils import check_days
-from log1.utils import write_exception
 from attachment.models import Attachment
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
+from log1.utils import write_exception, ERROR_MSG
+from project.utils import check_days, mark_in_active
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
-from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest
+from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, \
+    TimetrackEvent, TimetrackEventFeedback
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, LeaveSerializer
+    ConsultantLeaveSerializer, LeaveSerializer, TimetrackEventSerializer
 
 
 # Route - /payroll/
@@ -500,3 +501,34 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
+
+
+class TimetrackEventMobileViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
+    queryset = TimetrackEvent.objects.all()
+    serializer_class = TimetrackEventSerializer
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            mark_in_active()
+            queryset = TimetrackEvent.objects.filter(is_active=True)
+            serializer = TimetrackEventSerializer(queryset, many=True)
+            return Response({'result': serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='feedback')
+    def feedback(self, request, **kwargs):
+        try:
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get("pk"))
+            TimetrackEventFeedback.objects.create(
+                feedback=request.data.get("feedback", None),
+                consultant=request.user,
+                event=event
+            )
+            return Response({"message": "Event Feedback Submitted"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
