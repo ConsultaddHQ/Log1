@@ -9,7 +9,7 @@ from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -482,3 +482,17 @@ class TimesheetRequestSerializer(serializers.ModelSerializer):
             'client': obj.project.submission.client,
             'vendor': obj.project.submission.lead.vendor_company.name,
         }
+
+
+class TimetrackEventSerializer(serializers.ModelSerializer):
+    consultants = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimetrackEvent
+        fields = ('id', 'start', 'end', 'title', 'description', 'action_link', 'event_type', 'image',
+                  'feedback_type', 'consultants', 'is_active')
+
+    @staticmethod
+    def get_consultants(obj):
+        consultants = obj.consultants.all().values('id', 'name')
+        return consultants
