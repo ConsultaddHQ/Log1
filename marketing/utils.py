@@ -1,5 +1,6 @@
 import csv
 import json
+import pandas as pd
 from pytz import timezone
 from django.http import HttpResponse
 from datetime import datetime, timedelta
@@ -10,9 +11,11 @@ from constance import config
 from employee.models import User
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
+from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from marketing.models import Submission, Interview, Question, Answer
+from utils_app.utils import generate_s3_url
 
 
 def vendor_account_manager(vendor_company):

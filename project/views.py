@@ -1,3 +1,4 @@
+import csv
 import json
 from datetime import datetime, date
 
@@ -6,18 +7,16 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
-from consultant.serializers import FeedbackSerializer
 from consultant.utils import create_and_send_notification
 
+from rest_framework.mixins import *
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from constance import config
-from marketing.utils import date_filter, get_authenticated_users
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -28,19 +27,20 @@ from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant
 from notification.models import Notification, FCMDevice
 from utils_app.utils import delete_temp_file, export_to_csv
+from marketing.utils import date_filter, get_authenticated_users
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
-from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
-from notification.utils import push_notification_consultant, push_notification, create_notification
-from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest
-from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
-from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
-    ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, TimesheetRequestSerializer
+from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
-from datetime import datetime
+from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
+from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification,\
+    mark_in_active
+from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
+    ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
+    TimesheetRequestSerializer, TimetrackEventSerializer
 
 
 # Route - /project/
@@ -1763,6 +1763,125 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             push_notification_consultant(registration_ids, message_body)
 
             return Response({"message": "Leave balance updated"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset = TimetrackEvent.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_classes = TimetrackEventSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        try:
+            mark_in_active()
+            filter_for = request.GET.get('filter_for', 'all')
+            if filter_for == 'my':
+                queryset = TimetrackEvent.objects.filter(created_by=request.user)
+            else:
+                queryset = TimetrackEvent.objects.all()
+            serializer = TimetrackEventSerializer(queryset, many=True)
+            return Response({'result': serializer.data[first: last]}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            event_info = get_object_or_404(TimetrackEvent, id=kwargs.get("pk"))
+            serializer = TimetrackEventSerializer(event_info)
+            return Response({'data': serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            end_datatime = request.data.get('end')
+            start_datetime = request.data.get('start', None)
+            consultants_ids = json.loads(request.data.get('consultants', []))
+
+            if not start_datetime or not consultants_ids:
+                Response({"message": "Start Time or Consultant Ids not provided"}, status=201)
+
+            event = TimetrackEvent.objects.create(
+                start=start_datetime,
+                end=end_datatime,
+                created_by=request.user,
+                title=request.data.get('title', None),
+                image=request.FILES.get('image', None),
+                feedback_type=request.data.get('feedback_type'),
+                event_type=request.data.get('event_type', None),
+                description=request.data.get('description', None),
+                action_link=request.data.get('action_link', None),
+            )
+            for consultant_id in consultants_ids:
+                consultant = get_object_or_404(Consultant, id=consultant_id)
+                event.consultants.add(consultant)
+
+            event.save()
+            return Response({"message": "Event Created Successfully"}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
+            consultants_ids = json.loads(request.data.get('consultants', []))
+
+            if event.created_by == request.user or ('superadmin' | 'admin') in request.user.roles:
+                event.start = request.data.get('start')
+                if request.data.get('start') and request.data.get('end'):
+                    event.start = request.data.get('start')
+                    event.end = request.data.get('end')
+                if request.data.get('description'):
+                    event.description = request.data.get('description')
+                if request.data.get('title'):
+                    event.title = request.data.get('title')
+                if request.data.get('action_link'):
+                    event.action_link = request.data.get('action_link')
+                if request.data.get('feedback_type'):
+                    event.feedback_type = request.data.get('feedback_type')
+                if consultants_ids:
+                    event.consultants.clear()
+                    for id in consultants_ids:
+                        consultant = get_object_or_404(Consultant, id=id)
+                        event.consultants.add(consultant)
+                if request.FILES.get('image', None):
+                    event.image = request.FILES['image']
+                event.save()
+            else:
+                return Response({"message": "You don't have permission to update the event"}, status=403)
+
+            serializer = TimetrackEventSerializer(event)
+            return Response({"result": serializer.data}, status=201)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
+            if event.created_by == request.user:
+                event.delete()
+                return Response({"message": "Event Removed Successfully"}, status=202)
+            return Response({"message": "You don't have permission to delete the event"}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+    @action(methods=["get"], detail=True, url_name="feedback")
+    def get_feedback(self, request, *args, **kwargs):
+        try:
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk'))
+            consultant_feedback = event.feedback.all().values('id', 'feedback').annotate(
+                consultant_name=F('consultant__name')
+            )
+            return Response({"data": consultant_feedback, "total": consultant_feedback.count()}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

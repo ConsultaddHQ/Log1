@@ -5,8 +5,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 
-from employee.models import User, Team
 from activity.models import Comment
+from employee.models import User, Team
 from attachment.models import Attachment
 from consultant.models import ConsultantMarketing
 from utils_app.models import TimeStampedModel, Choice
