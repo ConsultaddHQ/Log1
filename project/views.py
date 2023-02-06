@@ -1784,7 +1784,7 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
             else:
                 queryset = TimetrackEvent.objects.all()
             serializer = TimetrackEventSerializer(queryset, many=True)
-            return Response({'result': serializer.data[first: last]}, status=200)
+            return Response({'result': serializer.data[first: last], "total": len(serializer.data)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
@@ -1833,7 +1833,7 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
             event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
             consultants_ids = json.loads(request.data.get('consultants', []))
 
-            if event.created_by == request.user or ('superadmin' | 'admin') in request.user.roles:
+            if event.created_by == request.user:
                 event.start = request.data.get('start')
                 if request.data.get('start') and request.data.get('end'):
                     event.start = request.data.get('start')
