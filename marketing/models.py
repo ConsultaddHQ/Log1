@@ -5,8 +5,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.fields import GenericRelation, GenericForeignKey
 
-from employee.models import User, Team
 from activity.models import Comment
+from employee.models import User, Team
 from attachment.models import Attachment
 from consultant.models import ConsultantMarketing
 from utils_app.models import TimeStampedModel, Choice
@@ -82,8 +82,8 @@ class Lead(TimeStampedModel):
         ('archived', 'Archived'),
     )
     POSITION_CHOICES = (
-        ('w2', 'W2'),
         ('c2c', 'C2C'),
+        ('w2', 'W2(Contract)'),
         ('full_time', 'Full Time'),
     )
     is_w2 = models.BooleanField(default=False)
@@ -141,8 +141,8 @@ class Submission(TimeStampedModel):
         ('interview', 'Interview'),
     )
     WORK_CHOICES = (
-        ('w2', 'W2'),
         ('c2c', 'C2C'),
+        ('w2', 'W2(Contract)'),
         ('full_time', 'Full Time'),
     )
     attachments = GenericRelation(Attachment)

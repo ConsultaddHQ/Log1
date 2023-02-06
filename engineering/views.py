@@ -1354,7 +1354,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 
 
 # Route - /team_structure/
-class TeamStructureViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin):
+class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = Team.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_class = TeamStructureSerializer

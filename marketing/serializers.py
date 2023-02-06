@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from marketing.models import *
 from consultant.models import Consultant
+from django.db.models import Q
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
@@ -709,3 +710,55 @@ class ParentQuestionSerializer(serializers.ModelSerializer):
         if obj.child_question.first() and obj.answer_type in ['yes_question', 'no_question']:
             return QuestionSerializer(obj.child_question.first().child_question.all(), many=True).data
         return None
+
+
+class TeamStructureSerializer(serializers.ModelSerializer):
+    team = serializers.SerializerMethodField()
+    is_scrum = serializers.SerializerMethodField()
+    current_offers = serializers.SerializerMethodField()
+    assign_consultant = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_offers', 'assign_consultant',
+                  'team', 'is_scrum')
+
+    @staticmethod
+    def get_team(obj):
+        if obj.team:
+            return {
+                "id": obj.team.id, "name": obj.team.name
+            }
+        return None
+
+    @staticmethod
+    def get_is_scrum(obj):
+        if obj.role.filter(name='admin'):
+            return True
+        return False
+
+    @staticmethod
+    def get_current_offers(obj):
+        offers = obj.submissions.filter(status__in=['project'])
+        if offers:
+            data = {
+                "count": len(offers),
+                "project": [{
+                    "id": offer.id, "client": offer.client
+                } for offer in offers]
+            }
+            return data
+        return []
+
+    @staticmethod
+    def get_assign_consultant(obj):
+        consultants = obj.marketed.filter(status='open')
+        if consultants:
+            data = {
+                "count": len(consultants),
+                "consultant": [{
+                    "id": consultant.consultant.id, "consultant_name": consultant.consultant.name
+                } for consultant in consultants]
+            }
+            return data
+        return []
