@@ -374,7 +374,8 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             sub = get_object_or_404(Submission, id=kwargs.get('pk'))
             users = get_authenticated_users(request)
 
-            if (sub.created_by in users) or request.user.employee_id == 5693:
+            if (sub.created_by in users) or (
+                    request.user.employee_id == 5693 and sub.consultant.email == 'rajeev.r@consuladd.com'):
                 permission['update'] = True
                 serializer = SubmissionV2DetailSerializer(sub)
                 return Response({"data": serializer.data, "permission": permission}, status=200)
