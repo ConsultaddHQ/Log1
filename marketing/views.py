@@ -636,7 +636,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                         queryset = queryset.filter(
                             Q(created_by=request.user) |
                             Q(consultant_marketing__consultant__in=consultant_ids) |
-                            Q(consultant_marketing__status='open', consultant_marketing__consultant__pocs__poc=request.user)
+                            Q(consultant_marketing__status='open',
+                              consultant_marketing__consultant__pocs__poc=request.user)
                         )
                     else:
                         queryset = queryset.filter(
@@ -1279,7 +1280,7 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='coding').order_by('question__position')
         coder_names = obj.guest.all()
         coders = ''
-        n= 0
+        n = 0
         for name in coder_names:
             if n == 0:
                 coders = name.employee_name
@@ -1594,7 +1595,7 @@ class InterviewViewSets(ModelViewSet):
                     if interview.calendar_id:
                         calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
-                            calendar_mail_id="suman.m@consultadd.com"
+                            calendar_mail_id = "suman.m@consultadd.com"
                         calendar = GoogleCalendar()
                         calendar.delete_calendar_booking(interview.calendar_id, calendar_mail_id, request)
                 except Exception as error:
@@ -1777,7 +1778,7 @@ class InterviewViewSets(ModelViewSet):
                     try:
                         calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
-                            calendar_mail_id="suman.m@consultadd.com"
+                            calendar_mail_id = "suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         booking_res = 'updated'
                         if msg == 'booked':
@@ -1853,7 +1854,7 @@ class InterviewViewSets(ModelViewSet):
                 if interview.calendar_id:
                     calendar_mail_id = interview.submission.created_by.email
                     if interview.if_previous_calendar:
-                        calendar_mail_id="suman.m@consultadd.com"
+                        calendar_mail_id = "suman.m@consultadd.com"
                     calendar = GoogleCalendar()
                     calendar.delete_calendar_booking(interview.calendar_id, calendar_mail_id, request)
             except Exception as error:
@@ -2127,7 +2128,7 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'updated'
                         calendar_mail_id = interview.submission.created_by.email
                         if interview.if_previous_calendar:
-                            calendar_mail_id="suman.m@consultadd.com"
+                            calendar_mail_id = "suman.m@consultadd.com"
                         res, msg = calendar.update_calendar(calendar_id, event, calendar_mail_id, request)
                         if msg == 'booked':
                             booking_res = 'booked'
@@ -2201,8 +2202,10 @@ class InterviewViewSets(ModelViewSet):
             else:
                 prev_feedback = []
                 interview = get_object_or_404(Interview, id=pk)
-                answers = Answer.objects.filter(object_id=interview.id, content_type__model='interview',
-                                                question__form_name=request.GET.get("form_name", "interview")).values('id')
+                answers = Answer.objects.filter(
+                    object_id=interview.id, content_type__model='interview',
+                    question__form_name=request.GET.get("form_name", "interview")
+                ).values('id')
                 for ans in answers:
                     prev_feedback.append(ans['id'])
                 ques_answers = create_answer(request, interview, 'interview')
@@ -2395,11 +2398,11 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 # Need to filter on based one type and objectId
                 mail_id = None
                 from_mail = test.submitted_by.email
-                email_object = MapMail.objects.filter(content_type__model="test",object_id=test.id).first()
+                email_object = MapMail.objects.filter(content_type__model="test", object_id=test.id).first()
                 if email_object:
                     mail_id = email_object.mail_id
                     from_mail = email_object.from_mail_id
-                res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail,request, mail_id)
+                res, msg, mail_id = send_email_attachment_multiple(mail_data, from_mail, request, mail_id)
                 delete_temp_file(path)
                 if not msg:
                     return res, "error"
@@ -2534,7 +2537,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                     engineer_associated = [obj.employee_name for obj in obj.engineer.all()]
                     writer.writerow([
                         obj.id, obj.submission.consultant.name, obj.submission.created_by.employee_name,
-                        obj.submission.client, obj.submission.lead.job_title,  obj.submission.lead.vendor_company.name,
+                        obj.submission.client, obj.submission.lead.job_title, obj.submission.lead.vendor_company.name,
                         obj.link, obj.created.date(), obj.deadline, obj.skills,
                         obj.submitted_by.employee_name if obj.submitted_by else None, obj.get_status_display(),
                         obj.feedback, engineer_associated
@@ -3018,7 +3021,7 @@ class QuestionViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /team_structure/
+# Route - /marketing_team/
 class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = Team.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -3026,8 +3029,35 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
-    def filter_marketers(queryset, filters, request):
+    def get_assign_consultant(obj):
+        consultants = obj.marketed.filter(status='open')
+        if consultants:
+            data = {
+                "count": len(consultants),
+                "consultant": [{
+                    "id": consultant.consultant.id, "consultant_name": consultant.consultant.name
+                } for consultant in consultants]
+            }
+            return data
+        return []
+
+    @staticmethod
+    def get_current_offers(obj):
+        offers = obj.submissions.filter(status__in=['project'])
+        if offers:
+            data = {
+                "count": len(offers),
+                "project": [{
+                    "id": offer.id, "client": offer.client
+                } for offer in offers]
+            }
+            return data
+        return []
+
+    def filter_marketers(self, queryset, filters, request):
         try:
+            marketer_data = []
+            scrum_master, scrum_id = None, ""
             shifts = User.SHIFT_CHOICE
             eng_teams = Team.objects.filter(dept='Marketing')
             inter_section = request.GET.get('inter_section', None)
@@ -3042,6 +3072,24 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                     queryset = queryset.filter(shift__in=filters['shifts'])
                 if "teams" in filters:
                     queryset = queryset.filter(team__id__in=filters['teams'])
+            scrum_master = queryset.filter(role__name__iexact='admin').first()
+            if scrum_master:
+                scrum_id = scrum_master.id
+            for obj in queryset:
+                assign_consultant = self.get_assign_consultant(obj)
+                current_offers = self.get_current_offers(obj)
+                data = {
+                    "id": obj.id, "employee_id": obj.employee_id, "employee_name": obj.employee_name,
+                    "assign_consultant": assign_consultant, "team": obj.team.name, "is_scrum": False,
+                    "shift": obj.get_shift_display(), "technology": obj.technology, "current_offers": current_offers
+                }
+                if obj.id == scrum_id:
+                    data["is_scrum"] = True
+                    scrum_master = data
+                    continue
+                marketer_data.append(data)
+            if scrum_master:
+                marketer_data.insert(0, scrum_master)
             counts = {
                 "shift": [
                     {
@@ -3067,7 +3115,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                     for technology in TECHNOLOGIES
                 ]
             }
-            return queryset, counts
+            return marketer_data, counts
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -3080,9 +3128,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             marketers = User.objects.filter(team__dept='Marketing', is_active=True)
             if query:
                 marketers = marketers.filter(employee_name__istartswith=query)
-            marketers, counts = self.filter_marketers(marketers, filters, request)
-            serializer = TeamStructureSerializer(marketers[first: last], many=True)
-            return Response({"data": serializer.data, "count": counts, "total": len(marketers)}, status=200)
+            marketers_data, counts = self.filter_marketers(marketers, filters, request)
+            return Response({"data": marketers_data[first: last], "count": counts, "total": len(marketers_data)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -3239,7 +3286,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     @action(methods=['put'], detail=True, url_path='update_scrum')
     def update_scrum(self, request, **kwargs):
         try:
-            if 'superadmin' not in request.user.roles():
+            if 'superadmin' not in request.user.roles:
                 return Response({"message": "You do not have access to perform this action"}, status=200)
             team_id = kwargs.get('pk')
             employee_id = request.data.get('employee_id', None)
