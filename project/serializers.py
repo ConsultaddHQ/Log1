@@ -495,4 +495,8 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_consultants(obj):
         consultants = obj.consultants.all().values('id', 'name')
-        return consultants
+        data = {
+            "consultants": consultants,
+            "all": True if len(consultants) > 50 else False
+        }
+        return data
