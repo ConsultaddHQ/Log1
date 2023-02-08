@@ -1768,6 +1768,7 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+# Route - /timesheet_event/
 class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
     queryset = TimetrackEvent.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -1802,7 +1803,14 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
         try:
             end_datatime = request.data.get('end')
             start_datetime = request.data.get('start', None)
-            consultants_ids = json.loads(request.data.get('consultants', []))
+
+            if request.data.get('all', True):
+                distinct_by = 'submission__consultant_marketing__consultant_id'
+                consultants_ids = Project.objects.filter(
+                    statuses__status='joined', statuses__is_current=True
+                ).values_list(distinct_by, flat=True).order_by(distinct_by).distinct(distinct_by)
+            else:
+                consultants_ids = json.loads(request.data.get('consultants', []))
 
             if not start_datetime or not consultants_ids:
                 Response({"message": "Start Time or Consultant Ids not provided"}, status=201)

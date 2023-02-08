@@ -3247,7 +3247,9 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             for team in teams:
                 data = {
                     "id": team.id, "team_name": team.name,
-                    "employee": team.employees.filter(is_active=True).values('id', 'employee_name'),
+                    "employee": team.employees.filter(is_active=True).exclude(role__name='admin').values('id', 'employee_name'),
+                    "scrum": team.employees.filter(
+                        is_active=True, role__name='admin').values('id', 'employee_name')
                 }
                 team_data.append(data)
 
