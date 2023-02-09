@@ -1839,7 +1839,7 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
     def update(self, request, *args, **kwargs):
         try:
             event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
-            consultants_ids = json.loads(request.data.get('consultants', []))
+            consultants_ids = json.loads(request.data.get('consultants', '[]'))
 
             if event.created_by == request.user:
                 event.start = request.data.get('start')
