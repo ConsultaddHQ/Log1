@@ -493,7 +493,7 @@ def mark_in_active():
     try:
         tz = timezone('EST')
         time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
-        events = TimetrackEvent.objects.filter(is_active=True, end__lte=time_est)
+        events = TimetrackEvent.objects.filter(is_active=True, end__lt=time_est)
         for event in events:
             event.is_active = False
             event.save()

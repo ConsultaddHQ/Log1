@@ -1804,13 +1804,13 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
             end_datatime = request.data.get('end')
             start_datetime = request.data.get('start', None)
 
-            if request.data.get('all', True):
+            if request.data.get('all', False):
                 distinct_by = 'submission__consultant_marketing__consultant_id'
                 consultants_ids = Project.objects.filter(
                     statuses__status='joined', statuses__is_current=True
                 ).values_list(distinct_by, flat=True).order_by(distinct_by).distinct(distinct_by)
             else:
-                consultants_ids = json.loads(request.data.get('consultants', []))
+                consultants_ids = json.loads(request.data.get('consultants', '[]'))
 
             if not start_datetime or not consultants_ids:
                 Response({"message": "Start Time or Consultant Ids not provided"}, status=201)
@@ -1839,7 +1839,7 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
     def update(self, request, *args, **kwargs):
         try:
             event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
-            consultants_ids = json.loads(request.data.get('consultants', []))
+            consultants_ids = json.loads(request.data.get('consultants', '[]'))
 
             if event.created_by == request.user:
                 event.start = request.data.get('start')
@@ -1882,14 +1882,22 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
-    @action(methods=["get"], detail=True, url_name="feedback")
-    def get_feedback(self, request, *args, **kwargs):
+    @action(methods=["get"], detail=True, url_name="event_feedback")
+    def event_feedback(self, request, *args, **kwargs):
         try:
             event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk'))
             consultant_feedback = event.feedback.all().values('id', 'feedback').annotate(
                 consultant_name=F('consultant__name')
             )
-            return Response({"data": consultant_feedback, "total": consultant_feedback.count()}, status=200)
+            columns = [
+                {"name": "id", "display_name": "Feedback Id"},
+                {"name": "consultant_name", "display_name": "Consultant Name"},
+                {"name": "feedback", "display_name": "Feedback"},
+            ]
+            file_url = export_to_csv(
+                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv"
+            )
+            return Response({"data": file_url}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
