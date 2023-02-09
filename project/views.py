@@ -1882,8 +1882,8 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
-    @action(methods=["get"], detail=True, url_name="feedback")
-    def feedback(self, request, *args, **kwargs):
+    @action(methods=["get"], detail=True, url_name="event_feedback")
+    def event_feedback(self, request, *args, **kwargs):
         try:
             event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk'))
             consultant_feedback = event.feedback.all().values('id', 'feedback').annotate(
