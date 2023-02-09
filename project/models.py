@@ -390,7 +390,7 @@ class TimetrackEventFeedback(models.Model):
         verbose_name='consultant'
     )
     event = models.ForeignKey(
-        TimetrackEvent, on_delete=models.PROTECT,
+        TimetrackEvent, on_delete=models.CASCADE,
         related_name='feedback',
         verbose_name='event'
     )

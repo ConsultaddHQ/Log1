@@ -512,9 +512,20 @@ class TimetrackEventMobileViewSet(GenericViewSet, ListModelMixin, RetrieveModelM
     def list(self, request, *args, **kwargs):
         try:
             mark_in_active()
-            queryset = TimetrackEvent.objects.filter(is_active=True)
-            serializer = TimetrackEventSerializer(queryset, many=True)
-            return Response({'result': serializer.data}, status=200)
+            event_data = []
+            events = TimetrackEvent.objects.filter(
+                consultants=request.user, is_active=True, start__lte=date.today(), end__gte=date.today()
+            )
+            for event in events:
+                if not TimetrackEventFeedback.objects.filter(consultant=request.user, event=event).first():
+                    data = {
+                        "action_link": event.action_link, "event_type": event.get_feedback_type_display(),
+                        "id": event.id, "start": event.start, "is_active": event.is_active, "end": event.end,
+                        "consultant_id": request.user.id, "title": event.title, "description": event.description,
+                        "image": f'https://{os.environ.get("AWS_STORAGE_BUCKET_NAME")}.s3.ap-south-1.amazonaws.com/media/{event.image.name}'
+                    }
+                    event_data.append(data)
+            return Response({'result': event_data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
