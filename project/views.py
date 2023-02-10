@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -24,7 +24,7 @@ from marketing.models import Submission, User
 from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
-from consultant.models import ConsultantPOC, Consultant
+from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from notification.models import Notification, FCMDevice
 from utils_app.utils import delete_temp_file, export_to_csv
 from marketing.utils import date_filter, get_authenticated_users
@@ -1898,6 +1898,64 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                 consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv"
             )
             return Response({"data": file_url}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset = ConsultantRateRevision.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        try:
+            data = []
+            counter = 1
+            consultants = Consultant.objects.filter(status__in=['on_project'])
+            for consultant in consultants:
+                last_revision = ConsultantRateRevision.objects.filter(consultant_id=consultant.id, end=None).first()
+                if last_revision:
+                    consultant_rate = last_revision.rate
+                    revision_date = last_revision.start
+                else:
+                    consultant_rate = consultant.rate
+                    revision_date = date(2010, 1, 1)
+                projects = Project.objects.filter(
+                    submission__consultant_marketing__consultant_id=consultant.id,
+                    is_remote=False, statuses__status='joined', statuses__is_current=True
+                )
+                length = 0
+                for project in projects:
+                    length = len(projects)
+                    project_rate = project.rate
+                    if revision_date < project.start_date:
+                        revision_date = project.start_date
+                    margin = project_rate - consultant_rate
+                    margin_percentage = round((margin / project_rate) * 100, 2)
+                assigned_marketer = ConsultantPOC.objects.filter(poc_type='marketer', consultant=consultant, end=None).first()
+                if not assigned_marketer:
+                    assigned_marketer = consultant.marketing.all().order_by('-created').first()
+                    if assigned_marketer:
+                        assigned_marketer = assigned_marketer.primary_marketer
+                else:
+                    assigned_marketer = assigned_marketer.poc
+                if (date.today() - timedelta(days=170) < revision_date) and margin_percentage < 23:
+                    data.append({
+                        "count": counter,
+                        "rate": consultant_rate,
+                        "po_rate": project_rate,
+                        "consultant_id": consultant.id,
+                        "margin": f"{margin_percentage}%",
+                        "consultant_name": consultant.name,
+                        "consultant_email": consultant.email,
+                        "marketer_name": assigned_marketer.employee_name if assigned_marketer else None,
+                        "marketer_email": assigned_marketer.email if assigned_marketer else None,
+                        "length": length, "doj": project.start_date,
+                        'vendor_name': project.submission.lead.vendor_company.name,
+                    })
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
