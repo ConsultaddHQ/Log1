@@ -6,7 +6,6 @@ from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
-import pandas as pd
 from utils_app.models import Choice
 from consultant.models import Consultant
 from activity.views import create_activity
@@ -16,7 +15,6 @@ from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from engineering.models import TrainingCheckList, ProjectDescription
-from utils_app.utils import generate_s3_url
 from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent
 
 
