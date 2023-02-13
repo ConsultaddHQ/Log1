@@ -1912,7 +1912,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         first, last = get_page_limits(request)
         try:
             data = []
-            counter = 1
+            export = json.loads(request.GET.get('export', 'false'))
             consultants = Consultant.objects.filter(status__in=['on_project'])
             for consultant in consultants:
                 last_revision = ConsultantRateRevision.objects.filter(consultant_id=consultant.id, end=None).first()
@@ -1920,42 +1920,57 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                     consultant_rate = last_revision.rate
                     revision_date = last_revision.start
                 else:
-                    consultant_rate = consultant.rate
+                    consultant_rate = 0
                     revision_date = date(2010, 1, 1)
-                projects = Project.objects.filter(
-                    submission__consultant_marketing__consultant_id=consultant.id,
+                project = Project.objects.filter(
                     is_remote=False, statuses__status='joined', statuses__is_current=True
-                )
-                length = 0
-                for project in projects:
-                    length = len(projects)
-                    project_rate = project.rate
-                    if revision_date < project.start_date:
-                        revision_date = project.start_date
-                    margin = project_rate - consultant_rate
-                    margin_percentage = round((margin / project_rate) * 100, 2)
-                assigned_marketer = ConsultantPOC.objects.filter(poc_type='marketer', consultant=consultant, end=None).first()
+                ).select_related('submission').filter(submission__consultant_marketing__consultant_id=consultant.id,
+                                                      ).order_by('-rate').first()
+                if not project:
+                    continue
+                project_rate = project.rate
+                if revision_date < project.start_date:
+                    revision_date = project.start_date
+                margin = project_rate - consultant_rate
+                margin_percentage = round((margin / project_rate) * 100, 2)
+                marketer = {}
+                assigned_marketer = ConsultantPOC.objects.filter(
+                    poc_type='marketer', consultant_id=consultant.id, end=None).first()
                 if not assigned_marketer:
-                    assigned_marketer = consultant.marketing.all().order_by('-created').first()
-                    if assigned_marketer:
-                        assigned_marketer = assigned_marketer.primary_marketer
+                    marketer['name'] = project.submission.created_by.employee_name
+                    marketer['email'] = project.submission.created_by.email
                 else:
-                    assigned_marketer = assigned_marketer.poc
+                    marketer['name'] = assigned_marketer.poc.employee_name
+                    marketer['email'] = assigned_marketer.poc.email
                 if (date.today() - timedelta(days=170) < revision_date) and margin_percentage < 23:
                     data.append({
-                        "count": counter,
                         "rate": consultant_rate,
                         "po_rate": project_rate,
+                        "doj": project.start_date,
                         "consultant_id": consultant.id,
                         "margin": f"{margin_percentage}%",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
-                        "marketer_name": assigned_marketer.employee_name if assigned_marketer else None,
-                        "marketer_email": assigned_marketer.email if assigned_marketer else None,
-                        "length": length, "doj": project.start_date,
-                        'vendor_name': project.submission.lead.vendor_company.name,
+                        "marketer_name": marketer.get('name'),
+                        "marketer_email": marketer.get('email'),
+                        'vendor_name': project.submission.lead.vendor_company.name
                     })
-            return Response({"data": data}, status=200)
+            file_url = None
+            if export:
+                columns = [
+                    {"name": "consultant_name", "display_name": "Consultant Name"},
+                    {"name": "consultant_email", "display_name": "Consultant Email"},
+                    {"name": "rate", "display_name": "Consultant Rate"},
+                    {"name": "po_rate", "display_name": "Project Rate"},
+                    {"name": "vendor_name", "display_name": "Vendor Name"},
+                    {"name": "po_start_date", "display_name": "Joining Date"},
+                    {"name": "margin", "display_name": "Margin"}
+                ]
+                file_url = export_to_csv(
+                    data, columns, f"consultant_rate_revision_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                    request=None
+                )
+            return Response({"data": data[first: last], "url": file_url, "total": len(data)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
