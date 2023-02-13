@@ -363,7 +363,8 @@ class TimesheetRequest(TimeStampedModel):
         return f'{self.id}:{self.project.consultant.name} - {self.status}'
 
 
-class TimesheetEvent(TimeStampedModel):
+
+class TimetrackEvent(TimeStampedModel):
     FEEDBACK_TYPE = (
         ('external', 'External'),
         ('internal ', 'Internal'),
@@ -390,15 +391,15 @@ class TimesheetEvent(TimeStampedModel):
     )
 
 
-class TimesheetEventFeedback(models.Model):
+class TimetrackEventFeedback(models.Model):
     feedback = models.TextField(_('feedback'), null=True, blank=True)
     consultant = models.ForeignKey(
         Consultant, on_delete=models.PROTECT,
         related_name='event',
         verbose_name='consultant'
     )
-    TimesheetEvent = models.ForeignKey(
-        TimesheetEvent, on_delete=models.PROTECT,
+    event = models.ForeignKey(
+        TimetrackEvent, on_delete=models.CASCADE,
         related_name='feedback',
         verbose_name='event'
     )

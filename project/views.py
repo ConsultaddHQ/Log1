@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from django.db import transaction
 from django.utils import timezone
@@ -9,12 +9,12 @@ from django.db.models import F, Q, Subquery, OuterRef
 from django.contrib.contenttypes.models import ContentType
 from consultant.utils import create_and_send_notification
 
+from rest_framework.mixins import *
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
 
 from constance import config
 from utils_app.mailing import send_email
@@ -24,7 +24,7 @@ from marketing.models import Submission, User
 from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
-from consultant.models import ConsultantPOC, Consultant
+from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from notification.models import Notification, FCMDevice
 from marketing.utils import date_filter, get_authenticated_users
 from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url
@@ -38,9 +38,23 @@ from project.utils import ProjectUtil, create_remote_consultant, set_consultant_
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, TimesheetRequestSerializer, TimesheetEventSerializer, TimesheetEventFeedbackSerializer
+    ConsultantLeaveSerializer, TimesheetRequestSerializer
 from utils_app.slack_notification import MessageCard as slack
+from utils_app.utils import delete_temp_file, export_to_csv
+from marketing.utils import date_filter, get_authenticated_users
+from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
+from notification.utils import push_notification_consultant
+from utils_app.slack_notification import MessageCard as slack
+from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
+from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification,\
+    mark_in_active
+from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
+    ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
+    TimesheetRequestSerializer, TimetrackEventSerializer
 
 
 # Route - /project/
@@ -1769,16 +1783,32 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
 
 # Route - /timesheet_event/
-class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
-    queryset = TimesheetEvent.objects.all()
-    serializer_classes = TimesheetEventSerializer
+class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset = TimetrackEvent.objects.all()
+    permission_classes = (IsAuthenticated,)
+    serializer_classes = TimetrackEventSerializer
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
         try:
-            query = TimesheetEvent.objects.all()
-            serializer = TimesheetEventSerializer(query, many=True)
-            return Response({'result': serializer.data}, status=200)
+            mark_in_active()
+            filter_for = request.GET.get('filter_for', 'all')
+            if filter_for == 'my':
+                queryset = TimetrackEvent.objects.filter(created_by=request.user)
+            else:
+                queryset = TimetrackEvent.objects.all()
+            serializer = TimetrackEventSerializer(queryset, many=True)
+            return Response({'result': serializer.data[first: last], "total": len(serializer.data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            event_info = get_object_or_404(TimetrackEvent, id=kwargs.get("pk"))
+            serializer = TimetrackEventSerializer(event_info)
+            return Response({'data': serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
@@ -1806,39 +1836,39 @@ class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, 
                     event.consultants.add(consultant)
 
                 event.save()
-                # data = {
-                #     "title": event.title,
-                #     "category": "alert",
-                #     "description": event.description,
-                #     "target_type": "timesheet",
-                #     "target_id": request.user.id,
-                #     "sender_id": request.user.id,
-                #     "recipient_user_type": "user",
-                #     "sender_user_type": "consultant",
-                # }
-                # create_notification(event.consultants, data)
-
-                # Push Notification
-                # message_body = {
-                #     "body": event.description,
-                #     "title": event.title,
-                #     "category": "alert",
-                #     "image": event.image,
-                #     "show_in_foreground": True,
-                #     "click_action": event.action_link,
-                #     "data": {
-                #         'is_read': False,
-                #         'is_deleted': False,
-                #         'target': 'timesheet',
-                #         'target_id': request.user.id,
-                #         'timestamp': str(timezone.now()),
-                #     },
-                # }
-                # consultant_ids = list(event.consultants.values_list('id', flat=True))
-                # push_notification(consultant_ids, message_body)
             desc = f"{request.user.employee_name} is created event"
             create_activity(kwargs.get('pk'), 'TimesheetEvent', request.user, desc, 'create')
             return Response({"message": "event created successfully"}, status=201)
+            start_datetime = request.data.get('start', None)
+
+            if request.data.get('all', False):
+                distinct_by = 'submission__consultant_marketing__consultant_id'
+                consultants_ids = Project.objects.filter(
+                    statuses__status='joined', statuses__is_current=True
+                ).values_list(distinct_by, flat=True).order_by(distinct_by).distinct(distinct_by)
+            else:
+                consultants_ids = json.loads(request.data.get('consultants', '[]'))
+
+            if not start_datetime or not consultants_ids:
+                Response({"message": "Start Time or Consultant Ids not provided"}, status=201)
+
+            event = TimetrackEvent.objects.create(
+                start=start_datetime,
+                end=end_datatime,
+                created_by=request.user,
+                title=request.data.get('title', None),
+                image=request.FILES.get('image', None),
+                feedback_type=request.data.get('feedback_type'),
+                event_type=request.data.get('event_type', None),
+                description=request.data.get('description', None),
+                action_link=request.data.get('action_link', None),
+            )
+            for consultant_id in consultants_ids:
+                consultant = get_object_or_404(Consultant, id=consultant_id)
+                event.consultants.add(consultant)
+
+            event.save()
+            return Response({"message": "Event Created Successfully"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -1856,12 +1886,13 @@ class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, 
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+
     def update(self, request, *args, **kwargs):
         try:
-            event = get_object_or_404(
-                TimesheetEvent, id=kwargs.get('pk', None),
-            )
-            if event.created_by == request.user or 'admin' in request.user.roles:
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
+            consultants_ids = json.loads(request.data.get('consultants', '[]'))
+
+            if event.created_by == request.user:
                 event.start = request.data.get('start')
                 if request.data.get('start') and request.data.get('end'):
                     event.start = request.data.get('start')
@@ -1876,69 +1907,110 @@ class TimeSheetEventViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, 
                     event.title = request.data.get('action_link')
                 if request.data.get('feedback_type'):
                     event.title = request.data.get('feedback_type')
+                if consultants_ids:
+                    event.consultants.clear()
+                    for id in consultants_ids:
+                        consultant = get_object_or_404(Consultant, id=id)
+                        event.consultants.add(consultant)
+                if request.FILES.get('image', None):
+                    event.image = request.FILES['image']
                 event.save()
             else:
                 return Response({"message": "You don't have permission to update the event"}, status=403)
 
-            # data = {
-            #     "title": event.title,
-            #     "category": "alert",
-            #     "description": event.description,
-            #     "target_type": "timesheet",
-            #     "target_id": request.user.id,
-            #     "sender_id": request.user.id,
-            #     "recipient_user_type": "user",
-            #     "sender_user_type": "consultant",
-            # }
-            # create_notification(event.consultant, data)
-            #
-            # # Push Notification
-            # message_body = {
-            #     "body": event.description,
-            #     "title": event.title,
-            #     "category": "alert",
-            #     "image":event.image,
-            #     "show_in_foreground": True,
-            #     "click_action": event.action_link,
-            #     "data": {
-            #         'is_read': False,
-            #         'is_deleted': False,
-            #         'target': 'timesheet',
-            #         'target_id': request.user.id,
-            #         'timestamp': str(timezone.now()),
-            #     },
-            # }
-            # consultant_ids = list(event.consultants.values_list('id', flat=True))
-            # push_notification(consultant_ids. message_body)
-
-            serializer = TimesheetEventSerializer(event)
+            serializer = TimetrackEventSerializer(event)
             return Response({"result": serializer.data}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=False, url_path='export')
-    def export(self, request, **kwargs):
+
+    def destroy(self, request, *args, **kwargs):
         try:
-            feedbacks = TimesheetEventFeedback.objects.all()
-            serializer = TimesheetEventFeedbackSerializer(feedbacks, many=True)
-            if serializer.data:
-                filename = f'{datetime.now()}'.replace(' ', '')
-                rows = []
-                for feedback in serializer.data:
-                    rows.append(
-                        [feedback.get('feedback', None), feedback['consultant'].get('name', None),
-                         feedback['event'].get('title', None), feedback['event'].get('description', None),
-                         feedback['event'].get('feedback_type', None)
-                    ])
-                with open(f'event_feedback_{filename}.csv', 'w') as csvfile:
-                    csvwriter = csv.writer(csvfile)
-                    csvwriter.writerow(['feedback', 'consultants', 'title', 'description', 'feedback_type'])
-                    csvwriter.writerows(rows)
-                file_url = generate_s3_url(f'event_feedback_{filename}.csv')
-                return Response({"data": file_url}, status=200)
-            return Response({"message": "No Data to export"}, status=400)
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
+            if event.created_by == request.user:
+                event.delete()
+                return Response({"message": "Event Removed Successfully"}, status=202)
+            return Response({"message": "You don't have permission to delete the event"}, status=403)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
+            return Response({"message": str(error)}, status=400)
+
+    @action(methods=["get"], detail=True, url_name="event_feedback")
+    def event_feedback(self, request, *args, **kwargs):
+        try:
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk'))
+            consultant_feedback = event.feedback.all().values('id', 'feedback').annotate(
+                consultant_name=F('consultant__name')
+            )
+            columns = [
+                {"name": "id", "display_name": "Feedback Id"},
+                {"name": "consultant_name", "display_name": "Consultant Name"},
+                {"name": "feedback", "display_name": "Feedback"},
+            ]
+            file_url = export_to_csv(
+                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv"
+            )
+            return Response({"data": file_url}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
+    queryset = ConsultantRateRevision.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        try:
+            data = []
+            counter = 1
+            consultants = Consultant.objects.filter(status__in=['on_project'])
+            for consultant in consultants:
+                last_revision = ConsultantRateRevision.objects.filter(consultant_id=consultant.id, end=None).first()
+                if last_revision:
+                    consultant_rate = last_revision.rate
+                    revision_date = last_revision.start
+                else:
+                    consultant_rate = consultant.rate
+                    revision_date = date(2010, 1, 1)
+                projects = Project.objects.filter(
+                    submission__consultant_marketing__consultant_id=consultant.id,
+                    is_remote=False, statuses__status='joined', statuses__is_current=True
+                )
+                length = 0
+                for project in projects:
+                    length = len(projects)
+                    project_rate = project.rate
+                    if revision_date < project.start_date:
+                        revision_date = project.start_date
+                    margin = project_rate - consultant_rate
+                    margin_percentage = round((margin / project_rate) * 100, 2)
+                assigned_marketer = ConsultantPOC.objects.filter(poc_type='marketer', consultant=consultant, end=None).first()
+                if not assigned_marketer:
+                    assigned_marketer = consultant.marketing.all().order_by('-created').first()
+                    if assigned_marketer:
+                        assigned_marketer = assigned_marketer.primary_marketer
+                else:
+                    assigned_marketer = assigned_marketer.poc
+                if (date.today() - timedelta(days=170) < revision_date) and margin_percentage < 23:
+                    data.append({
+                        "count": counter,
+                        "rate": consultant_rate,
+                        "po_rate": project_rate,
+                        "consultant_id": consultant.id,
+                        "margin": f"{margin_percentage}%",
+                        "consultant_name": consultant.name,
+                        "consultant_email": consultant.email,
+                        "marketer_name": assigned_marketer.employee_name if assigned_marketer else None,
+                        "marketer_email": assigned_marketer.email if assigned_marketer else None,
+                        "length": length, "doj": project.start_date,
+                        'vendor_name': project.submission.lead.vendor_company.name,
+                    })
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 

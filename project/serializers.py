@@ -8,8 +8,8 @@ from employee.serializers import UserSerializer
 from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
-from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent, TimesheetEventFeedback
+from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule,\
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -390,58 +390,6 @@ class ConsultantLeaveSerializer(serializers.ModelSerializer):
         return obj.leave_type.display_name
 
 
-class TimesheetEventSerializer(serializers.ModelSerializer):
-    consultants = serializers.SerializerMethodField()
-
-    class Meta:
-        model = TimesheetEvent
-        fields = ('id', 'start', 'end', 'title', 'description', 'action_link', 'event_type', 'image',
-                  'feedback_type', 'consultants', 'is_active')
-
-    @staticmethod
-    def get_consultants(obj):
-        consultants = obj.consultants.all()
-        data = []
-        if consultants:
-             for consultant in consultants:
-                 data.append(consultant.name)
-             return data
-        return None
-
-
-class TimesheetEventFeedbackSerializer(serializers.ModelSerializer):
-    event = serializers.SerializerMethodField()
-    consultant = serializers.SerializerMethodField()
-
-    class Meta:
-        model = TimesheetEventFeedback
-        fields = ('feedback', 'consultant', 'event')
-
-    @staticmethod
-    def get_consultant(obj):
-        if obj.consultant:
-            data = {
-               "id": obj.consultant.id,
-               "name": obj.consultant.name,
-            }
-            return data
-        return None
-
-    @staticmethod
-    def get_event(obj):
-        event = obj.TimesheetEvent
-        if event:
-            data = {
-                "end": event.end,
-                "start": event.start,
-                "title": event.title,
-                "Description": event.description,
-                "feedback_type": event.feedback_type,
-            }
-            return data
-        return None
-
-
 class LeaveSerializer(serializers.ModelSerializer):
     leave_type = serializers.SerializerMethodField()
     attachment = serializers.SerializerMethodField()
@@ -534,3 +482,21 @@ class TimesheetRequestSerializer(serializers.ModelSerializer):
             'client': obj.project.submission.client,
             'vendor': obj.project.submission.lead.vendor_company.name,
         }
+
+
+class TimetrackEventSerializer(serializers.ModelSerializer):
+    consultants = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimetrackEvent
+        fields = ('id', 'start', 'end', 'title', 'description', 'action_link', 'event_type', 'image',
+                  'feedback_type', 'consultants', 'is_active')
+
+    @staticmethod
+    def get_consultants(obj):
+        consultants = obj.consultants.all().values('id', 'name')
+        data = {
+            "consultants": consultants,
+            "all": True if len(consultants) > 50 else False
+        }
+        return data

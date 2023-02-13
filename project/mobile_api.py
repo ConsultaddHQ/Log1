@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.db.models import Q, F, Max, Subquery, OuterRef
+from django.db.models import Q, Max
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -20,13 +20,16 @@ from attachment.models import Attachment
 from consultant.models import Consultant
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
+from log1.utils import write_exception, ERROR_MSG
+from project.utils import check_days, mark_in_active
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
 from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, \
-    TimesheetEvent, TimesheetEventFeedback
+    TimetrackEvent, TimetrackEventFeedback
+
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, LeaveSerializer
+    ConsultantLeaveSerializer, LeaveSerializer, TimetrackEventSerializer
 
 
 # Route - /payroll/
@@ -410,23 +413,6 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @action(methods=['put'], detail=False, url_path='feedback')
-    def feedback(self, request, **kwargs):
-        try:
-            event = get_object_or_404(
-                TimesheetEvent, id=request.data.get("event_id")
-            )
-
-            TimesheetEventFeedback.objects.create(
-                feedback=request.data.get("feedback", None),
-                consultant=request.user,
-                TimesheetEvent=event
-            ).save()
-            return Response({"data": "event feedback submitted"}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
 
 # Route - /consultant_leave/
 class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
@@ -519,3 +505,44 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+
+class TimetrackEventMobileViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
+    queryset = TimetrackEvent.objects.all()
+    serializer_class = TimetrackEventSerializer
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            mark_in_active()
+            event_data = []
+            events = TimetrackEvent.objects.filter(
+                consultants=request.user, is_active=True, start__lte=date.today(), end__gte=date.today()
+            )
+            for event in events:
+                if not TimetrackEventFeedback.objects.filter(consultant=request.user, event=event).first():
+                    data = {
+                        "action_link": event.action_link, "event_type": event.get_feedback_type_display(),
+                        "id": event.id, "start": event.start, "is_active": event.is_active, "end": event.end,
+                        "consultant_id": request.user.id, "title": event.title, "description": event.description,
+                        "image": f'https://{os.environ.get("AWS_STORAGE_BUCKET_NAME")}.s3.ap-south-1.amazonaws.com/media/{event.image.name}'
+                    }
+                    event_data.append(data)
+            return Response({'result': event_data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='feedback')
+    def feedback(self, request, **kwargs):
+        try:
+            event = get_object_or_404(TimetrackEvent, id=kwargs.get("pk"))
+            TimetrackEventFeedback.objects.create(
+                feedback=request.data.get("feedback", None),
+                consultant=request.user,
+                event=event
+            )
+            return Response({"message": "Event Feedback Submitted"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
