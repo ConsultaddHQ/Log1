@@ -1591,3 +1591,25 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='compare_teams')
+    def compare_team(self, request):
+        try:
+            team_data = []
+            team_ids = request.GET.get("team_ids", '')
+            if team_ids:
+                team_ids = team_ids.split(',')
+            teams = Team.objects.filter(dept='Engineering', id__in=team_ids).order_by('-id')
+            for team in teams:
+                data = {
+                    "id": team.id, "team_name": team.name,
+                    "employee": team.employees.filter(is_active=True).exclude(role__name='scrum_master').values('id', 'employee_name'),
+                    "scrum": team.employees.filter(
+                        is_active=True, role__name='admin').values('id', 'employee_name')
+                }
+                team_data.append(data)
+
+            return Response({"data": team_data, "total": len(teams)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, 'error': error}, status=400)
