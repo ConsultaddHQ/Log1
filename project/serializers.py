@@ -8,7 +8,7 @@ from employee.serializers import UserSerializer
 from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
-from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
+from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule,\
     ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
 
 

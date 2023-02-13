@@ -26,6 +26,20 @@ from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from notification.models import Notification, FCMDevice
+from marketing.utils import date_filter, get_authenticated_users
+from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url
+from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
+
+from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
+from notification.utils import push_notification_consultant, push_notification, create_notification
+from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimesheetEvent, TimesheetEventFeedback
+from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification
+from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
+    ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ProjectTimeSheetSerializer, \
+    ConsultantLeaveSerializer, TimesheetRequestSerializer
+from utils_app.slack_notification import MessageCard as slack
 from utils_app.utils import delete_temp_file, export_to_csv
 from marketing.utils import date_filter, get_authenticated_users
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
@@ -1802,6 +1816,29 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
     def create(self, request, *args, **kwargs):
         try:
             end_datatime = request.data.get('end')
+            start_datetime = request.data.get('start')
+            consultants_id = request.data.get('consultants', [])
+
+            if start_datetime or consultants_id:
+                event = TimesheetEvent.objects.create(
+                    start=start_datetime,
+                    end=end_datatime,
+                    created_by=request.user,
+                    title=request.data.get('title', None),
+                    image=request.FILES.get('image', None),
+                    feedback_type=request.data.get('feedback_type'),
+                    event_type=request.data.get('event_type', None),
+                    description=request.data.get('description', None),
+                    action_link=request.data.get('action_link', None),
+                )
+                for consultant_id in consultants_id:
+                    consultant = get_object_or_404(Consultant, id=consultant_id)
+                    event.consultants.add(consultant)
+
+                event.save()
+            desc = f"{request.user.employee_name} is created event"
+            create_activity(kwargs.get('pk'), 'TimesheetEvent', request.user, desc, 'create')
+            return Response({"message": "event created successfully"}, status=201)
             start_datetime = request.data.get('start', None)
 
             if request.data.get('all', False):
@@ -1836,6 +1873,20 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            event = get_object_or_404(TimesheetEvent, id=kwargs.get('pk', None))
+            if event.created_by == request.user or 'admin' in request.user.roles:
+                event.is_active = False
+                event.save()
+                return Response({"message": "delete the event successfully"}, status=202)
+            return Response({"message": "You don't have permission to delete the event"}, status=403)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": str(error)}, status=400)
+
+
     def update(self, request, *args, **kwargs):
         try:
             event = get_object_or_404(TimetrackEvent, id=kwargs.get('pk', None))
@@ -1846,14 +1897,16 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                 if request.data.get('start') and request.data.get('end'):
                     event.start = request.data.get('start')
                     event.end = request.data.get('end')
+                if request.data.get('image'):
+                    event.title = request.data.get('image')
                 if request.data.get('description'):
-                    event.description = request.data.get('description')
+                    event.title = request.data.get('description')
                 if request.data.get('title'):
                     event.title = request.data.get('title')
                 if request.data.get('action_link'):
-                    event.action_link = request.data.get('action_link')
+                    event.title = request.data.get('action_link')
                 if request.data.get('feedback_type'):
-                    event.feedback_type = request.data.get('feedback_type')
+                    event.title = request.data.get('feedback_type')
                 if consultants_ids:
                     event.consultants.clear()
                     for id in consultants_ids:
@@ -1870,6 +1923,7 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
+
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -1959,3 +2013,4 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+

@@ -21,8 +21,8 @@ from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, Consult
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
-from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
-    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, ProjectOrderViewSet,\
+    ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
     ConsultantRevisionViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
     TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet

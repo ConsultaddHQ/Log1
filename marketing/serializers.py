@@ -733,7 +733,11 @@ class TeamStructureSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_is_scrum(obj):
+<<<<<<< HEAD
+        if obj.role.filter(name='scrum_master'):
+=======
         if obj.role.filter(name='admin'):
+>>>>>>> dummy-dev
             return True
         return False
 
