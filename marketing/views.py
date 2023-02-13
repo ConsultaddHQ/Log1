@@ -16,27 +16,18 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from employee.serializers import TeamSerializer
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
 from activity.models import Activity
-<<<<<<< HEAD
-from employee.models import User, Team, Role
-=======
->>>>>>> dummy-dev
 from utils_app.models import ObjectGroup
 from activity.views import create_activity
 from employee.models import User, Team, Role
 from employee.serializers import TeamSerializer
 from django.contrib.auth.models import ContentType
 from activity.serializers import ActivitySerializer
-<<<<<<< HEAD
-from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES
-=======
 from utils_app.calendar import GoogleCalendar, Calendar
 from utils_app.mailing import send_email_without_template
->>>>>>> dummy-dev
 from attachment.models import Attachment, create_attachment
 from utils_app.slack_notification import MessageCard as slack
 from consultant.models import Consultant, ConsultantMarketing
@@ -3031,11 +3022,7 @@ class QuestionViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-<<<<<<< HEAD
-# Route - /team_structure/
-=======
 # Route - /marketing_team/
->>>>>>> dummy-dev
 class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = Team.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -3043,10 +3030,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     authentication_classes = (TokenAuthentication,)
 
     @staticmethod
-<<<<<<< HEAD
-    def filter_marketers(queryset, filters, request):
-        try:
-=======
     def get_assign_consultant(obj):
         consultants = obj.marketed.filter(status='open')
         if consultants:
@@ -3076,26 +3059,16 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
         try:
             marketer_data = []
             scrum_master, scrum_id = None, ""
->>>>>>> dummy-dev
             shifts = User.SHIFT_CHOICE
             eng_teams = Team.objects.filter(dept='Marketing')
             inter_section = request.GET.get('inter_section', None)
 
             if filters:
-<<<<<<< HEAD
-                if "shifts" in filters:
-                    queryset = queryset.filter(shift__in=filters['shifts'])
-                if "teams" in filters:
-                    queryset = queryset.filter(team__id__in=filters['teams'])
-=======
->>>>>>> dummy-dev
                 if "skills" in filters:
                     if inter_section == "true":
                         queryset = queryset.filter(technology__contains=filters["skills"])
                     else:
                         queryset = queryset.filter(technology__overlap=filters['skills'])
-<<<<<<< HEAD
-=======
                 if "shifts" in filters:
                     queryset = queryset.filter(shift__in=filters['shifts'])
                 if "teams" in filters:
@@ -3118,7 +3091,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 marketer_data.append(data)
             if scrum_master:
                 marketer_data.insert(0, scrum_master)
->>>>>>> dummy-dev
             counts = {
                 "shift": [
                     {
@@ -3130,11 +3102,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 ],
                 "team": [
                     {
-<<<<<<< HEAD
-                        "id":team.id,
-=======
                         "id": team.id,
->>>>>>> dummy-dev
                         "display_name": team.name,
                         "count": queryset.filter(team=team).exclude(team=None).count()
                     }
@@ -3148,20 +3116,12 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                     for technology in TECHNOLOGIES
                 ]
             }
-<<<<<<< HEAD
-            return queryset, counts
-=======
             return marketer_data, counts
->>>>>>> dummy-dev
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
     def list(self, request, **kwargs):
-<<<<<<< HEAD
-
-=======
->>>>>>> dummy-dev
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query', None)
@@ -3169,14 +3129,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             marketers = User.objects.filter(team__dept='Marketing', is_active=True)
             if query:
                 marketers = marketers.filter(employee_name__istartswith=query)
-<<<<<<< HEAD
-            marketers, counts = self.filter_marketers(marketers, filters, request)
-            serializer = TeamStructureSerializer(marketers[first: last], many=True)
-            return Response({"data": serializer.data, "count": counts, "total": len(marketers)}, status=200)
-=======
             marketers_data, counts = self.filter_marketers(marketers, filters, request)
             return Response({"data": marketers_data[first: last], "count": counts, "total": len(marketers_data)}, status=200)
->>>>>>> dummy-dev
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -3186,11 +3140,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             team = get_object_or_404(Team, id=kwargs.get('pk'))
             data = {
                 "count": team.employees.filter(is_active=True).count(),
-<<<<<<< HEAD
-                "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
-=======
                 "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing
->>>>>>> dummy-dev
             }
             return Response({"data": data}, status=200)
         except Exception as error:
@@ -3199,11 +3149,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
 
     def create(self, request, *args, **kwargs):
         try:
-<<<<<<< HEAD
-            if 'superadmin' not in request.user.roles and 'scrum_master' not in request.user.roles:
-=======
             if 'superadmin' not in request.user.roles and 'admin' not in request.user.roles:
->>>>>>> dummy-dev
                 return Response({"message": "You don't have access"}, status=400)
 
             data = request.data
@@ -3233,8 +3179,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-<<<<<<< HEAD
-=======
     # @action(methods=['get'], detail=False, url_path='export')
     # def export(self, request, **kwargs):
     #     try:
@@ -3253,7 +3197,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     #         write_exception(error, request)
     #         return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
->>>>>>> dummy-dev
     @action(methods=['put'], detail=False, url_path='update_shift')
     def shift(self, request, **kwargs):
         try:
@@ -3283,12 +3226,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 data = {
                     "count": team.employees.filter(is_active=True).count(),
                     "id": team.id, "name": team.name, "scrum_timing": team.scrum_timing,
-<<<<<<< HEAD
-                    "employee": team.employees.filter(is_active=True).values('id', 'employee_name'),
-                    "scrum_master": team.employees.filter(role__name='scrum_master', is_active=True).values(
-=======
                     "scrum_master": team.employees.filter(role__name='admin', is_active=True).values(
->>>>>>> dummy-dev
                         'id', 'employee_name')
                 }
                 team_data.append(data)
@@ -3299,16 +3237,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
     @action(methods=['get'], detail=False, url_path='compare_teams')
-<<<<<<< HEAD
-    def teams(self, request, **kwargs):
-        try:
-            team_data = []
-            teams = Team.objects.filter(dept='Marketing', id__in=request.get("team_ids",[])).order_by('-id')
-            for team in teams:
-                data = {
-                    "team_name": team.name,
-                    "employee": team.employees.filter(is_active=True).values('id', 'employee_name'),
-=======
     def compare_team(self, request):
         try:
             team_data = []
@@ -3322,7 +3250,6 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                     "employee": team.employees.filter(is_active=True).exclude(role__name='admin').values('id', 'employee_name'),
                     "scrum": team.employees.filter(
                         is_active=True, role__name='admin').values('id', 'employee_name')
->>>>>>> dummy-dev
                 }
                 team_data.append(data)
 
@@ -3342,11 +3269,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             scrum_masters, employee_added = [], []
             for emp_id in employee_ids:
                 employee = get_object_or_404(User, id=emp_id)
-<<<<<<< HEAD
-                if employee.role.filter(name='scrum_master'):
-=======
                 if employee.role.filter(name='admin'):
->>>>>>> dummy-dev
                     scrum_masters.append(employee.employee_name)
                     continue
                 employee_added.append(employee.employee_name)
@@ -3366,20 +3289,13 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     @action(methods=['put'], detail=True, url_path='update_scrum')
     def update_scrum(self, request, **kwargs):
         try:
-<<<<<<< HEAD
-=======
             if 'superadmin' not in request.user.roles:
                 return Response({"message": "You do not have access to perform this action"}, status=200)
->>>>>>> dummy-dev
             team_id = kwargs.get('pk')
             employee_id = request.data.get('employee_id', None)
             if not employee_id:
                 return Response({"message": "No employee selected"}, status=200)
-<<<<<<< HEAD
-            scrum_role = Role.objects.get(name='scrum_master')
-=======
             scrum_role = Role.objects.get(name='admin')
->>>>>>> dummy-dev
             employee = get_object_or_404(User, id=employee_id, team_id=kwargs.get('pk'))
             prev_scrum = User.objects.filter(team_id=team_id, role=scrum_role)
             if prev_scrum:
@@ -3390,14 +3306,9 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             desc = f"{request.user.employee_name} made {employee.employee_name} as scrum master for {employee.team.name}"
             create_activity(kwargs.get('pk'), 'team', request.user, desc, 'updated')
 
-<<<<<<< HEAD
-            return Response({"message": f"{employee.employee_name} appointed as scrum master for {employee.team.name}"},
-                            status=202)
-=======
             return Response(
                 {"message": f"{employee.employee_name} appointed as scrum master for {employee.team.name}"}, status=202
             )
->>>>>>> dummy-dev
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
