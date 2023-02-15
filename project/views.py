@@ -1912,14 +1912,16 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         first, last = get_page_limits(request)
         try:
             data = []
-            margin_percentage = 0
             margin = request.GET.get('margin', 'below_21')
             if margin == '21-30':
-                condition = 21 <= margin_percentage >= 30
+                lte = 21
+                gte = 30
             elif margin == 'above_30':
-                condition = 30 <= margin_percentage
+                gte = 30
+                lte = 100
             else:
-                condition = margin_percentage <= 21
+                lte = 21
+                gte = 0
             export = json.loads(request.GET.get('export', 'false'))
             consultants = Consultant.objects.filter(status__in=['on_project'])
             for consultant in consultants:
@@ -1950,7 +1952,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 else:
                     marketer['name'] = assigned_marketer.poc.employee_name
                     marketer['email'] = assigned_marketer.poc.email
-                if (date.today() - timedelta(days=170) < revision_date) and condition:
+                if (date.today() - timedelta(days=170) < revision_date) and gte <= margin_percentage <= lte:
                     data.append({
                         "rate": consultant_rate,
                         "po_rate": project_rate,
