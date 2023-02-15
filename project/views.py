@@ -1915,14 +1915,11 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             query = request.GET.get('query', None)
             margin = request.GET.get('margin', 'below_21')
             if margin == '21-30':
-                gte = 21
-                lte = 30
+                gte, lte = 21, 30
             elif margin == 'above_30':
-                gte = 30
-                lte = 100
+                gte, lte = 30, 100
             else:
-                gte = 0
-                lte = 21
+                gte, lte = 0, 21
             export = json.loads(request.GET.get('export', 'false'))
             consultants = Consultant.objects.filter(status__in=['on_project'])
             if query:
