@@ -4,11 +4,11 @@ import csv
 from datetime import date, timedelta
 from django.core.management import BaseCommand
 
+from employee.models import User
 from project.models import Project
-from log1.utils import write_exception
-from utils_app.mailing import send_email
+from utils_app.mailing import send_email_attachment_multiple
 from consultant.models import Consultant, ConsultantRateRevision, ConsultantPOC
-from utils_app.utils import create_cron_error, create_cron_object
+from utils_app.utils import create_cron_error, create_cron_object, delete_temp_file
 
 
 class Command(BaseCommand):
@@ -18,11 +18,12 @@ class Command(BaseCommand):
         job = create_cron_object(name='rate_due_notification')
         try:
             data = []
+            counter = 1
             consultants = Consultant.objects.filter(status__in=['on_project'])
             file = open('consultant_rate_revision.csv', 'w+')
             writer = csv.writer(file)
             writer.writerow(
-                ['Consultant Name', 'Marketer Name', "Project rate", 'Consultant rate', 'DOJ', 'Last Revised Date',
+                ['Consultant Name', 'Marketer Name', "Project rate", 'Consultant rate', 'Margin', 'Last Revised Date',
                  'Vendor Name']
             )
             for consultant in consultants:
@@ -53,12 +54,13 @@ class Command(BaseCommand):
                 else:
                     marketer['name'] = assigned_marketer.poc.employee_name
                     marketer['email'] = assigned_marketer.poc.email
-                if (date.today() - timedelta(days=170) < revision_date) and margin_percentage < 23:
+                if (date.today() - timedelta(days=150) < revision_date) and margin_percentage < 30:
                     consultant_info = {
-                        "rate": consultant_rate,
+                        "counter": counter,
                         "po_rate": project_rate,
-                        "doj": project.start_date,
+                        "rate": consultant_rate,
                         "consultant_id": consultant.id,
+                        "last_revision": revision_date,
                         "margin": f"{margin_percentage}%",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
@@ -68,23 +70,33 @@ class Command(BaseCommand):
                     }
                     writer.writerow([
                         consultant_info['consultant_name'], consultant_info['marketer_name'],
-                        consultant_info['po_rate'], consultant_info['rate'], consultant_info['po_start_date'],
+                        consultant_info['po_rate'], consultant_info['rate'], consultant_info['margin'],
                         consultant_info['last_revision'], consultant_info['vendor_name']
                     ])
                     data.append(consultant_info)
-            # if os.environ.get('ENV', 'local') == 'prod':
-            #     to = ['finance@consultadd.com']
-            # else:
-            #     to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
-            # mail_data = {
-            #     'to': to, 'cc': [], 'bcc': [],
-            #     'subject': f"Consultant Rate Revision Due",
-            #     'template': '../templates/rate_due_notification.html',
-            #     'context': {
-            #         "data": data,
-            #     },
-            # }
-            # if len(data) > 0:
-            #     send_email(mail_data, "admin@consultadd.com")
+                    counter += 1
+            file.close()
+            file = open(file.name, 'r')
+            if os.environ.get('ENV', 'local') == 'prod':
+                to = ['finance@consultadd.com',  'relations@consulatdd.com', 'arun.k@consultadd.com']
+                scrum_master = User.objects.filter(
+                    team__dept='Marketing', role__name='admin', is_active=True
+                ).values_list('email', flat=True)
+                to.extend(scrum_master)
+            else:
+                to = ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com']
+            mail_data = {
+                'attachments': [file.name],
+                'to': to, 'cc': [], 'bcc': [],
+                'subject': f"Consultant Rate Revision Due Info",
+                'template': '../templates/rate_due_notification.html',
+                'context': {
+                    "data": data,
+                },
+            }
+            if len(data) > 0:
+                send_email_attachment_multiple(mail_data, "admin@consultadd.com")
+            delete_temp_file([file.name])
         except Exception as error:
             print(error)
+            create_cron_error(job, error)

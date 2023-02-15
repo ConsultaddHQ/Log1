@@ -1912,18 +1912,21 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         first, last = get_page_limits(request)
         try:
             data = []
+            query = request.GET.get('query', None)
             margin = request.GET.get('margin', 'below_21')
             if margin == '21-30':
-                lte = 21
-                gte = 30
+                gte = 21
+                lte = 30
             elif margin == 'above_30':
                 gte = 30
                 lte = 100
             else:
-                lte = 21
                 gte = 0
+                lte = 21
             export = json.loads(request.GET.get('export', 'false'))
             consultants = Consultant.objects.filter(status__in=['on_project'])
+            if query:
+                consultants = consultants.filter(name__istartswith=query)
             for consultant in consultants:
                 last_revision = ConsultantRateRevision.objects.filter(consultant_id=consultant.id, end=None).first()
                 if last_revision:
