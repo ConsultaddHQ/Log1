@@ -100,7 +100,7 @@ def get_timezone(city_name):
         return None
 
 
-def export_to_csv(payload, columns, filename, request):
+def export_to_csv(payload, columns, filename, request=None):
     try:
         file = open(filename, 'w')
         writer = csv.writer(file)

@@ -522,32 +522,43 @@
                     <td class="email-masthead">
                         <a href="https://log1.app" class="f-fallback email-masthead_name">
                             <span style="font-weight: bold; font-size: 40px;"><img
-                                    src="https://log1.app/api/media/assets/images/logo.png" alt="" width="100"/></span>
+                                    src="https://log1.app/api/media/assets/images/logo.png" alt="" width="100%"/></span>
                         </a>
                     </td>
                 </tr>
                 <!-- Email Body -->
                 <tr>
-                    <td class="email-body" width="570" position="relative" cellpadding="0" cellspacing="0">
-                        <table class="email-body_inner" style="position: relative;" align="center" width="570" cellpadding="0" cellspacing="0"
-                               role="presentation">
+                    <td class="email-body" width="100%" cellpadding="0" cellspacing="0">
+                        <table class="email-body_inner" width="100%" cellpadding="0" cellspacing="0" role="presentation">
                             <!-- Body content -->
                             <tr>
                                 <td class="content-cell">
                                     <div class="f-fallback">
                                         <h1>Hello</h1><br>
-                                        <h2>Rate Revision due</h2>
+                                        <h3>Below is a table containing the list of consultants whose rate revision is
+                                            pending for the past five months. A CSV file is also attached along with
+                                            this mail having same info. PFA</h3>
                                             <table class="tableheading">
                                               <tr>
-                                                <th style="text-align:center;width: 10px;">#</th>
-                                                <th style="text-align: center;width: 100px;">Name</th>
-                                                <th style="width: 80px;text-align: center;">Email</th>
+                                                <th style="text-align: center;">#</th>
+                                                <th style="text-align: center;">Consultant Name</th>
+                                                <th style="text-align: center;">Consultant Email</th>
+                                                <th style="text-align: center;">Project Rate</th>
+                                                <th style="text-align: center;">Consultant Rate</th>
+                                                <th style="text-align: center;">Margin</th>
+                                                <th style="text-align: center;">Last Revision Date</th>
+                                                <th style="text-align: center;">Vendor Name</th>
                                               </tr>
                                                 {% for i in data %}
                                               <tr>
-                                                <td style="text-align:center;">{{i.count}}</td>
+                                                <td style="text-align:center;">{{i.counter}}</td>
                                                 <td style="text-align:center;">{{i.consultant_name}}</td>
                                                 <td style="text-align:center;">{{i.consultant_email}}</td>
+                                                <td style="text-align:center;">{{i.po_rate}}</td>
+                                                <td style="text-align:center;">{{i.rate}}</td>
+                                                <td style="text-align:center;">{{i.margin}}</td>
+                                                <td style="text-align:center;">{{i.last_revision}}</td>
+                                                <td style="text-align:center;">{{i.vendor_name}}</td>
                                               </tr>
                                               {% endfor %}
                                             </table>

@@ -1895,7 +1895,7 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                 {"name": "feedback", "display_name": "Feedback"},
             ]
             file_url = export_to_csv(
-                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv"
+                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv", request
             )
             return Response({"data": file_url}, status=200)
         except Exception as error:
@@ -1912,8 +1912,18 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         first, last = get_page_limits(request)
         try:
             data = []
+            query = request.GET.get('query', None)
+            margin = request.GET.get('margin', 'below_21')
+            if margin == '21-30':
+                gte, lte = 21, 30
+            elif margin == 'above_30':
+                gte, lte = 30, 100
+            else:
+                gte, lte = 0, 21
             export = json.loads(request.GET.get('export', 'false'))
             consultants = Consultant.objects.filter(status__in=['on_project'])
+            if query:
+                consultants = consultants.filter(name__istartswith=query)
             for consultant in consultants:
                 last_revision = ConsultantRateRevision.objects.filter(consultant_id=consultant.id, end=None).first()
                 if last_revision:
@@ -1942,11 +1952,11 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 else:
                     marketer['name'] = assigned_marketer.poc.employee_name
                     marketer['email'] = assigned_marketer.poc.email
-                if (date.today() - timedelta(days=170) < revision_date) and margin_percentage < 23:
+                if (date.today() - timedelta(days=170) < revision_date) and gte <= margin_percentage <= lte:
                     data.append({
                         "rate": consultant_rate,
                         "po_rate": project_rate,
-                        "doj": project.start_date,
+                        "last_revision": revision_date,
                         "consultant_id": consultant.id,
                         "margin": f"{margin_percentage}%",
                         "consultant_name": consultant.name,
@@ -1963,7 +1973,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                     {"name": "rate", "display_name": "Consultant Rate"},
                     {"name": "po_rate", "display_name": "Project Rate"},
                     {"name": "vendor_name", "display_name": "Vendor Name"},
-                    {"name": "po_start_date", "display_name": "Joining Date"},
+                    {"name": "last_revision", "display_name": "Last Revision"},
                     {"name": "margin", "display_name": "Margin"}
                 ]
                 file_url = export_to_csv(
