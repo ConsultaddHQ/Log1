@@ -1947,9 +1947,9 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 project_rate = project.rate
                 if revision_date < project.start_date:
                     revision_date = project.start_date
-                if start and revision_date<start:
+                if start and revision_date < start:
                     continue
-                if end and revision_date>end:
+                if end and revision_date > end:
                     continue
                 margin = project_rate - consultant_rate
                 margin_percentage = round((margin / project_rate) * 100, 2)
