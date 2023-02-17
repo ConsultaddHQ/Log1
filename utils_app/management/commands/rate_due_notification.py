@@ -61,7 +61,7 @@ class Command(BaseCommand):
                         "rate": consultant_rate,
                         "consultant_id": consultant.id,
                         "last_revision": revision_date,
-                        "margin": f"{margin_percentage}%",
+                        "margin": f"{margin}({margin_percentage}%)",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),

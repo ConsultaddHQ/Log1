@@ -313,6 +313,7 @@
         .email-masthead {
             padding: 25px 0;
             text-align: center;
+            display: none !important;
         }
 
         .email-masthead_logo {
@@ -339,7 +340,9 @@
         }
 
         .email-body_inner {
-            width: 650px;
+            /* width: 650px; */
+            width: 95%;
+            margin-top: 25px !important;
             margin: 0 auto;
             padding: 0;
             -premailer-width: 570px;
@@ -534,7 +537,7 @@
                             <tr>
                                 <td class="content-cell">
                                     <div class="f-fallback">
-                                        <h1>Hello</h1><br>
+                                        <h1>Hello Team,</h1>
                                         <h3>Below is a table containing the list of consultants whose rate revision is
                                             pending for the past five months. A CSV file is also attached along with
                                             this mail having same info. PFA</h3>
@@ -546,7 +549,7 @@
                                                 <th style="text-align: center;">Project Rate</th>
                                                 <th style="text-align: center;">Consultant Rate</th>
                                                 <th style="text-align: center;">Margin</th>
-                                                <th style="text-align: center;">Last Revision Date</th>
+                                                <th style="text-align: center;">Last Revision</th>
                                                 <th style="text-align: center;">Vendor Name</th>
                                               </tr>
                                                 {% for i in data %}
@@ -556,7 +559,7 @@
                                                 <td style="text-align:center;">{{i.consultant_email}}</td>
                                                 <td style="text-align:center;">{{i.po_rate}}</td>
                                                 <td style="text-align:center;">{{i.rate}}</td>
-                                                <td style="text-align:center;">{{i.margin}}</td>
+                                                <td style="text-align:center; min-width: 60px">{{i.margin}}</td>
                                                 <td style="text-align:center;">{{i.last_revision}}</td>
                                                 <td style="text-align:center;">{{i.vendor_name}}</td>
                                               </tr>
