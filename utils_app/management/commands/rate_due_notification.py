@@ -54,7 +54,7 @@ class Command(BaseCommand):
                 else:
                     marketer['name'] = assigned_marketer.poc.employee_name
                     marketer['email'] = assigned_marketer.poc.email
-                if (date.today() - timedelta(days=150) < revision_date) and margin_percentage < 30:
+                if (date.today() - timedelta(days=150) > revision_date) and margin_percentage < 22:
                     consultant_info = {
                         "counter": counter,
                         "po_rate": project_rate,
