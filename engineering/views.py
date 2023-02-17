@@ -56,7 +56,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     projects = projects.filter(submission__marketing_team__iexact=filters['teams'])
 
                 if 'status' in filters:
-                    projects = projects.filter(statuses__status=filters['status'], statuses__is_current=True)
+                    projects = projects.filter(statuses__status__istartswith=filters['status'], statuses__is_current= True)
 
                 if 'assignment' in filters:
                     if filters['assignment'] == 'assigned':
@@ -160,10 +160,8 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "assignment_count": {
                     "all": {
                         "display_name": "All",
-                        "count": Project.objects.filter(
-                            statuses__is_current=True, support_required=True,
-                            statuses__status__in=['new', 'received', 'on_boarded', 'joined'],
-                        ).count(),
+                        "count": Project.objects.all().count()
+
                     },
                     "assigned": {
                         "display_name": "Assigned",
@@ -179,7 +177,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     },
                     "old_projects": {
                         "display_name": "Old Projects",
-                        "count": projects.filter(created__lt="2021-10-01").count(),
+                        "count": projects.filter(created__lte="2021-10-01").count(),
                     },
                     "support_not_required": {
                         "display_name": "Support Not Required",
