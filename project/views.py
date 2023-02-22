@@ -1912,8 +1912,14 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
         first, last = get_page_limits(request)
         try:
             data = []
+            end = request.GET.get('end', None)
+            start = request.GET.get('start', None)
             query = request.GET.get('query', None)
             margin = request.GET.get('margin', 'below_21')
+            if start:
+                start = datetime.strptime(start, '%Y-%m-%d').date()
+            if end:
+                end = datetime.strptime(end, '%Y-%m-%d').date()
             if margin == '21-30':
                 gte, lte = 21, 30
             elif margin == 'above_30':
@@ -1941,6 +1947,10 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 project_rate = project.rate
                 if revision_date < project.start_date:
                     revision_date = project.start_date
+                if start and revision_date < start:
+                    continue
+                if end and revision_date > end:
+                    continue
                 margin = project_rate - consultant_rate
                 margin_percentage = round((margin / project_rate) * 100, 2)
                 marketer = {}
@@ -1952,17 +1962,30 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 else:
                     marketer['name'] = assigned_marketer.poc.employee_name
                     marketer['email'] = assigned_marketer.poc.email
-                if (date.today() - timedelta(days=170) < revision_date) and gte <= margin_percentage <= lte:
+                if (start or end) and gte <= margin_percentage <= lte:
                     data.append({
                         "rate": consultant_rate,
                         "po_rate": project_rate,
                         "last_revision": revision_date,
                         "consultant_id": consultant.id,
-                        "margin": f"{margin_percentage}%",
+                        "margin": f"{margin}({margin_percentage}%)",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),
                         "marketer_email": marketer.get('email'),
+                        'vendor_name': project.submission.lead.vendor_company.name
+                    })
+                elif (date.today() - timedelta(days=170) > revision_date) and gte <= margin_percentage <= lte:
+                    data.append({
+                        "rate": consultant_rate,
+                        "po_rate": project_rate,
+                        "last_revision": revision_date,
+                        "consultant_id": consultant.id,
+                        "consultant_name": consultant.name,
+                        "consultant_email": consultant.email,
+                        "marketer_name": marketer.get('name'),
+                        "marketer_email": marketer.get('email'),
+                        "margin": f"{margin}({margin_percentage}%)",
                         'vendor_name': project.submission.lead.vendor_company.name
                     })
             file_url = None
