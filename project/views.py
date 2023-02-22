@@ -1981,11 +1981,11 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                         "po_rate": project_rate,
                         "last_revision": revision_date,
                         "consultant_id": consultant.id,
-                        "margin": f"{margin}({margin_percentage}%)",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),
                         "marketer_email": marketer.get('email'),
+                        "margin": f"{margin}({margin_percentage}%)",
                         'vendor_name': project.submission.lead.vendor_company.name
                     })
             file_url = None

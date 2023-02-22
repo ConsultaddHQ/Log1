@@ -61,11 +61,11 @@ class Command(BaseCommand):
                         "rate": consultant_rate,
                         "consultant_id": consultant.id,
                         "last_revision": revision_date,
-                        "margin": f"{margin}({margin_percentage}%)",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),
                         "marketer_email": marketer.get('email'),
+                        "margin": f"{margin}({margin_percentage}%)",
                         'vendor_name': project.submission.lead.vendor_company.name
                     }
                     writer.writerow([
