@@ -506,8 +506,8 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def holiday(self, request):
         try:
             year = date.today().year
-            holidays = [f"01/02/{year}", f"02/16/{year}", f"02/20/{year}", f"05/29/{year}", f"06/19/{year}",
-                        f"07/04/{year}", f"09/04/{year}", f"10/09/{year}", f"11/11/{year}", f"11/13/{year}",
+            holidays = [f"01/02/{year}", f"01/16/{year}", f"02/20/{year}", f"05/29/{year}", f"06/19/{year}",
+                        f"07/04/{year}", f"09/04/{year}", f"10/09/{year}", f"11/13/{year}",
                         f"11/23/{year}", f"11/24/{year}", f"12/25/{year}"]
             return Response({"result": holidays}, status=200)
         except Exception as error:
