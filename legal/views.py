@@ -94,7 +94,7 @@ class PetitionViewSets(ModelViewSet):
                 consultants = consultants.filter(petitions__status=petition_status)
             total = consultants.distinct('id').count()
             data = []
-            for consultant in consultants.distinct('id')[first:last]:
+            for consultant in consultants.distinct('id'):
                 petition = consultant.petitions.latest('created')
                 data.append({
                     'consultant': {
@@ -119,7 +119,7 @@ class PetitionViewSets(ModelViewSet):
                 })
 
             data = sorted(data, key=lambda d: d['id'], reverse=True)
-            return Response({"results": data, "total": total}, status=200)
+            return Response({"results": data[first:last], "total": total}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
