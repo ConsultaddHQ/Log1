@@ -26,6 +26,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         filter_for = request.GET.get("filter_for", None)
         result_count = request.GET.get("result_count", 5)
         filter_by_time = request.GET.get("filter_by", None)
+        start_year = request.GET.get("start_year", None)
+        end_year = request.GET.get("end_year", None)
 
         try:
             if filter_for == 'my':
@@ -35,7 +37,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     Q(submission__created_by=request.user)
                 )
                 consultant = Consultant.objects.filter(marketing__marketer=request.user)
-                projects = Project.objects.filter(submission__created_by=request.user)
+                project_qs = Project.objects.filter(submission__created_by=request.user)
 
             elif filter_for == 'team':
                 if not team_name:
@@ -43,11 +45,11 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 sub = Submission.objects.filter(created_by__team__name=team_name)
                 consultant = Consultant.objects.filter(marketing__teams__name=team_name)
                 interviews = Interview.objects.filter(submission__marketing_team__name=team_name)
-                projects = Project.objects.filter(submission__marketing_team__name=team_name)
+                project_qs = Project.objects.filter(submission__marketing_team__name=team_name)
 
             else:
                 sub = Submission.objects.all()
-                projects = Project.objects.all()
+                project_qs = Project.objects.all()
                 interviews = Interview.objects.all()
                 consultant = Consultant.objects.all()
 
@@ -62,7 +64,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client',
                      'job_title')
 
-            upcoming_joining = projects.filter(
+            upcoming_joining = project_qs.filter(
                 statuses__status='on_boarded', statuses__is_current=True
             ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
@@ -71,7 +73,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 marketer_name=F('submission__created_by__employee_name'),
             ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
 
-            new_offers = projects.filter(
+            new_offers = project_qs.filter(
                 statuses__is_current=True,
                 start_date__gte=datetime.today(),
                 statuses__status__in=['new', 'received', 'on_boarded'],
@@ -89,7 +91,11 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             }
 
             last = date.today().replace(day=1) - timedelta(days=1)
-            if filter_by_time == 'last_month':
+            if start_year and end_year:
+                first = date(int(start_year), 1, 1)
+                last = date(int(end_year), 1, 1)
+
+            elif filter_by_time == 'last_month':
                 first = last.replace(day=1)
 
             elif filter_by_time == 'this_year':
@@ -105,7 +111,9 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             else:
                 first = date.today().replace(day=1)
                 last = date.today()
-
+            projects = project_qs.filter(
+                statuses__created__range=[first, last], submission__marketing_team__dept="Marketing"
+            ).order_by('id').distinct('id').all()
             total = projects.count()
             new = projects.filter(statuses__status='new', statuses__is_current=True).count()
             joined = projects.filter(statuses__status='joined', statuses__is_current=True).count()
@@ -116,19 +124,19 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             cancelled = projects.filter(statuses__status__istartswith='cancelled', statuses__is_current=True).count()
             terminated = projects.filter(statuses__status__istartswith='terminate', statuses__is_current=True).count()
             not_joined = projects.filter(
-                statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
-            ).count()
+                statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()).count()
 
             count = {
                 'total_offers': total,
-                'offer': projects.filter(created__range=[first, last]).count(),
-                'submission': sub.filter(created__range=[first, last]).count(),
+                'offer': project_qs.filter(created__range=[first, last], submission__marketing_team__dept="Marketing").count(),
+                'submission': sub.filter( created__range=[first, last], marketing_team__dept="Marketing")
+                    .exclude(status='draft').count(),
                 'on_project': consultant.filter(status='on_project', created__range=[first, last]).count(),
                 'ba_bench': consultant.filter(skills__contains='BA', status='on_bench', created__range=[first, last]).count(),
                 'dev_bench':  consultant.filter(status='on_bench', created__range=[first, last]).exclude(skills__exact='BA').count(),
                 'interview': interviews.filter(
-                    created__range=[first, last], status__in=['offer', 'feedback_due', 'failed']
-                ).count(),
+                    created__range=[first, last], submission__marketing_team__dept="Marketing"
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
             }
 
             offer_count = [
@@ -152,10 +160,18 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         team_name = request.GET.get("team", None)
         filter_for = request.GET.get("filter_for", None)
         filter_by_time = request.GET.get("filter_by", None)
+        start_year = request.GET.get("start_year", None)
+        end_year = request.GET.get("end_year", None)
 
         try:
             last = date.today().replace(day=1) - timedelta(days=1)
-            if filter_by_time == 'last_month':
+            if start_year and end_year:
+                first = date(int(start_year), 1, 1)
+                last = date(int(end_year), 1, 1)
+                prev_last = last + timedelta(days=(last - first).days)
+                prev_first = first + timedelta(days=(last - first).days)
+
+            elif filter_by_time == 'last_month':
                 first = last.replace(day=1)
 
                 prev_last = last + relativedelta(months=-1)
@@ -289,6 +305,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         team_name = request.GET.get("team", None)
         filter_for = request.GET.get("filter_for", "")
         filter_by_time = request.GET.get("filter_by", "")
+        start_year = request.GET.get("start_year", None)
+        end_year = request.GET.get("end_year", None)
 
         try:
             if filter_for == 'my':
@@ -310,6 +328,11 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             last = date.today().replace(day=1) - timedelta(days=1) + relativedelta(months=-(diff - 1))
             first = last.replace(day=1)
+
+            if start_year and end_year:
+                first = date(int(start_year), 1, 1)
+                last = date(int(end_year), 1, 1)
+                diff = (relativedelta(last, first)).years*12
             for i in range(diff):
                 projects_count = projects.filter(created__range=[first, last]).count()
                 data = {
