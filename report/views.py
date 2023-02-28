@@ -779,8 +779,7 @@ class MarketingReportViewSets(GenericViewSet):
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
                     submission__marketing_team__id=team_id,
-                    statuses__status__in=['new', 'received', 'on_boarded'],
-                    statuses__created__gte=start, statuses__created__lte=end,
+                    created__gte=start, created__lte=end,
                 ).order_by('id').distinct('id').count()
                 joining_count = Project.objects.filter(
                     statuses__status='joined',
