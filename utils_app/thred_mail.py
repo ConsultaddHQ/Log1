@@ -43,20 +43,18 @@ def get_field(email, field_name):
             return m['value']   
 
 
-
-def add_attachments(email, attachments, max_MB: int = 25):
-    mime_consumer = {'text': text.MIMEText,
-                     'image': image.MIMEImage,
-                     'audio': audio.MIMEAudio }
+def add_attachments(email, attachments, max_MB= int(25)):
+    mime_consumer = {
+        'text': text.MIMEText, 'image': image.MIMEImage, 'audio': audio.MIMEAudio
+    }
 
     sz = len(bytes(email))
-    added = 0
     count = 0
     for f in attachments:
         print(sz / 1024 / 1024)
         margin = max_MB * 1024 * 1024 - sz
         if margin <= 100000:
-            # print(f'Message size limit reached. Added first {count} of {len(attachments)}')
+            # Message size limit reached. Added first {count} of {len(attachments)}'
             break
         mimetype, encoding = mimetypes.guess_type(f)
         if mimetype is None or encoding is not None:
@@ -76,12 +74,16 @@ def add_attachments(email, attachments, max_MB: int = 25):
             # Use the known conversion.
             print(f'Reading file of type {main_type}')
             with open(f, 'rb') as source:
-                attachment = consumer(source.read(), _subtype=sub_type)
+                if sub_type == 'csv':
+                    attachment = consumer(source.read().decode('UTF-8'), _subtype=sub_type)
+                else:
+                    attachment = consumer(source.read(), _subtype=sub_type)
 
         encoders.encode_base64(attachment)
         attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(f))
         if len(bytes(attachment)) >= margin:
-            margin = 0 # Add your own "skip this file" or "these should be links from Drive" logic.
+            # Add your own "skip this file" or "these should be links from Drive" logic.
+            margin = 0
             return True
         else:
             added = len(bytes(attachment))
@@ -92,7 +94,6 @@ def add_attachments(email, attachments, max_MB: int = 25):
     # print(f'Email size is now ~{len(bytes(email)) / 1024 / 1024} MB')
 
 
-
 # def add_file(filepath, filename, object):
 #     attachment = open(filepath, "rb")
 #     p = base.MIMEBase('application', 'octet-stream')
@@ -101,7 +102,6 @@ def add_attachments(email, attachments, max_MB: int = 25):
 #     p.add_header('Content-Disposition', "attachment; filename= %s" % filename)
 #     object.attach(p)
 #     return object        
-
 
 def create_message(from_email, mail_data):
     body = render_to_string(mail_data["template"], mail_data["context"])
