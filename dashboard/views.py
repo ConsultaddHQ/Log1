@@ -28,7 +28,6 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         filter_by_time = request.GET.get("filter_by", None)
         start_year = request.GET.get("start_year", None)
         end_year = request.GET.get("end_year", None)
-
         try:
             if filter_for == 'my':
                 sub = Submission.objects.filter(created_by=request.user)
@@ -65,7 +64,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                      'job_title')
 
             upcoming_joining = project_qs.filter(
-                statuses__status='on_boarded', statuses__is_current=True
+                statuses__status='on_boarded', statuses__is_current=True, start_date__gte=datetime.today()
             ).order_by('-start_date')[:result_count].annotate(
                 client=F('submission__client'),
                 vendor=F('submission__lead__vendor_company__name'),
@@ -168,8 +167,14 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
-                prev_last = last + timedelta(days=(last - first).days)
-                prev_first = first + timedelta(days=(last - first).days)
+                prev_last = last - timedelta(days=(last - first).days)
+                prev_first = first - timedelta(days=(last - first).days)
+
+            elif filter_by_time == 'this_year':
+                first = last.replace(day=1, month=1)
+
+                prev_last = last - timedelta(days=(last - first).days)
+                prev_first = first - timedelta(days=(last - first).days)
 
             elif filter_by_time == 'last_month':
                 first = last.replace(day=1)
@@ -192,31 +197,35 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             # this_month
             else:
                 last = date.today()
-                prev_first, prev_last = None, None
                 first = date.today().replace(day=1)
+                prev_last = last - timedelta(days=(last - first).days)
+                prev_first = first - timedelta(days=(last - first).days)
 
+            project = Project.objects.filter(submission__marketing_team__dept="Marketing")
             if filter_for == 'my':
-                new_po = Project.objects.filter(
+                new_po = project.filter(
                     statuses__status='joined',
                     submission__created_by=request.user,
                     statuses__created__range=[first, last],
                 ).count()
 
-                offers_count = Project.objects.filter(
-                    submission__created__range=[first, last], submission__created_by=request.user
+                offers_count = project.filter(
+                    created__range=[first, last], submission__created_by=request.user
                 ).count()
 
-                submissions_count = Submission.objects.filter(
-                    created__range=[first, last], created_by=request.user
-                ).count()
+                submissions_count = project.filter(
+                    created__range=[first, last],
+                    created_by=request.user,
+                    marketing_team__dept="Marketing"
+                ) .exclude(status='draft').count(),
 
                 interviews_count = Interview.objects.filter(
                     submission__created_by=request.user,
-                    submission__created__range=[first, last],
-                    status__in=['offer', 'failed', 'feedback_due'],
-                ).count()
+                    created__range=[first, last],
+                    submission__marketing_team__dept="Marketing"
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
 
-                joining_count = Project.objects.filter(
+                joining_count = project.filter(
                     statuses__status='joined',
                     submission__created_by=request.user,
                     submission__created__range=[first, last],
@@ -226,48 +235,51 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 if not team_name:
                     team_name = request.user.team.name
 
-                new_po = Project.objects.filter(
+                new_po = project.filter(
                     statuses__status='joined',
                     statuses__created__range=[first, last],
                     submission__marketing_team__name=team_name,
                 ).count()
 
-                offers_count = Project.objects.filter(
-                    submission__created__range=[first, last], submission__marketing_team__name=team_name
+                offers_count = project.filter(
+                    created__range=[first, last], submission__marketing_team__name=team_name
                 ).count()
 
                 submissions_count = Submission.objects.filter(
-                    created__range=[first, last], created_by__team__name=team_name
-                ).count()
+                    created__range=[first, last],
+                    created_by__team__name=team_name,
+                    marketing_team__dept="Marketing"
+                ).exclude(status='draft').count(),
 
                 interviews_count = Interview.objects.filter(
                     submission__created__range=[first, last],
                     submission__marketing_team__name=team_name,
-                    status__in=['offer', 'failed', 'feedback_due'],
-                ).count()
+                    submission__marketing_team__dept="Marketing"
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
 
-                joining_count = Project.objects.filter(
+                joining_count = project.filter(
                     statuses__status='joined',
                     submission__created__range=[first, last],
                     submission__marketing_team__name=team_name
                 ).count()
 
             else:
-                submissions_count = Submission.objects.filter(created__range=[first, last]).count()
-                offers_count = Project.objects.filter(submission__created__range=[first, last]).count()
+                submissions_count = Submission.objects.filter(
+                    created__range=[first, last], marketing_team__dept="Marketing").exclude(status='draft').count()
+                offers_count = project.filter(created__range=[first, last]).count()
                 interviews_count = Interview.objects.filter(
-                    submission__created__range=[first, last], status__in=['offer', 'failed', 'feedback_due']
-                ).count()
-                new_po = Project.objects.filter(
+                    created__range=[first, last], submission__marketing_team__dept="Marketing"
+                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                new_po = project.filter(
                     statuses__status='joined', statuses__created__range=[first, last]
                 ).count()
-                joining_count = Project.objects.filter(
-                    statuses__status='joined', submission__created__range=[first, last]
+                joining_count = project.filter(
+                    statuses__status='joined', submission__created__range=[first, last],
                 ).count()
 
             percent = None
             if filter_by_time != 'this_month':
-                prev_po = Project.objects.filter(
+                prev_po = project.filter(
                     statuses__status='joined', created__range=[prev_first, prev_last]
                 ).count()
 
@@ -310,11 +322,13 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
         try:
             if filter_for == 'my':
-                projects = Project.objects.filter(submission__created_by=request.user)
+                projects = Project.objects.filter(
+                    submission__created_by=request.user, submission__marketing_team__dept="Marketing")
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
-                projects = Project.objects.filter(submission__marketing_team__name=team_name)
+                projects = Project.objects.filter(
+                    submission__marketing_team__name=team_name, submission__marketing_team__dept="Marketing")
             else:
                 projects = Project.objects.all()
 
