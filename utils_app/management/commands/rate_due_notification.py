@@ -6,7 +6,7 @@ from django.core.management import BaseCommand
 
 from employee.models import User
 from project.models import Project
-from utils_app.mailing import send_email_attachment_multiple
+from utils_app.thred_mail import send_email_attachment_multiple
 from consultant.models import Consultant, ConsultantRateRevision, ConsultantPOC
 from utils_app.utils import create_cron_error, create_cron_object, delete_temp_file
 
@@ -22,10 +22,9 @@ class Command(BaseCommand):
             consultants = Consultant.objects.filter(status__in=['on_project'])
             file = open('consultant_rate_revision.csv', 'w+')
             writer = csv.writer(file)
-            writer.writerow(
-                ['Consultant Name', 'Marketer Name', "Project rate", 'Consultant rate', 'Margin', 'Last Revised Date',
-                 'Vendor Name']
-            )
+            writer.writerow([
+                'Consultant Name', 'Marketer Name', 'Vendor Name', 'Last Revised Date', 'Margin', "Project rate", 'Consultant rate'
+            ])
             for consultant in consultants:
                 last_revision = ConsultantRateRevision.objects.filter(consultant_id=consultant.id, end=None).first()
                 if last_revision:
@@ -69,9 +68,8 @@ class Command(BaseCommand):
                         'vendor_name': project.submission.lead.vendor_company.name
                     }
                     writer.writerow([
-                        consultant_info['consultant_name'], consultant_info['marketer_name'],
-                        consultant_info['po_rate'], consultant_info['rate'], consultant_info['margin'],
-                        consultant_info['last_revision'], consultant_info['vendor_name']
+                        consultant_info['consultant_name'], consultant_info['marketer_name'], consultant_info['vendor_name'],
+                        consultant_info['last_revision'], consultant_info['margin'], consultant_info['po_rate'], consultant_info['rate']
                     ])
                     data.append(consultant_info)
                     counter += 1
