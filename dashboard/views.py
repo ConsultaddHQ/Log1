@@ -217,7 +217,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     created__range=[first, last],
                     created_by=request.user,
                     marketing_team__dept="Marketing"
-                ) .exclude(status='draft').count(),
+                ) .exclude(status='draft').count()
 
                 interviews_count = Interview.objects.filter(
                     submission__created_by=request.user,
@@ -249,7 +249,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     created__range=[first, last],
                     created_by__team__name=team_name,
                     marketing_team__dept="Marketing"
-                ).exclude(status='draft').count(),
+                ).exclude(status='draft').count()
 
                 interviews_count = Interview.objects.filter(
                     submission__created__range=[first, last],
