@@ -800,7 +800,7 @@ class MarketingReportViewSets(GenericViewSet):
                     "team": team.name.title(),
                     "offer_count": offer_count,
                     "scrum_master": scrum_master,
-                    "joining_count": joining_count,
+                    "joined_count": joining_count,
                     "interview_count": interview_count,
                     "bench_consultant": bench_consultant,
                     "submission_count": submission_count,
@@ -831,7 +831,7 @@ class MarketingReportViewSets(GenericViewSet):
                 {"name": "submission_count", "display_name": "Submission Count"},
                 {"name": "interview_count", "display_name": "Interview Count"},
                 {"name": "offer_count", "display_name": "Offer Count"},
-                {"name": "joining_count", "display_name": "Joining Count"},
+                {"name": "joined_count", "display_name": "Joined Count"},
             ]
             if export:
                 url = export_to_csv(
