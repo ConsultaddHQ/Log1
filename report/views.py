@@ -880,7 +880,7 @@ class MarketingReportViewSets(GenericViewSet):
                 {"display_name": "Submission Count", "count": submission_count, "default": submission_count},
                 {"display_name": "Interview Count", "count": interview_count, "default": submission_count},
                 {"display_name": "Offer Count", "count": offer_count, "default": submission_count},
-                {"display_name": "Joining Count", "count": joining_count, "default": submission_count},
+                {"display_name": "Joined Count", "count": joining_count, "default": submission_count},
                 {"display_name": "Termination Count", "count": termination_count, "default": submission_count}
             ]
             return Response({"data": counts_data}, status=200)
