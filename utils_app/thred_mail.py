@@ -79,7 +79,7 @@ def add_attachments(email, attachments, max_MB= int(25)):
                 else:
                     attachment = consumer(source.read(), _subtype=sub_type)
 
-        encoders.encode_base64(attachment)
+        # encoders.encode_base64(attachment)
         attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(f))
         if len(bytes(attachment)) >= margin:
             # Add your own "skip this file" or "these should be links from Drive" logic.

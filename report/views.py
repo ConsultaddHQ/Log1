@@ -779,8 +779,7 @@ class MarketingReportViewSets(GenericViewSet):
                 ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
                 offer_count = Project.objects.filter(
                     submission__marketing_team__id=team_id,
-                    statuses__status__in=['new', 'received', 'on_boarded'],
-                    statuses__created__gte=start, statuses__created__lte=end,
+                    created__gte=start, created__lte=end,
                 ).order_by('id').distinct('id').count()
                 joining_count = Project.objects.filter(
                     statuses__status='joined',
@@ -801,7 +800,7 @@ class MarketingReportViewSets(GenericViewSet):
                     "team": team.name.title(),
                     "offer_count": offer_count,
                     "scrum_master": scrum_master,
-                    "joining_count": joining_count,
+                    "joined_count": joining_count,
                     "interview_count": interview_count,
                     "bench_consultant": bench_consultant,
                     "submission_count": submission_count,
@@ -832,7 +831,7 @@ class MarketingReportViewSets(GenericViewSet):
                 {"name": "submission_count", "display_name": "Submission Count"},
                 {"name": "interview_count", "display_name": "Interview Count"},
                 {"name": "offer_count", "display_name": "Offer Count"},
-                {"name": "joining_count", "display_name": "Joining Count"},
+                {"name": "joined_count", "display_name": "Joined Count"},
             ]
             if export:
                 url = export_to_csv(
@@ -881,7 +880,7 @@ class MarketingReportViewSets(GenericViewSet):
                 {"display_name": "Submission Count", "count": submission_count, "default": submission_count},
                 {"display_name": "Interview Count", "count": interview_count, "default": submission_count},
                 {"display_name": "Offer Count", "count": offer_count, "default": submission_count},
-                {"display_name": "Joining Count", "count": joining_count, "default": submission_count},
+                {"display_name": "Joined Count", "count": joining_count, "default": submission_count},
                 {"display_name": "Termination Count", "count": termination_count, "default": submission_count}
             ]
             return Response({"data": counts_data}, status=200)

@@ -86,16 +86,17 @@ class PetitionViewSets(ModelViewSet):
                     Q(petitions__assigned_to__employee_name=query) |
                     Q(petitions__beneficiary__name__istartswith=query)
                 )
-            if petition_type:
-                consultants = consultants.filter(petitions__petition_type=petition_type)
-            if employer:
-                consultants = consultants.filter(petitions__employer=employer)
             if petition_status:
                 consultants = consultants.filter(petitions__status=petition_status)
-            total = consultants.count()
+            if employer:
+                consultants = consultants.filter(petitions__employer=employer)
+            dst_consultants = consultants.distinct('id')
             data = []
-            for consultant in consultants.distinct('id')[first:last]:
-                petition = consultant.petitions.latest('created')
+            for consultant in dst_consultants:
+                if petition_type:
+                    petition = consultant.petitions.filter(petition_type=petition_type).first()
+                else:
+                    petition = consultant.petitions.latest('created')
                 data.append({
                     'consultant': {
                         "id": consultant.id,
@@ -117,7 +118,10 @@ class PetitionViewSets(ModelViewSet):
                     'total_documents': DocumentList.objects.filter(petition__beneficiary=consultant).exclude(
                         doc_type__name='other').count(),
                 })
-            return Response({"results": data, "total": total}, status=200)
+
+            data = sorted(data, key=lambda d: d['id'], reverse=True)
+
+            return Response({"results": data[first:last], "total": len(data)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
