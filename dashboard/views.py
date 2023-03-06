@@ -213,7 +213,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     created__range=[first, last], submission__created_by=request.user
                 ).count()
 
-                submissions_count = project.filter(
+                submissions_count = Submission.objects.filter(
                     created__range=[first, last],
                     created_by=request.user,
                     marketing_team__dept="Marketing"
