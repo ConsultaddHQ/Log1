@@ -973,33 +973,34 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
 
     @action(methods=['get'], detail=False, url_path='similar_submission')
     def submission_check(self, request):
-        vendor_company = ""
         try:
             filter_by = request.GET.get('filter_by')
             if request.GET.get('lead_id') == "0":
-                qs = VendorCompany.objects.filter(id=request.GET.get('company_id'))
-                if qs:
-                    vendor_company = qs.first()
+                try:
+                    obj = get_object_or_404(VendorCompany, id=request.GET.get('company_id'))
+                    vendor_company = obj.name
+                except Exception as e:
+                    vendor_company = ""
             else:
                 lead = get_object_or_404(Lead, id=request.GET.get('lead_id'))
                 vendor_company = lead.vendor_company.name
 
-            f_vendor = Q(lead__vendor_company__name__contains=vendor_company)
-            f_client = Q(client__iexact=request.GET.get('client'))
+            f_vendor = Q(lead__vendor_company__name__icontains=vendor_company)
+            f_client = Q(client__icontains=request.GET.get('client'))
             f_consultant = Q(consultant_marketing__consultant__id=request.GET.get('consultant_id'))
 
             if filter_by == "client":
-                queryset = Submission.objects.filter(f_client & f_consultant)
+                queryset = Submission.objects.filter(f_client, f_consultant)
             elif filter_by == "vendor":
-                queryset = Submission.objects.filter(f_vendor & f_consultant)
+                queryset = Submission.objects.filter(f_vendor, f_consultant)
             else:
-                queryset = Submission.objects.filter(f_vendor & f_consultant & f_client)
+                queryset = Submission.objects.filter(f_vendor, f_consultant, f_client)
 
             data = queryset.annotate(
                 marketer_name=F('created_by__employee_name'),
                 consultant_name=F('consultant_marketing__consultant__name'),
                 vendor_company=F('lead__vendor_company__name')
-            ).values('consultant_name', 'marketer_name', 'created', 'status', 'vendor_company', 'client')
+            ).values('consultant_name', 'marketer_name', 'created', 'status', 'vendor_company', 'client', 'id')
 
             return Response({"data": data, "total": len(data)}, status=200)
         except Exception as error:
