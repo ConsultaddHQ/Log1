@@ -979,7 +979,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 try:
                     obj = get_object_or_404(VendorCompany, id=request.GET.get('company_id'))
                     vendor_company = obj.name
-                except Exception as e:
+                except VendorCompany.DoesNotExist:
                     vendor_company = ""
             else:
                 lead = get_object_or_404(Lead, id=request.GET.get('lead_id'))
