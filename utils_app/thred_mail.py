@@ -55,7 +55,7 @@ def add_attachments(email, attachments, max_MB= int(25)):
         margin = max_MB * 1024 * 1024 - sz
         if margin <= 100000:
             # Message size limit reached. Added first {count} of {len(attachments)}'
-            break
+            return True
         mimetype, encoding = mimetypes.guess_type(f)
         if mimetype is None or encoding is not None:
             mimetype = 'application/octet-stream'
@@ -84,13 +84,13 @@ def add_attachments(email, attachments, max_MB= int(25)):
         if len(bytes(attachment)) >= margin:
             # Add your own "skip this file" or "these should be links from Drive" logic.
             margin = 0
-            return True
+            continue
         else:
             added = len(bytes(attachment))
             sz += added
             count += 1
             email.attach(attachment)
-            return False
+    return False
     # print(f'Email size is now ~{len(bytes(email)) / 1024 / 1024} MB')
 
 
