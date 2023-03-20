@@ -817,7 +817,7 @@ class MarketingReportViewSets(GenericViewSet):
                 "team": "Total",
                 "scrum_master": "",
                 "offer_count": total_offers,
-                "joining_count": total_joining,
+                "joined_count": total_joining,
                 "bench_consultant": total_bench,
                 "interview_count": total_interviews,
                 "submission_count": total_submissions,
