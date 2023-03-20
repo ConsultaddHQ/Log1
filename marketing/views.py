@@ -974,7 +974,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     @action(methods=['get'], detail=False, url_path='similar_submission')
     def submission_check(self, request):
         try:
-            filter_by = request.GET.get('filter_by')
+            filter_by = request.GET.get('filter_by', None)
             if request.GET.get('lead_id') == "0":
                 try:
                     obj = get_object_or_404(VendorCompany, id=request.GET.get('company_id'))
