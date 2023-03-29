@@ -6,7 +6,7 @@ from constance import config
 from employee.models import User
 from marketing.models import Submission
 from consultant.models import Consultant
-from utils_app.mailing import send_email
+from utils_app.thred_mail import send_email
 from utils_app.utils import create_cron_error, create_cron_object
 
 
@@ -64,7 +64,7 @@ class Command(BaseCommand):
                 }
 
                 reply_to = [config.RELATIONS]
-                mail_res, msg = send_email(mail_data, "marketing@consultadd.com", reply_to)
+                mail_id, mail_res, from_email = send_email(mail_data, "marketing@consultadd.com", reply_to)
 
                 submission_data.append({
                     "scrum_masters": cc,
@@ -87,6 +87,7 @@ class Command(BaseCommand):
                     'days': days,
                 },
             }
-            send_email(mail_data, "marketing@consultadd.com")
+            if submission_data:
+                send_email(mail_data, "marketing@consultadd.com")
         except Exception as error:
             create_cron_error(job, error)
