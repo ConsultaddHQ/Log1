@@ -89,21 +89,24 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 "interviews": upcoming_interviews
             }
 
-            last = date.today().replace(day=1) - timedelta(days=1)
+            last = date.today()
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
 
             elif filter_by_time == 'last_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last.replace(day=1)
 
             elif filter_by_time == 'this_year':
                 first = last.replace(day=1) + relativedelta(months=-(last.month-1))
 
             elif filter_by_time == 'last_6_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
             elif filter_by_time == 'last_12_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last + timedelta(days=1) + relativedelta(months=-12)
 
             # this_month
@@ -163,7 +166,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         end_year = request.GET.get("end_year", None)
 
         try:
-            last = date.today().replace(day=1) - timedelta(days=1)
+            last = date.today()
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
@@ -177,18 +180,21 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 prev_first = first - timedelta(days=(last - first).days)
 
             elif filter_by_time == 'last_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last.replace(day=1)
 
                 prev_last = last + relativedelta(months=-1)
                 prev_first = first + relativedelta(months=-1)
 
             elif filter_by_time == 'last_6_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
                 prev_last = last + relativedelta(months=-6)
                 prev_first = first + relativedelta(months=-6)
 
             elif filter_by_time == 'last_12_month':
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last + timedelta(days=1) + relativedelta(months=-12)
 
                 prev_last = last + relativedelta(months=-12)
@@ -196,7 +202,6 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             # this_month
             else:
-                last = date.today()
                 first = date.today().replace(day=1)
                 prev_last = last - timedelta(days=(last - first).days)
                 prev_first = first - timedelta(days=(last - first).days)

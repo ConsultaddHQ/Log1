@@ -88,7 +88,7 @@ def date_filter(queryset, timestamp, field_str):
 # Change status of scheduled and rescheduled Interviews to feedback_due
 def change_to_feedback_due():
     try:
-        tz = timezone('EST')
+        tz = timezone('US/Eastern')
         time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
         previous_interviews = Interview.objects.filter(
             start_time__lte=time_est, status__in=['scheduled', 'rescheduled']
