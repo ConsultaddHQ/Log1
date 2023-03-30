@@ -1024,7 +1024,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             for record in records:
                 record["log1"] = record['log1'] if record.get('log1') else False
                 if record.get('role', []):
-                    roles.append(record.get('role', [])[0].replace(' ', '').split(","))
+                    roles.append(record.get('role', []).replace(' ', '').split(","))
                 record_list.append(User(
                     email=record.get('email'),
                     phone=record.get('phone'),
@@ -1035,15 +1035,15 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                     is_active=True if record.get('log1') else False,
                     password=make_password(record.get('password', 'consultadd')),
                     team=Team.objects.filter(
-                        name=record.get('team').capitalize()
+                        name=record.get('team').strip().capitalize()
                     ).first() if isinstance(record.get('team'), str) else None
                 ))
-
             users = User.objects.bulk_create(record_list)
             for user, role in zip(record_list, roles):
                 for role_name in role:
-                    role_object = Role.objects.filter(name=role_name).first()
-                    user.role.add(role_object)
+                    role_object = Role.objects.filter(name=role_name.lower().strip()).first()
+                    if role_object:
+                        user.role.add(role_object)
             users = [user.employee_id for user in users]
             result["users"] = users
             result["msg"] = f"{len(users)} users  Created"
