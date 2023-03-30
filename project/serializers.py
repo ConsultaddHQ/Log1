@@ -31,7 +31,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_created(obj):
-        return obj.start_date
+        return obj.created
 
     @staticmethod
     def get_client(obj):

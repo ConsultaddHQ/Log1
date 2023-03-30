@@ -759,7 +759,7 @@ class MarketingReportViewSets(GenericViewSet):
                 start = date.today() - timedelta(days=30)
             if not end:
                 end = date.today()
-
+            end = end + timedelta(days=1) if type(end) is not str else datetime.strptime(end, '%Y-%m-%d').date() + timedelta(days=1)
             data, url = list(), ""
             total_bench = total_submissions = total_interviews = total_joining = total_offers = total_termination = 0
             teams = Team.objects.filter(dept='Marketing')
