@@ -1023,67 +1023,72 @@ class MessageCard:
             if payload.get('data') is None:
                 return "No data to display", "ok"
             file_url = create_csv_file(payload)
-            card_data = {
-                "blocks": [
-                    {
-                        "type": "header",
-                        "text": {
-                            "type": "plain_text",
-                            "text": ":memo: Pool Candidates",
-                            "emoji": True
-                        }
-                    },
-                    {
-                        "type": "divider"
-                    },
-                ]
+            card_data = {}
+            head_block = {
+                "type": "header",
+                "text": {
+                    "emoji": True,
+                    "type": "plain_text",
+                    "text": f":memo: Pool Candidates\t   \t   {date.today().strftime('%d %b, %Y')}"
+                }
             }
-            sl = 1
-            for data in payload['data']:
-                if sl < 10:
-                    first_column = f"`{sl}.` *Consultant:* {data.get('consultant', None)}\n\t   " \
-                                   f"*Team:* {data.get('team')}\n\t   *Skills*: {data.get('skills')}"
-                else:
-                    first_column = f"`{sl}.` *Consultant:* {data.get('consultant', None)}\n\t    " \
-                                   f"*Team:* {data.get('team')}\n\t    *Skills*: {data.get('skills')}"
+            content_len = len(payload['data'])
+            portions = int(content_len/15) + 1
+            first, last = 0, 15
+            for portion in range(0, portions):
+                sl = 1
+                card_data['blocks'] = []
+                if payload['data'][first: last]:
+                    card_data['blocks'].append(head_block)
+                for data in payload['data'][first: last]:
+                    if sl < 10:
+                        first_column = f"`{sl}.` *Consultant:* {data.get('consultant', None)}\n\t   " \
+                                       f"*Team:* {data.get('team')}\n\t   *Skills*: {data.get('skills')}"
+                    else:
+                        first_column = f"`{sl}.` *Consultant:* {data.get('consultant', None)}\n\t    " \
+                                       f"*Team:* {data.get('team')}\n\t    *Skills*: {data.get('skills')}"
 
-                card_data['blocks'].append(
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": first_column
-                            },
-                            {
-                                "type": "mrkdwn",
-                                "text": f"`Days` {data.get('days')}\n `Recruiter` {data.get('recruiter', None)} "
-                                        f"\n `Marketer` {data.get('marketer')}\n `Open Offer` {data.get('open_offer')}"
-                            }
-                        ]
-                    },
-                )
-                sl += 1
-            card_data['blocks'].append(
-                {
-                    "type": "actions",
-                    "elements": [
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": "Download CSV"
+                    card_data['blocks'].append(
+                        {
+                            "type": "section",
+                            "fields": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": first_column
                                 },
-                                "style": "primary",
-                                "url": file_url,
-                                "value": "click_me_123",
-                                "action_id": "button-action"
-                            }
-                    ]
-                },
-            )
-            res, msg = post_msg_using_webhook(url, card_data)
-            return res, msg
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"`Days` {data.get('days')}\n `Recruiter` {data.get('recruiter', None)} "
+                                            f"\n `Marketer` {data.get('marketer')}\n `Open Offer` {data.get('open_offer')}"
+                                }
+                            ]
+                        },
+                    )
+                    sl += 1
+                if payload['data'][first: last]:
+                    card_data['blocks'].append(
+                        {
+                            "type": "actions",
+                            "elements": [
+                                    {
+                                        "type": "button",
+                                        "text": {
+                                            "type": "plain_text",
+                                            "emoji": True,
+                                            "text": "Download CSV"
+                                        },
+                                        "style": "primary",
+                                        "url": file_url,
+                                        "value": "click_me_123",
+                                        "action_id": "button-action"
+                                    }
+                            ]
+                        },
+                    )
+                    post_msg_using_webhook(url, card_data)
+                first = last
+                data_left = content_len - (portion+1)*15
+                last = last + 16 + data_left if data_left <= 20 else last + 16
+            print(content_len)
         except Exception as error:
             return error, "error"
