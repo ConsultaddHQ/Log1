@@ -3189,7 +3189,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
                 return Response({"message": "You don't have access"}, status=400)
 
             data = request.data
-            team = Team.objects.filter(name=data['name'])
+            name = data['name'].replace(' ', '')
+            team = Team.objects.filter(name__iexact=name)
             if team:
                 return Response({"message": "Team name already in use"}, status=400)
             Team.objects.create(name=data['name'], scrum_timing=data['scrum_timing'],
@@ -3202,6 +3203,10 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     def update(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
+            name = request.data['name'].replace(' ', '')
+            existing_team = Team.objects.filter(name__iexact=name)
+            if existing_team:
+                return Response({"message": "Team name already in use"}, status=400)
             serializer = TeamSerializer(team, data=request.data, partial=True)
             serializer.is_valid()
             serializer.save()
