@@ -103,7 +103,7 @@ class PetitionViewSets(ModelViewSet):
                         "name": consultant.name,
                         "email": consultant.email,
                         "status": consultant.status,
-                        "is_active": consultant.is_active,
+                        "is_active": False if consultant.status == 'terminated' else True,
                     },
                     'id': petition.id,
                     'status': petition.status,
