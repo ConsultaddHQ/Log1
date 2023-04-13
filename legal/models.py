@@ -23,7 +23,6 @@ PETITION_TYPES = (
 )
 
 PETITION_STATUSES = (
-    ('new', 'New'),
     ('rfe', 'RFE'),
     ('denied', 'Denied'),
     ('shipped', 'Shipped'),

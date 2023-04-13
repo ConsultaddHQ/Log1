@@ -90,20 +90,19 @@ class PetitionViewSets(ModelViewSet):
                 consultants = consultants.filter(petitions__status=petition_status)
             if employer:
                 consultants = consultants.filter(petitions__employer=employer)
+            if petition_type:
+                consultants = consultants.filter(petitions__petition_type=petition_type)
             dst_consultants = consultants.distinct('id')
             data = []
             for consultant in dst_consultants:
-                if petition_type:
-                    petition = consultant.petitions.filter(petition_type=petition_type).first()
-                else:
-                    petition = consultant.petitions.latest('created')
+                petition = consultant.petitions.latest('created')
                 data.append({
                     'consultant': {
                         "id": consultant.id,
                         "name": consultant.name,
                         "email": consultant.email,
                         "status": consultant.status,
-                        "is_active": consultant.is_active,
+                        "is_active": False if consultant.status == 'terminated' else True,
                     },
                     'id': petition.id,
                     'status': petition.status,
@@ -397,6 +396,7 @@ class PetitionViewSets(ModelViewSet):
             file = request.FILES.get('file', None)
             if lca_no:
                 petition.lca_no = lca_no
+                petition.status = 'lca_filed'
                 petition.save()
 
             elif file:
@@ -407,6 +407,8 @@ class PetitionViewSets(ModelViewSet):
                     doc_type_id='25',
                     creator=request.user,
                 )
+                petition.status = 'lca_approved'
+                petition.save()
             else:
                 return Response({'error': 'Data is missing'}, status=400)
 
