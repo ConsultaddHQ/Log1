@@ -1968,7 +1968,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                         "po_rate": project_rate,
                         "last_revision": revision_date,
                         "consultant_id": consultant.id,
-                        "margin": f"{margin}({margin_percentage}%)",
+                        "margin": f"{round(margin, 1)}({margin_percentage}%)",
                         "consultant_name": consultant.name,
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),
