@@ -1985,7 +1985,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                         "consultant_email": consultant.email,
                         "marketer_name": marketer.get('name'),
                         "marketer_email": marketer.get('email'),
-                        "margin": f"{margin}({margin_percentage}%)",
+                        "margin": f"{round(margin, 1)}({margin_percentage}%)",
                         'vendor_name': project.submission.lead.vendor_company.name
                     })
             file_url = None
