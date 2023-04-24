@@ -505,6 +505,7 @@ def create_consultant(request, creator_id):
             return consultant, "exists"
         else:
             consultant = Consultant.objects.create(
+                is_active=True,
                 work_type='full_time',
                 phone_no=phone_numbers,
                 links=links, skills=skills,
