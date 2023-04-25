@@ -19,10 +19,10 @@ from consultant.models import Consultant
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
 from log1.utils import write_exception, ERROR_MSG
-from project.utils import check_days, mark_in_active
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
+from project.utils import check_days, mark_in_active, timesheet_submission_mail
 from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, \
     TimetrackEvent, TimetrackEventFeedback
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
@@ -61,9 +61,9 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
         if obj.submission.work_type == 'C2C':
             days = 6
-        elif frequency == 'biweekly':
+        elif frequency == 'Biweekly':
             days = 13
-        elif frequency == 'monthly':
+        elif frequency == 'Monthly':
             days = 29
         else:
             days = 6
@@ -116,7 +116,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             data = {
                 "timesheet": hasattr(project, 'timesheets'),
                 "project_type": project.submission.work_type,
-                "timesheet_frequency": project.timesheet_frequency,
+                "timesheet_frequency": project.get_timesheet_frequency_display(),
             }
             return Response({"result": data}, status=200)
         except Exception as error:
@@ -135,7 +135,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 if prev_timesheet.exclude(status='draft').exists():
                     last_filled_timesheet = prev_timesheet.exclude(status='draft').first()
                     draft_timesheet = prev_timesheet.filter(status='draft', start__gte=last_filled_timesheet.end)
-                    timesheet_start_date = draft_timesheet.last().start
+                    timesheet_start_date = draft_timesheet.last().start if draft_timesheet else last_filled_timesheet.end
                     draft_timesheet.delete()
                     self.create_timesheet(project, timesheet_start_date, frequency)
                 else:
@@ -263,6 +263,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
             user_ids = list(user_list.values_list('id', flat=True))
             push_notification(user_ids, message_body)
+            timesheet_submission_mail(timesheet, request)
 
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)

@@ -84,11 +84,12 @@ class PayrollScheduleSerializer(serializers.ModelSerializer):
 class ProjectTimeSheetSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    work_type = serializers.SerializerMethodField()
     total_hours = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours')
+        fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours', 'work_type')
 
     @staticmethod
     def get_status(obj):
@@ -100,9 +101,15 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_client(obj):
-        if obj.statuses.filter(is_current=True).first().status == 'joined':
-            return obj.submission.client + ' (Active)'
-        return obj.submission.client
+        data = {
+            "name": obj.submission.client + 'TimeSheets' if obj.submission.work_type == 'c2c' else 'PayStubs',
+            "is_active": True if obj.statuses.filter(is_current=True).first().status == 'joined' else False
+        }
+        return data
+
+    @staticmethod
+    def get_work_type(obj):
+        return obj.submission.get_work_type_display()
 
     @staticmethod
     def get_total_hours(obj):
@@ -141,6 +148,8 @@ class TimeSheetSerializer(serializers.ModelSerializer):
             'timesheet_frequency': obj.timesheet_frequency,
             'project_type': obj.project.submission.work_type,
             'vendor': obj.project.submission.lead.vendor_company.name,
+            'project_type': obj.project.submission.get_work_type_display(),
+            'timesheet_frequency': obj.project.get_timesheet_frequency_display(),
         }
 
 
@@ -182,6 +191,7 @@ class FinanceSerializer(serializers.ModelSerializer):
             'start_date': obj.project.start_date,
             'client': obj.project.submission.client,
             'vendor': obj.project.submission.lead.vendor_company.name,
+            'work_type': obj.project.submission.get_work_type_display(),
         }
 
 
@@ -195,14 +205,22 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         model = Consultant
         fields = ('id', 'name', 'email', 'ts_status', 'project', 'pending_leave', 'pending_request')
 
-    @staticmethod
-    def get_project(obj):
-        project = Project.objects.filter(
-            Q(consultant=obj, statuses__is_current=True) & (
-                    Q(statuses__status__istartswith='terminated') |
-                    Q(statuses__status__in=['joined', 'complete', 'extended'])
+    def get_project(self, obj):
+        project_type = self.context.get('project_type', None)
+        if project_type:
+            project = Project.objects.filter(
+                Q(consultant=obj, statuses__is_current=True, submission__work_type=project_type) & (
+                        Q(statuses__status__istartswith='terminated') |
+                        Q(statuses__status__in=['joined', 'complete', 'extended'])
+                )
             )
-        )
+        else:
+            project = Project.objects.filter(
+                Q(consultant=obj, statuses__is_current=True) & (
+                        Q(statuses__status__istartswith='terminated') |
+                        Q(statuses__status__in=['joined', 'complete', 'extended'])
+                )
+            )
         if project:
             project = project.latest('-start_date')
             return {
@@ -211,6 +229,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
                 'start_date': project.start_date,
                 'client': project.submission.client,
                 'vendor': project.submission.lead.vendor_company.name,
+                'project_type': project.submission.get_work_type_display(),
             }
         return None
 

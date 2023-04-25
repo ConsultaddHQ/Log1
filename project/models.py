@@ -26,7 +26,8 @@ FEEDBACK_CHOICES = (
 class Project(TimeStampedModel):
     TIMESHEET_FREQUENCIES = (
         ('weekly', 'Weekly'),
-        ('biweekly', 'Biweekly')
+        ('biweekly', 'Biweekly'),
+        ('monthly', 'Monthly')
     )
     attachments = GenericRelation(Attachment)
     rate = models.FloatField(_('Rate'), null=True, blank=True)
