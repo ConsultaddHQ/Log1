@@ -500,3 +500,24 @@ def mark_in_active():
     except Exception as error:
         write_exception(message=error)
         return None
+
+
+def timesheet_submission_mail(obj, request=None):
+    try:
+        project_type = "Timesheet" if obj.project.submission.work_type == 'c2c' else "Paystubs"
+        mail_data = {
+            'cc': [], 'bcc': ['shreyas.k@consultadd.com'],
+            'template': '../templates/timesheet_submission.html',
+            'to': ['finance@consultadd.com'],
+            'subject': f"{project_type} submission Info",
+            'context': {
+                'type': project_type,
+                'client': obj.project.submission.client,
+                'consultant_name': obj.project.consultant.name,
+                'timesheet date': obj.start.strftime("%b %d, %Y") - obj.end.strftime("%b %d, %Y"),
+            }
+        }
+        send_email(mail_data, request=request)
+    except Exception as error:
+        write_exception(error, request)
+        return None
