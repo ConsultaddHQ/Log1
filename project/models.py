@@ -24,6 +24,10 @@ FEEDBACK_CHOICES = (
 
 
 class Project(TimeStampedModel):
+    TIMESHEET_FREQUENCIES = (
+        ('weekly', 'Weekly'),
+        ('biweekly', 'Biweekly')
+    )
     attachments = GenericRelation(Attachment)
     rate = models.FloatField(_('Rate'), null=True, blank=True)
     end_date = models.DateField(_('End Date'), null=True, blank=True)
@@ -39,6 +43,9 @@ class Project(TimeStampedModel):
     duration = models.CharField(_('Duration'), max_length=50, null=True, blank=True)
     reporting_details = models.TextField(_('Reporting Details'), null=True, blank=True)
     invoicing_period = models.IntegerField(_('Invoicing Period'), null=True, blank=True)
+    timesheet_frequency = models.CharField(
+        _("Frequency"), max_length=30,
+        choices=TIMESHEET_FREQUENCIES, null=True, blank=True)
     is_msg_sent = models.BooleanField(
         _('Is Message Sent'),
         help_text='Message sent on Offer-announcement channel ?',
