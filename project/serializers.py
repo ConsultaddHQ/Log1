@@ -138,6 +138,8 @@ class TimeSheetSerializer(serializers.ModelSerializer):
             'employer': obj.project.employer,
             'start_date': obj.project.start_date,
             'client': obj.project.submission.client,
+            'timesheet_frequency': obj.timesheet_frequency,
+            'project_type': obj.project.submission.work_type,
             'vendor': obj.project.submission.lead.vendor_company.name,
         }
 
