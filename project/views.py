@@ -1298,7 +1298,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
         try:
             if project_id:
-                projects = Project.objects.get(id=project_id)
+                projects = Project.objects.filter(id=project_id)
             else:
                 projects = Project.objects.filter(
                     Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
@@ -1327,7 +1327,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     if timesheet_status == 'pending_for_approval':
                         queryset = queryset.filter(status__in=['submitted', 'updated'], is_active=True)
                     else:
-                        queryset = queryset.filter(timesheets__status=timesheet_status, is_active=True)
+                        queryset = queryset.filter(status=timesheet_status, is_active=True)
 
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)

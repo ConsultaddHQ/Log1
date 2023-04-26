@@ -89,7 +89,7 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours', 'work_type')
+        fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours', 'work_type', 'timesheet_frequency')
 
     @staticmethod
     def get_status(obj):
@@ -101,11 +101,7 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_client(obj):
-        data = {
-            "name": obj.submission.client + 'TimeSheets' if obj.submission.work_type == 'c2c' else 'PayStubs',
-            "is_active": True if obj.statuses.filter(is_current=True).first().status == 'joined' else False
-        }
-        return data
+        return obj.submission.client + (' (TimeSheets)' if obj.submission.work_type == 'c2c' else ' (PayStubs)')
 
     @staticmethod
     def get_work_type(obj):
@@ -144,12 +140,10 @@ class TimeSheetSerializer(serializers.ModelSerializer):
             'id': obj.project.id,
             'employer': obj.project.employer,
             'start_date': obj.project.start_date,
-            'client': obj.project.submission.client,
-            'timesheet_frequency': obj.timesheet_frequency,
-            'project_type': obj.project.submission.work_type,
             'vendor': obj.project.submission.lead.vendor_company.name,
             'project_type': obj.project.submission.get_work_type_display(),
             'timesheet_frequency': obj.project.get_timesheet_frequency_display(),
+            'client': obj.project.submission.client + (' (TimeSheets)' if obj.project.submission.work_type == 'c2c' else ' (PayStubs)'),
         }
 
 
