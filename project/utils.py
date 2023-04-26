@@ -512,12 +512,12 @@ def timesheet_submission_mail(obj, request=None):
             'subject': f"{project_type} submission Info",
             'context': {
                 'type': project_type,
-                'client': obj.project.submission.client,
+                'client_name': obj.project.submission.client,
                 'consultant_name': obj.project.consultant.name,
-                'timesheet date': obj.start.strftime("%b %d, %Y") - obj.end.strftime("%b %d, %Y"),
+                'timesheet_date': f'{obj.start.strftime("%b %d, %Y")} - {obj.end.strftime("%b %d, %Y")}',
             }
         }
-        send_email(mail_data, request=request)
+        send_email(mail_data, 'product@consultadd.com', request=request)
     except Exception as error:
         write_exception(error, request)
         return None
