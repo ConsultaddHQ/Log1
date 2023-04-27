@@ -500,3 +500,30 @@ def mark_in_active():
     except Exception as error:
         write_exception(message=error)
         return None
+
+
+def timesheet_submission_mail(obj, request=None):
+    try:
+        project_type = "Timesheet" if obj.project.submission.work_type == 'c2c' else "Paystubs"
+        if os.environ.get('ENV') == 'PROD':
+            app_link = f"https://app.log1.com/#/finance/timesheet_details/{request.user.id}/{obj.project.id}/"
+        else:
+            app_link = f"https://d2us7jrqrv1djj.cloudfront.net/#/finance/timesheet_details/{request.user.id}/{obj.project.id}/"
+
+        mail_data = {
+            'cc': [], 'bcc': ['shreyas.k@consultadd.com'],
+            'template': '../templates/timesheet_submission.html',
+            'to': ['finance@consultadd.com'],
+            'subject': f"{project_type} submission Info",
+            'context': {
+                'type': project_type,
+                'client_name': obj.project.submission.client,
+                'consultant_name': obj.project.consultant.name,
+                'timesheet_date': f'{obj.start.strftime("%b %d, %Y")} - {obj.end.strftime("%b %d, %Y")}',
+                'app_link': app_link
+            }
+        }
+        send_email(mail_data, 'product@consultadd.com', request=request)
+    except Exception as error:
+        write_exception(error, request)
+        return None
