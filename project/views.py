@@ -36,7 +36,7 @@ from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_li
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
     SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
-    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification,\
+    fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
@@ -668,7 +668,8 @@ class ProjectViewSets(ModelViewSet):
                         marketing.save()
 
                     # Creating first week Timesheet on project status change to joined
-                    util.create_timesheet()
+                    if project.submission.work_type == 'c2c':
+                        util.create_timesheet()
 
                     # Creating first week Timesheet on project status change to joined
                     util.assign_leave()
@@ -1110,7 +1111,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                         user_list.append(user)
 
                 title = f"{emp_name} tagged you in a {consultant.name}'s {feedback_type} feedback."
-                create_and_send_notification(consultant, feedback, title, user_list, request)              
+                create_and_send_notification(consultant, feedback, title, user_list, request)
 
                 # POC Notification
                 pocs = consultant.pocs.all()
@@ -1132,7 +1133,8 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     "project_start_date": str(support.project.start_date),
                     "consultant_name": support.project.consultant.name,
                     "support_duration":
-                        str(datetime.strptime(data['end'], "%Y-%m-%d") - datetime.strptime(str(support.project.start_date), "%Y-%m-%d")).split(",")[0],
+                        str(datetime.strptime(data['end'], "%Y-%m-%d") - datetime.strptime(
+                            str(support.project.start_date), "%Y-%m-%d")).split(",")[0],
 
                 }
                 slack.consultant_independent_message_card(payload, self.request)
@@ -1290,13 +1292,13 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         start = request.GET.get('start', None)
-        status = request.GET.get('status', None)
         project_id = request.GET.get('project_id', None)
+        timesheet_status = request.GET.get('status', None)
         end = request.GET.get('end', date.today().strftime('%Y-%m-%d'))
 
         try:
             if project_id:
-                projects = Project.objects.get(id=project_id)
+                projects = Project.objects.filter(id=project_id)
             else:
                 projects = Project.objects.filter(
                     Q(statuses__is_current=True, consultant_id=kwargs.get('pk', None)) & (
@@ -1321,13 +1323,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     ).exclude(status='draft')
                 else:
                     queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
+                if timesheet_status:
+                    if timesheet_status == 'pending_for_approval':
+                        queryset = queryset.filter(status__in=['submitted', 'updated'], is_active=True)
+                    else:
+                        queryset = queryset.filter(status=timesheet_status, is_active=True)
 
-                if status == 'pending':
-                    queryset = queryset.filter(status__in=['submitted', 'updated'])
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"data": serializer.data, 'total': total}, status=200)
-            return Response({"message": "No Project Found"}, status=400)
+            return Response({"data": {}, 'total': 0}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1383,8 +1388,11 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def consultant(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
+        end_date = request.GET.get('end', None)
+        start_date = request.GET.get('start', None)
         leave_status = request.GET.get('leave_status', '')
         consultant_id = request.GET.get('consultant', None)
+        project_type = request.GET.get('project_type', None)
         consultant_name = request.GET.get('consultant_name', None)
         timesheet_status = request.GET.get('timesheet_status', [])
 
@@ -1407,6 +1415,17 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
                 consultants = Consultant.objects.filter(id__in=list(consultant_ids)).order_by('id').distinct('id')
 
+            if start_date:
+                consultants = consultants.filter(projects__timesheets__start__gte=start_date)
+            if end_date:
+                consultants = consultants.filter(projects__timesheets__end__lte=end_date)
+            if project_type:
+                consultants = consultants.filter(
+                    Q(projects__submission__work_type=project_type, projects__statuses__is_current=True) & (
+                            Q(projects__statuses__status__istartswith='terminated') |
+                            Q(projects__statuses__status__in=['joined', 'complete', 'extended'])
+                    )
+                )
             if timesheet_status:
                 if timesheet_status == 'pending_for_approval':
                     consultants = consultants.filter(
@@ -1433,7 +1452,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
             queryset = consultants.order_by('name').distinct('name')
             total = queryset.count()
-            serializer = ConsultantTimeSheetSerializer(queryset[first:last], many=True)
+            serializer = ConsultantTimeSheetSerializer(
+                queryset[first:last], context={"project_type": project_type}, many=True
+            )
             return Response({"data": serializer.data, 'total': total}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -1517,9 +1538,11 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def projects(self, request, *args, **kwargs):
         try:
             project_id = request.GET.get('project_id', None)
-
+            work_type = request.GET.get('project_type', None)
             if not project_id:
-                projects = Project.objects.filter(
+                projects = Project.objects.filter(submission__work_type=work_type) \
+                    if work_type else Project.objects.all()
+                projects = projects.filter(
                     Q(consultant_id=kwargs.get('pk'), statuses__is_current=True) & (
                             Q(statuses__status='joined') |
                             Q(statuses__status__istartswith='terminated') |
@@ -1527,8 +1550,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     )
                 ).annotate(
                     client=F('submission__client'),
+                    work_type=F('submission__work_type'),
                     vendor=F('submission__lead__vendor_company__name'),
-                ).values('id', 'client', 'vendor').order_by('-start_date')
+                ).values('id', 'client', 'vendor', 'work_type').order_by('-start_date')
                 return Response({'result': projects}, status=200)
 
             else:
@@ -1536,6 +1560,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 data = {
                     "id": project.consultant.id, "project_id": project.id,
                     "vendor": project.submission.lead.vendor_company.name,
+                    "work_type": project.submission.get_work_type_display(),
                     "name": project.consultant.name, "email": project.consultant.email,
                     "team": project.submission.marketing_team.name, "start_date": project.start_date,
                     "client": project.submission.client, "marketer": project.submission.created_by.employee_name

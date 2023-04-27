@@ -123,7 +123,7 @@ def create_message(from_email, mail_data):
         message['bcc'] = ','.join(mail_data["bcc"])
         
     else:
-        message['to'] = ','.join(['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com'])
+        message['to'] = ','.join(['piyush.y@consultadd.com', 'shreyas.k@consultadd.com', 'gufran.a@consultadd.com'])
         message['cc'] = ''
         message['bcc'] = ''
         
