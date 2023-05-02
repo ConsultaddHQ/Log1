@@ -827,13 +827,7 @@ class MessageCard:
                         }
                     },
                     {
-                        "type": "context",
-                        "elements": [
-                            {
-                                "type": "plain_text",
-                                "text": " "
-                            }
-                        ]
+                        "type": "divider"
                     },
                     {
                         "type": "section",
@@ -846,12 +840,7 @@ class MessageCard:
                                 "type": "plain_text",
                                 "text": payload.get('employer', 'NA'),
                                 "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
+                            },
                             {
                                 "type": "mrkdwn",
                                 "text": "*Location*"
@@ -860,12 +849,7 @@ class MessageCard:
                                 "type": "plain_text",
                                 "text": payload.get('city', 'NA'),
                                 "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
+                            },
                             {
                                 "type": "mrkdwn",
                                 "text": "*Recruiter*"
@@ -874,20 +858,14 @@ class MessageCard:
                                 "type": "plain_text",
                                 "text": payload.get('recruiter_name', 'NA'),
                                 "emoji": True
-                            }
-                        ]
-                    },
-                    {
-                        "type": "section",
-                        "fields": [
+                            },
                             {
                                 "type": "mrkdwn",
                                 "text": "*Status*"
                             },
                             {
-                                "type": "plain_text",
-                                "text": payload.get('recruiter_name', 'NA'),
-                                "emoji": True
+                                "type": "mrkdwn",
+                                "text": f"`{payload.get('status', 'NA')}`",
                             }
                         ]
                     },
