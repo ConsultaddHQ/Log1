@@ -128,6 +128,19 @@ def get_project_check_list(project):
             "reporting_details": result.get("reporting_details"),
         }
 
+    if project.submission.get_work_type_display() != 'C2C':
+        result = get_attachment_status(project)
+
+        return {
+            "total": 5,
+            "status": result.get("status"),
+            "start_date": result.get("start_date"),
+            "offer_letter": result.get("offer_letter"),
+            "client_address": result.get("client_address"),
+            "vendor_address": result.get("vendor_address"),
+            "reporting_details": result.get("reporting_details"),
+        }
+
     if project.attachments.filter(attachment_type='msa'):
         msa = 1
     if project.attachments.filter(attachment_type='work_order'):
@@ -326,8 +339,8 @@ class ProjectUtil:
                                  f"*{self.project.submission.client.strip()}*"
             payload = {
                 "activity_text": self.activity_text, "submission_id": self.project.submission.id,
-                "employer": self.employer, "city": self.project.city, "recruiter_name": recruiter_name,
-                "status": status, "reason": reason, "sub_title": activity_sub_title, "project_id": self.project.id,
+                "employer": self.employer, "recruiter_name": recruiter_name, "project_id": self.project.id,
+                "status": status, "reason": reason, "activity_sub_title": activity_sub_title, "city": self.project.city
             }
             slack.po_cancellation_message_card(payload, self.request)
 
