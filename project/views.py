@@ -1087,12 +1087,12 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             
             # need to add slack card here
             if data.get('status') == "independent":
-                # adding consultant update here    
+                # adding consultant update here
                 user_list = []
                 feedback = ConsultantFeedback.objects.create(
+                    project=project,
                     created_by=request.user,
                     department='engineering',
-                    project_id=request.data.get('project'),
                     rating=request.data.get('rating', None),
                     verdict=request.data.get('verdict', None),
                     consultant_id=request.data.get('consultant_id'),

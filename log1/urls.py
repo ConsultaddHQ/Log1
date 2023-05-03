@@ -31,9 +31,8 @@ from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSet
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
     InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets, MarketingTeamViewSet
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
-    ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets,\
-    ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet
-
+    ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
+    ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
 
 router = DefaultRouter()
 schema_view = get_swagger_view(title='Log1')
@@ -58,6 +57,7 @@ router.register(r'consultant_work_auth', WorkAuthViewSets)
 router.register(r'consultant_exit', ConsultantExitViewSets)
 router.register(r'beats_consultant', ConsultantImportViewSet)
 router.register(r'consultant_bench', ConsultantBenchViewSets)
+router.register(r'log1_consultant', ConsultantPerformanceViewSet)
 router.register(r'consultant_profile', ConsultantProfileViewSets)
 router.register(r'consultant_marketing', ConsultantMarketingViewSets)
 router.register(r'consultant/(?P<consultant_id>[0-9]+)/feedback', ConsultantFeedbackViewSet)
