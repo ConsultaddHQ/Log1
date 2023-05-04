@@ -512,7 +512,7 @@
     </style>
   <![endif]-->
 </head>
-<body>
+<body width="100%">
 <span class="preheader"></span>
 <table class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" role="presentation">
     <tr>
@@ -535,17 +535,18 @@
                             <tr>
                                 <td class="content-cell">
                                     <div class="f-fallback">
-                                        <h1>Hello</h1><br>
-                                        <h2>Below is the list of incomplete submissions from {{start}} to {{ end }},
+                                        <h1>Hello team,</h1><br>
+                                        <h2>Below is the list of incomplete submissions from {{ start }} to {{ end }},
                                             Please mark the submission as complete so that submission mails can be sent
                                             to consultants.
-                                        </h2>
+                                        </h2><br>
                                             <table class="tableheading">
                                               <tr>
                                                 <th style="width: 70px;text-align: center;">Submission ID</th>
                                                 <th style="text-align:center;width: 120px;">Consultant Name</th>
                                                 <th style="width: 74px;text-align: center;">Marketer</th>
                                                 <th style="width: 100px;text-align: center;">Recruiter</th>
+                                                <th style="width: 100px;text-align: center;">Marketing Team</th>
                                                 <th style="width: 70px;text-align: center;">Client</th>
                                                 <th style="width: 70px;text-align: center;">Vendor</th>
                                                 <th style="width: 70px;text-align: center;">App Link</th>
@@ -556,6 +557,7 @@
                                                 <td style="text-align:center;">{{i.consultant_name}}</td>
                                                 <td style="text-align:center;">{{ i.marketer }}</td>
                                                 <td style="text-align:center;">{{ i.recruiter }}</td>
+                                                <td style="text-align:center;">{{ i.marketing_team }}</td>
                                                 <td style="text-align:center;">{{i.client}}</td>
                                                 <td style="text-align:center;">{{i.vendor}}</td>
                                                 <td style="text-align:center;">{{i.app_link}}</td>
