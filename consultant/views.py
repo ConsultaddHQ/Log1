@@ -1853,14 +1853,20 @@ class ConsultantPerformanceViewSet(GenericViewSet):
                 feedbacks = []
                 engineering_feedbacks = project.feedbacks.filter(department='engineering')
                 for feedback in engineering_feedbacks:
-                    feedbacks.append({"description": feedback.description, "name": feedback.created_by.employee_name})
+                    feedbacks.append({
+                        "created_date": feedback.created,
+                        "description": feedback.description,
+                        "name": feedback.created_by.employee_name
+                    })
                 project_data = {
+                    "rate": project.rate,
                     "feedback": feedbacks,
+                    "location": project.city,
                     "status": project.status,
                     "end_date": project.end_date,
                     "start_date": project.start_date,
                     "client": project.submission.client,
-                    "location": project.submission.lead.job_title,
+                    "job_title": project.submission.lead.job_title,
                     "is_remote": True if project.is_remote else False,
                     "marketer_name": project.created_by.employee_name,
                     "work_type": project.submission.get_work_type_display()
@@ -1869,4 +1875,4 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error)
-            return Response({"error": str(error)}, status=400)
+            return Response({"data": []}, status=200)
