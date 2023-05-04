@@ -111,7 +111,35 @@ def get_attachment_status(project):
 
 
 def get_project_check_list(project):
-    msa, work_order = 0, 0
+    msa, work_order, offer_letter = 0, 0, 0
+
+    if project.submission.get_work_type_display() != 'C2C':
+        if project.attachments.filter(attachment_type='offer_letter'):
+            offer_letter = 1
+        result = get_attachment_status(project)
+
+        return {
+            "total": 5,
+            "status": result.get("status"),
+            "start_date": result.get("start_date"),
+            "offer_letter": result.get("offer_letter"),
+            "client_address": result.get("client_address"),
+            "vendor_address": result.get("vendor_address"),
+            "reporting_details": result.get("reporting_details"),
+        }
+
+    if project.submission.get_work_type_display() != 'C2C':
+        result = get_attachment_status(project)
+
+        return {
+            "total": 5,
+            "status": result.get("status"),
+            "start_date": result.get("start_date"),
+            "offer_letter": result.get("offer_letter"),
+            "client_address": result.get("client_address"),
+            "vendor_address": result.get("vendor_address"),
+            "reporting_details": result.get("reporting_details"),
+        }
 
     if project.submission.get_work_type_display() != 'C2C':
         result = get_attachment_status(project)
@@ -538,9 +566,9 @@ def timesheet_submission_mail(obj, request=None):
     try:
         project_type = "Timesheet" if obj.project.submission.work_type == 'c2c' else "Paystubs"
         if os.environ.get('ENV') == 'PROD':
-            app_link = f"https://app.log1.com/#/finance/timesheet_details/{request.user.id}/{obj.project.id}/"
+            app_link = f"https://app.log1.com/#/finance/timesheet_details/{request.user.id}/{obj.project.id}"
         else:
-            app_link = f"https://d2us7jrqrv1djj.cloudfront.net/#/finance/timesheet_details/{request.user.id}/{obj.project.id}/"
+            app_link = f"https://d2us7jrqrv1djj.cloudfront.net/#/finance/timesheet_details/{request.user.id}/{obj.project.id}"
 
         mail_data = {
             'cc': [], 'bcc': ['shreyas.k@consultadd.com'],
