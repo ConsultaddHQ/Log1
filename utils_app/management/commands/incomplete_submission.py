@@ -10,7 +10,7 @@ class Command(BaseCommand):
     help = "This command is for sending incomplete submission notification"
 
     def handle(self, *args, **options):
-        job = create_cron_object(name='complete_submissions')
+        job = create_cron_object(name='incomplete_submissions')
         try:
             data = []
             today = datetime.today()
