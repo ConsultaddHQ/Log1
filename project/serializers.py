@@ -101,7 +101,7 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_client(obj):
-        return obj.submission.client + (' (TimeSheets)' if obj.submission.work_type == 'c2c' else ' (PayStubs)')
+        return obj.submission.client + (' (Timesheets)' if obj.submission.work_type == 'c2c' else ' (Paystubs)')
 
     @staticmethod
     def get_work_type(obj):

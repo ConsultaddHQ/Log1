@@ -1851,7 +1851,7 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             projects = consultant.projects.all()
             for project in projects:
                 feedbacks = []
-                engineering_feedbacks = project.feedbacks.filter(department='engineering')
+                engineering_feedbacks = project.feedbacks.filter(department__iexact='engineering')
                 for feedback in engineering_feedbacks:
                     feedbacks.append({
                         "created_date": feedback.created,
