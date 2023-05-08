@@ -1,3 +1,4 @@
+import csv
 from datetime import datetime, timedelta, date
 from django.core.management import BaseCommand
 
@@ -26,7 +27,6 @@ class Command(BaseCommand):
 
             col_name = ["Submission ID", "Consultant Name", "Marketer", "Recruiter", "Marketing Team", "Client",
                         "Vendor", "App Link"]
-            import csv
             file = open(f"incomplete_submission.csv", 'w+')
             writer = csv.writer(file)
             writer.writerow(col_name)
