@@ -83,8 +83,10 @@ class Command(BaseCommand):
                            f" {str(date.today().strftime('%m/%d/%Y'))}",
                 'template': '../templates/consultants_submissions_admin_report.html',
                 'context': {
-                    "data": submission_data,
                     'days': days,
+                    "data": submission_data,
+                    'start': str(last_2_days.strftime('%m/%d/%Y')),
+                    'end': {str(date.today().strftime('%m/%d/%Y'))}
                 },
             }
             if submission_data:
