@@ -141,7 +141,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 else:
                     timesheet_start_date = prev_timesheet.last().start
                     prev_timesheet.delete()
-                    self.create_timesheet(project, timesheet_start_date + timedelta(days=1), frequency)
+                    self.create_timesheet(project, timesheet_start_date, frequency)
             else:
                 self.create_timesheet(project, frequency=frequency)
 
