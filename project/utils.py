@@ -56,8 +56,34 @@ def create_remote_consultant(request):
 
 
 def get_attachment_status(project):
-    s_msa, s_work_order = 0, 0
+    s_msa, s_work_order, offer_letter = 0, 0, 0
     sub = project.submission
+
+    start_date = 1 if project.start_date else 0
+    client_address = 1 if (project.client_address and len(project.client_address.strip()) > 0) else 0
+    vendor_address = 1 if (project.vendor_address and len(project.vendor_address.strip()) > 0) else 0
+    reporting_details = 1 if (project.reporting_details and len(project.reporting_details.strip()) > 0) else 0
+
+    if project.submission.get_work_type_display() != 'C2C':
+        if project.attachments.filter(attachment_type='offer_letter'):
+            offer_letter = 1
+
+        total = offer_letter + client_address + vendor_address + start_date + reporting_details
+        if sub.consultant.name == 'Bharat Bhate' and sub.created_by.employee_id == 2831:
+            list_status = True
+        else:
+            list_status = True if (total / 5) >= 1 else False
+
+        return {
+            "total": total,
+            "status": list_status,
+            "start_date": start_date,
+            "offer_letter": offer_letter,
+            "client_address": client_address,
+            "vendor_address": vendor_address,
+            "reporting_details": reporting_details,
+        }
+
     if project.attachments.filter(attachment_type='msa_signed'):
         s_msa = 1
 
@@ -66,11 +92,6 @@ def get_attachment_status(project):
 
     if project.attachments.filter(attachment_type='work_order_msa_signed'):
         s_msa, s_work_order = 1, 1
-
-    start_date = 1 if project.start_date else 0
-    client_address = 1 if (project.client_address and len(project.client_address.strip()) > 0) else 0
-    vendor_address = 1 if (project.vendor_address and len(project.vendor_address.strip()) > 0) else 0
-    reporting_details = 1 if (project.reporting_details and len(project.reporting_details.strip()) > 0) else 0
 
     total = s_msa + s_work_order + client_address + vendor_address + start_date + reporting_details
     if sub.consultant.name == 'Bharat Bhate' and sub.created_by.employee_id == 2831:
@@ -90,30 +111,68 @@ def get_attachment_status(project):
 
 
 def get_project_check_list(project):
-    msa, work_order = 0, 0
+    msa, work_order, offer_letter = 0, 0, 0
+
+    if project.submission.get_work_type_display() != 'C2C':
+        if project.attachments.filter(attachment_type='offer_letter'):
+            offer_letter = 1
+        result = get_attachment_status(project)
+
+        return {
+            "total": 5,
+            "status": result.get("status"),
+            "start_date": result.get("start_date"),
+            "offer_letter": result.get("offer_letter"),
+            "client_address": result.get("client_address"),
+            "vendor_address": result.get("vendor_address"),
+            "reporting_details": result.get("reporting_details"),
+        }
+
+    if project.submission.get_work_type_display() != 'C2C':
+        result = get_attachment_status(project)
+
+        return {
+            "total": 5,
+            "status": result.get("status"),
+            "start_date": result.get("start_date"),
+            "offer_letter": result.get("offer_letter"),
+            "client_address": result.get("client_address"),
+            "vendor_address": result.get("vendor_address"),
+            "reporting_details": result.get("reporting_details"),
+        }
+
+    if project.submission.get_work_type_display() != 'C2C':
+        result = get_attachment_status(project)
+
+        return {
+            "total": 5,
+            "status": result.get("status"),
+            "start_date": result.get("start_date"),
+            "offer_letter": result.get("offer_letter"),
+            "client_address": result.get("client_address"),
+            "vendor_address": result.get("vendor_address"),
+            "reporting_details": result.get("reporting_details"),
+        }
 
     if project.attachments.filter(attachment_type='msa'):
         msa = 1
-
     if project.attachments.filter(attachment_type='work_order'):
         work_order = 1
-
     if project.attachments.filter(attachment_type='work_order_msa'):
         msa, work_order = 1, 1
-
     result = get_attachment_status(project)
 
     return {
         "total": 6,
         "msa": msa,
         "work_order": work_order,
-        "status": result["status"],
-        "msa_signed": result["msa_signed"],
-        "start_date": result["start_date"],
-        "client_address": result["client_address"],
-        "vendor_address": result["vendor_address"],
-        "work_order_signed": result["work_order_signed"],
-        "reporting_details": result["reporting_details"],
+        "status": result.get("status"),
+        "msa_signed": result.get("msa_signed"),
+        "start_date": result.get("start_date"),
+        "client_address": result.get("client_address"),
+        "vendor_address": result.get("vendor_address"),
+        "work_order_signed": result.get("work_order_signed"),
+        "reporting_details": result.get("reporting_details"),
     }
 
 
@@ -157,7 +216,7 @@ class ProjectUtil:
             self.employer = self.project.submission.employer
         marketer = self.project.submission.created_by
         marketer_name = f"<@{marketer.slack_id}>" if marketer.slack_id else marketer.employee_name
-        self.activity_text = f"Project by *{marketer_name }* from *{marketer.team.name}*"
+        self.activity_text = f"Project by *{marketer_name}* from *{marketer.team.name}*"
 
     def fetch_project_count(self, project_status):
         try:
@@ -213,8 +272,9 @@ class ProjectUtil:
                 "submission_id": self.project.submission.id, "project_id": self.project.id,
                 "activity_title": activity_title, "activity_text": self.activity_text, "total": total,
                 "employer": self.employer, "recruiter_name": recruiter_name, "team_name": team, "team": team_count,
-                "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0], '%Y-%m-%d').strftime('%a, %d %B %Y'),
-            }            
+                "submitted_on": datetime.strptime(str(self.project.submission.created).split(' ')[0],
+                                                  '%Y-%m-%d').strftime('%a, %d %B %Y'),
+            }
             slack.consultant_joined_message_card(payload, self.request)
             title = f" Project Joined :: {self.consultant.name} :: {self.project.submission.client}"
             send_notification_for_user(self.consultant, self.user, title, 'project')
@@ -238,11 +298,11 @@ class ProjectUtil:
                                      if interview.supervisor])
 
             payload = {
-                "submission_id": self.project.submission.id, "project_id": self.project.id,
                 "client": self.project.submission.client, "consultant": self.consultant.name,
+                "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
                 "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
                 "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "city": self.project.city, "supervisors": supervisors, "job_title": self.project.submission.lead.job_title,
+                "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
             }
             slack.po_receive_message_card(payload, self.request)
 
@@ -292,10 +352,10 @@ class ProjectUtil:
                                  f"*{self.project.submission.client.strip()}*"
             payload = {
                 "activity_text": self.activity_text, "submission_id": self.project.submission.id,
-                "employer": self.employer, "city": self.project.city, "recruiter_name": recruiter_name,
-                "status": status, "reason": reason, "sub_title": activity_sub_title, "project_id": self.project.id,
+                "employer": self.employer, "recruiter_name": recruiter_name, "project_id": self.project.id,
+                "status": status, "reason": reason, "activity_sub_title": activity_sub_title, "city": self.project.city
             }
-            # MessageCard.po_cancellation_message_card(payload, self.request)
+            slack.po_cancellation_message_card(payload, self.request)
 
             title = f"Project Cancelled :: {self.consultant} :: {self.project.submission.client}"
             send_notification_for_user(self.project.consultant, self.user, title, 'project')
@@ -499,4 +559,31 @@ def mark_in_active():
             event.save()
     except Exception as error:
         write_exception(message=error)
+        return None
+
+
+def timesheet_submission_mail(obj, request=None):
+    try:
+        project_type = "Timesheet" if obj.project.submission.work_type == 'c2c' else "Paystubs"
+        if os.environ.get('ENV') == 'PROD':
+            app_link = f"https://app.log1.com/#/finance/timesheet_details/{request.user.id}/{obj.project.id}"
+        else:
+            app_link = f"https://d2us7jrqrv1djj.cloudfront.net/#/finance/timesheet_details/{request.user.id}/{obj.project.id}"
+
+        mail_data = {
+            'cc': [], 'bcc': ['shreyas.k@consultadd.com'],
+            'template': '../templates/timesheet_submission.html',
+            'to': ['finance@consultadd.com'],
+            'subject': f"{project_type} submission Info",
+            'context': {
+                'type': project_type,
+                'client_name': obj.project.submission.client,
+                'consultant_name': obj.project.consultant.name,
+                'timesheet_date': f'{obj.start.strftime("%b %d, %Y")} - {obj.end.strftime("%b %d, %Y")}',
+                'app_link': app_link
+            }
+        }
+        send_email(mail_data, 'product@consultadd.com', request=request)
+    except Exception as error:
+        write_exception(error, request)
         return None

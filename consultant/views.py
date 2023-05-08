@@ -1828,3 +1828,51 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
         except Exception as error:
             write_exception(message=error)
             return Response({"error": str(error)}, status=400)
+
+
+# Route - /log1_consultant/
+class ConsultantPerformanceViewSet(GenericViewSet):
+    queryset = Consultant.objects.all()
+    serializer_class = ConsultantPetitionLoginSerializer
+
+    @staticmethod
+    def verify_api_key(api_key):
+        if not APIKey.objects.is_valid(api_key):
+            return Response({"message": "Unauthorized"}, status=401)
+        return True
+
+    @action(methods=['GET'], detail=False, url_path='project')
+    def project(self, request):
+        self.verify_api_key(request.GET['api_key'])
+        try:
+            data = []
+            email = request.GET.get('email')
+            consultant = get_object_or_404(Consultant, email=email)
+            projects = consultant.projects.all()
+            for project in projects:
+                feedbacks = []
+                engineering_feedbacks = project.feedbacks.filter(department__iexact='engineering')
+                for feedback in engineering_feedbacks:
+                    feedbacks.append({
+                        "created_date": feedback.created,
+                        "description": feedback.description,
+                        "name": feedback.created_by.employee_name
+                    })
+                project_data = {
+                    "rate": project.rate,
+                    "feedback": feedbacks,
+                    "location": project.city,
+                    "status": project.status,
+                    "end_date": project.end_date,
+                    "start_date": project.start_date,
+                    "client": project.submission.client,
+                    "job_title": project.submission.lead.job_title,
+                    "is_remote": True if project.is_remote else False,
+                    "marketer_name": project.created_by.employee_name,
+                    "work_type": project.submission.get_work_type_display()
+                }
+                data.append(project_data)
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(message=error)
+            return Response({"data": []}, status=200)
