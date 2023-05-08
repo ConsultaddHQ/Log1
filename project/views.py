@@ -895,7 +895,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             support_qs = True if len(project.support.all()) > 1 else False
             project_support = ProjectSupport.objects.create(
                 project=project, is_proxy_support=request.data.get('is_proxy_support', False),
-                support=support_person, start=start, end=end, feedback=request.data.get('feedback', None),
+                support=support_person, start=start, end=end, feedback=request.data.get('description', None),
             )
             if not project_support.is_proxy_support:
                 SupportStatus.objects.create(

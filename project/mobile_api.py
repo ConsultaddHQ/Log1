@@ -135,7 +135,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 if prev_timesheet.exclude(status='draft').exists():
                     last_filled_timesheet = prev_timesheet.exclude(status='draft').first()
                     draft_timesheet = prev_timesheet.filter(status='draft', start__gte=last_filled_timesheet.end)
-                    timesheet_start_date = draft_timesheet.last().start if draft_timesheet else last_filled_timesheet.end
+                    timesheet_start_date = draft_timesheet.last().start if draft_timesheet else last_filled_timesheet.end + timedelta(days=1)
                     draft_timesheet.delete()
                     self.create_timesheet(project, timesheet_start_date, frequency)
                 else:
