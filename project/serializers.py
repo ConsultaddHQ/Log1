@@ -101,7 +101,13 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_client(obj):
-        return obj.submission.client + (' (Timesheets)' if obj.submission.work_type == 'c2c' else ' (Paystubs)')
+        char = ''
+        status = ProjectStatus.objects.filter(project=obj, is_current=True).filter(
+            Q(status='complete') | Q(status__istartswith='terminated')
+        ).first()
+        if status:
+            char = '  '
+        return obj.submission.client + (' (Timesheets)' + char if obj.submission.work_type == 'c2c' else ' (Paystubs)') + char
 
     @staticmethod
     def get_work_type(obj):

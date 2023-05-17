@@ -479,10 +479,11 @@ class ConsultantFeedbackSerializer(serializers.ModelSerializer):
 
 
 class FeedbackSerializer(serializers.ModelSerializer):
-    created_by = serializers.SerializerMethodField()
     project = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
     consultant = serializers.SerializerMethodField()
     tagged_user = serializers.SerializerMethodField()
+    feedback_type = serializers.SerializerMethodField()
     department = serializers.CharField(allow_null=True, allow_blank=True)
 
     class Meta:
@@ -513,6 +514,10 @@ class FeedbackSerializer(serializers.ModelSerializer):
         if obj.tagged_user:
             return TaggedUserSerializer(obj.tagged_user.all(), many=True).data
         return None
+
+    @staticmethod
+    def get_feedback_type(obj):
+        return obj.get_feedback_type_display()
 
 
 # Consultant Login
