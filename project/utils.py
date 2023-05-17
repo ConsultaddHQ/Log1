@@ -565,7 +565,7 @@ def mark_in_active():
 def timesheet_submission_mail(obj, request=None):
     try:
         project_type = "Timesheet" if obj.project.submission.work_type == 'c2c' else "Paystubs"
-        if os.environ.get('ENV') == 'PROD':
+        if os.environ.get('ENV') == 'prod':
             app_link = f"https://app.log1.com/#/finance/timesheet_details/{request.user.id}/{obj.project.id}"
         else:
             app_link = f"https://d2us7jrqrv1djj.cloudfront.net/#/finance/timesheet_details/{request.user.id}/{obj.project.id}"
