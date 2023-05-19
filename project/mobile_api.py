@@ -263,7 +263,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
             user_ids = list(user_list.values_list('id', flat=True))
             push_notification(user_ids, message_body)
-            timesheet_submission_mail(timesheet, request)
+            # timesheet_submission_mail(timesheet, request)
 
             serializer = self.serializer_class(timesheet)
             return Response({"result": serializer.data, "timesheet_id": timesheet_id}, status=201)
