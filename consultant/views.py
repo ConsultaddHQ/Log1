@@ -1876,16 +1876,3 @@ class ConsultantPerformanceViewSet(GenericViewSet):
         except Exception as error:
             write_exception(message=error)
             return Response({"data": []}, status=400)
-
-    @action(methods=['GET'], detail=False, url_path='feedback')
-    def feedback(self, request):
-        self.verify_api_key(request.GET['api_key'])
-        try:
-            email = request.GET.get('email')
-            consultant = get_object_or_404(Consultant, email=email)
-            feedback_queryset = ConsultantFeedback.objects.filter(consultant=consultant)
-            serializer = FeedbackSerializer(feedback_queryset, many=True)
-            return Response({"data": serializer.data, "count": len(serializer.data)}, status=200)
-        except Exception as error:
-            write_exception(message=error)
-            return Response({"data": []}, status=400)
