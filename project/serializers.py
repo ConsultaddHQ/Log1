@@ -101,7 +101,13 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_client(obj):
-        return obj.submission.client + (' (Timesheets)' if obj.submission.work_type == 'c2c' else ' (Paystubs)')
+        char = ''
+        status = ProjectStatus.objects.filter(project=obj, is_current=True).filter(
+            Q(status='complete') | Q(status__istartswith='terminated')
+        ).first()
+        if status:
+            char = '  '
+        return obj.submission.client + (' (Timesheets)' + char if obj.submission.work_type == 'c2c' else ' (Paystubs)') + char
 
     @staticmethod
     def get_work_type(obj):
@@ -201,6 +207,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
 
     def get_project(self, obj):
         project_type = self.context.get('project_type', None)
+        timesheet_status = self.context.get('timesheet_status', None)
         if project_type:
             project = Project.objects.filter(
                 Q(consultant=obj, statuses__is_current=True, submission__work_type=project_type) & (
@@ -215,8 +222,19 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
                         Q(statuses__status__in=['joined', 'complete', 'extended'])
                 )
             )
+        if timesheet_status:
+            if timesheet_status == 'pending_for_approval':
+                project = Project.objects.filter(timesheets__status__in=['submitted', 'updated'],consultant=obj)
+            else:
+                project = Project.objects.filter(timesheets__status=timesheet_status, consultant=obj)
+
         if project:
             project = project.latest('-start_date')
+            timesheet_qs = TimeSheet.objects.filter(project=project)
+            status = ''
+            if timesheet_qs:
+                latest_timesheet = timesheet_qs .latest('-submitted_at')
+                status = latest_timesheet.status
             return {
                 'id': project.id,
                 'team': project.employer,
@@ -224,6 +242,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
                 'client': project.submission.client,
                 'vendor': project.submission.lead.vendor_company.name,
                 'project_type': project.submission.get_work_type_display(),
+                'status': timesheet_status if timesheet_status else status,
             }
         return None
 
@@ -232,7 +251,8 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         queryset = TimeSheet.objects.filter(project__consultant=obj)
         submitted_ts = True if queryset.filter(status__in=['submitted', 'updated']) else False
         rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
-        return {'submitted': submitted_ts, 'rejected': rejected_ts}
+        draft_ts = True if queryset.filter(status='draft', is_active=True) else False
+        return {'submitted': submitted_ts, 'rejected': rejected_ts, 'draft': draft_ts}
 
     @staticmethod
     def get_pending_leave(obj):
