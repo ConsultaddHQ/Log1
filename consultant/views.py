@@ -1875,4 +1875,4 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error)
-            return Response({"data": []}, status=400)
+            return Response({"data": []}, status=200)
