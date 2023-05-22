@@ -1524,10 +1524,12 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @action(methods=["post"], detail=False, url_name="sent_reminder")
-    def sent_reminder(self, request, *args, **kwargs):
+    @action(methods=["post"], detail=False, url_name="send_reminder")
+    def send_reminder(self, request, *args, **kwargs):
         try:
             consultant_ids = request.data.get('consultant_ids', [])
+            if not consultant_ids:
+                return Response({"message": "mail sent"}, status=400)
             emails = Consultant.objects.filter(id__in=consultant_ids).values_list('email', flat=True)
             for consultant_id in consultant_ids:
                 timesheet_list = TimeSheet.objects.filter(
