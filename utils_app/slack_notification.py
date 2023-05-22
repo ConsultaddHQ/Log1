@@ -1107,8 +1107,7 @@ class MessageCard:
                     section_text = \
                         f":submission: *Highest No Of Submissions*\n*Name:*{payload['data'][rank]['submission']['name']}" \
                         f"\n*Team Name :* `{payload['data'][rank]['submission']['team']}`" \
-                        f"\n*Count:* `{payload['data'][rank]['submission']['score']}`" \
-                            if offer else "`No Offers Recorded Yet`"
+                        f"\n*Count:* `{payload['data'][rank]['submission']['score']}`"
                 else:
                     section_text = f":submission: *Highest No Of Submissions*\n`No Submissions Recorded Yet`"
 
@@ -1164,20 +1163,34 @@ class MessageCard:
                         ]
                     }
                 )
-                card_data["blocks"].append(
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": section_text
+
+                if offer:
+                    card_data["blocks"].append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": section_text
+                            }
                         }
-                    }
-                )
+                    )
                 card_data["blocks"].append(
                     {
                         "type": "divider"
                     }
                 )
+                if not offer and rank> 1:
+                    card_data["blocks"].append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "*Zero* *offers*, *time's* *running* *out!* *Determine*, *explore*, *take* *action!* :hourglass_flowing_sand: :rocket:"
+                            }
+                        }
+                    )
+
+
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
         except Exception as error:
