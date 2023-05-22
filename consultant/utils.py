@@ -512,7 +512,7 @@ def create_consultant(request, creator_id):
                 ssn=request.data.get('ssn'),
                 name=request.data.get('name'),
                 email=request.data.get('email'),
-                skype=request.data.get('skype'),
+                skype=request.data.get('skype_id'),
                 gender=request.data.get('gender'),
                 country=request.data.get('country'),
                 date_of_birth=request.data.get('dob'),
@@ -548,16 +548,21 @@ def create_consultant(request, creator_id):
                 )
 
             # Creating Consultant Original Profile Consultant
+            visa_details = json.loads(request.data.get('work_auth', '[]'))[0] \
+                if request.data.get('work_auth', None) else []
+            education = json.loads(request.data.get('education', '[]'))[0] \
+                if request.data.get('education', None) else []
             ConsultantProfile.objects.create(
                 title="Original",
                 consultant_id=consultant_id,
                 profile_owner_id=creator_id,
-                links=request.data.get('links'),
+                links=links,
                 date_of_birth=request.data.get('dob'),
-                visa_end=request.data.get('visa_end'),
-                visa_type=request.data.get('visa_type'),
-                visa_start=request.data.get('visa_start'),
+                visa_end=visa_details['end'],
+                visa_type=visa_details['type']['name'],
+                visa_start=visa_details['start'],
                 current_city=request.data.get('current_location'),
+                education=education['edu_type']['name']
             )
 
             add_other_details(request, consultant)

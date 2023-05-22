@@ -2542,6 +2542,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 if 'client' in filters and len(filters["client"]) > 0:
                     queryset = queryset.filter(submission__client__in=filters['client'])
 
+                if 'platform' in filters and len(filters["platform"]) > 0:
+                    queryset = queryset.filter(
+                        Q(engineer_feedback__answer__in=filters["platform"]) | Q(platform__in=filters['platform']))
+
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     queryset = queryset.filter(submission__created_by_id__in=filters['marketer'])
 
@@ -2736,6 +2740,15 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def test_status(self, request):
         try:
             return Response({"result": Test.STATUS_CHOICES}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='test_platform')
+    def test_platform(self, request):
+        try:
+            platforms = Question.objects.get(title="Platform", form_name='online_test')
+            return Response(platforms.options, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)

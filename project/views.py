@@ -1319,16 +1319,16 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     if not end:
                         end = date.today().strftime('%Y-%m-%d')
                     queryset = TimeSheet.objects.filter(
-                        project__in=ids, start__range=[start, end]
-                    ).exclude(status='draft')
+                        project__in=ids, start__range=[start, end])
                 else:
-                    queryset = TimeSheet.objects.filter(project__in=ids).exclude(status='draft')
+                    queryset = TimeSheet.objects.filter(project__in=ids)
                 if timesheet_status:
                     if timesheet_status == 'pending_for_approval':
                         queryset = queryset.filter(status__in=['submitted', 'updated'], is_active=True)
                     else:
                         queryset = queryset.filter(status=timesheet_status, is_active=True)
-
+                else:
+                    queryset = queryset.exclude(status='draft')
                 total = queryset.count()
                 serializer = self.serializer_class(queryset[first:last], many=True)
                 return Response({"data": serializer.data, 'total': total}, status=200)
@@ -1453,7 +1453,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             queryset = consultants.order_by('name').distinct('name')
             total = queryset.count()
             serializer = ConsultantTimeSheetSerializer(
-                queryset[first:last], context={"project_type": project_type}, many=True
+                queryset[first:last], context={"project_type": project_type, "timesheet_status": timesheet_status}, many=True
             )
             return Response({"data": serializer.data, 'total': total}, status=200)
         except Exception as error:
@@ -1523,6 +1523,33 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
+
+    @action(methods=["post"], detail=False, url_name="send_reminder")
+    def send_reminder(self, request, *args, **kwargs):
+        try:
+            consultant_ids = request.data.get('consultant_ids', [])
+            if not consultant_ids:
+                return Response({"message": "mail sent"}, status=400)
+            emails = Consultant.objects.filter(id__in=consultant_ids).values_list('email', flat=True)
+            for consultant_id in consultant_ids:
+                timesheet_list = TimeSheet.objects.filter(
+                    status='draft', project__consultant__id=consultant_id, is_active=True)
+                mail_data = {
+                    'cc': [config.FINANCE, 'yash.j@consultadd.com'],
+                    'bcc': [],
+                    'template': '../templates/reminder.html',
+                    'to': emails,
+                    'subject': "Timesheet reminder",
+                    'context': {
+                        'consultant': Consultant.objects.get(id=consultant_id).name,
+                        'timesheet_list': timesheet_list
+                    }
+                }
+                send_email_(mail_data, 'sakshi.shetty@consultadd.com', request=request)
+            return Response({"message": "mail sent"}, status=202)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
 
     @action(methods=["get"], detail=True, url_name="from_notification")
     def from_notification(self, request, pk):
