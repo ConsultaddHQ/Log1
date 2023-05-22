@@ -117,7 +117,7 @@ class User(AbstractUser, PermissionsMixin):
     slack_id = models.CharField(_("Slack Id"), max_length=20, null=True, blank=True)
     phone = models.CharField(_("Phone Number"), max_length=20, null=True, blank=True)
     avatar = models.ImageField(_("Profile Picture"), upload_to='avatar/', blank=True, null=True)
-    associated_to = models.ManyToManyField(Team, related_name='associates', null=True, blank=True)
+    associated_to = models.ManyToManyField(Team, related_name='associates', blank=True)
     gender = models.CharField(_('Gender'), choices=GENDER_CHOICE, max_length=10, null=True, blank=True)
     shift = models.CharField(_('Shift Time'), choices=SHIFT_CHOICE, max_length=20, null=True, blank=True)
     team = models.ForeignKey(Team, on_delete=models.PROTECT, related_name='employees', null=True, blank=True)

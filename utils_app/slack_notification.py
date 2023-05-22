@@ -608,7 +608,7 @@ class MessageCard:
                             "type": "mrkdwn",
                             "text": f"{payload.get('feedback', 'NA')}"
                         }
-                    },                                    
+                    },
                     {
                         "type": "actions",
                         "elements": [
@@ -922,6 +922,7 @@ class MessageCard:
             write_exception(message=error, request=request)
             return str(error)
 
+    # noinspection PyTypeChecker
     @staticmethod
     def interview_data_report(payload, url):
         try:
@@ -975,18 +976,18 @@ class MessageCard:
                 {
                     "type": "actions",
                     "elements": [
-                            {
-                                "type": "button",
-                                "text": {
-                                    "type": "plain_text",
-                                    "emoji": True,
-                                    "text": "Download CSV"
-                                },
-                                "style": "primary",
-                                "url": file_url,
-                                "value": "click_me_123",
-                                "action_id": "button-action"
-                            }
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "emoji": True,
+                                "text": "Download CSV"
+                            },
+                            "style": "primary",
+                            "url": file_url,
+                            "value": "click_me_123",
+                            "action_id": "button-action"
+                        }
                     ]
                 },
             )
@@ -1011,7 +1012,7 @@ class MessageCard:
                 }
             }
             content_len = len(payload['data'])
-            portions = int(content_len/15) + 1
+            portions = int(content_len / 15) + 1
             first, last = 0, 15
             for portion in range(0, portions):
                 sl = 1
@@ -1048,25 +1049,149 @@ class MessageCard:
                         {
                             "type": "actions",
                             "elements": [
-                                    {
-                                        "type": "button",
-                                        "text": {
-                                            "type": "plain_text",
-                                            "emoji": True,
-                                            "text": "Download CSV"
-                                        },
-                                        "style": "primary",
-                                        "url": file_url,
-                                        "value": "click_me_123",
-                                        "action_id": "button-action"
-                                    }
+                                {
+                                    "type": "button",
+                                    "text": {
+                                        "type": "plain_text",
+                                        "emoji": True,
+                                        "text": "Download CSV"
+                                    },
+                                    "style": "primary",
+                                    "url": file_url,
+                                    "value": "click_me_123",
+                                    "action_id": "button-action"
+                                }
                             ]
                         },
                     )
                     post_msg_using_webhook(url, card_data)
                 first = last
-                data_left = content_len - (portion+1)*15
+                data_left = content_len - (portion + 1) * 15
                 last = last + 16 + data_left if data_left <= 20 else last + 16
             print(content_len)
+        except Exception as error:
+            return error, "error"
+
+    # noinspection PyTypeChecker
+    @staticmethod
+    def marketing_leaderboard(payload, url):
+        try:
+            card_data = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":onsultadd:  Consultant Compete  :onsultadd:",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"`{payload['competition_day']}th` *Day Of Competition Leaderboard*"
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    }
+                ]
+            }
+            for rank in range(1, payload["positions"] + 1):
+                offer = True if 'offer' in payload["data"][rank] else False
+                interview = True if 'interview' in payload["data"][rank] else False
+                submission = True if 'submission' in payload["data"][rank] else False
+
+                if submission:
+                    section_text = \
+                        f":submission: *Highest No Of Submissions*\n*Name:*{payload['data'][rank]['submission']['name']}" \
+                        f"\n*Team Name :* `{payload['data'][rank]['submission']['team']}`" \
+                        f"\n*Count:* `{payload['data'][rank]['submission']['score']}`"
+                else:
+                    section_text = f":submission: *Highest No Of Submissions*\n`No Submissions Recorded Yet`"
+
+                if rank > 1 and not offer and not submission and not interview:
+                    break
+
+                card_data["blocks"].append(
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f":medal: Top {rank}",
+                            "emoji": True
+                        }
+                    }
+                )
+                card_data["blocks"].append(
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": ":Offer: *Highest No Of Offers*" if offer else ":submission: *Highest No Of Submission*" if submission else ":Offer: *Highest No Of Offers*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": ":interview: *Highest No Of Interviews*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Name*: {payload['data'][rank]['offer']['name']}" if offer else f"*Name*: {payload['data'][rank]['submission']['name']}" if submission else "`No Offers Recorded Yet`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Name*: {payload['data'][rank]['interview']['name']}" if interview else "`No Interviews Recorded Yet`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Team Name*: `{payload['data'][rank]['offer']['team']}`" if offer else f"*Team Name*: `{payload['data'][rank]['submission']['team']}`" if submission else ""
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Team Name*: `{payload['data'][rank]['interview']['team']}`" if interview else ""
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Count*: `{payload['data'][rank]['offer']['score']}`" if offer else f"*Count*: `{payload['data'][rank]['submission']['score']}`" if submission else ""
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Count*: `{payload['data'][rank]['interview']['score']}`" if interview else ""
+                            }
+                        ]
+                    }
+                )
+
+                if offer:
+                    card_data["blocks"].append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": section_text
+                            }
+                        }
+                    )
+                card_data["blocks"].append(
+                    {
+                        "type": "divider"
+                    }
+                )
+                if not offer and rank> 1:
+                    card_data["blocks"].append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "*Zero* *offers*, *time's* *running* *out!* *Determine*, *explore*, *take* *action!* :hourglass_flowing_sand: :rocket:"
+                            }
+                        }
+                    )
+
+
+            res, msg = post_msg_using_webhook(url, card_data)
+            return res, msg
         except Exception as error:
             return error, "error"
