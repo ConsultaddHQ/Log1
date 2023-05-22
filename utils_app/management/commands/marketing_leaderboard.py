@@ -58,11 +58,11 @@ class Command(BaseCommand):
             for rank in range(1, positions+1):
                 leaders_data["data"][rank] = {}
             leaders_data['competition_day'] = str(
-                date.today() - datetime.strptime('2023-05-15', "%Y-%m-%d").date()).split(' ')[0]
+                date.today() - datetime.strptime('2023-05-14', "%Y-%m-%d").date()).split(' ')[0]
 
             sub_info = {"submission": {}}
             submission_score = sub_info['submission']
-            submissions = Submission.objects.filter(created__gte='2023-02-01', created__lt='2023-02-28')
+            submissions = Submission.objects.filter(created__gte='2023-05-15')
             for sub in submissions:
                 employee_id = sub.created_by.employee_id
                 if employee_id not in submission_score:
