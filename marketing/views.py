@@ -2594,6 +2594,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def create(self, request, *args, **kwargs):
         try:
+            # breakpoint()
             users = get_authenticated_users(request)
             submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by__in=users)
             if not submission:
@@ -2636,15 +2637,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             )
 
             if test.platform:
-                test_content_type = ContentType.objects.get(model='test')
-                available_platforms = Choice.objects.filter(
-                    name__icontains=test.platform, field='platform',
-                    content_type=test_content_type, display_name__icontains=test.platform
-                )
-                if not available_platforms.first() and test.platform != 'Not Available':
-                    Choice.objects.create(
-                        content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
-                    )
+                test_platform(request, test.platform)
             # Activity
             if is_video:
                 desc = f"Video test created with deadline {str(test.deadline)}"

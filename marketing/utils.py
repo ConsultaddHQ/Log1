@@ -13,6 +13,7 @@ from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
+from utils_app.models import Choice
 from utils_app.slack_notification import MessageCard as slack
 from marketing.models import Submission, Interview, Question, Answer
 from utils_app.utils import generate_s3_url
@@ -54,7 +55,7 @@ def get_users_and_attendees(request, interview):
             for user in scrum_masters:
                 user_list.append(user)
                 attendees.append({"email": user.email})
-                            
+
         for user in interview.guest.all():
             user_list.append(user)
             attendees.append({"email": user.email})
@@ -120,8 +121,8 @@ def get_interview_title(interview):
 
         return f"Call Supervisor - {call_supervisor} " \
                f"{'(Consultant)' if is_consultant == True else ''} :: {interview.round}R :: " \
-               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::"\
-               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::"\
+               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::" \
+               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::" \
                f"{interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"
 
     except Exception as error:
@@ -278,9 +279,12 @@ def create_answer(request, obj, model):
             elif question.answer_type == 'option':
                 value = data.get("answer")
                 available_option = question.options
-                if value not in available_option:
-                    question.options.append(value)
-                    question.save()
+                if question.title == 'Platform':
+                    test_platform(request, value)
+                else:
+                    if value not in available_option:
+                        question.options.append(value)
+                        question.save()
             else:
                 value = data.get("answer", None)
 
@@ -419,5 +423,26 @@ def get_interview_report(payload, request):
                 data.get('passed_reason', None),
             ])
         return response
+    except Exception as error:
+        write_exception(error, request)
+
+
+def test_platform(request, platform):
+    try:
+        test_content_type = ContentType.objects.get(model='test')
+        question = get_object_or_404(Question, title='Platform')
+        available_option = question.options
+        available_platforms = Choice.objects.filter(
+            name__icontains=platform, field='platform',
+            content_type=test_content_type, display_name__icontains=platform
+        )
+        if not available_platforms.first() and platform != 'Not Available':
+            Choice.objects.create(
+                content_type=test_content_type, name=platform, field='platform',
+                display_name=platform
+            )
+        if platform not in available_option:
+            question.options.append(platform)
+            question.save()
     except Exception as error:
         write_exception(error, request)
