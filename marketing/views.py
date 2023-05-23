@@ -2594,7 +2594,6 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
     def create(self, request, *args, **kwargs):
         try:
-            # breakpoint()
             users = get_authenticated_users(request)
             submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by__in=users)
             if not submission:
