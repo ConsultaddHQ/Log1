@@ -121,8 +121,8 @@ def get_interview_title(interview):
 
         return f"Call Supervisor - {call_supervisor} " \
                f"{'(Consultant)' if is_consultant == True else ''} :: {interview.round}R :: " \
-               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::" \
-               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::" \
+               f"{interview.get_screening_type_display()} :: {interview.get_interview_mode_display()} ::"\
+               f"{interview.start_time.strftime('%m/%d/%Y :: %I:%M %p EST')} :: {interview.submission.client} ::"\
                f"{interview.consultant.name} :: {interview.marketer.employee_name} ::  {interview.submission.employer}"
 
     except Exception as error:
