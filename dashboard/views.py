@@ -61,7 +61,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client',
-                     'job_title')
+                     'job_title', 'submission_id')
 
             upcoming_joining = project_qs.filter(
                 statuses__status='on_boarded', statuses__is_current=True, start_date__gte=datetime.today()
@@ -70,7 +70,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 vendor=F('submission__lead__vendor_company__name'),
                 consultant_name=F('consultant__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
+            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote',
+                     'submission_id')
 
             new_offers = project_qs.filter(
                 statuses__is_current=True,
@@ -81,7 +82,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 consultant_name=F('consultant__name'),
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
+            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote',
+                     'submission_id')
 
             data = {
                 "new_offers": new_offers,
