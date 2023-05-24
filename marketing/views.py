@@ -478,7 +478,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def employer(self, request):
         try:
             consultadd_emp = Team.objects.get(name='Consultadd')
-            if 'superadmin' in request.user.roles:
+            if 'superadmin' in request.user.roles or 'Recruitment' == request.user.team.dept:
                 employers = Team.objects.filter(
                     Q(dept='Marketing') | Q(name='Consultadd')
                 ).order_by('name').values('id', 'name')
