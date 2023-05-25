@@ -1143,4 +1143,3 @@ class EngineerReportXposedViewSets(GenericViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
