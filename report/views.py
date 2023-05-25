@@ -1040,3 +1040,106 @@ class MarketingReportViewSets(GenericViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /engineers/
+class EngineerReportXposedViewSets(GenericViewSet):
+    queryset = User.objects.all()
+    serializer_class = ProjectSupportDetailSerializer
+
+    @staticmethod
+    def verify_api_key(api_key):
+        if not APIKey.objects.is_valid(api_key):
+            return Response({"message": "Unauthorized"}, status=401)
+        return True
+
+    @action(methods=['get'], detail=False, url_path='project/support')
+    def get_info(self, request, *args, **kwargs):
+        self.verify_api_key(request.GET.get('api_key'))
+        try:
+            resp = {}
+            count = 1
+            cycle_info = request.GET.get('cycle', None)
+            engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
+
+            emp_info = {
+                "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
+            }
+            if cycle_info:
+                if cycle_info == '1':
+                    cycle_duration = 'January to June'
+                    cycle_date = datetime.strptime(f"{date.today().year}-01-01", '%Y-%m-%d').date()
+                else:
+                    cycle_duration = 'July to December'
+                    year = date.today().year if date.today().month > 6 else date.today().year - 1
+                    cycle_date = datetime.strptime(f"{year}-07-01", '%Y-%m-%d').date()
+            else:
+                if date.today().month < 7:
+                    cycle_duration = 'January to June'
+                    cycle_date = datetime.strptime(f"{date.today().year}-01-01", '%Y-%m-%d').date()
+                else:
+                    cycle_duration = 'July to December'
+                    cycle_date = datetime.strptime(f"{date.today().year}-07-01", '%Y-%m-%d').date()
+
+            supports = ProjectSupport.objects.filter(support=engineer, is_proxy_support=False).filter(
+                Q(end__gt=cycle_date) | Q(end__isnull=True)
+            )
+            for support in supports:
+                prev_statuses = []
+                handover_given = False
+                handover_received = False
+                project = support.project
+                statuses = support.statuses
+                training_duration = 0
+                support_start = cycle_date if cycle_date > support.start else support.start
+
+                if statuses:
+                    active_status_obj = statuses.filter(is_current=True).first()
+                    if active_status_obj:
+                        active_status = active_status_obj.frequency
+                        if active_status == 'handover':
+                            handover_given = True
+                    else:
+                        active_status = "NA"
+                else:
+                    active_status = "NA"
+
+                prev_supports_qs = ProjectSupport.objects.filter(project=project, start__lt=support.start, )\
+                    .exclude(id=support.id)
+                for prev_supports_obj in prev_supports_qs:
+                    support_statuses = prev_supports_obj.statuses.filter(
+                        is_current=True, is_proxy_support=False).values_list('frequency')
+                    prev_statuses.extend(support_statuses)
+
+                if 'handover' in prev_statuses:
+                    handover_received = True
+
+                technology = project.description.technology if project.description.technology else "NA" \
+                    if hasattr(project, 'description') else "NA"
+
+                if support.start < project.start_date and cycle_date < project.start_date:
+                    if date.today() < project.start_date:
+                        active_status = 'Training'
+                        training_duration = (date.today() - support_start).days
+                    else:
+                        training_duration = (project.start_date - support_start).days
+
+                if support.end:
+                    support_duration = f'{(support.end - support_start).days  - training_duration} days'
+                else:
+                    support_duration = f'{(date.today() - support_start).days  - training_duration} days'
+
+                resp[f"project_{count}"] = {
+                    "status": " ".join(active_status.split('_')).capitalize(),
+                    "support_start": support.start, "support_end": support.end,
+                    "consultant_name": support.project.submission.consultant.name,
+                    "handover_received": handover_received, "handover_given": handover_given,
+                    "is_remote": support.project.is_remote, "client": support.project.submission.client,
+                    "support_id": support.id, "skills": technology, "support_duration": support_duration,
+                    "training_duration": f'{training_duration} days', "project_start": project.start_date,
+                }
+                count += 1
+            return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
