@@ -61,6 +61,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
         week_day = start_date.weekday()
         if week_day == 6:
             start_date = start_date + timedelta(days=1)
+            week_day = start_date.weekday()
         if obj.submission.work_type == 'C2C':
             days = 6
         elif frequency == 'Biweekly':

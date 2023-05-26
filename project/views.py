@@ -1471,8 +1471,6 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 timesheet.status_updated_by = request.user
                 timesheet.save()
                 if request.data.get('status') == 'rejected':
-                    timesheet.is_active = False
-                    timesheet.save()
                     sender_content_type = ContentType.objects.get(model='user')
                     target_content_type = ContentType.objects.get(model='timesheet')
                     recipient_content_type = ContentType.objects.get(model='consultant')
