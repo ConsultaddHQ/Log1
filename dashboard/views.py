@@ -1,6 +1,6 @@
 from django.db.models import F, Q
-from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -8,7 +8,6 @@ from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-
 
 from project.models import Project
 from consultant.models import Consultant
@@ -98,25 +97,25 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             elif filter_by_time == 'last_month':
                 last = date.today().replace(day=1)
-                first = last.replace(day=1)
+                first = last.replace(day=1) - relativedelta(months=1)
 
             elif filter_by_time == 'this_year':
-                first = last.replace(day=1) + relativedelta(months=-(last.month-1))
+                first = last.replace(day=1) + relativedelta(months=-(last.month - 1))
 
             elif filter_by_time == 'last_6_month':
                 last = date.today().replace(day=1)
-                first = last + timedelta(days=1) + relativedelta(months=-6)
+                first = last + relativedelta(months=-6)
 
             elif filter_by_time == 'last_12_month':
                 last = date.today().replace(day=1)
-                first = last + timedelta(days=1) + relativedelta(months=-12)
+                first = last + relativedelta(months=-12)
 
             # this_month
             else:
                 first = date.today().replace(day=1)
                 last = date.today() + timedelta(days=1)
             projects = project_qs.filter(
-                statuses__created__range=[first, last], submission__marketing_team__dept="Marketing"
+                statuses__created__range=[first, last]
             ).order_by('id').distinct('id').all()
             total = projects.count()
             new = projects.filter(statuses__status='new', statuses__is_current=True).count()
@@ -132,15 +131,16 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             count = {
                 'total_offers': total,
-                'offer': project_qs.filter(created__range=[first, last], submission__marketing_team__dept="Marketing").count(),
-                'submission': sub.filter(created__range=[first, last], marketing_team__dept="Marketing").exclude(
-                    status='draft').count(),
+                'offer': project_qs.filter(created__range=[first, last]).exclude(submission__status='archive').count(),
+                'submission': sub.filter(created__range=[first, last]).exclude(
+                    status__in=['draft', 'archive']).exclude(consultant_marketing__consultant__status='terminated'
+                                                             ).count(),
                 'on_project': consultant.filter(status='on_project', created__range=[first, last]).count(),
-                'ba_bench': consultant.filter(skills__contains='BA', status='on_bench', created__range=[first, last]).count(),
-                'dev_bench':  consultant.filter(status='on_bench', created__range=[first, last]).exclude(skills__exact='BA').count(),
-                'interview': interviews.filter(
-                    created__range=[first, last], submission__marketing_team__dept="Marketing"
-                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                'ba_bench': consultant.filter(skills__contains='BA', status='on_bench',
+                                              created__range=[first, last]).count(),
+                'dev_bench': consultant.filter(status='on_bench', created__range=[first, last]).exclude(
+                    skills__exact='BA').count(),
+                'interview': interviews.filter(start_time__range=[first, last]).count()
             }
 
             offer_count = [
@@ -183,7 +183,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             elif filter_by_time == 'last_month':
                 last = date.today().replace(day=1)
-                first = last.replace(day=1)
+                first = last.replace(day=1) - relativedelta(months=1)
 
                 prev_last = last + relativedelta(months=-1)
                 prev_first = first + relativedelta(months=-1)
@@ -224,7 +224,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     created__range=[first, last],
                     created_by=request.user,
                     marketing_team__dept="Marketing"
-                ) .exclude(status='draft').count()
+                ).exclude(status='draft').count()
 
                 interviews_count = Interview.objects.filter(
                     submission__created_by=request.user,
@@ -353,7 +353,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
-                diff = (relativedelta(last, first)).years*12
+                diff = (relativedelta(last, first)).years * 12
             for i in range(diff):
                 projects_count = projects.filter(created__range=[first, last]).count()
                 data = {
