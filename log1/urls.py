@@ -11,16 +11,17 @@ from rest_framework.documentation import include_docs_urls
 from activity.views import CommentViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
-from dashboard.views import MarketingDashboardViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
+from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
 from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
     TimetrackEventMobileViewSet
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
-from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets
+from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
+    EngineerReportXposedViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
     ConsultantRevisionViewSet
@@ -94,12 +95,15 @@ router.register(r'choice', ChoiceViewSet)
 router.register(r'cmd', SlashCommandViewSets)
 
 router.register(r'report', ScrumMeetingReport)
+router.register(r'engineers', EngineerReportXposedViewSets)
 router.register(r'support_report', EngineeringReportViewSets)
 router.register(r'marketing_report', MarketingReportViewSets)
 
 router.register(r'comment', CommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
+
+router.register(r'quick_actions', QuickActionsViewSets)
 
 router.register(r'ckiller_data', CkillerSubmissionViewSet)
 

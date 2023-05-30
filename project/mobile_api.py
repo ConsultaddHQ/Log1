@@ -2,8 +2,9 @@ import os
 from datetime import datetime, timedelta, date
 
 from django.utils import timezone
-from django.shortcuts import get_object_or_404
 from django.db.models import Q, Max
+from django.shortcuts import get_object_or_404
+from dateutil.relativedelta import relativedelta
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -58,17 +59,19 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
         if not start_date:
             start_date = obj.start_date
         week_day = start_date.weekday()
-
+        if week_day == 6:
+            start_date = start_date + timedelta(days=1)
+            week_day = start_date.weekday()
         if obj.submission.work_type == 'C2C':
             days = 6
         elif frequency == 'Biweekly':
             days = 13
-        elif frequency == 'Monthly':
-            days = 29
         else:
             days = 6
 
-        if week_day == 0:
+        if frequency == 'Monthly':
+            end_date = start_date.replace(day=1) + relativedelta(months=1) - timedelta(days=1)
+        elif week_day == 0:
             end_date = start_date + timedelta(days=days)
         else:
             end_date = start_date + timedelta(days=days - week_day)
@@ -79,7 +82,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 hours=0, status='draft', project=obj,
             )
             start_date = end_date + timedelta(days=1)
-            end_date = end_date + timedelta(days=days+1)
+            end_date = end_date + timedelta(days=days + 1)
 
     def list(self, request, *args, **kwargs):
         try:
