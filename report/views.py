@@ -21,7 +21,6 @@ from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
-from utils_app.slack_notification import MessageCard
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
@@ -1043,107 +1042,107 @@ class MarketingReportViewSets(GenericViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /leaders/
-class MarketingLeaderViewSets(GenericViewSet, ListModelMixin):
+# Route - /engineers/
+class EngineerReportXposedViewSets(GenericViewSet):
     queryset = User.objects.all()
     serializer_class = ProjectSupportDetailSerializer
 
     @staticmethod
-    def get_leaders(payload, category_data, positions, category_rely_data=None):
-        prev_score, prev_id = None, None
-        count = 1
-        category = list(category_data.keys())[0]
-        employee_scores = category_data[category]
-        sorted_data = dict(sorted(employee_scores.items(), key=lambda x: x[1], reverse=True))
-        for data in sorted_data:
-            employee_id = data
-            if count > positions:
-                break
-            if not sorted_data.get(data) and prev_score and prev_id:
-                employee_score = prev_score
-                employee_id = prev_id
-            else:
-                employee_score = sorted_data[data]
+    def verify_api_key(api_key):
+        if not APIKey.objects.is_valid(api_key):
+            return Response({"message": "Unauthorized"}, status=401)
+        return True
 
-            same_score_employees = list(filter(lambda k: sorted_data[k] == employee_score, sorted_data.keys()))
-            if len(same_score_employees) > 1 and category_rely_data:
-                employee_rely_score = dict(
-                    (k, category_rely_data[k]) for k in category_rely_data if k in same_score_employees)
-                sorted_employee_rely_score = dict(sorted(employee_rely_score.items(), key=lambda x: x[1], reverse=True))
-                employee_id = list(sorted_employee_rely_score.keys())[0]
-
-            employee = User.objects.get(employee_id=employee_id)
-            emp_data = {
-                "name": f"<@{employee.slack_id}>" if employee.slack_id else employee.employee_name,
-                "team": employee.team.name, "score": sorted_data[employee_id]
-            }
-            if employee_id != data:
-                prev_score = sorted_data[employee_id]
-                prev_id = data
-            payload[count][category] = emp_data
-            sorted_data = {k: v for k, v in sorted_data.items() if k != employee_id}
-            count += 1
-
-        return payload
-
-    def list(self, request, *args, **kwargs):
+    @action(methods=['get'], detail=False, url_path='project/support')
+    def get_info(self, request, *args, **kwargs):
+        self.verify_api_key(request.GET.get('api_key'))
         try:
-            start_date = request.GET.get('start_date', '2023-04-15')
-            end_date = request.GET.get('end_date', date.today().strftime("%Y-%m-%d"))
-            positions = 2
-            leaders_data = {
-                "positions": positions, "data": {}, "categories": ['offer', 'interview', 'submission']
+            resp = {}
+            count = 1
+            cycle_info = request.GET.get('cycle', None)
+            try:
+                engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
+            except Exception:
+                return Response({"message": "Employee Id does not exist"}, status=400)
+
+            emp_info = {
+                "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
             }
-
-            for rank in range(1, positions + 1):
-                leaders_data["data"][rank] = {}
-            leaders_data['competition_day'] = \
-            str(datetime.strptime(end_date, "%Y-%m-%d").date() - datetime.strptime(start_date,
-                                                                                   "%Y-%m-%d").date()).split(' ')[0]
-
-            end_date = (datetime.strptime(end_date, "%Y-%m-%d").date() + timedelta(days=1)).strftime("%Y-%m-%d")
-            sub_info = {"submission": {}}
-            submission_score = sub_info['submission']
-            submissions = Submission.objects.filter(created__gte=start_date, created__lte=end_date)
-            for sub in submissions:
-                employee_id = sub.created_by.employee_id
-                if employee_id not in submission_score:
-                    submission_score[employee_id] = 1
+            if cycle_info:
+                if cycle_info == '1':
+                    cycle_duration = 'January to June'
+                    cycle_date = datetime.strptime(f"{date.today().year}-01-01", '%Y-%m-%d').date()
                 else:
-                    submission_score[employee_id] = submission_score[employee_id] + 1
-            leaders_data["data"] = self.get_leaders(leaders_data["data"], sub_info, positions)
+                    cycle_duration = 'July to December'
+                    year = date.today().year if date.today().month > 6 else date.today().year - 1
+                    cycle_date = datetime.strptime(f"{year}-07-01", '%Y-%m-%d').date()
+            else:
+                if date.today().month < 7:
+                    cycle_duration = 'January to June'
+                    cycle_date = datetime.strptime(f"{date.today().year}-01-01", '%Y-%m-%d').date()
+                else:
+                    cycle_duration = 'July to December'
+                    cycle_date = datetime.strptime(f"{date.today().year}-07-01", '%Y-%m-%d').date()
 
-            interview_info = {'interview': {}}
-            interview_score = interview_info['interview']
-            interviews = Interview.objects.filter(
-                submission__in=submissions, status__in=['next_round', 'failed', 'offer', 'feedback_due']
+            supports = ProjectSupport.objects.filter(support=engineer, is_proxy_support=False).filter(
+                Q(end__gt=cycle_date) | Q(end__isnull=True)
             )
-            for interview in interviews:
-                employee_id = interview.submission.created_by.employee_id
-                if employee_id not in interview_score:
-                    interview_score[employee_id] = 1
+            for support in supports:
+                prev_statuses = []
+                handover_given = False
+                handover_received = False
+                project = support.project
+                statuses = support.statuses
+                training_duration = 0
+                support_start = cycle_date if cycle_date > support.start else support.start
+
+                if statuses:
+                    active_status_obj = statuses.filter(is_current=True).first()
+                    if active_status_obj:
+                        active_status = active_status_obj.frequency
+                        if active_status == 'handover':
+                            handover_given = True
+                    else:
+                        active_status = "NA"
                 else:
-                    interview_score[employee_id] = interview_score[employee_id] + 1
-            leaders_data["data"] = self.get_leaders(leaders_data["data"], interview_info, positions, submission_score)
+                    active_status = "NA"
 
-            offer_info = {'offer': {}}
-            offer_score = offer_info['offer']
-            offers = Project.objects.filter(
-                submission__in=submissions, statuses__is_current=True,
-                statuses__status__in=['On Boarded', 'Joined', 'joined', 'on_boarded']
-            )
-            for offer in offers:
-                employee_id = offer.submission.created_by.employee_id
-                if employee_id not in offer_info:
-                    offer_score[employee_id] = 1
+                prev_supports_qs = ProjectSupport.objects.filter(project=project, start__lt=support.start, )\
+                    .exclude(id=support.id)
+                for prev_supports_obj in prev_supports_qs:
+                    support_statuses = prev_supports_obj.statuses.filter(
+                        is_current=True, is_proxy_support=False).values_list('frequency')
+                    prev_statuses.extend(support_statuses)
+
+                if 'handover' in prev_statuses:
+                    handover_received = True
+
+                technology = project.description.technology if project.description.technology else "NA" \
+                    if hasattr(project, 'description') else "NA"
+
+                if support.start < project.start_date and cycle_date < project.start_date:
+                    if date.today() < project.start_date:
+                        active_status = 'Training'
+                        training_duration = (date.today() - support_start).days
+                    else:
+                        training_duration = (project.start_date - support_start).days
+
+                if support.end:
+                    support_duration = f'{(support.end - support_start).days  - training_duration} days'
                 else:
-                    offer_score[employee_id] = offer_score[employee_id] + 1
+                    support_duration = f'{(date.today() - support_start).days  - training_duration} days'
 
-            leaders_data["data"] = self.get_leaders(leaders_data["data"], offer_info, positions, interview_score)
-            url = 'https://hooks.slack.com/services/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'
-            MessageCard.marketing_leaderboard(leaders_data, url)
-
-            return Response({'max_rounds': "max_rounds"}, status=200)
+                resp[f"project_{count}"] = {
+                    "status": " ".join(active_status.split('_')).capitalize(),
+                    "support_start": support.start, "support_end": support.end,
+                    "consultant_name": support.project.submission.consultant.name,
+                    "handover_received": handover_received, "handover_given": handover_given,
+                    "is_remote": support.project.is_remote, "client": support.project.submission.client,
+                    "support_id": support.id, "skills": technology, "support_duration": support_duration,
+                    "training_duration": f'{training_duration} days', "project_start": project.start_date,
+                }
+                count += 1
+            return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
