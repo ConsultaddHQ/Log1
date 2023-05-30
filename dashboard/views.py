@@ -11,7 +11,9 @@ from rest_framework.authentication import TokenAuthentication
 
 from project.models import Project
 from consultant.models import Consultant
+from dashboard.models import QuickActions
 from log1.utils import ERROR_MSG, write_exception
+from dashboard.serializers import QuickActionSerializer
 from marketing.models import Submission, Interview, Test
 
 
@@ -96,7 +98,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 last = date(int(end_year), 1, 1)
 
             elif filter_by_time == 'last_month':
-                last = date.today().replace(day=1)
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last.replace(day=1) - relativedelta(months=1)
 
             elif filter_by_time == 'this_year':
@@ -182,7 +184,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 prev_first = first - timedelta(days=(last - first).days)
 
             elif filter_by_time == 'last_month':
-                last = date.today().replace(day=1)
+                last = date.today().replace(day=1) - timedelta(days=1)
                 first = last.replace(day=1) - relativedelta(months=1)
 
                 prev_last = last + relativedelta(months=-1)
@@ -395,6 +397,52 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).values('id', 'marketer', 'submit_date'),
             }
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+
+class QuickActionsViewSets(GenericViewSet, ListModelMixin):
+    queryset = QuickActions.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = QuickActions.objects.filter(user=request.user).first()
+            serializer = QuickActionSerializer(queryset)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+    @action(methods=['post', 'delete'], detail=False, url_path='add_consultant')
+    def add_consultant(self, request):
+        try:
+            add_consultant_id = request.data.get('add_consultant')
+            search_consultant_id = request.data.get('search_consultant')
+            quick_action, created = QuickActions.objects.get_or_create(user=request.user)
+
+            if add_consultant_id:
+                add_consultant = Consultant.objects.get(id=add_consultant_id)
+                if request.method == 'POST':
+                    if quick_action.add_consultants.count() >= 5:
+                        return Response({"message": "Maximum limit reached"}, status=400)
+                    quick_action.add_consultants.add(add_consultant)
+                else:
+                    quick_action.add_consultants.remove(add_consultant)
+            else:
+                search_consultant = Consultant.objects.get(id=search_consultant_id)
+                if request.method == 'POST':
+                    quick_action.search_consultants.add(search_consultant)
+                    if quick_action.search_consultants.count() > 3:
+                        last_item = quick_action.search_consultants.last()
+                        quick_action.search_consultants.remove(last_item)
+                else:
+                    quick_action.search_consultants.remove(search_consultant)
+
+            return Response({"message": "action update"}, status=200)
+
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
