@@ -1875,7 +1875,7 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error)
-            return Response({"data": []}, status=400)
+            return Response({"data": []}, status=200)
 
     @action(methods=['GET'], detail=False, url_path='feedback')
     def feedback(self, request):
@@ -1888,4 +1888,4 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             return Response({"data": serializer.data, "count": len(serializer.data)}, status=200)
         except Exception as error:
             write_exception(message=error)
-            return Response({"data": []}, status=400)
+            return Response({"data": []}, status=200)
