@@ -6,8 +6,8 @@ from django.db import transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
-from django.contrib.contenttypes.models import ContentType
 from consultant.utils import create_and_send_notification
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.response import Response
@@ -24,10 +24,10 @@ from marketing.models import Submission, User
 from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
-from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from notification.models import Notification, FCMDevice
 from utils_app.utils import delete_temp_file, export_to_csv
 from marketing.utils import date_filter, get_authenticated_users
+from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from notification.utils import push_notification_consultant
@@ -1491,48 +1491,40 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 timesheet.status_updated_by = request.user
                 timesheet.save()
                 if request.data.get('status') == 'rejected':
-                    timesheet.is_active = False
-                    timesheet.save()
-
-                    new_timesheet = TimeSheet.objects.create(
-                        remark=timesheet.remark, project=timesheet.project,
-                        status='rejected', start=timesheet.start, end=timesheet.end,
-                        additional_hours=timesheet.additional_hours, hours=timesheet.hours,
-                    )
                     sender_content_type = ContentType.objects.get(model='user')
                     target_content_type = ContentType.objects.get(model='timesheet')
                     recipient_content_type = ContentType.objects.get(model='consultant')
 
-                    if new_timesheet.remark or len(new_timesheet.remark) != 0:
-                        title = f"Timesheet rejected for week end {str(new_timesheet.end)} for client " \
-                                f"{new_timesheet.project.submission.client} \n Remark: {new_timesheet.remark}"
+                    if timesheet.remark or len(timesheet.remark) != 0:
+                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
+                                f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
                     else:
-                        title = f"Timesheet rejected for week end {str(new_timesheet.end)} for client " \
-                                f"{new_timesheet.project.submission.client}"
+                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
+                                f"{timesheet.project.submission.client}"
 
                     Notification.objects.create(
                         category="rejected", recipient_content_type=recipient_content_type,
-                        title=title, recipient_object_id=new_timesheet.project.consultant.id,
+                        title=title, recipient_object_id=timesheet.project.consultant.id,
                         sender_content_type=sender_content_type, target_content_type=target_content_type,
-                        description=title, target_object_id=new_timesheet.id, sender_object_id=request.user.id,
+                        description=title, target_object_id=timesheet.id, sender_object_id=request.user.id,
                     )
 
                     # Push Notification
                     message_body = {
-                        "body": title, "title": title, "category": "rejected",
+                        "body": title, "title": "Timesheet Rejected", "category": "rejected",
                         "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
                         "data": {
-                            'target': 'timesheet', 'target_id': new_timesheet.id,
+                            'target': 'timesheet', 'target_id': timesheet.id,
                             'is_read': False, 'is_deleted': False, 'timestamp': str(timezone.now()),
                         },
                     }
-                    object_ids = new_timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
+                    object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
                     registration_ids = list(
                         FCMDevice.objects.filter(
                             object_id__in=list(object_ids), content_type__model='consultanttoken'
                         ).values_list('device_id', flat=True))
                     push_notification_consultant(registration_ids, message_body)
-                    serializer = self.serializer_class(new_timesheet)
+                    serializer = self.serializer_class(timesheet)
                 else:
                     serializer = self.serializer_class(timesheet)
                 return Response({"data": serializer.data, "message": "Timesheet is updated"}, status=202)
@@ -1548,20 +1540,28 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def send_reminder(self, request, *args, **kwargs):
         try:
             consultant_ids = request.data.get('consultant_ids', [])
+            start = request.data.get('start', None)
+            end = request.data.get('end', None)
             if not consultant_ids:
                 return Response({"message": "mail sent"}, status=400)
-            emails = Consultant.objects.filter(id__in=consultant_ids).values_list('email', flat=True)
             for consultant_id in consultant_ids:
+                consultant = Consultant.objects.get(id=consultant_id)
                 timesheet_list = TimeSheet.objects.filter(
-                    status='draft', project__consultant__id=consultant_id, is_active=True)
+                    status='draft', project__consultant__id=consultant_id, is_active=True,)
+
+                if start is not None:
+                    timesheet_list = timesheet_list.filter(start__gte=start)
+
+                if end is not None:
+                    timesheet_list = timesheet_list.filter(end__lte=end)
                 mail_data = {
                     'cc': [config.FINANCE, 'yash.j@consultadd.com'],
                     'bcc': [],
                     'template': '../templates/reminder.html',
-                    'to': emails,
+                    'to': [consultant.email],
                     'subject': "Timesheet reminder",
                     'context': {
-                        'consultant': Consultant.objects.get(id=consultant_id).name,
+                        'consultant': consultant.name,
                         'timesheet_list': timesheet_list
                     }
                 }
