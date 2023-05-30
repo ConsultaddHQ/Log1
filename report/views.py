@@ -1063,7 +1063,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
             try:
                 engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
             except Exception:
-                return Response({"message": "Employee Id does not exist",}, status=400)
+                return Response({"message": "Employee Id does not exist"}, status=400)
 
             emp_info = {
                 "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
