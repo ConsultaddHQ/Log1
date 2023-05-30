@@ -1,6 +1,6 @@
 from django.db.models import F, Q
-from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -9,10 +9,11 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
-
 from project.models import Project
 from consultant.models import Consultant
+from dashboard.models import QuickActions
 from log1.utils import ERROR_MSG, write_exception
+from dashboard.serializers import QuickActionSerializer
 from marketing.models import Submission, Interview, Test
 
 
@@ -41,7 +42,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             elif filter_for == 'team':
                 if not team_name:
                     team_name = request.user.team.name
-                sub = Submission.objects.filter(created_by__team__name=team_name)
+                sub = Submission.objects.filter(marketing_team__name=team_name)
                 consultant = Consultant.objects.filter(marketing__teams__name=team_name)
                 interviews = Interview.objects.filter(submission__marketing_team__name=team_name)
                 project_qs = Project.objects.filter(submission__marketing_team__name=team_name)
@@ -61,7 +62,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 marketer_name=F('submission__created_by__employee_name'),
                 consultant_name=F('submission__consultant_marketing__consultant__name'),
             ).values('id', 'start_time', 'end_time', 'consultant_name', 'marketer_name', 'vendor', 'client',
-                     'job_title')
+                     'job_title', 'submission_id')
 
             upcoming_joining = project_qs.filter(
                 statuses__status='on_boarded', statuses__is_current=True, start_date__gte=datetime.today()
@@ -70,7 +71,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 vendor=F('submission__lead__vendor_company__name'),
                 consultant_name=F('consultant__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
+            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote',
+                     'submission_id')
 
             new_offers = project_qs.filter(
                 statuses__is_current=True,
@@ -81,7 +83,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 consultant_name=F('consultant__name'),
                 vendor=F('submission__lead__vendor_company__name'),
                 marketer_name=F('submission__created_by__employee_name'),
-            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote')
+            ).values('id', 'start_date', 'consultant_name', 'marketer_name', 'vendor', 'client', 'is_remote',
+                     'submission_id')
 
             data = {
                 "new_offers": new_offers,
@@ -89,32 +92,32 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 "interviews": upcoming_interviews
             }
 
-            last = date.today()
+            last = date.today() + timedelta(days=1)
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
 
             elif filter_by_time == 'last_month':
                 last = date.today().replace(day=1) - timedelta(days=1)
-                first = last.replace(day=1)
+                first = last.replace(day=1) - relativedelta(months=1)
 
             elif filter_by_time == 'this_year':
-                first = last.replace(day=1) + relativedelta(months=-(last.month-1))
+                first = last.replace(day=1) + relativedelta(months=-(last.month - 1))
 
             elif filter_by_time == 'last_6_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
-                first = last + timedelta(days=1) + relativedelta(months=-6)
+                last = date.today().replace(day=1)
+                first = last + relativedelta(months=-6)
 
             elif filter_by_time == 'last_12_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
-                first = last + timedelta(days=1) + relativedelta(months=-12)
+                last = date.today().replace(day=1)
+                first = last + relativedelta(months=-12)
 
             # this_month
             else:
                 first = date.today().replace(day=1)
-                last = date.today()
+                last = date.today() + timedelta(days=1)
             projects = project_qs.filter(
-                statuses__created__range=[first, last], submission__marketing_team__dept="Marketing"
+                statuses__created__range=[first, last]
             ).order_by('id').distinct('id').all()
             total = projects.count()
             new = projects.filter(statuses__status='new', statuses__is_current=True).count()
@@ -130,15 +133,16 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             count = {
                 'total_offers': total,
-                'offer': project_qs.filter(created__range=[first, last], submission__marketing_team__dept="Marketing").count(),
-                'submission': sub.filter( created__range=[first, last], marketing_team__dept="Marketing")
-                    .exclude(status='draft').count(),
+                'offer': project_qs.filter(created__range=[first, last]).exclude(submission__status='archive').count(),
+                'submission': sub.filter(created__range=[first, last]).exclude(
+                    status__in=['draft', 'archive']).exclude(consultant_marketing__consultant__status='terminated'
+                                                             ).count(),
                 'on_project': consultant.filter(status='on_project', created__range=[first, last]).count(),
-                'ba_bench': consultant.filter(skills__contains='BA', status='on_bench', created__range=[first, last]).count(),
-                'dev_bench':  consultant.filter(status='on_bench', created__range=[first, last]).exclude(skills__exact='BA').count(),
-                'interview': interviews.filter(
-                    created__range=[first, last], submission__marketing_team__dept="Marketing"
-                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                'ba_bench': consultant.filter(skills__contains='BA', status='on_bench',
+                                              created__range=[first, last]).count(),
+                'dev_bench': consultant.filter(status='on_bench', created__range=[first, last]).exclude(
+                    skills__exact='BA').count(),
+                'interview': interviews.filter(start_time__range=[first, last]).count()
             }
 
             offer_count = [
@@ -166,7 +170,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
         end_year = request.GET.get("end_year", None)
 
         try:
-            last = date.today()
+            last = date.today() + timedelta(days=1)
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
@@ -181,20 +185,20 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             elif filter_by_time == 'last_month':
                 last = date.today().replace(day=1) - timedelta(days=1)
-                first = last.replace(day=1)
+                first = last.replace(day=1) - relativedelta(months=1)
 
                 prev_last = last + relativedelta(months=-1)
                 prev_first = first + relativedelta(months=-1)
 
             elif filter_by_time == 'last_6_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
+                last = date.today().replace(day=1)
                 first = last + timedelta(days=1) + relativedelta(months=-6)
 
                 prev_last = last + relativedelta(months=-6)
                 prev_first = first + relativedelta(months=-6)
 
             elif filter_by_time == 'last_12_month':
-                last = date.today().replace(day=1) - timedelta(days=1)
+                last = date.today().replace(day=1)
                 first = last + timedelta(days=1) + relativedelta(months=-12)
 
                 prev_last = last + relativedelta(months=-12)
@@ -222,7 +226,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     created__range=[first, last],
                     created_by=request.user,
                     marketing_team__dept="Marketing"
-                ) .exclude(status='draft').count()
+                ).exclude(status='draft').count()
 
                 interviews_count = Interview.objects.filter(
                     submission__created_by=request.user,
@@ -252,7 +256,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
                 submissions_count = Submission.objects.filter(
                     created__range=[first, last],
-                    created_by__team__name=team_name,
+                    marketing_team__name=team_name,
                     marketing_team__dept="Marketing"
                 ).exclude(status='draft').count()
 
@@ -351,7 +355,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
-                diff = (relativedelta(last, first)).years*12
+                diff = (relativedelta(last, first)).years * 12
             for i in range(diff):
                 projects_count = projects.filter(created__range=[first, last]).count()
                 data = {
@@ -393,6 +397,52 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).values('id', 'marketer', 'submit_date'),
             }
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+
+class QuickActionsViewSets(GenericViewSet, ListModelMixin):
+    queryset = QuickActions.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = QuickActions.objects.filter(user=request.user).first()
+            serializer = QuickActionSerializer(queryset)
+            return Response({"data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+    @action(methods=['post', 'delete'], detail=False, url_path='add_consultant')
+    def add_consultant(self, request):
+        try:
+            add_consultant_id = request.data.get('add_consultant')
+            search_consultant_id = request.data.get('search_consultant')
+            quick_action, created = QuickActions.objects.get_or_create(user=request.user)
+
+            if add_consultant_id:
+                add_consultant = Consultant.objects.get(id=add_consultant_id)
+                if request.method == 'POST':
+                    if quick_action.add_consultants.count() >= 5:
+                        return Response({"message": "Maximum limit reached"}, status=400)
+                    quick_action.add_consultants.add(add_consultant)
+                else:
+                    quick_action.add_consultants.remove(add_consultant)
+            else:
+                search_consultant = Consultant.objects.get(id=search_consultant_id)
+                if request.method == 'POST':
+                    quick_action.search_consultants.add(search_consultant)
+                    if quick_action.search_consultants.count() > 3:
+                        last_item = quick_action.search_consultants.last()
+                        quick_action.search_consultants.remove(last_item)
+                else:
+                    quick_action.search_consultants.remove(search_consultant)
+
+            return Response({"message": "action update"}, status=200)
+
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)

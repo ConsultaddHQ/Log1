@@ -198,43 +198,15 @@ class FinanceSerializer(serializers.ModelSerializer):
 class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
     ts_status = serializers.SerializerMethodField()
-    pending_leave = serializers.SerializerMethodField()
-    pending_request = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'ts_status', 'project', 'pending_leave', 'pending_request')
 
-    def get_project(self, obj):
-        project_type = self.context.get('project_type', None)
-        timesheet_status = self.context.get('timesheet_status', None)
-        if project_type:
-            project = Project.objects.filter(
-                Q(consultant=obj, statuses__is_current=True, submission__work_type=project_type) & (
-                        Q(statuses__status__istartswith='terminated') |
-                        Q(statuses__status__in=['joined', 'complete', 'extended'])
-                )
-            )
-        else:
-            project = Project.objects.filter(
-                Q(consultant=obj, statuses__is_current=True) & (
-                        Q(statuses__status__istartswith='terminated') |
-                        Q(statuses__status__in=['joined', 'complete', 'extended'])
-                )
-            )
-        if timesheet_status:
-            if timesheet_status == 'pending_for_approval':
-                project = Project.objects.filter(timesheets__status__in=['submitted', 'updated'],consultant=obj)
-            else:
-                project = Project.objects.filter(timesheets__status=timesheet_status, consultant=obj)
-
+    @staticmethod
+    def get_project(obj):
+        project = obj.projects.all().latest('-start_date')
         if project:
-            project = project.latest('-start_date')
-            timesheet_qs = TimeSheet.objects.filter(project=project)
-            status = ''
-            if timesheet_qs:
-                latest_timesheet = timesheet_qs .latest('-submitted_at')
-                status = latest_timesheet.status
             return {
                 'id': project.id,
                 'team': project.employer,
@@ -242,7 +214,6 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
                 'client': project.submission.client,
                 'vendor': project.submission.lead.vendor_company.name,
                 'project_type': project.submission.get_work_type_display(),
-                'status': timesheet_status if timesheet_status else status,
             }
         return None
 
