@@ -6,8 +6,8 @@ from django.db import transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import F, Q, Subquery, OuterRef
-from django.contrib.contenttypes.models import ContentType
 from consultant.utils import create_and_send_notification
+from django.contrib.contenttypes.models import ContentType
 
 from rest_framework.mixins import *
 from rest_framework.response import Response
@@ -24,10 +24,10 @@ from marketing.models import Submission, User
 from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
-from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from notification.models import Notification, FCMDevice
 from utils_app.utils import delete_temp_file, export_to_csv
 from marketing.utils import date_filter, get_authenticated_users
+from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
 
 from notification.utils import push_notification_consultant
@@ -924,7 +924,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                     # )
                 else:
                     message = "Support assignment mail send &"
-                    
+
             return Response({"message": message + "Support is added"}, status=201)
         except Exception as error:
             write_exception(error, request)
@@ -1084,7 +1084,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             serializer.save()
             desc = f"{request.user.employee_name} updated {msg.get('var2', '')} support {msg.get('var1', 'details')} "
             create_activity(support.project.id, 'projectsupport', request.user, desc, 'updated')
-            
+
             # need to add slack card here
             if data.get('status') == "independent":
                 # adding consultant update here
@@ -1103,7 +1103,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
                 consultant = feedback.consultant
                 emp_name = request.user.employee_name
                 feedback_type = feedback.get_feedback_type_display()
-                
+
                 tags = request.data.get('tagged_user', [])
                 if len(tags) > 0:
                     for tag in tags:
@@ -1318,8 +1318,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 if start:
                     if not end:
                         end = date.today().strftime('%Y-%m-%d')
-                    queryset = TimeSheet.objects.filter(
-                        project__in=ids, start__range=[start, end])
+                    queryset = TimeSheet.objects.filter(project__in=ids, start__gte=start, end__lte=end)
                 else:
                     queryset = TimeSheet.objects.filter(project__in=ids)
                 if timesheet_status:
@@ -1393,10 +1392,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         leave_status = request.GET.get('leave_status', '')
         consultant_id = request.GET.get('consultant', None)
         project_type = request.GET.get('project_type', None)
-        consultant_name = request.GET.get('consultant_name', None)
-        timesheet_status = request.GET.get('timesheet_status', [])
+        timesheet_status = request.GET.get('timesheet_status', None)
 
         try:
+            result = []
             project_status = [
                 'terminated-fired_performance_issue', 'terminated-fired_security_issue',
                 'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
@@ -1405,57 +1404,78 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             ]
 
             if consultant_id:
-                consultants = Consultant.objects.filter(id=consultant_id)
-            elif consultant_name:
-                consultants = Consultant.objects.filter(name__istartswith=consultant_name)
+                consultant = Consultant.objects.filter(id=consultant_id).first()
+                if not consultant_id:
+                    return Response({"message": "Consultant Not Found"}, status=400)
+                project_qs = consultant.projects.all()
             else:
-                consultant_ids = Project.objects.filter(
+                project_qs = Project.objects.filter(
                     statuses__status__in=project_status, statuses__is_current=True
-                ).values_list('consultant', flat=True)
-
-                consultants = Consultant.objects.filter(id__in=list(consultant_ids)).order_by('id').distinct('id')
-
-            if start_date:
-                consultants = consultants.filter(projects__timesheets__start__gte=start_date)
-            if end_date:
-                consultants = consultants.filter(projects__timesheets__end__lte=end_date)
-            if project_type:
-                consultants = consultants.filter(
-                    Q(projects__submission__work_type=project_type, projects__statuses__is_current=True) & (
-                            Q(projects__statuses__status__istartswith='terminated') |
-                            Q(projects__statuses__status__in=['joined', 'complete', 'extended'])
-                    )
                 )
-            if timesheet_status:
-                if timesheet_status == 'pending_for_approval':
-                    consultants = consultants.filter(
-                        projects__timesheets__status__in=['submitted', 'updated'], projects__timesheets__is_active=True,
-                        projects__submission__status__in=['draft', 'sub', 'project', 'in_offer', 'interview']
-                    )
-                else:
-                    consultants = consultants.filter(
-                        projects__timesheets__status=timesheet_status, projects__timesheets__is_active=True
-                    )
+
+            if project_type:
+                project_qs = project_qs.filter(submission__work_type=project_type)
+
+            timesheet_qs = TimeSheet.objects.filter(project__in=project_qs)
+            if start_date:
+                timesheet_qs = timesheet_qs.filter(start__gte=start_date)
+            if end_date:
+                timesheet_qs = timesheet_qs.filter(end__lte=end_date)
+            if timesheet_status == 'pending_for_approval':
+                timesheet_qs = timesheet_qs.filter(status__in=['submitted', 'updated'], is_active=True)
+            elif timesheet_status:
+                timesheet_qs = timesheet_qs.filter(status=timesheet_status, is_active=True)
+            project_ids = timesheet_qs.filter().order_by('-project_id').distinct('project_id').values_list(
+                'project_id', flat=True
+            )
+
+            consultant_ids = project_qs.filter(id__in=project_ids).order_by('-consultant_id').distinct('consultant_id') \
+                .values_list('consultant_id', flat=True)
+
+            consultants = Consultant.objects.filter(id__in=consultant_ids)
+
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                consultants = consultants.filter(name__istartswith=query)
+
             if leave_status:
                 if leave_status == 'pending':
                     consultants = consultants.filter(leaves__status='applied')
                 elif leave_status == 'not_pending':
                     consultants = consultants.exclude(leaves__status='applied')
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                consultants = consultants.filter(
-                    Q(name__istartswith=query) |
-                    Q(projects__employer__startswith=query) |
-                    Q(projects__submission__client__icontains=query) |
-                    Q(projects__submission__lead__vendor_company__name__icontains=query)
-                ).order_by('id').distinct('id')
 
-            queryset = consultants.order_by('name').distinct('name')
-            total = queryset.count()
-            serializer = ConsultantTimeSheetSerializer(
-                queryset[first:last], context={"project_type": project_type, "timesheet_status": timesheet_status}, many=True
-            )
-            return Response({"data": serializer.data, 'total': total}, status=200)
+            project_qs = project_qs.filter(id__in=project_ids, consultant__in=consultants).order_by(
+                'consultant_id', 'id').distinct('consultant_id')
+            for obj in project_qs[first: last]:
+                consultant = obj.consultant
+                ts_obj = TimeSheet.objects.filter(project=obj, status__in=['submitted', 'approved', 'rejected', 'updated']).first()
+                status = None if not ts_obj else ts_obj.status
+                ts_qs = TimeSheet.objects.filter(project__consultant=consultant)
+                data = {
+                    "id": consultant.id,
+                    "name": consultant.name,
+                    "email": consultant.email,
+                    "pending_leave": True if consultant.leaves.filter(status='applied').order_by('created') else False,
+                    "pending_request": True
+                    if TimesheetRequest.objects.filter(project__consultant=consultant, status='request') else False,
+                    "ts_status": {
+                        "submitted": True if ts_qs.filter(status__in=['submitted', 'updated']) else False,
+                        "rejected_ts": True if ts_qs.filter(status='rejected', is_active=True) else False,
+                        "draft_ts": True if ts_qs.filter(status='draft', is_active=True) else False
+                    },
+                    "project": {
+                        'id': obj.id,
+                        'team': obj.employer,
+                        'start_date': obj.start_date,
+                        'client': obj.submission.client,
+                        'vendor': obj.submission.lead.vendor_company.name,
+                        'project_type': obj.submission.get_work_type_display(),
+                        'status': timesheet_status if timesheet_status else status
+                    }
+                }
+                result.append(data)
+
+            return Response({"data": result, 'total': len(project_qs)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1471,48 +1491,40 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 timesheet.status_updated_by = request.user
                 timesheet.save()
                 if request.data.get('status') == 'rejected':
-                    timesheet.is_active = False
-                    timesheet.save()
-
-                    new_timesheet = TimeSheet.objects.create(
-                        remark=timesheet.remark, project=timesheet.project,
-                        status='rejected', start=timesheet.start, end=timesheet.end,
-                        additional_hours=timesheet.additional_hours, hours=timesheet.hours,
-                    )
                     sender_content_type = ContentType.objects.get(model='user')
                     target_content_type = ContentType.objects.get(model='timesheet')
                     recipient_content_type = ContentType.objects.get(model='consultant')
 
-                    if new_timesheet.remark or len(new_timesheet.remark) != 0:
-                        title = f"Timesheet rejected for week end {str(new_timesheet.end)} for client " \
-                                f"{new_timesheet.project.submission.client} \n Remark: {new_timesheet.remark}"
+                    if timesheet.remark or len(timesheet.remark) != 0:
+                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
+                                f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
                     else:
-                        title = f"Timesheet rejected for week end {str(new_timesheet.end)} for client " \
-                                f"{new_timesheet.project.submission.client}"
+                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
+                                f"{timesheet.project.submission.client}"
 
                     Notification.objects.create(
                         category="rejected", recipient_content_type=recipient_content_type,
-                        title=title, recipient_object_id=new_timesheet.project.consultant.id,
+                        title=title, recipient_object_id=timesheet.project.consultant.id,
                         sender_content_type=sender_content_type, target_content_type=target_content_type,
-                        description=title, target_object_id=new_timesheet.id, sender_object_id=request.user.id,
+                        description=title, target_object_id=timesheet.id, sender_object_id=request.user.id,
                     )
 
                     # Push Notification
                     message_body = {
-                        "body": title, "title": title, "category": "rejected",
+                        "body": title, "title": "Timesheet Rejected", "category": "rejected",
                         "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
                         "data": {
-                            'target': 'timesheet', 'target_id': new_timesheet.id,
+                            'target': 'timesheet', 'target_id': timesheet.id,
                             'is_read': False, 'is_deleted': False, 'timestamp': str(timezone.now()),
                         },
                     }
-                    object_ids = new_timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
+                    object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
                     registration_ids = list(
                         FCMDevice.objects.filter(
                             object_id__in=list(object_ids), content_type__model='consultanttoken'
                         ).values_list('device_id', flat=True))
                     push_notification_consultant(registration_ids, message_body)
-                    serializer = self.serializer_class(new_timesheet)
+                    serializer = self.serializer_class(timesheet)
                 else:
                     serializer = self.serializer_class(timesheet)
                 return Response({"data": serializer.data, "message": "Timesheet is updated"}, status=202)
@@ -1528,20 +1540,28 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
     def send_reminder(self, request, *args, **kwargs):
         try:
             consultant_ids = request.data.get('consultant_ids', [])
+            start = request.data.get('start', None)
+            end = request.data.get('end', None)
             if not consultant_ids:
                 return Response({"message": "mail sent"}, status=400)
-            emails = Consultant.objects.filter(id__in=consultant_ids).values_list('email', flat=True)
             for consultant_id in consultant_ids:
+                consultant = Consultant.objects.get(id=consultant_id)
                 timesheet_list = TimeSheet.objects.filter(
-                    status='draft', project__consultant__id=consultant_id, is_active=True)
+                    status='draft', project__consultant__id=consultant_id, is_active=True,)
+
+                if start is not None:
+                    timesheet_list = timesheet_list.filter(start__gte=start)
+
+                if end is not None:
+                    timesheet_list = timesheet_list.filter(end__lte=end)
                 mail_data = {
                     'cc': [config.FINANCE, 'yash.j@consultadd.com'],
                     'bcc': [],
                     'template': '../templates/reminder.html',
-                    'to': emails,
+                    'to': [consultant.email],
                     'subject': "Timesheet reminder",
                     'context': {
-                        'consultant': Consultant.objects.get(id=consultant_id).name,
+                        'consultant': consultant.name,
                         'timesheet_list': timesheet_list
                     }
                 }
@@ -1821,7 +1841,8 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
 
 # Route - /timesheet_event/
-class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
+class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin,
+                            DestroyModelMixin):
     queryset = TimetrackEvent.objects.all()
     permission_classes = (IsAuthenticated,)
     serializer_classes = TimetrackEventSerializer
@@ -1955,7 +1976,8 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin):
+class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin,
+                                DestroyModelMixin):
     queryset = ConsultantRateRevision.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)

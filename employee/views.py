@@ -500,7 +500,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             assigned_teams = []
             primary_team = request.user.team
             associated_teams = request.user.associated_to.all().values('id', 'name')
-            if primary_team not in request.user.associated_to.all():
+            if primary_team not in request.user.associated_to.all() and primary_team.dept != 'Recruitment':
                 assigned_teams.append({"id": primary_team.id, "name": primary_team.name})
             assigned_teams.extend(associated_teams)
             return Response({"data": assigned_teams}, status=200)

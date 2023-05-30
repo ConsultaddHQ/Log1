@@ -478,7 +478,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     def employer(self, request):
         try:
             consultadd_emp = Team.objects.get(name='Consultadd')
-            if 'superadmin' in request.user.roles:
+            if 'superadmin' in request.user.roles or 'Recruitment' == request.user.team.dept:
                 employers = Team.objects.filter(
                     Q(dept='Marketing') | Q(name='Consultadd')
                 ).order_by('name').values('id', 'name')
@@ -2636,15 +2636,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             )
 
             if test.platform:
-                test_content_type = ContentType.objects.get(model='test')
-                available_platforms = Choice.objects.filter(
-                    name__icontains=test.platform, field='platform',
-                    content_type=test_content_type, display_name__icontains=test.platform
-                )
-                if not available_platforms.first() and test.platform != 'Not Available':
-                    Choice.objects.create(
-                        content_type=test_content_type, name=test.platform, field='platform', display_name=test.platform
-                    )
+                test_platform(request, test.platform)
             # Activity
             if is_video:
                 desc = f"Video test created with deadline {str(test.deadline)}"
