@@ -11,10 +11,10 @@ from rest_framework.documentation import include_docs_urls
 from activity.views import CommentViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
-from dashboard.views import MarketingDashboardViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
+from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
 from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
     TimetrackEventMobileViewSet
@@ -102,6 +102,8 @@ router.register(r'marketing_report', MarketingReportViewSets)
 router.register(r'comment', CommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
+
+router.register(r'quick_actions', QuickActionsViewSets)
 
 router.register(r'ckiller_data', CkillerSubmissionViewSet)
 
