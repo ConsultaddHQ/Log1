@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from django.core.management import BaseCommand
 
+from constance import config
 from employee.models import User
 from project.models import Project
 from marketing.models import Submission, Interview
@@ -62,7 +63,7 @@ class Command(BaseCommand):
 
             sub_info = {"submission": {}}
             submission_score = sub_info['submission']
-            submissions = Submission.objects.filter(created__gte='2023-05-15')
+            submissions = Submission.objects.filter(created__gte='2022-05-15')
             for sub in submissions:
                 employee_id = sub.created_by.employee_id
                 if employee_id not in submission_score:
@@ -98,7 +99,7 @@ class Command(BaseCommand):
 
             leaders_data["data"] = self.get_leaders(leaders_data["data"], offer_info, positions, interview_score)
 
-            MessageCard.marketing_leaderboard(leaders_data, 'local')
+            MessageCard.marketing_leaderboard(leaders_data, config.slack_consultadd_compete_url)
         except Exception as error:
             print(error)
             create_cron_error(job, error)
