@@ -1,4 +1,6 @@
 from datetime import date, datetime
+
+from constance import config
 from django.core.management import BaseCommand
 
 from employee.models import User
@@ -98,7 +100,7 @@ class Command(BaseCommand):
 
             leaders_data["data"] = self.get_leaders(leaders_data["data"], offer_info, positions, interview_score)
 
-            MessageCard.marketing_leaderboard(leaders_data, 'local')
+            MessageCard.marketing_leaderboard(leaders_data, config.slack_consultadd_compete_url)
         except Exception as error:
             print(error)
             create_cron_error(job, error)

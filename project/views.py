@@ -1448,8 +1448,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 'consultant_id', 'id').distinct('consultant_id')
             for obj in project_qs[first: last]:
                 consultant = obj.consultant
-                ts_obj = TimeSheet.objects.filter(project=obj, status__in=['submitted', 'approved', 'rejected', 'updated']).first()
-                status = None if not ts_obj else ts_obj.status
+                ts_obj = timesheet_qs.filter(project=obj)
+                ts_status = None if not ts_obj else ts_obj.first().status
                 ts_qs = TimeSheet.objects.filter(project__consultant=consultant)
                 data = {
                     "id": consultant.id,
@@ -1470,7 +1470,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                         'client': obj.submission.client,
                         'vendor': obj.submission.lead.vendor_company.name,
                         'project_type': obj.submission.get_work_type_display(),
-                        'status': timesheet_status if timesheet_status else status
+                        'status': timesheet_status if timesheet_status else ts_status
                     }
                 }
                 result.append(data)
