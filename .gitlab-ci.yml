@@ -11,10 +11,10 @@ build:
 
   only:
     refs:
-      - master
+      - staging
   script:
-      - git checkout master
-      - git pull origin master
+      - git checkout staging
+      - git pull origin staging
       - sudo cp -R . /home/ubuntu/log1
       - cd /home/ubuntu
       - source env/bin/activate
@@ -35,7 +35,7 @@ test:
   stage: test
   only:
     refs:
-      - master
+      - staging
   script:
     - echo "Running log1 test suite......"
     - cd /home/ubuntu
@@ -48,7 +48,7 @@ deploy:
   stage: deploy
   only:
     refs:
-      - master
+      - staging
   script:
     - echo "Deploying to Log1 Server"
     - cd /home/ubuntu/log1
