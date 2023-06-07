@@ -419,8 +419,8 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
     @action(methods=['post', 'delete'], detail=False, url_path='add_consultant')
     def add_consultant(self, request):
         try:
-            add_consultant_id = request.data.get('add_consultant')
-            search_consultant_id = request.data.get('search_consultant')
+            add_consultant_id = request.GET.get('add_consultant')
+            search_consultant_id = request.GET.get('search_consultant')
             quick_action, created = QuickActions.objects.get_or_create(user=request.user)
 
             if add_consultant_id:
