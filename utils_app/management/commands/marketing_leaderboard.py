@@ -3,6 +3,7 @@ from datetime import date, datetime
 from constance import config
 from django.core.management import BaseCommand
 
+from constance import config
 from employee.models import User
 from project.models import Project
 from marketing.models import Submission, Interview
