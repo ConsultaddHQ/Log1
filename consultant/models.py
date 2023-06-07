@@ -247,6 +247,9 @@ class WorkAuth(TimeStampedModel):
         ('gc_ead', 'Green Card-EAD'),
         ('us_citizen', 'US CITIZEN'),
         ('opt_ext', 'OPT-EAD Extension'),
+        ('PR', 'Canadian PR'),
+        ('TN permit', 'TN Visa'),
+        ('OWP', 'Open Work Permit'),
     )
     is_current = models.BooleanField(_('Is current Visa'), default=True)
     visa_end = models.DateField(_('Visa End Date'), blank=True, null=True)
@@ -330,7 +333,7 @@ class ConsultantProfile(TimeStampedModel):
     education = models.TextField(_('Academics Details'), blank=True, null=True)
     date_of_birth = models.DateField(_('Date of birth'), blank=True, null=True)
     links = models.CharField(_('Links'), max_length=100, blank=True, null=True)
-    visa_type = models.CharField(_('Visa Type'), max_length=20, blank=True, null=True)
+    visa_type = models.CharField(_('Visa Type'), max_length=20, choices=WorkAuth.VISA_CHOICES, blank=True, null=True)
     linkedin = models.CharField(_('Linkedin URL'), max_length=300, blank=True, null=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
     profile_owner = models.ForeignKey(
@@ -447,7 +450,7 @@ class ConsultantRateRevision(TimeStampedModel):
 class ConsultantPOC(TimeStampedModel):
     start = models.DateField(_('Rate Start Date'), blank=True, null=True)
     end = models.DateField(_('Rate End Date'), default=None, blank=True, null=True)
-    poc_type = models.CharField(_('Recruiter Or Retention Or marketer'), max_length=20, blank=True, null=True)
+    poc_type = models.CharField(_('Recruiter Or Retention Or marketer Or legal'), max_length=20, blank=True, null=True)
     poc = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='consultants',
