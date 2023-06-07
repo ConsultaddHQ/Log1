@@ -428,6 +428,8 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
                 if request.method == 'POST':
                     if quick_action.add_consultants.count() >= 5:
                         return Response({"message": "Maximum limit reached"}, status=400)
+                    if quick_action.add_consultants.filter(id=add_consultant.id).exists():
+                        return Response({"message": "Consultant already exists"}, status=400)
                     quick_action.add_consultants.add(add_consultant)
                 else:
                     quick_action.add_consultants.remove(add_consultant)
