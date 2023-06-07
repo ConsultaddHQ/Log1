@@ -14,7 +14,7 @@ class Command(BaseCommand):
                     engineer_feedback__created__gte='2023-01-01')
            for test in tests:
                self.assigned_test_points(test)
-           return Response({"message": "Done"}, status=400)
+           print("Done")
         except Exception as error:
             print(error)
     def assigned_test_points(self, test):
@@ -54,13 +54,13 @@ class Command(BaseCommand):
             )
             for engineer in employee_associated:
                 answers = test.engineer_feedback.all()
-                answer = answers.filter(question__title="Upload Documents").first()
+                answer = answers.filter(question__title="Select type of test").first()
                 if 1 <= answer.created.month <= 6:
-                    cycle_start = datetime(datetime.now().year + 1, 1, 1)
-                    cycle_end = datetime(datetime.now().year + 1, 6, 30)
+                    cycle_start = datetime(answer.created.year + 1, 1, 1)
+                    cycle_end = datetime(answer.created.year + 1, 6, 30)
                 else:
-                    cycle_start = datetime(datetime.now().year, 7, 1)
-                    cycle_end = datetime(datetime.now().year, 12, 31)
+                    cycle_start = datetime(answer.created.year, 7, 1)
+                    cycle_end = datetime(answer.created.year, 12, 31)
                 cycle = Cycle.objects.get_or_create(start_date=cycle_start, end_date=cycle_end)
                 previous_points = EngineerPoint.objects.filter(engineer=engineer, is_active=True)
                 engineer_point, created = EngineerPoint.objects.get_or_create(engineer=engineer, cycle=cycle[0])
@@ -69,7 +69,7 @@ class Command(BaseCommand):
                 engineer_point.points = engineer_point.points + points
                 engineer_point.save()
         except Exception as error:
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            print(error)
     @staticmethod
     def calculate_mcq_points(no_of_mcq):
         first_twenty_points = (20 if no_of_mcq > 20 else no_of_mcq) * 0.25
