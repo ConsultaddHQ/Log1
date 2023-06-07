@@ -1105,7 +1105,7 @@ class MessageCard:
 
                 if submission:
                     section_text = \
-                        f":submission: *Highest No Of Submissions*\n*Name:*{payload['data'][rank]['submission']['name']}" \
+                        f":submission: *Highest No Of Submissions*\n*Name:* {payload['data'][rank]['submission']['name']}" \
                         f"\n*Team Name :* `{payload['data'][rank]['submission']['team']}`" \
                         f"\n*Count:* `{payload['data'][rank]['submission']['score']}`"
                 else:
