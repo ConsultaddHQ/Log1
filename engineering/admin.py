@@ -1,6 +1,6 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
-from engineering.models import ProjectDescription, ProjectUpdate, TrainingAgenda, TrainingCheckList,Cycle,EngineerPoint
+from engineering.models import ProjectDescription, ProjectUpdate, TrainingAgenda, TrainingCheckList
 
 
 @admin.register(ProjectUpdate)
@@ -30,14 +30,3 @@ class TrainingCheckListAdmin(ExportActionModelAdmin):
     search_fields = ('id',)
     actions = ["export_as_csv"]
     list_display = ('id', 'project', 'status')
-
-@admin.register(EngineerPoint)
-class EngineerPointListAdmin(ExportActionModelAdmin):
-    search_fields = ('id',)
-    actions = ["export_as_csv"]
-    list_display = ('id', 'engineer', 'cycle','is_active')
-
-@admin.register(Cycle)
-class CycleListAdmin(ExportActionModelAdmin):
-    search_fields = ('id',)
-    list_display = ('id', 'start_date', 'end_date','is_current')
