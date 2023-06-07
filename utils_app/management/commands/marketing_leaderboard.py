@@ -1,4 +1,6 @@
 from datetime import date, datetime
+
+from constance import config
 from django.core.management import BaseCommand
 
 from constance import config
@@ -63,7 +65,7 @@ class Command(BaseCommand):
 
             sub_info = {"submission": {}}
             submission_score = sub_info['submission']
-            submissions = Submission.objects.filter(created__gte='2022-05-15')
+            submissions = Submission.objects.filter(created__gte='2023-05-15')
             for sub in submissions:
                 employee_id = sub.created_by.employee_id
                 if employee_id not in submission_score:

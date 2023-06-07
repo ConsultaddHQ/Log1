@@ -201,7 +201,7 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'email', 'ts_status', 'project', 'pending_leave', 'pending_request')
+        fields = ('id', 'name', 'email', 'ts_status', 'project')
 
     @staticmethod
     def get_project(obj):
@@ -224,19 +224,6 @@ class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
         rejected_ts = True if queryset.filter(status='rejected', is_active=True) else False
         draft_ts = True if queryset.filter(status='draft', is_active=True) else False
         return {'submitted': submitted_ts, 'rejected': rejected_ts, 'draft': draft_ts}
-
-    @staticmethod
-    def get_pending_leave(obj):
-        # leaves = obj.leaves.filter(leave_type__is_expired=False, status='applied').order_by('created')
-        leaves = obj.leaves.filter(status='applied').order_by('created')
-        if leaves:
-            return True
-        return False
-
-    @staticmethod
-    def get_pending_request(obj):
-        queryset = TimesheetRequest.objects.filter(project__consultant=obj)
-        return True if queryset.filter(status='request') else False
 
 
 class ProjectGetSerializer(serializers.ModelSerializer):
