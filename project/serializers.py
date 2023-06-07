@@ -198,6 +198,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 class ConsultantTimeSheetSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
     ts_status = serializers.SerializerMethodField()
+    pending_leave = serializers.SerializerMethodField()
 
     class Meta:
         model = Consultant
