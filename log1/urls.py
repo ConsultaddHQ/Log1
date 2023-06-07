@@ -30,8 +30,7 @@ from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectS
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet, DefaultCalendarViewSets, CertificateViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets, MarketingTeamViewSet, \
-    MarketingAPIViewSet
+    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets, MarketingTeamViewSet
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
@@ -89,7 +88,6 @@ router.register(r'project/(?P<project_id>[0-9]+)/summary', ProjectSummaryViewSet
 router.register(r'project/(?P<project_id>[0-9]+)/training', TrainingAgendaViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/checklist', TrainingCheckListViewSet)
 router.register(r'finance/(?P<consultant_id>[0-9]+)/leave', LeaveManagementViewSets)
-router.register(r'engineer_detail', MarketingAPIViewSet)
 
 router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)
