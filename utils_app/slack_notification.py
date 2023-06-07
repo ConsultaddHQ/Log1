@@ -1105,7 +1105,7 @@ class MessageCard:
 
                 if submission:
                     section_text = \
-                        f":submission: *Highest No Of Submissions*\n*Name:*{payload['data'][rank]['submission']['name']}" \
+                        f":submission: *Highest No Of Submissions*\n*Name:* {payload['data'][rank]['submission']['name']}" \
                         f"\n*Team Name :* `{payload['data'][rank]['submission']['team']}`" \
                         f"\n*Count:* `{payload['data'][rank]['submission']['score']}`"
                 else:
@@ -1179,7 +1179,7 @@ class MessageCard:
                         "type": "divider"
                     }
                 )
-                if not offer and rank> 1:
+                if not offer and 'offer' not in payload["data"].get(rank-1) and rank> 1:
                     card_data["blocks"].append(
                         {
                             "type": "section",

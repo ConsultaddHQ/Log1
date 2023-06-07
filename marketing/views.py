@@ -1883,10 +1883,23 @@ class InterviewViewSets(ModelViewSet):
     def cancel_interview(self, request, pk):
         try:
             users = get_authenticated_users(request)
-            qs = Interview.objects.filter(id=pk, submission__created_by__in=users)
-            if not qs:
+            interview = Interview.objects.get(id=pk)
+            sup_condition = all([
+                interview.round > 1,
+                interview.supervisor not in users,
+                interview.status not in ['scheduled', 'rescheduled'],
+                interview.supervisor.employee_id not in [1001, 9999]
+            ])
+            if sup_condition:
+                return Response({"message": "Please ask supervisor to cancel this round"}, status=404)
+
+            marketer_condition = all([
+                (interview.status in ['scheduled', 'rescheduled'] or interview.round <= 1),
+                interview.marketer not in users
+            ])
+            if marketer_condition:
                 return Response({"message": "You don't have access"}, status=404)
-            interview = qs.first()
+
             try:
                 if interview.calendar_id:
                     calendar_mail_id = interview.submission.created_by.email
