@@ -59,7 +59,7 @@ class Command(BaseCommand):
                     cycle_start = datetime(answer.created.year + 1, 1, 1)
                     cycle_end = datetime(answer.created.year + 1, 6, 30)
                 else:
-                    cycle_start = datetime(answer.createdyear, 7, 1)
+                    cycle_start = datetime(answer.created.year, 7, 1)
                     cycle_end = datetime(answer.created.year, 12, 31)
                 cycle = Cycle.objects.get_or_create(start_date=cycle_start, end_date=cycle_end)
                 previous_points = EngineerPoint.objects.filter(engineer=engineer, is_active=True)
