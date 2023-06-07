@@ -404,6 +404,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             'employee_name': user_obj.employee_name,
         }
         return data
+
     def get_recruiter(self, obj):
         queryset = obj.pocs.filter(end=None, poc_type='recruiter').first()
         if queryset:
@@ -417,11 +418,11 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             poc = queryset.poc
         else:
             queryset = Petition.objects.filter(beneficiary=obj, is_active=True).first()
-            if queryset:
-                poc = queryset.assigned_to
-        if queryset:
+            poc = queryset.assigned_to if queryset else None
+        if poc:
             return self.user_data(queryset, poc)
         return None
+
     def get_active_marketer(self, obj):
         queryset = obj.pocs.filter(end=None, poc_type='marketer').first()
         if queryset:
