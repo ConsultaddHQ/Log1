@@ -66,4 +66,4 @@ class Command(BaseCommand):
             send_email_attachment_multiple(mail_data, 'product@consultadd.com')
             delete_temp_file([file.name])
         except Exception as error:
-            print(error)
+            create_cron_error(job, error)
