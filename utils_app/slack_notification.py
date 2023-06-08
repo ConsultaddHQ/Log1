@@ -1072,7 +1072,6 @@ class MessageCard:
         except Exception as error:
             return error, "error"
 
-    # noinspection PyTypeChecker
     @staticmethod
     def marketing_leaderboard(payload, url):
         try:
