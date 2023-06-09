@@ -37,8 +37,8 @@ jobs:
       - name: Set permissions for log1 directory
         run: |
           sudo chmod -R a+rwx /home/ubuntu/log1
-          sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
-          sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
+#          sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
+#          sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
 
   test:
     runs-on: self-hosted
