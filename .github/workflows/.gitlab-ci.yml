@@ -27,55 +27,22 @@ jobs:
         run: sudo cp -R . /home/ubuntu/log1
 
       - name: Change Source
-        run: cd /home/ubuntu/log1
-
-      - name: check path
-        run: |
+        run: | 
+         cd /home/ubuntu/log1
           pwd
           ls
-
-      - name: Enable ENV
-        run: source ../env/bin/activate
-
-      - name: Install dependencies
-        run: |
+          source ../env/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: check path
-        run: pwd
-
-      - name: Build and migrate
-        run: |
           python manage.py makemigrations
           python manage.py migrate
-
-#      - name: Copy files to log1 directory
-#        run: sudo cp -R . /home/ubuntu/log1
-
-
-#      - name: Set permissions for log1 directory
-#        run: |
-#          sudo chmod -R a+rwx /home/ubuntu/log1
-#          sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
-#          sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
-
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.8.10
-
-      - name: Set permissions for media directory
-        run: sudo chmod -R a+rwx /home/ubuntu/log1/media/
+          sudo chmod -R a+rwx /home/ubuntu/log1
+          sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
+          sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
+          sudo chmod -R a+rwx /home/ubuntu/log1/media/
 
 #      - name: Run tests
 #        run: python manage.py test
-
-      - name: Checkout code
-        uses: actions/checkout@v2
 
       - name: Deploy to Log1 Server
         run: |
