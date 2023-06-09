@@ -1,4 +1,4 @@
-name: CI-Log1Staging
+name: CI-Log1-Backend-Staging
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: log1-backend-staging
 
     steps:
       - name: Checkout code
@@ -20,9 +20,6 @@ jobs:
 
       - name: Copy to project directory
         run: sudo cp -R . /home/ubuntu/log1
-
-      - name: Check Path
-        run: pwd
 
       - name: Change directory
         run: | 
