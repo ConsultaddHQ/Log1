@@ -1107,11 +1107,11 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 else:
                     active_status = "NA"
 
-                prev_supports_qs = ProjectSupport.objects.filter(project=project, start__lt=support.start, )\
-                    .exclude(id=support.id)
+                prev_supports_qs = ProjectSupport.objects.filter(
+                    project=project, start__lt=support.start, is_proxy_support=False
+                ).exclude(id=support.id)
                 for prev_supports_obj in prev_supports_qs:
-                    support_statuses = prev_supports_obj.statuses.filter(
-                        is_current=True, is_proxy_support=False).values_list('frequency')
+                    support_statuses = prev_supports_obj.statuses.filter(is_current=True).values_list('frequency')
                     prev_statuses.extend(support_statuses)
 
                 if 'handover' in prev_statuses:
