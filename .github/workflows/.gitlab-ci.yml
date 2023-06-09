@@ -10,6 +10,14 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: check path
+        run: |
+          pwd
+          ls
+
+      - name: Change DIR
+        uses: cd /home/ubuntu/log1/
+
       - name: Checkout code
         uses: actions/checkout@v2
 
