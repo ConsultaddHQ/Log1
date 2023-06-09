@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - staging
+  pull_request:
+    branches:
+      - staging
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
@@ -42,7 +45,7 @@ jobs:
         - /home/ubuntu/log1
 
   test:
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
@@ -60,7 +63,7 @@ jobs:
 #        run: python manage.py test
 
   deploy:
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
 
     steps:
       - name: Checkout code
