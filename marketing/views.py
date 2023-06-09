@@ -3406,7 +3406,9 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             if not  employee_id:
                 return Response({'error': "user not found"}, status=400)
             engineer = User.objects.get(employee_id=employee_id)
-            tests = engineer.associated_tests.filter(created__lte='2023-04-01', created__gte='2020-12-31')
+            tests = Test.objects.filter(engineer=engineer,engineer_feedback__created__lte='2023-06-01',
+                    engineer_feedback__created__gte='2023-01-01').distinct()
+
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
             offline_type_of_test = Question.objects.filter(title='Select type of test', form_name='offline_test')
             online_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True), content_type__model='test', question=online_type_of_test[0]).values_list('object_id', flat=True)
@@ -3524,10 +3526,8 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     def get_all(self, request, *args, **kwargs):
         try:
             from api_key.models import APIKey
-            if not APIKey.objects.is_valid(request.GET.get('api_key')):
-                return Response({"message": "Unauthorized"}, status=401)
             employee_info = {}
-            tests = Test.objects.filter(created__lte='2023-04-01', created__gte='2022-12-31')
+            tests = Test.objects.filter(engineer_feedback__created__lte='2023-06-01',engineer_feedback__created__gte='2022-01-01').distinct()
             for test in tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0
