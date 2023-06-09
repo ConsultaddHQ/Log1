@@ -40,10 +40,6 @@ jobs:
           sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
           sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
 
-    artifacts:
-      paths:
-        - /home/ubuntu/log1
-
   test:
     runs-on: self-hosted
 
