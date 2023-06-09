@@ -31,8 +31,12 @@ jobs:
           python manage.py makemigrations
           python manage.py migrate
 
-      - name: Copy files to log1 directory
-        run: sudo cp -R . /home/ubuntu/log1
+      - name: check path
+        run: pwd
+
+#      - name: Copy files to log1 directory
+#        run: sudo cp -R . /home/ubuntu/log1
+
 
 #      - name: Set permissions for log1 directory
 #        run: |
