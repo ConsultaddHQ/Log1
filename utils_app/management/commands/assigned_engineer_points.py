@@ -11,7 +11,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
            tests = Test.objects.filter(engineer_feedback__created__lte='2023-06-01',
-                    engineer_feedback__created__gte='2023-01-01')
+                    engineer_feedback__created__gte='2023-01-01').distinct()
            for test in tests:
                self.assigned_test_points(test)
            print("Done")
