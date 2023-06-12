@@ -1135,7 +1135,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 resp[f"project_{count}"] = {
                     "status": " ".join(active_status.split('_')).capitalize(),
                     "support_start": support.start, "support_end": support.end,
-                    "consultant_name": support.project.submission.consultant.name,
+                    "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id,
                     "handover_received": handover_received, "handover_given": handover_given,
                     "is_remote": support.project.is_remote, "client": support.project.submission.client,
                     "support_id": support.id, "skills": technology, "support_duration": support_duration,

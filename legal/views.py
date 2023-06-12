@@ -215,13 +215,12 @@ class PetitionViewSets(ModelViewSet):
         try:
             consultant = get_object_or_404(Consultant, id=request.data['consultant'])
             petition_id = consultant.petitions.first().id
-            documents = Document.objects.filter(petition=petition_id,
-                                                doc_type__name__in=['resume', 'paystub', 'timesheet',
-                                                                    'previous_approval',
-                                                                    'passport', 'visa', 'consultadd_w2',
-                                                                    'insurance_card', 'performance_review_sheet',
-                                                                    'client_letter', 'vendor_letter']
-                                                ).exclude(doc_type__category='Petition Document')
+            documents = Document.objects.filter(petition=petition_id).exclude(
+                doc_type__category='Petition Document').exclude(
+                doc_type__name__in=['resume', 'paystub', 'timesheet', 'previous_approval', 'passport', 'visa',
+                                    'consultadd_w2', 'insurance_card', 'performance_review_sheet',
+                                    'client_letter', 'vendor_letter']
+            )
             petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
