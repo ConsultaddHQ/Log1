@@ -1072,7 +1072,6 @@ class MessageCard:
         except Exception as error:
             return error, "error"
 
-    # noinspection PyTypeChecker
     @staticmethod
     def marketing_leaderboard(payload, url):
         try:
@@ -1179,18 +1178,48 @@ class MessageCard:
                         "type": "divider"
                     }
                 )
-                if not offer and 'offer' not in payload["data"].get(rank-1) and rank> 1:
-                    card_data["blocks"].append(
-                        {
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": "*Zero* *offers*, *time's* *running* *out!* *Determine*, *explore*, *take* *action!* :hourglass_flowing_sand: :rocket:"
-                            }
+
+            if 'offer' not in payload["data"][1]:
+                card_data["blocks"].append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Zero* *offers*, *time's* *running* *out!* *Determine*, *explore*, *take* *action!* :hourglass_flowing_sand: :rocket:"
                         }
-                    )
-
-
+                    }
+                )
+            else:
+                card_data["blocks"].append(
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f":Offer: *Total No Of Offers:*  `{payload['total_offers']}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f":Offer: *Total No Of Offers in pipeline:*  `{payload['offers_in_pipeline']}`"
+                            }
+                        ]
+                    }
+                )
+                card_data["blocks"].append(
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f":interview: *Total No Of Interviews:*  `{payload['total_interview']}`\n"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f":submission: *Total No Of Submissions:*  `{payload['total_submission']}`\n"
+                            }
+                        ]
+                    }
+                )
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
         except Exception as error:
