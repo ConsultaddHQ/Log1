@@ -1,6 +1,6 @@
 from django.db.models import F, Q
-from dateutil.relativedelta import relativedelta
 from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
 
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -9,11 +9,11 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
-
 from project.models import Project
 from consultant.models import Consultant
 from log1.utils import ERROR_MSG, write_exception
 from marketing.models import Submission, Interview, Test
+from dashboard.models import QuickActions, QuickActionAddConsultant, QuickActionSearchConsultant
 
 
 class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
@@ -97,26 +97,26 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 last = date(int(end_year), 1, 1)
 
             elif filter_by_time == 'last_month':
-                last = date.today().replace(day=1)
-                first = last.replace(day=1)
+                last = date.today().replace(day=1) - timedelta(days=1)
+                first = last.replace(day=1) - relativedelta(months=1)
 
             elif filter_by_time == 'this_year':
-                first = last.replace(day=1) + relativedelta(months=-(last.month-1))
+                first = last.replace(day=1) + relativedelta(months=-(last.month - 1))
 
             elif filter_by_time == 'last_6_month':
                 last = date.today().replace(day=1)
-                first = last + timedelta(days=1) + relativedelta(months=-6)
+                first = last + relativedelta(months=-6)
 
             elif filter_by_time == 'last_12_month':
                 last = date.today().replace(day=1)
-                first = last + timedelta(days=1) + relativedelta(months=-12)
+                first = last + relativedelta(months=-12)
 
             # this_month
             else:
                 first = date.today().replace(day=1)
                 last = date.today() + timedelta(days=1)
             projects = project_qs.filter(
-                statuses__created__range=[first, last], submission__marketing_team__dept="Marketing"
+                statuses__created__range=[first, last]
             ).order_by('id').distinct('id').all()
             total = projects.count()
             new = projects.filter(statuses__status='new', statuses__is_current=True).count()
@@ -132,15 +132,16 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
 
             count = {
                 'total_offers': total,
-                'offer': project_qs.filter(created__range=[first, last], submission__marketing_team__dept="Marketing").count(),
-                'submission': sub.filter(created__range=[first, last], marketing_team__dept="Marketing").exclude(
-                    status='draft').count(),
+                'offer': project_qs.filter(created__range=[first, last]).exclude(submission__status='archive').count(),
+                'submission': sub.filter(created__range=[first, last]).exclude(
+                    status__in=['draft', 'archive']).exclude(consultant_marketing__consultant__status='terminated'
+                                                             ).count(),
                 'on_project': consultant.filter(status='on_project', created__range=[first, last]).count(),
-                'ba_bench': consultant.filter(skills__contains='BA', status='on_bench', created__range=[first, last]).count(),
-                'dev_bench':  consultant.filter(status='on_bench', created__range=[first, last]).exclude(skills__exact='BA').count(),
-                'interview': interviews.filter(
-                    created__range=[first, last], submission__marketing_team__dept="Marketing"
-                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
+                'ba_bench': consultant.filter(skills__contains='BA', status='on_bench',
+                                              created__range=[first, last]).count(),
+                'dev_bench': consultant.filter(status='on_bench', created__range=[first, last]).exclude(
+                    skills__exact='BA').count(),
+                'interview': interviews.filter(start_time__range=[first, last]).count()
             }
 
             offer_count = [
@@ -182,8 +183,8 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 prev_first = first - timedelta(days=(last - first).days)
 
             elif filter_by_time == 'last_month':
-                last = date.today().replace(day=1)
-                first = last.replace(day=1)
+                last = date.today().replace(day=1) - timedelta(days=1)
+                first = last.replace(day=1) - relativedelta(months=1)
 
                 prev_last = last + relativedelta(months=-1)
                 prev_first = first + relativedelta(months=-1)
@@ -224,7 +225,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                     created__range=[first, last],
                     created_by=request.user,
                     marketing_team__dept="Marketing"
-                ) .exclude(status='draft').count()
+                ).exclude(status='draft').count()
 
                 interviews_count = Interview.objects.filter(
                     submission__created_by=request.user,
@@ -353,7 +354,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             if start_year and end_year:
                 first = date(int(start_year), 1, 1)
                 last = date(int(end_year), 1, 1)
-                diff = (relativedelta(last, first)).years*12
+                diff = (relativedelta(last, first)).years * 12
             for i in range(diff):
                 projects_count = projects.filter(created__range=[first, last]).count()
                 data = {
@@ -395,6 +396,88 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
                 ).values('id', 'marketer', 'submit_date'),
             }
             return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+
+class QuickActionsViewSets(GenericViewSet, ListModelMixin):
+    queryset = QuickActions.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            quick_action = QuickActions.objects.filter(user=request.user).first()
+            add_consultants = QuickActionAddConsultant.objects.filter(quick_actions=quick_action)
+            search_consultants = QuickActionSearchConsultant.objects.filter(quick_actions=quick_action)
+            add_consultants_ls=[]
+            search_consultants_ls=[]
+            for add_consultant in add_consultants:
+                consultant = {
+                    "id":add_consultant.consultant.id,
+                    "name":add_consultant.consultant.name
+                }
+                add_consultants_ls.append(consultant)
+
+            for search_consultant in search_consultants:
+                consultant = {
+                    "id":search_consultant.consultant.id,
+                    "name":search_consultant.consultant.name
+                }
+                search_consultants_ls.append(consultant)
+            add_consultants_ls.reverse()
+            search_consultants_ls.reverse()
+            return Response({"data":{"id":quick_action.id ,"add_consultants":add_consultants_ls,"search_consultant":search_consultants_ls}}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": error}, status=400)
+
+    @action(methods=['post', 'delete'], detail=False, url_path='add_consultant')
+    def add_consultant(self, request):
+        try:
+            add_consultant_id = request.GET.get('add_consultant')
+            search_consultant_id = request.GET.get('search_consultant')
+            quick_action, created = QuickActions.objects.get_or_create(user=request.user)
+
+            if add_consultant_id:
+                add_consultant = Consultant.objects.get(id=add_consultant_id)
+                if request.method == 'POST':
+                    add_consultant_exists = QuickActionAddConsultant.objects.filter(
+                        quick_actions=quick_action,consultant=add_consultant).exists()
+                    if not add_consultant_exists:
+                        if QuickActionAddConsultant.objects.filter(quick_actions=quick_action).count() >= 5:
+                            return Response({"message": "Maximum limit reached"}, status=400)
+                        QuickActionAddConsultant.objects.create(
+                            quick_actions=quick_action,
+                            consultant=add_consultant
+                        )
+                else:
+                    QuickActionAddConsultant.objects.filter(
+                        quick_actions=quick_action,
+                        consultant=add_consultant
+                    ).delete()
+            else:
+                search_consultant = Consultant.objects.get(id=search_consultant_id)
+                if request.method == 'POST':
+                    if QuickActionSearchConsultant.objects.filter(quick_actions=quick_action,
+                                                                  consultant=search_consultant).exists():
+                        QuickActionSearchConsultant.objects.filter(quick_actions=quick_action,
+                                                                   consultant=search_consultant).delete()
+                    QuickActionSearchConsultant.objects.create(
+                        quick_actions=quick_action,
+                        consultant=search_consultant
+                    )
+                    if QuickActionSearchConsultant.objects.filter(quick_actions=quick_action).count() > 3:
+                        QuickActionSearchConsultant.objects.filter(quick_actions=quick_action).first().delete()
+                else:
+                    QuickActionSearchConsultant.objects.filter(
+                        quick_actions=quick_action,
+                        consultant=search_consultant
+                    ).delete()
+
+            return Response({"message": "action update"}, status=200)
+
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)

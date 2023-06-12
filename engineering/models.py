@@ -106,3 +106,37 @@ class TrainingAgenda(TimeStampedModel):
 
     def __str__(self):
         return str(self.project.id)
+
+class Cycle(models.Model):
+    is_current = models.BooleanField(_('Is current'), default=True)
+    start_date = models.DateField(_('Start Date'))
+    end_date = models.DateField(_('End Date'))
+
+    def __str__(self):
+        if self.is_current:
+            return f"Current Cycle ({self.start_date} to {self.end_date})"
+        else:
+            return f"Cycle ({self.start_date} to {self.end_date})"
+
+class EngineerPoint(TimeStampedModel):
+    points = models.IntegerField(_('points'), default=0)
+    is_active = models.BooleanField(_('Is active'), default=True)
+    cycle = models.ForeignKey(
+        Cycle, on_delete=models.PROTECT,
+        related_name='test_point',
+        verbose_name='Cycle',
+    )
+    engineer = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='test_point',
+        verbose_name='Test_engineer'
+    )
+
+    def __str__(self):
+        return f"EngineerPoint - {self.engineer},{self.points}, Active: {self.is_active}"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(EngineerPoint, self).save(*args, **kwargs)

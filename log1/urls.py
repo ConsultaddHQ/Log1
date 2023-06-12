@@ -11,10 +11,10 @@ from rest_framework.documentation import include_docs_urls
 from activity.views import CommentViewSet
 from impersonate.views import ImpersonateViewSets
 from ckiller.views import CkillerSubmissionViewSet
-from dashboard.views import MarketingDashboardViewSet
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from attachment.views import AttachmentView, AttachmentGetView
+from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
 from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
     TimetrackEventMobileViewSet
@@ -30,7 +30,8 @@ from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectS
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
     AllUsersViewSet, HandoverViewSets, LoginViewSet, DefaultCalendarViewSets, CertificateViewSets
 from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
-    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets, MarketingTeamViewSet
+    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets, MarketingTeamViewSet, \
+    MarketingAPIViewSet
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
@@ -88,6 +89,7 @@ router.register(r'project/(?P<project_id>[0-9]+)/summary', ProjectSummaryViewSet
 router.register(r'project/(?P<project_id>[0-9]+)/training', TrainingAgendaViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/checklist', TrainingCheckListViewSet)
 router.register(r'finance/(?P<consultant_id>[0-9]+)/leave', LeaveManagementViewSets)
+router.register(r'engineer_detail', MarketingAPIViewSet)
 
 router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)
@@ -102,6 +104,8 @@ router.register(r'marketing_report', MarketingReportViewSets)
 router.register(r'comment', CommentViewSet)
 
 router.register(r'impersonate', ImpersonateViewSets)
+
+router.register(r'quick_actions', QuickActionsViewSets)
 
 router.register(r'ckiller_data', CkillerSubmissionViewSet)
 

@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from rest_framework import serializers
 
 from consultant.models import *
+from legal.models import Petition
 from project.models import Project
 from marketing.models import Interview
 from project.models import ConsultantFeedback
@@ -252,7 +253,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'retention', 'rate', 'work_auth', 'exit',
+        fields = ('id', 'name', 'email', 'skills', 'status', 'marketing', 'recruiter', 'retention', 'rate', 'work_auth', 'exit',
                   'rate_revision', 'visa_type')
 
     @staticmethod
@@ -338,6 +339,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
 
 class ConsultantBenchSerializer(serializers.ModelSerializer):
     rate = serializers.ReadOnlyField()
+    legal = serializers.SerializerMethodField()
     support = serializers.SerializerMethodField()
     profiles = serializers.SerializerMethodField()
     retention = serializers.SerializerMethodField()
@@ -353,8 +355,8 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consultant
         fields = ('id', 'name', 'email', 'skills', 'ssn', 'gender', 'phone_no', 'links', 'skills', 'skype', 'status',
-                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'retention', 'rate',
-                  'support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer',
+                  'date_of_birth', 'work_type', 'current_city', 'is_w2', 'work_auth', 'recruiter', 'retention','legal',
+                  'rate','support', 'profiles', 'education', 'terminate', 'experience', 'marketing', 'payroll_employer',
                   'internal_employee', 'marital_status', 'active_marketer', 'timezone', 'country')
 
     @staticmethod
@@ -402,7 +404,6 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             'employee_name': user_obj.employee_name,
         }
         return data
-
     def get_recruiter(self, obj):
         queryset = obj.pocs.filter(end=None, poc_type='recruiter').first()
         if queryset:
@@ -410,6 +411,17 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             return self.user_data(queryset, poc)
         return None
 
+    def get_legal(self, obj):
+        queryset = obj.pocs.filter(end=None, poc_type='legal').first()
+        if queryset:
+            poc = queryset.poc
+        else:
+            queryset = Petition.objects.filter(beneficiary=obj, is_active=True).first()
+            if queryset:
+                poc = queryset.assigned_to
+        if queryset:
+            return self.user_data(queryset, poc)
+        return None
     def get_active_marketer(self, obj):
         queryset = obj.pocs.filter(end=None, poc_type='marketer').first()
         if queryset:

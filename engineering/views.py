@@ -1326,13 +1326,14 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                 "total": len(technology_ls),
                 "status_counts": technology
             }
-
+            engineer_point = EngineerPoint.objects.filter(engineer=kwargs.get('pk'), is_active=True).first()
             data = {
                 "test": test_counts,
                 "project": project_counts,
                 "technology": technology_counts,
                 "guest_interview": guest_interview,
                 "supervisor_interview": supervisor_interview,
+                "points":engineer_point.points if engineer_point else 0.0,
             }
             return Response({"data": data}, status=200)
         except Exception as error:

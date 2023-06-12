@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8.10
+
+      - name: check path
+        run: |
+          pwd
+          ls
+
+      - name: Copy to source
+        run: sudo cp -R . /home/ubuntu/log1
+
+      - name: Change Source
+        run: | 
+         cd /home/ubuntu/log1
+          pwd
+          ls
+          source ../env/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python manage.py makemigrations
+          python manage.py migrate
+          sudo chmod -R a+rwx /home/ubuntu/log1
+          sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
+          sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
+          sudo chmod -R a+rwx /home/ubuntu/log1/media/
+
+#      - name: Run tests
+#        run: python manage.py test
+
+      - name: Deploy to Log1 Server
+        run: |
+          echo "Deploying to Log1 Server"
+          cd /home/ubuntu/log1
+          sudo systemctl restart gunicorn
+
+
+#jobs:
+#  build:
+#    runs-on: self-hosted
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#
+#      - name: Set up Python
+#        uses: actions/setup-python@v2
+#        with:
+#          python-version: 3.8.10
+#
+#      - name: Install dependencies
+#        run: |
+#          python -m pip install --upgrade pip
+#          pip install -r requirements.txt
+#
+#      - name: Build and migrate
+#        run: |
+#          python manage.py makemigrations
+#          python manage.py migrate
+#
+#      - name: Copy files to log1 directory
+#        run: sudo cp -R . /home/ubuntu/log1
+#
+#      - name: Set permissions for log1 directory
+#        run: |
+#          sudo chmod -R a+rwx /home/ubuntu/log1
+#          sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
+#          sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
+#
+#  test:
+#    runs-on: self-hosted
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#
+#      - name: Set up Python
+#        uses: actions/setup-python@v2
+#        with:
+#          python-version: 3.8.10
+#
+#      - name: Set permissions for media directory
+#        run: sudo chmod -R a+rwx /home/ubuntu/log1/media/
+#
+#      - name: Run tests
+#        run: python manage.py test
+#
+#  deploy:
+#    runs-on: self-hosted
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#
+#      - name: Deploy to Log1 Server
+#        run: |
+#          echo "Deploying to Log1 Server"
+#          cd /home/ubuntu/log1
+#          sudo systemctl restart gunicorn

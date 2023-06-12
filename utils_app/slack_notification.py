@@ -1072,7 +1072,6 @@ class MessageCard:
         except Exception as error:
             return error, "error"
 
-    # noinspection PyTypeChecker
     @staticmethod
     def marketing_leaderboard(payload, url):
         try:
@@ -1179,7 +1178,7 @@ class MessageCard:
                         "type": "divider"
                     }
                 )
-                if not offer and rank> 1:
+                if not offer and 'offer' not in payload["data"].get(rank-1) and rank> 1:
                     card_data["blocks"].append(
                         {
                             "type": "section",
