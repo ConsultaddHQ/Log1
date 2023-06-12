@@ -1,0 +1,47 @@
+name: CI-Log1-Backend-Prod
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: log1-backend-prod
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8.10
+
+      - name: Copy to project directory
+        run: sudo cp -R . /home/ubuntu/log1
+
+      - name: Change directory
+        run: | 
+         cd /home/ubuntu/log1
+          source ../env/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python manage.py makemigrations
+          python manage.py migrate
+          sudo chmod -R a+rwx /home/ubuntu/log1
+          sudo chmod a+rwx /home/ubuntu/log1/logs/address.log
+          sudo chmod a+rwx /home/ubuntu/log1/logs/error.log
+          sudo chmod -R a+rwx /home/ubuntu/log1/media/
+
+      - name: Run Test
+        run: |
+          echo "Run Test Cases"
+          cd /home/ubuntu/log1
+#          python manage.py test
+
+      - name: Deploy to Log1 Server
+        run: |
+          echo "Deploying to Log1 Server"
+          cd /home/ubuntu/log1
+          sudo systemctl restart gunicorn
