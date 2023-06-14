@@ -928,7 +928,6 @@ class MessageCard:
         try:
             if payload.get('data') is None:
                 return "No data to display", "ok"
-            file_url = create_csv_file(payload)
             card_data = {
                 "blocks": [
                     {
@@ -948,30 +947,50 @@ class MessageCard:
                     },
                     {
                         "type": "divider"
-                    },
+                    }
                 ]
             }
-            sl = 1
-            for data in payload['data']:
+
+            screening_type_headers = payload['data'].keys()
+            for header in screening_type_headers:
+                if not payload['data'][header]:
+                    continue
                 card_data['blocks'].append(
                     {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
-                                        f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
-                                        f"   *Time:* {data.get('start', None).split('::')[1]}"
-                            },
-                            {
-                                "type": "mrkdwn",
-                                "text": f"`Consultant` {data.get('consultant')}\n `Client` {data.get('client', None)} "
-                                        f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
-                            }
-                        ]
-                    },
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f"{header}",
+                            "emoji": True
+                        }
+                    }
                 )
-                sl += 1
+                sl = 1
+                for data in payload['data'][header]:
+                    card_data['blocks'].append(
+                        {
+                            "type": "section",
+                            "fields": [
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
+                                            f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
+                                            f"   *Time:* {data.get('start', None).split('::')[1]}"
+                                },
+                                {
+                                    "type": "mrkdwn",
+                                    "text": f"`Consultant` {data.get('consultant')}\n `Client` {data.get('client', None)} "
+                                            f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
+                                }
+                            ]
+                        },
+                    )
+                    sl += 1
+                card_data['blocks'].append(
+                    {
+                        "type": "divider"
+                    }
+                )
             card_data['blocks'].append(
                 {
                     "type": "actions",
@@ -984,12 +1003,12 @@ class MessageCard:
                                 "text": "Download CSV"
                             },
                             "style": "primary",
-                            "url": file_url,
+                            "url": payload['file_url'],
                             "value": "click_me_123",
                             "action_id": "button-action"
                         }
                     ]
-                },
+                }
             )
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
@@ -1072,6 +1091,7 @@ class MessageCard:
         except Exception as error:
             return error, "error"
 
+    # noinspection PyTypeChecker
     @staticmethod
     def marketing_leaderboard(payload, url):
         try:
@@ -1188,7 +1208,6 @@ class MessageCard:
                             }
                         }
                     )
-
 
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
