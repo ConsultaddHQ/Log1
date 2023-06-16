@@ -574,34 +574,57 @@ class ResetPasswordViewSets(GenericViewSet):
                 return Response({"message": "User is not active"}, status=400)
         return Response({"message": "Something went wrong"}, status=400)
 
-    @action(methods=['post'], detail=False, url_path='confirm_password')
-    def confirm_password(self, request):
+    def valid_token(self, data):
         try:
-            serializer = self.pass_serializer_class(data=request.data)
+            serializer = self.pass_serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
-            password = serializer.validated_data['password']
-            token = serializer.validated_data['token']
+            if data.get('password'):
+                password = serializer.validated_data['password']
+            if data.get('token'):
+                token = serializer.validated_data['token']
 
             password_reset_token_validation_time = get_token_expiry_time()
 
             reset_password_token = ResetPasswordToken.objects.filter(key=token).first()
 
             if reset_password_token is None:
-                return Response({'message': 'Token not found'}, status=404)
+                return reset_password_token if reset_password_token else '', \
+                    password if data.get('password') else '', False
 
             expiry_date = reset_password_token.created_at + timedelta(hours=password_reset_token_validation_time)
 
             if timezone.now() > expiry_date:
                 reset_password_token.delete()
-                return Response({'message': 'Token Expired'}, status=404)
+                return reset_password_token if reset_password_token else '', \
+                    password if data.get('password') else '', False
+            return reset_password_token if reset_password_token else '', \
+                password if data.get('password') else '', True
+        except Exception as error:
+            write_exception(message=error)
+            return False
 
-            reset_password_token.user.set_password(password)
-            reset_password_token.user.save()
+    @action(methods=['post'], detail=False, url_path='token_verify')
+    def token_verify(self, request):
+        try:
+            reset_password_token, password, valid = self.valid_token(request.data)
+            if valid:
+                return Response({'message': 'OTP Verified'}, status=200)
+            return Response({'message': 'Invalid OTP'}, status=400)
+        except Exception as error:
+            write_exception(message=error)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-            # Delete all password reset tokens for this user
-            ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
-
-            return Response({'message': 'Password changed successfully'}, status=200)
+    @action(methods=['post'], detail=False, url_path='confirm_password')
+    def confirm_password(self, request):
+        try:
+            reset_password_token, password, valid = self.valid_token(request.data)
+            if valid:
+                reset_password_token.user.set_password(password)
+                reset_password_token.user.save()
+                ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
+                return Response({'message': 'Password changed successfully'}, status=200)
+            else:
+                return Response({'message': 'Invalid OTP'}, status=200)
         except Exception as error:
             write_exception(message=error)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
