@@ -575,6 +575,23 @@ class ResetPasswordViewSets(GenericViewSet):
         return Response({"message": "Something went wrong"}, status=400)
 
     def valid_token(self, data):
+        """
+            Validate a password reset token.
+
+            This function validates a password reset token by checking its expiry
+            and existence in the database. This method also validates the data type of
+            token and password. It returns the reset token object (if valid), the password (if provided),
+            and a flag indicating if the token is valid.
+
+            Args:
+                self: The current object instance.
+                data (dict): The data containing the password reset token and password.
+
+            Returns:
+                Three variables: Reset token object (if valid), Password (if provided),
+                and a flag indicating if the token is valid.
+        """
+
         try:
             serializer = self.pass_serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
@@ -605,6 +622,19 @@ class ResetPasswordViewSets(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='token_verify')
     def token_verify(self, request):
+        """
+            Verify a password reset token.
+
+            This api verifies a password reset token by calling the `valid_token` function
+            and returns a response based on the validity of the token.
+
+            Args:
+                self: The current object instance.
+                request: The HTTP request object.
+
+            Returns:
+                Response: The response indicating the result of token verification.
+        """
         try:
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
@@ -616,6 +646,20 @@ class ResetPasswordViewSets(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
+        """
+            Confirm token and change the password.
+
+            This api confirms a password reset token by calling the `valid_token` function,
+            and if the token is valid, it changes the user's password and deletes the
+            reset password token from the database.
+
+            Args:
+                self: The current object instance.
+                request: The HTTP request object.
+
+            Returns:
+                Response: The response indicating the result of change password.
+        """
         try:
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
