@@ -641,7 +641,7 @@ class ResetPasswordViewSets(GenericViewSet):
                 return Response({'message': 'OTP Verified'}, status=200)
             return Response({'message': 'Invalid OTP'}, status=400)
         except Exception as error:
-            write_exception(message=error)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
@@ -670,7 +670,7 @@ class ResetPasswordViewSets(GenericViewSet):
             else:
                 return Response({'message': 'Invalid OTP'}, status=200)
         except Exception as error:
-            write_exception(message=error)
+            write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
