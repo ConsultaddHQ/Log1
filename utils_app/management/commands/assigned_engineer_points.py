@@ -1,17 +1,14 @@
-import csv
 from datetime import datetime
+from django.db.models import F
+from marketing.models import Test, Answer
 from django.core.management import BaseCommand
-from django.contrib.auth.models import ContentType
-from requests import Response
 from engineering.models import Cycle, EngineerPoint
-from log1.utils import ERROR_MSG
-from marketing.models import Test, Question, Answer
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
-           tests = Test.objects.filter(engineer_feedback__created__lte='2023-06-01',
-                    engineer_feedback__created__gte='2023-01-01').distinct()
+           tests = Test.objects.filter(engineer_feedback__created__lte='2023-06-30',
+                          engineer_feedback__created__gte='2023-01-01').order_by(F('created').asc()).distinct()
            for test in tests:
                self.assigned_test_points(test)
            print("Done")
@@ -54,10 +51,10 @@ class Command(BaseCommand):
             )
             for engineer in employee_associated:
                 answers = test.engineer_feedback.all()
-                answer = answers.filter(question__title="Select type of test").first()
+                answer = answers.filter(question__title="Upload Documents").first()
                 if 1 <= answer.created.month <= 6:
-                    cycle_start = datetime(answer.created.year + 1, 1, 1)
-                    cycle_end = datetime(answer.created.year + 1, 6, 30)
+                    cycle_start = datetime(answer.created.year, 1, 1)
+                    cycle_end = datetime(answer.created.year, 6, 30)
                 else:
                     cycle_start = datetime(answer.created.year, 7, 1)
                     cycle_end = datetime(answer.created.year, 12, 31)

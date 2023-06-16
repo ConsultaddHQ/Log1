@@ -199,7 +199,7 @@ def calculate_points(self, test_platform_name, test_type, test_current_status,
         else:
             pass
         return round(points, 2)
-def assigned_test_points(self,test,request):
+def assigned_test_points(test,request):
     try:
         platform_name = None
         mcqs, coding_answers = 0, 0
@@ -226,7 +226,7 @@ def assigned_test_points(self,test,request):
         if coding_question_answer:
             coding_answers = coding_question_answer.answer
         employee_associated = test.engineer.all()
-        points = self.calculate_points(
+        points =calculate_points(
             test_type=test_type,
             test_current_status=test.status,
             test_platform_name=platform_name,
@@ -237,8 +237,8 @@ def assigned_test_points(self,test,request):
             answers = test.engineer_feedback.all()
             answer = answers.filter(question__title="Upload Documents").first()
             if 1 <= answer.created.month <= 6:
-                cycle_start = datetime(datetime.now().year + 1, 1, 1)
-                cycle_end = datetime(datetime.now().year + 1, 6, 30)
+                cycle_start = datetime(datetime.now().year, 1, 1)
+                cycle_end = datetime(datetime.now().year, 6, 30)
             else:
                 cycle_start = datetime(datetime.now().year, 7, 1)
                 cycle_end = datetime(datetime.now().year, 12, 31)
