@@ -482,7 +482,7 @@ def schedule_push_notification(serialized_args):
         }
         registration_id = FCMDevice.objects.filter(
             object_id=user_id, content_type__model='user').latest('date_created').device_id
-        delay = timedelta(seconds=2).total_seconds()
+        delay = timedelta(hours=2).total_seconds()
         sleep(delay)
         push_notification_supervisor(registration_id, message_body)
     except Exception as error:
