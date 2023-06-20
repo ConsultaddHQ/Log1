@@ -118,7 +118,6 @@ def change_to_feedback_due():
                 }
                 registration_id = FCMDevice.objects.filter(
                     object_id=supervisor.id, content_type__model='user').latest('date_created').device_id
-                registration_id = 'eLSehSIulBiBXIfH3TvjjL:APA91bF-Hh1xPkeuF67xQedZhz27uVvG7Dhs4WwLJDu6mEzmaX98HwEUzl1kPr6WwkXErRRHX5pbCh1cJXdkroKtn9q4pxlbyawJNWuqswgfwtczoSG9ss8hSkpDSeAyQmSP0Sz2NSxn'
                 push_notification_supervisor(registration_id, message_body)
 
     except Exception as error:
