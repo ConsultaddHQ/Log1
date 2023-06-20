@@ -1,5 +1,6 @@
 import os
 import pytz
+import json
 import difflib
 from datetime import date
 
@@ -2292,6 +2293,45 @@ class InterviewViewSets(ModelViewSet):
                     {"passed_reasons": passed_reasons, "failure_reasons": tuple(failed_reasons_list)}, status=200
                 )
             return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+    @action(methods=['get'], detail=False, url_path='remind_me_later')
+    def remind_me_later(self, request):
+        try:
+            notification = PushNotification.objects.filter(supervisor=request.user.id).first()
+            interviews = Interview.objects.filter(status="feedback_due", supervisor=request.user.id).all()
+            if interviews:
+                notification.count += 1
+                notification.save()
+                if notification.count < 3:
+                    serialized_args = json.dumps([request.user.id,notification.count])
+                    schedule_push_notification.delay(serialized_args)
+            else:
+                notification.delete()
+                notification.save()
+            return Response({"message":"Done"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='supervisor_feedback_due')
+    def supervisor_feedback_due(self, request,pk):
+        try:
+            interviews = Interview.objects.filter(status="feedback_due", supervisor=pk).all()
+            notification = PushNotification.objects.filter(supervisor=pk).first()
+            feedback_due_list = []
+            for interview in interviews:
+                feedback_due = {
+                    "round": interview.round,
+                    "schedule": interview.end_time,
+                    "client": interview.submission.client,
+                    "position": interview.submission.lead.position.name,
+                    "consultant_name": interview.submission.consultant_marketing.consultant.name
+                }
+                feedback_due_list.append(feedback_due)
+
+            return Response({"data": {"count": notification.count if notification else 0,"interview": feedback_due_list}},status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

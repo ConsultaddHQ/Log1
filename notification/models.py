@@ -4,6 +4,8 @@ from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
 
+from employee.models import User
+from utils_app.models import TimeStampedModel
 
 class NotificationQuerySet(models.query.QuerySet):
     """ Notification QuerySet """
@@ -138,3 +140,21 @@ class Notification(models.Model):
         if self.deleted:
             self.deleted = False
             self.save()
+
+class PushNotification(TimeStampedModel):
+    count = models.IntegerField(_('count'), default=1)
+    supervisor = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='pushnotification',
+        verbose_name='Supervisor'
+    )
+
+    def save(self, *args, **kwargs):
+
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(PushNotification, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.supervisor.employee_name} '
