@@ -51,7 +51,7 @@ class Command(BaseCommand):
             )
             for engineer in employee_associated:
                 answers = test.engineer_feedback.all()
-                answer = answers.filter(question__title="Upload Documents").first()
+                answer = answers.first()
                 if 1 <= answer.created.month <= 6:
                     cycle_start = datetime(answer.created.year, 1, 1)
                     cycle_end = datetime(answer.created.year, 6, 30)

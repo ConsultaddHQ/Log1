@@ -174,12 +174,12 @@ def calculate_mcq_points(no_of_mcq):
             rest_all_points if rest_all_points > 0 else 0)
         return round(points, 2)
 
-def calculate_points(self, test_platform_name, test_type, test_current_status,
+def calculate_points( test_platform_name, test_type, test_current_status,
                          no_of_people_involved=0, no_mcq_q=0, no_coding_q=0):
         points = 0
         if test_type.lower() == 'online':
             if no_mcq_q and no_coding_q:
-                test_points = self.calculate_mcq_points(int(no_mcq_q)) + int(no_coding_q) * 3
+                test_points = calculate_mcq_points(int(no_mcq_q)) + int(no_coding_q) * 3
                 bonus_points = 0.75 * (1 if test_current_status == 'passed' else 0)
                 points = (test_points + bonus_points) / no_of_people_involved
             elif no_coding_q:
@@ -187,7 +187,7 @@ def calculate_points(self, test_platform_name, test_type, test_current_status,
                 bonus_points = 1 * (1 if test_current_status == 'passed' else 0)
                 points = (test_points + bonus_points) / no_of_people_involved
             elif no_mcq_q:
-                test_points = self.calculate_mcq_points(int(no_mcq_q))
+                test_points = calculate_mcq_points(int(no_mcq_q))
                 bonus_points = 0.5 * (1 if test_current_status == 'passed' else 0)
                 points = (test_points + bonus_points) / no_of_people_involved
             else:
@@ -214,6 +214,7 @@ def assigned_test_points(test,request):
                                                question__form_name='online_test').first()
             if platform:
                 platform_name = platform.answer
+
         MCQ_question_answer = Answer.objects.filter(
             object_id=test.id, content_type__model='test', question__title='Number of MCQ questions'
         ).first()
@@ -235,7 +236,7 @@ def assigned_test_points(test,request):
         )
         for engineer in employee_associated:
             answers = test.engineer_feedback.all()
-            answer = answers.filter(question__title="Upload Documents").first()
+            answer = answers.first()
             if 1 <= answer.created.month <= 6:
                 cycle_start = datetime(datetime.now().year, 1, 1)
                 cycle_end = datetime(datetime.now().year, 6, 30)
