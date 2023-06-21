@@ -165,6 +165,7 @@ def get_remote_project_csv(payload, request):
     except Exception as error:
         write_exception(error, request)
 
+
 @staticmethod
 def calculate_mcq_points(no_of_mcq):
         first_twenty_points = (20 if no_of_mcq > 20 else no_of_mcq) * 0.25
@@ -173,6 +174,7 @@ def calculate_mcq_points(no_of_mcq):
         points = first_twenty_points + (next_ten_points if next_ten_points > 0 else 0) + (
             rest_all_points if rest_all_points > 0 else 0)
         return round(points, 2)
+
 
 def calculate_points( test_platform_name, test_type, test_current_status,
                          no_of_people_involved=0, no_mcq_q=0, no_coding_q=0):
@@ -199,6 +201,8 @@ def calculate_points( test_platform_name, test_type, test_current_status,
         else:
             pass
         return round(points, 2)
+
+
 def assigned_test_points(test,request):
     try:
         platform_name = None
@@ -254,4 +258,3 @@ def assigned_test_points(test,request):
 
     except Exception as error:
         write_exception(error, request)
-
