@@ -89,16 +89,3 @@ def push_notification_consultant(registration_ids, message_body):
         return False
     except Exception as error:
         return error
-
-def push_notification_supervisor(registration_id, message_body):
-    try:
-        if os.environ.get('ENV', 'local') == 'prod':
-             push_service.notify_single_device(
-                registration_id=registration_id,
-                 message_title=message_body['title'],
-                message_body=message_body['body'],
-                data_message=message_body,
-            )
-        return False
-    except Exception as error:
-        return error

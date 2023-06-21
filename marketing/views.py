@@ -17,7 +17,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from engineering.utils import assigned_test_points
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -2296,16 +2295,16 @@ class InterviewViewSets(ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-    @action(methods=['get'], detail=False, url_path='remind_me_later')
+    @action(methods=['post'], detail=False, url_path='remind_me_later')
     def remind_me_later(self, request):
         try:
-            notification = PushNotification.objects.filter(supervisor=request.user.id).first()
+            notification = SupervisorNotification.objects.filter(supervisor=request.user.id).first()
             interviews = Interview.objects.filter(status="feedback_due", supervisor=request.user.id).all()
             if interviews:
                 notification.count += 1
                 notification.save()
                 if notification.count < 3:
-                    serialized_args = json.dumps([request.user.id,notification.count])
+                    serialized_args = json.dumps([request.user.id, notification.count])
                     schedule_push_notification.delay(serialized_args)
             else:
                 notification.delete()
@@ -2319,7 +2318,7 @@ class InterviewViewSets(ModelViewSet):
     def supervisor_feedback_due(self, request,pk):
         try:
             interviews = Interview.objects.filter(status="feedback_due", supervisor=pk).all()
-            notification = PushNotification.objects.filter(supervisor=pk).first()
+            notification = SupervisorNotification.objects.filter(supervisor=pk).first()
             feedback_due_list = []
             for interview in interviews:
                 feedback_due = {

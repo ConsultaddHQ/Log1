@@ -10,15 +10,16 @@ from django.contrib.auth.models import ContentType
 
 from constance import config
 from employee.models import User
+from utils_app.models import Choice
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
+from notification.models import FCMDevice, SupervisorNotification
+from marketing.models import Submission, Interview, Question, Answer
+
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
-from notification.models import FCMDevice, PushNotification
-from notification.utils import push_notification_supervisor
-from utils_app.models import Choice
+from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
-from marketing.models import Submission, Interview, Question, Answer
 
 
 def vendor_account_manager(vendor_company):
@@ -111,17 +112,12 @@ def change_to_feedback_due():
             interview.save()
 
         # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
-        notifications = PushNotification.objects.all()
-        for notification in notifications:
-            interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.supervisor).all()
-            if not interviews:
-                notification.delete()
-                notification.save()
-        supervisor_list = User.objects.filter(screening__status="feedback_due").distinct()
+        delete_supervisor_notification
 
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
+        supervisor_list = User.objects.filter(screening__status="feedback_due").distinct()
         for supervisor in supervisor_list:
-            notification,created = PushNotification.objects.get_or_create(supervisor=supervisor)
+            notification,created = SupervisorNotification.objects.get_or_create(supervisor=supervisor)
             if created:
                 message_body = {
                     "body": "interview feedback due", "title": "interview feedback due", "category": "PopUp",
@@ -130,9 +126,10 @@ def change_to_feedback_due():
                         'count': 1
                     },
                 }
-                registration_id = FCMDevice.objects.filter(
-                    object_id=supervisor.id, content_type__model='user').latest('date_created').device_id
-                push_notification_supervisor(registration_id, message_body)
+                registration_ids = list(
+                    FCMDevice.objects.filter(
+                        object_id=supervisor.id, content_type__model='user').values_list('device_id', flat=True))
+                push_notification_consultant(registration_ids, message_body)
 
     except Exception as error:
         write_exception(message=error)
@@ -483,6 +480,7 @@ def test_platform(request, platform):
             question.save()
     except Exception as error:
         write_exception(error, request)
+
 @shared_task()
 def schedule_push_notification(serialized_args):
     try:
@@ -494,11 +492,25 @@ def schedule_push_notification(serialized_args):
                 'count':count
             },
         }
-        registration_id = FCMDevice.objects.filter(
-            object_id=user_id, content_type__model='user').latest('date_created').device_id
+        registration_ids = list(
+            FCMDevice.objects.filter(
+                object_id=user_id, content_type__model='user').values_list('device_id', flat=True))
         delay = timedelta(hours=2).total_seconds()
         sleep(delay)
-        push_notification_supervisor(registration_id, message_body)
+        push_notification_consultant(registration_ids, message_body)
+    except Exception as error:
+        write_exception(error, None)
+        return str(error), False
+
+
+@shared_task()
+def delete_supervisor_notification():
+    try:
+        notifications = SupervisorNotification.objects.all()
+        for notification in notifications:
+            interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.supervisor).all()
+            if not interviews:
+                notification.delete()
     except Exception as error:
         write_exception(error, None)
         return str(error), False

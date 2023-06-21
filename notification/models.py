@@ -141,7 +141,7 @@ class Notification(models.Model):
             self.deleted = False
             self.save()
 
-class PushNotification(TimeStampedModel):
+class SupervisorNotification(TimeStampedModel):
     count = models.IntegerField(_('count'), default=1)
     supervisor = models.ForeignKey(
         User, on_delete=models.CASCADE,
@@ -154,7 +154,7 @@ class PushNotification(TimeStampedModel):
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
-        return super(PushNotification, self).save(*args, **kwargs)
+        return super(SupervisorNotification, self).save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.id}:{self.supervisor.employee_name} '

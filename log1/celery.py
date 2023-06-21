@@ -12,5 +12,6 @@ APP = Celery('log1')
 APP.config_from_object('django.conf:settings', namespace='CELERY')
 
 APP.autodiscover_tasks()
+
 if __name__ == '__main__':
     APP.start()
