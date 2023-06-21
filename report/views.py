@@ -1064,10 +1064,18 @@ class EngineerReportXposedViewSets(GenericViewSet):
             if request.GET.get('emp_id') is None and request.GET.get('project_id') is None:
                 return Response({"message": "Employee ID and project ID does not exist"}, status=200)
             if request.GET.get('emp_id'):
-                engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
-                emp_info = {
-                    "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
-                }
+                try:
+                    engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
+                    emp_info = {
+                        "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
+                    }
+                except Exception:
+                    return Response({"message": "Employee Id does not exist"}, status=400)
+            if request.GET.get('project_id'):
+                try:
+                    Project.objects.get(pk=request.GET.get('project_id'))
+                except Exception:
+                    return Response({"message": "project not found"}, status=400)
 
             if cycle_info:
                 if cycle_info == '1':
@@ -1132,9 +1140,8 @@ class EngineerReportXposedViewSets(GenericViewSet):
                         training_duration = (date.today() - support_start).days
                     else:
                         training_duration = (project.start_date - support_start).days
-
                 if support.end:
-                    support_duration = f'{(support.end - support_start).days - training_duration} days'
+                    support_duration = f'{(support_start - support.end).days - training_duration} days'
                 else:
                     support_duration = f'{(date.today() - support_start).days - training_duration} days'
 
