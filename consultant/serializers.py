@@ -253,7 +253,7 @@ class ConsultantV2ListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Consultant
-        fields = ('id', 'name', 'skills', 'status', 'marketing', 'recruiter', 'retention', 'rate', 'work_auth', 'exit',
+        fields = ('id', 'name', 'email', 'skills', 'status', 'marketing', 'recruiter', 'retention', 'rate', 'work_auth', 'exit',
                   'rate_revision', 'visa_type')
 
     @staticmethod

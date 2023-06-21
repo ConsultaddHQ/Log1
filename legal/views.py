@@ -112,9 +112,9 @@ class PetitionViewSets(ModelViewSet):
                     'petition_type': petition.petition_type,
                     'beneficiary_type': petition.beneficiary_type,
                     'assigned_to': petition.assigned_to.employee_name,
-                    'uploaded_documents': Document.objects.filter(petition__beneficiary=consultant).exclude(
-                        doc_type__name='other').count(),
-                    'total_documents': DocumentList.objects.filter(petition__beneficiary=consultant).exclude(
+                    'uploaded_documents': Document.objects.filter(petition_id=petition.id).exclude(
+                        doc_type__name='other').order_by('doc_type__name').distinct('doc_type__name').count(),
+                    'total_documents': DocumentList.objects.filter(petition_id=petition.id).exclude(
                         doc_type__name='other').count(),
                 })
 
@@ -180,7 +180,7 @@ class PetitionViewSets(ModelViewSet):
             petition_ids = Petition.objects.filter(beneficiary_id=consultant_id).values('id')
             doc_types = DocumentList.objects.filter(
                 petition_id__in=petition_ids
-            ).exclude(doc_type__category="Petition Document")
+            ).exclude(doc_type__category="Petition Document").order_by('doc_type').distinct('doc_type')
             categories = Types.objects.exclude(category="Petition Document").order_by('category').distinct('category')
             for category in categories:
                 data[category.category] = []
@@ -215,7 +215,12 @@ class PetitionViewSets(ModelViewSet):
         try:
             consultant = get_object_or_404(Consultant, id=request.data['consultant'])
             petition_id = consultant.petitions.first().id
-            documents = Document.objects.filter(petition=petition_id).exclude(doc_type__category='Petition Document')
+            documents = Document.objects.filter(petition=petition_id).exclude(
+                doc_type__category='Petition Document').exclude(
+                doc_type__name__in=['resume', 'paystub', 'timesheet', 'previous_approval', 'passport', 'visa',
+                                    'consultadd_w2', 'insurance_card', 'performance_review_sheet',
+                                    'client_letter', 'vendor_letter']
+            )
             petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
@@ -231,11 +236,11 @@ class PetitionViewSets(ModelViewSet):
                     file=doc.file,
                     verified=None,
                     creator=request.user,
-                    doc_type_id=doc.doc_type_id,
-                    petition_id=petition.id,
+                    doc_type=doc.doc_type,
+                    petition=petition,
                 )
 
-            for i in Types.objects.filter(category="Petition Document"):
+            for i in Types.objects.all():
                 DocumentList.objects.get_or_create(petition=petition, doc_type=i, to_show=False)
 
             return Response({"message": "Extension created", "data": {

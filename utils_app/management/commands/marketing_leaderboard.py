@@ -100,6 +100,7 @@ class Command(BaseCommand):
                     offer_score[employee_id] = offer_score[employee_id] + 1
 
             leaders_data["data"] = self.get_leaders(leaders_data["data"], offer_info, positions, interview_score)
+
             leaders_data["total_submission"] = submissions.count()
             leaders_data["total_interview"] = interviews.count()
             leaders_data["total_offers"] = offers.count()
