@@ -4,7 +4,7 @@ from django.core.management import BaseCommand
 
 from marketing.models import Submission
 from utils_app.thred_mail import send_email_attachment_multiple
-from utils_app.utils import create_cron_error, create_cron_object, export_to_csv, delete_temp_file
+from utils_app.utils import create_cron_error, create_cron_object, delete_temp_file
 
 
 class Command(BaseCommand):

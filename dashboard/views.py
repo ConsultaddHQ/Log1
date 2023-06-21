@@ -11,10 +11,9 @@ from rest_framework.authentication import TokenAuthentication
 
 from project.models import Project
 from consultant.models import Consultant
-from dashboard.models import QuickActions
 from log1.utils import ERROR_MSG, write_exception
-from dashboard.serializers import QuickActionSerializer
 from marketing.models import Submission, Interview, Test
+from dashboard.models import QuickActions, QuickActionAddConsultant, QuickActionSearchConsultant
 
 
 class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
@@ -409,9 +408,32 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = QuickActions.objects.filter(user=request.user).first()
-            serializer = QuickActionSerializer(queryset)
-            return Response({"data": serializer.data}, status=200)
+            quick_action = QuickActions.objects.get_or_create(user=request.user)
+            add_consultants = QuickActionAddConsultant.objects.filter(quick_actions=quick_action[0])
+            search_consultants = QuickActionSearchConsultant.objects.filter(quick_actions=quick_action[0])
+            add_consultants_ls = []
+            search_consultants_ls = []
+            for add_consultant in add_consultants:
+                consultant = {
+                    "id": add_consultant.consultant.id,
+                    "name": add_consultant.consultant.name
+                }
+                add_consultants_ls.append(consultant)
+
+            for search_consultant in search_consultants:
+                consultant = {
+                    "id": search_consultant.consultant.id,
+                    "name": search_consultant.consultant.name
+                }
+                search_consultants_ls.append(consultant)
+            add_consultants_ls.reverse()
+            search_consultants_ls.reverse()
+            data = {
+                "id": quick_action[0].id,
+                "add_consultants": add_consultants_ls,
+                "search_consultant": search_consultants_ls
+            }
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
@@ -419,27 +441,45 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
     @action(methods=['post', 'delete'], detail=False, url_path='add_consultant')
     def add_consultant(self, request):
         try:
-            add_consultant_id = request.data.get('add_consultant')
-            search_consultant_id = request.data.get('search_consultant')
+            add_consultant_id = request.GET.get('add_consultant')
+            search_consultant_id = request.GET.get('search_consultant')
             quick_action, created = QuickActions.objects.get_or_create(user=request.user)
 
             if add_consultant_id:
                 add_consultant = Consultant.objects.get(id=add_consultant_id)
                 if request.method == 'POST':
-                    if quick_action.add_consultants.count() >= 5:
-                        return Response({"message": "Maximum limit reached"}, status=400)
-                    quick_action.add_consultants.add(add_consultant)
+                    add_consultant_exists = QuickActionAddConsultant.objects.filter(
+                        quick_actions=quick_action,consultant=add_consultant).exists()
+                    if not add_consultant_exists:
+                        if QuickActionAddConsultant.objects.filter(quick_actions=quick_action).count() >= 5:
+                            return Response({"message": "Maximum limit reached"}, status=400)
+                        QuickActionAddConsultant.objects.create(
+                            quick_actions=quick_action,
+                            consultant=add_consultant
+                        )
                 else:
-                    quick_action.add_consultants.remove(add_consultant)
+                    QuickActionAddConsultant.objects.filter(
+                        quick_actions=quick_action,
+                        consultant=add_consultant
+                    ).delete()
             else:
                 search_consultant = Consultant.objects.get(id=search_consultant_id)
                 if request.method == 'POST':
-                    quick_action.search_consultants.add(search_consultant)
-                    if quick_action.search_consultants.count() > 3:
-                        last_item = quick_action.search_consultants.last()
-                        quick_action.search_consultants.remove(last_item)
+                    if QuickActionSearchConsultant.objects.filter(quick_actions=quick_action,
+                                                                  consultant=search_consultant).exists():
+                        QuickActionSearchConsultant.objects.filter(quick_actions=quick_action,
+                                                                   consultant=search_consultant).delete()
+                    QuickActionSearchConsultant.objects.create(
+                        quick_actions=quick_action,
+                        consultant=search_consultant
+                    )
+                    if QuickActionSearchConsultant.objects.filter(quick_actions=quick_action).count() > 3:
+                        QuickActionSearchConsultant.objects.filter(quick_actions=quick_action).first().delete()
                 else:
-                    quick_action.search_consultants.remove(search_consultant)
+                    QuickActionSearchConsultant.objects.filter(
+                        quick_actions=quick_action,
+                        consultant=search_consultant
+                    ).delete()
 
             return Response({"message": "action update"}, status=200)
 
