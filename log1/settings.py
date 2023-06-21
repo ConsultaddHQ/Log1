@@ -335,6 +335,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_candidate_feedback_url', ('URL', 'Slack Candidate Feedback Channel')),
     ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
     ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
+    ('slack_consultadd_compete_url', ('URL', 'Slack Consultadd Compete Channel')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -355,6 +356,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'slack_joined_url', 'slack_marketing_report_url', 'slack_general_url', 'slack_offer_failure_url',
         'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url',
         'slack_recruitment_url', 'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
-        'slack_engineering_private_url'
+        'slack_engineering_private_url', 'slack_consultadd_compete_url'
     ),
 }
