@@ -91,6 +91,16 @@ def date_filter(queryset, timestamp, field_str):
 # Change status of scheduled and rescheduled Interviews to feedback_due
 def change_to_feedback_due():
     try:
+        """
+            Updates the status of interviews and sends push notifications for feedback.
+
+            - Retrieves interviews that have a start time earlier than or equal to the current UTC time
+              and have a status of 'scheduled' or 'rescheduled'.
+            - Updates the status of the retrieved interviews to 'feedback_due'.
+            - Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
+            - Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
+            - Sends push notifications to supervisors with the necessary information.
+            """
         tz = timezone('US/Eastern')
         time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
         previous_interviews = Interview.objects.filter(
@@ -99,6 +109,8 @@ def change_to_feedback_due():
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
+
+        # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
         notifications = PushNotification.objects.all()
         for notification in notifications:
             interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.supervisor).all()
@@ -106,6 +118,8 @@ def change_to_feedback_due():
                 notification.delete()
                 notification.save()
         supervisor_list = User.objects.filter(screening__status="feedback_due").distinct()
+
+        # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
         for supervisor in supervisor_list:
             notification,created = PushNotification.objects.get_or_create(supervisor=supervisor)
             if created:
