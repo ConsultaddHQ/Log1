@@ -404,6 +404,7 @@ class ConsultantBenchSerializer(serializers.ModelSerializer):
             'employee_name': user_obj.employee_name,
         }
         return data
+
     def get_recruiter(self, obj):
         queryset = obj.pocs.filter(end=None, poc_type='recruiter').first()
         if queryset:
