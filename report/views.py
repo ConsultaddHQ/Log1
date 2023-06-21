@@ -1059,15 +1059,16 @@ class EngineerReportXposedViewSets(GenericViewSet):
         try:
             resp = {}
             count = 1
+            emp_info = {}
             cycle_info = request.GET.get('cycle', None)
-            try:
+            if request.GET.get('emp_id') is None and request.GET.get('prj_id') is None:
+                return Response({"message": "Employee ID and project ID does not exist"}, status=200)
+            if request.GET.get('emp_id'):
                 engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
-            except Exception:
-                return Response({"message": "Employee Id does not exist"}, status=400)
+                emp_info = {
+                    "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
+                }
 
-            emp_info = {
-                "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
-            }
             if cycle_info:
                 if cycle_info == '1':
                     cycle_duration = 'January to June'
@@ -1084,9 +1085,14 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     cycle_duration = 'July to December'
                     cycle_date = datetime.strptime(f"{date.today().year}-07-01", '%Y-%m-%d').date()
 
-            supports = ProjectSupport.objects.filter(support=engineer, is_proxy_support=False).filter(
-                Q(end__gt=cycle_date) | Q(end__isnull=True)
-            )
+            if request.GET.get('emp_id'):
+                supports = ProjectSupport.objects.filter(support=engineer, is_proxy_support=False).filter(
+                    Q(end__gt=cycle_date) | Q(end__isnull=True)
+                )
+            else:
+                supports = [
+                    ProjectSupport.objects.filter(project=request.GET.get('prj_id')).order_by('-created').first()]
+
             for support in supports:
                 prev_statuses = []
                 handover_given = False
@@ -1128,9 +1134,9 @@ class EngineerReportXposedViewSets(GenericViewSet):
                         training_duration = (project.start_date - support_start).days
 
                 if support.end:
-                    support_duration = f'{(support.end - support_start).days  - training_duration} days'
+                    support_duration = f'{(support.end - support_start).days - training_duration} days'
                 else:
-                    support_duration = f'{(date.today() - support_start).days  - training_duration} days'
+                    support_duration = f'{(date.today() - support_start).days - training_duration} days'
 
                 resp[f"project_{count}"] = {
                     "status": " ".join(active_status.split('_')).capitalize(),
