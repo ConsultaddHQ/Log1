@@ -416,14 +416,16 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
             for add_consultant in add_consultants:
                 consultant = {
                     "id": add_consultant.consultant.id,
-                    "name": add_consultant.consultant.name
+                    "name": add_consultant.consultant.name,
+                    "email": add_consultant.consultant.email
                 }
                 add_consultants_ls.append(consultant)
 
             for search_consultant in search_consultants:
                 consultant = {
                     "id": search_consultant.consultant.id,
-                    "name": search_consultant.consultant.name
+                    "name": search_consultant.consultant.name,
+                    "email": search_consultant.consultant.email
                 }
                 search_consultants_ls.append(consultant)
             add_consultants_ls.reverse()
