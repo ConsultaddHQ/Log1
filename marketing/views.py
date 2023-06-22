@@ -3469,8 +3469,8 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
             data = {
                 "Name": engineer.employee_name,
-                "Total point": round(points, 2),
                 "Total Test": tests.count(),
+                "Total point": round(points, 2),
                 "Total MCQ questions": total_mcqs,
                 "Total Coding Questions": total_coding,
                 "Offline Test": len(offline_test_id),
