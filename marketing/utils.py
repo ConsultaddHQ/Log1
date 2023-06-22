@@ -75,7 +75,8 @@ def date_filter(queryset, timestamp, field_str):
     if timestamp and type(timestamp) == dict:
         lte_date = timestamp.get('lte', None)
         # if lte_date:
-        #     lte_date = datetime.strptime(lte_date, '%Y-%m-%d').date()
+        #     lte_date = (
+        #             datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
         lte = lte_date
         gte = timestamp.get('gte', None)
         if lte:
