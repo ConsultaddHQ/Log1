@@ -1151,7 +1151,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     "is_remote": support.project.is_remote, "client": support.project.submission.client,
                     "support_id": support.id, "skills": technology, "support_duration": 0,
                     "training_duration": f'{training_duration} days', "project_start": project.start_date,
-                    "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id,
+                    "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id
                 }
                 count += 1
             return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=200)
