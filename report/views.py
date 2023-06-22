@@ -1059,15 +1059,24 @@ class EngineerReportXposedViewSets(GenericViewSet):
         try:
             resp = {}
             count = 1
+            emp_info = {}
             cycle_info = request.GET.get('cycle', None)
-            try:
-                engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
-            except Exception:
-                return Response({"message": "Employee Id does not exist"}, status=400)
+            if request.GET.get('emp_id') is None and request.GET.get('project_id') is None:
+                return Response({"message": "Employee ID and project ID does not exist"}, status=200)
+            if request.GET.get('emp_id'):
+                try:
+                    engineer = User.objects.get(employee_id=request.GET.get('emp_id'))
+                    emp_info = {
+                        "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
+                    }
+                except Exception:
+                    return Response({"message": "Employee Id does not exist"}, status=400)
+            if request.GET.get('project_id'):
+                try:
+                    project = Project.objects.get(pk=request.GET.get('project_id'))
+                except Exception:
+                    return Response({"message": "project not found"}, status=400)
 
-            emp_info = {
-                "name": engineer.employee_name, "emp_id": engineer.employee_id, "email": engineer.email
-            }
             if cycle_info:
                 if cycle_info == '1':
                     cycle_duration = 'January to June'
@@ -1084,9 +1093,13 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     cycle_duration = 'July to December'
                     cycle_date = datetime.strptime(f"{date.today().year}-07-01", '%Y-%m-%d').date()
 
-            supports = ProjectSupport.objects.filter(support=engineer, is_proxy_support=False).filter(
-                Q(end__gt=cycle_date) | Q(end__isnull=True)
-            )
+            if request.GET.get('emp_id'):
+                supports = ProjectSupport.objects.filter(support=engineer, is_proxy_support=False).filter(
+                    Q(end__gt=cycle_date) | Q(end__isnull=True)
+                )
+            else:
+                supports = ProjectSupport.objects.filter(project=project).order_by('-created')
+
             for support in supports:
                 prev_statuses = []
                 handover_given = False
@@ -1126,18 +1139,17 @@ class EngineerReportXposedViewSets(GenericViewSet):
                         training_duration = (date.today() - support_start).days
                     else:
                         training_duration = (project.start_date - support_start).days
-
                 if support.end:
-                    support_duration = f'{(support.end - support_start).days  - training_duration} days'
+                    support_duration = f'{(support.end - support_start).days - training_duration} days'
                 else:
-                    support_duration = f'{(date.today() - support_start).days  - training_duration} days'
+                    support_duration = f'{(date.today() - support_start).days - training_duration} days'
 
                 resp[f"project_{count}"] = {
                     "status": " ".join(active_status.split('_')).capitalize(),
                     "support_start": support.start, "support_end": support.end,
                     "handover_received": handover_received, "handover_given": handover_given,
                     "is_remote": support.project.is_remote, "client": support.project.submission.client,
-                    "support_id": support.id, "skills": technology, "support_duration": support_duration,
+                    "support_id": support.id, "skills": technology, "support_duration": 0,
                     "training_duration": f'{training_duration} days', "project_start": project.start_date,
                     "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id,
                 }
