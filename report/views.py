@@ -1073,7 +1073,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     return Response({"message": "Employee Id does not exist"}, status=400)
             if request.GET.get('project_id'):
                 try:
-                    Project.objects.get(pk=request.GET.get('project_id'))
+                    project = Project.objects.get(pk=request.GET.get('project_id'))
                 except Exception:
                     return Response({"message": "project not found"}, status=400)
 
@@ -1098,7 +1098,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     Q(end__gt=cycle_date) | Q(end__isnull=True)
                 )
             else:
-                supports = ProjectSupport.objects.filter(project=request.GET.get('project_id')).order_by('-created')
+                supports = ProjectSupport.objects.filter(project=project).order_by('-created')
 
             for support in supports:
                 prev_statuses = []
