@@ -1098,8 +1098,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     Q(end__gt=cycle_date) | Q(end__isnull=True)
                 )
             else:
-                supports = [
-                    ProjectSupport.objects.filter(project=request.GET.get('project_id')).order_by('-created').first()]
+                supports = ProjectSupport.objects.filter(project=request.GET.get('project_id')).order_by('-created')
 
             for support in supports:
                 prev_statuses = []
@@ -1141,7 +1140,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     else:
                         training_duration = (project.start_date - support_start).days
                 if support.end:
-                    support_duration = f'{(support_start - support.end).days - training_duration} days'
+                    support_duration = f'{(support.end - support_start).days - training_duration} days'
                 else:
                     support_duration = f'{(date.today() - support_start).days - training_duration} days'
 
