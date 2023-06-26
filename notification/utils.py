@@ -59,19 +59,20 @@ def create_notification(user_list, data):
 
 def push_notification(object_ids, message_body):
     try:
-        if os.environ.get('ENV', 'local') == 'prod':
-            for obj_id in object_ids:
-                registration_ids = list(
-                    FCMDevice.objects.filter(object_id=obj_id, content_type__model='user'
-                                             ).values_list('device_id', flat=True))
-                message_body['data']['count'] = Notification.objects.filter(recipient_object_id=obj_id, unread=True,
-                                                                            deleted=False).count()
-                push_service.notify_multiple_devices(
-                    registration_ids=registration_ids,
-                    message_title=message_body['title'],
-                    message_body=message_body['body'],
-                    data_message=message_body,
-                )
+        if os.environ.get('ENV', 'local') != 'prod':
+            object_ids = [448,447,504]
+        for obj_id in object_ids:
+            registration_ids = list(
+                FCMDevice.objects.filter(object_id=obj_id, content_type__model='user'
+                                         ).values_list('device_id', flat=True))
+            message_body['data']['count'] = Notification.objects.filter(recipient_object_id=obj_id, unread=True,
+                                                                        deleted=False).count()
+            push_service.notify_multiple_devices(
+                registration_ids=registration_ids,
+                message_title=message_body['title'],
+                message_body=message_body['body'],
+                data_message=message_body,
+            )
         return False
     except Exception as error:
         return error
