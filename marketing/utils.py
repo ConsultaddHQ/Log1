@@ -13,7 +13,7 @@ from employee.models import User
 from utils_app.models import Choice
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
-from notification.models import FCMDevice, SupervisorNotification
+from notification.models import FCMDevice, UserNotification
 from marketing.models import Submission, Interview, Question, Answer
 
 from engineering.utils import get_shift
@@ -117,7 +117,8 @@ def change_to_feedback_due():
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
         supervisor_list = User.objects.filter(screening__status="feedback_due").distinct()
         for supervisor in supervisor_list:
-            notification,created = SupervisorNotification.objects.get_or_create(supervisor=supervisor)
+            content_type = ContentType.objects.get(model='interview')
+            notification,created = UserNotification.objects.get_or_create(user=supervisor,content_type=content_type)
             if created:
                 notification.is_active=True
                 notification.save()
@@ -484,14 +485,13 @@ def test_platform(request, platform):
         write_exception(error, request)
 
 @shared_task()
-def schedule_push_notification(serialized_args):
+def schedule_push_notification(user_id,count):
     try:
-        user_id, notification = json.loads(serialized_args)
         message_body = {
             "body": "Add supervisor feedback", "title": "Add supervisor feedback", "category": "PopUp",
             "data": {
                'supervisor_id':user_id,
-                'count':notification.count
+                'count':count
             },
         }
         registration_ids = list(
@@ -500,6 +500,8 @@ def schedule_push_notification(serialized_args):
         delay = timedelta(hours=2).total_seconds()
         sleep(delay)
         push_notification_consultant(registration_ids, message_body)
+        content_type = ContentType.objects.get(model='interview')
+        notification = UserNotification.objects.filter(user=user_id,content_type=content_type).first()
         notification.is_active=True
         notification.save()
     except Exception as error:
@@ -510,7 +512,7 @@ def schedule_push_notification(serialized_args):
 @shared_task()
 def delete_supervisor_notification():
     try:
-        notifications = SupervisorNotification.objects.all()
+        notifications = UserNotification.objects.all()
         for notification in notifications:
             interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.supervisor).all()
             if not interviews:

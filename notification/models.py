@@ -141,10 +141,11 @@ class Notification(models.Model):
             self.deleted = False
             self.save()
 
-class SupervisorNotification(TimeStampedModel):
+class UserNotification(TimeStampedModel):
     is_active = models.BooleanField(default=False)
     count = models.IntegerField(_('count'), default=1)
-    supervisor = models.ForeignKey(
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE , null=True, blank=True)
+    user = models.ForeignKey(
         User, on_delete=models.CASCADE,
         related_name='pushnotification',
         verbose_name='Supervisor'
@@ -155,7 +156,7 @@ class SupervisorNotification(TimeStampedModel):
         if not self.id:
             self.created = timezone.now()
         self.modified = timezone.now()
-        return super(SupervisorNotification, self).save(*args, **kwargs)
+        return super(UserNotification, self).save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.id}:{self.supervisor.employee_name} '

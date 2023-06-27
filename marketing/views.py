@@ -2299,14 +2299,14 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['post'], detail=False, url_path='remind_me_later')
     def remind_me_later(self, request):
         try:
-            notification = SupervisorNotification.objects.filter(supervisor=request.user.id).first()
+            content_type = ContentType.objects.get(model='interview')
+            notification = UserNotification.objects.filter(user=request.user.id,content_type=content_type).first()
             interviews = Interview.objects.filter(status="feedback_due", supervisor=request.user.id).all()
             if interviews:
                 notification.count += 1
                 notification.save()
                 if notification.count < 3:
-                    serialized_args = json.dumps([request.user.id, notification])
-                    schedule_push_notification.delay(serialized_args)
+                    schedule_push_notification.delay(request.user.id,notification.count)
             else:
                 if notification:
                     notification.delete()
@@ -2319,8 +2319,8 @@ class InterviewViewSets(ModelViewSet):
     def supervisor_feedback_due(self, request,pk):
         try:
             interviews = Interview.objects.filter(status="feedback_due", supervisor=pk)
-            breakpoint()
-            notification = SupervisorNotification.objects.filter(supervisor=pk,is_active=True).first()
+            content_type = ContentType.objects.get(model='interview')
+            notification = UserNotification.objects.filter(user=pk,is_active=True,content_type=content_type).first()
             feedback_due_list = []
             if notification:
                 notification.is_active = False
