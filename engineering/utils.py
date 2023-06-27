@@ -202,7 +202,7 @@ def calculate_points(test_platform_name, test_type, test_current_status,
             pass
         return round(points, 2)
 
-
+      
 def assigned_test_points(test,request):
     try:
         platform_name = None

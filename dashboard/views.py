@@ -408,27 +408,34 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
 
     def list(self, request, *args, **kwargs):
         try:
-            quick_action = QuickActions.objects.filter(user=request.user).first()
-            add_consultants = QuickActionAddConsultant.objects.filter(quick_actions=quick_action)
-            search_consultants = QuickActionSearchConsultant.objects.filter(quick_actions=quick_action)
-            add_consultants_ls=[]
-            search_consultants_ls=[]
+            quick_action = QuickActions.objects.get_or_create(user=request.user)
+            add_consultants = QuickActionAddConsultant.objects.filter(quick_actions=quick_action[0])
+            search_consultants = QuickActionSearchConsultant.objects.filter(quick_actions=quick_action[0])
+            add_consultants_ls = []
+            search_consultants_ls = []
             for add_consultant in add_consultants:
                 consultant = {
-                    "id":add_consultant.consultant.id,
-                    "name":add_consultant.consultant.name
+                    "id": add_consultant.consultant.id,
+                    "name": add_consultant.consultant.name,
+                    "email": add_consultant.consultant.email
                 }
                 add_consultants_ls.append(consultant)
 
             for search_consultant in search_consultants:
                 consultant = {
-                    "id":search_consultant.consultant.id,
-                    "name":search_consultant.consultant.name
+                    "id": search_consultant.consultant.id,
+                    "name": search_consultant.consultant.name,
+                    "email": search_consultant.consultant.email
                 }
                 search_consultants_ls.append(consultant)
             add_consultants_ls.reverse()
             search_consultants_ls.reverse()
-            return Response({"data":{"id":quick_action.id ,"add_consultants":add_consultants_ls,"search_consultant":search_consultants_ls}}, status=200)
+            data = {
+                "id": quick_action[0].id,
+                "add_consultants": add_consultants_ls,
+                "search_consultant": search_consultants_ls
+            }
+            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
