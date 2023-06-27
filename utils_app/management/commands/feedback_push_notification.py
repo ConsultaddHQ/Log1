@@ -18,11 +18,11 @@ class Command(BaseCommand):
             thirty_days_ago = today - timedelta(days=30)
 
             # Query to fetch the project support instances
+            breakpoint()
             project_support_persons = ProjectSupport.objects.filter(
                 ~Q(project__feedbacks__created__gte=thirty_days_ago) &
-                Q(project__support_required=True)
+                Q(project__support_required=True,statuses__frequency__in=['is_active','less_active'])
             )
-
             for support_person in project_support_persons:
                 data = {
                     "title": "consultant feedback due",

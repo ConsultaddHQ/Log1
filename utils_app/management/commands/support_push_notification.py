@@ -31,7 +31,7 @@ class Command(BaseCommand):
             # user case send the notification to user on daily base if can not submit the feedback script run daily
             project_support_persons = ProjectSupport.objects.filter(
                 ~Q(project__updates__created__gte=seven_days_ago) &
-                Q(project__support_required=True)
+                Q(project__support_required=True,statuses__frequency__in=['is_active','less_active'])
             )
 
             for support_person in project_support_persons:
