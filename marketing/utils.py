@@ -112,7 +112,7 @@ def change_to_feedback_due():
             interview.save()
 
         # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
-        delete_supervisor_notification
+        delete_supervisor_notification.delay()
 
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
         supervisor_list = User.objects.filter(screening__status="feedback_due").distinct()
