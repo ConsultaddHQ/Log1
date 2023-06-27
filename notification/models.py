@@ -159,4 +159,4 @@ class UserNotification(TimeStampedModel):
         return super(UserNotification, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.id}:{self.supervisor.employee_name} '
+        return f'{self.id}:{self.user.employee_name} '

@@ -2296,6 +2296,7 @@ class InterviewViewSets(ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
     @action(methods=['post'], detail=False, url_path='remind_me_later')
     def remind_me_later(self, request):
         try:
