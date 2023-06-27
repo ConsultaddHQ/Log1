@@ -119,6 +119,8 @@ def change_to_feedback_due():
         for supervisor in supervisor_list:
             notification,created = SupervisorNotification.objects.get_or_create(supervisor=supervisor)
             if created:
+                notification.is_active=True
+                notification.save()
                 message_body = {
                     "body": "interview feedback due", "title": "interview feedback due", "category": "PopUp",
                     "data": {
@@ -484,12 +486,12 @@ def test_platform(request, platform):
 @shared_task()
 def schedule_push_notification(serialized_args):
     try:
-        user_id, count = json.loads(serialized_args)
+        user_id, notification = json.loads(serialized_args)
         message_body = {
             "body": "Add supervisor feedback", "title": "Add supervisor feedback", "category": "PopUp",
             "data": {
                'supervisor_id':user_id,
-                'count':count
+                'count':notification.count
             },
         }
         registration_ids = list(
@@ -498,6 +500,8 @@ def schedule_push_notification(serialized_args):
         delay = timedelta(hours=2).total_seconds()
         sleep(delay)
         push_notification_consultant(registration_ids, message_body)
+        notification.is_active=True
+        notification.save()
     except Exception as error:
         write_exception(error, None)
         return str(error), False

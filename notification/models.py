@@ -142,6 +142,7 @@ class Notification(models.Model):
             self.save()
 
 class SupervisorNotification(TimeStampedModel):
+    is_active = models.BooleanField(default=False)
     count = models.IntegerField(_('count'), default=1)
     supervisor = models.ForeignKey(
         User, on_delete=models.CASCADE,

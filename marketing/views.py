@@ -17,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+from engineering.utils import assigned_test_points
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -2304,11 +2305,11 @@ class InterviewViewSets(ModelViewSet):
                 notification.count += 1
                 notification.save()
                 if notification.count < 3:
-                    serialized_args = json.dumps([request.user.id, notification.count])
+                    serialized_args = json.dumps([request.user.id, notification])
                     schedule_push_notification.delay(serialized_args)
             else:
-                notification.delete()
-                notification.save()
+                if notification:
+                    notification.delete()
             return Response({"message":"Done"}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -2317,18 +2318,22 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['get'], detail=True, url_path='supervisor_feedback_due')
     def supervisor_feedback_due(self, request,pk):
         try:
-            interviews = Interview.objects.filter(status="feedback_due", supervisor=pk).all()
-            notification = SupervisorNotification.objects.filter(supervisor=pk).first()
+            interviews = Interview.objects.filter(status="feedback_due", supervisor=pk)
+            breakpoint()
+            notification = SupervisorNotification.objects.filter(supervisor=pk,is_active=True).first()
             feedback_due_list = []
-            for interview in interviews:
-                feedback_due = {
-                    "round": interview.round,
-                    "schedule": interview.end_time,
-                    "client": interview.submission.client,
-                    "position": interview.submission.lead.position.name,
-                    "consultant_name": interview.submission.consultant_marketing.consultant.name
-                }
-                feedback_due_list.append(feedback_due)
+            if notification:
+                notification.is_active = False
+                notification.save()
+                for interview in interviews:
+                    feedback_due = {
+                        "round": interview.round,
+                        "schedule": interview.end_time,
+                        "client": interview.submission.client,
+                        "position": interview.submission.lead.position.name,
+                        "consultant_name": interview.submission.consultant_marketing.consultant.name
+                    }
+                    feedback_due_list.append(feedback_due)
 
             return Response({"data": {"count": notification.count if notification else 0,"interview": feedback_due_list}},status=200)
         except Exception as error:
