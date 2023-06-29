@@ -165,6 +165,7 @@ def get_remote_project_csv(payload, request):
     except Exception as error:
         write_exception(error, request)
 
+
 @staticmethod
 def calculate_mcq_points(no_of_mcq):
         first_twenty_points = (20 if no_of_mcq > 20 else no_of_mcq) * 0.25
@@ -174,12 +175,13 @@ def calculate_mcq_points(no_of_mcq):
             rest_all_points if rest_all_points > 0 else 0)
         return round(points, 2)
 
-def calculate_points(self, test_platform_name, test_type, test_current_status,
+
+def calculate_points(test_platform_name, test_type, test_current_status,
                          no_of_people_involved=0, no_mcq_q=0, no_coding_q=0):
         points = 0
         if test_type.lower() == 'online':
             if no_mcq_q and no_coding_q:
-                test_points = self.calculate_mcq_points(int(no_mcq_q)) + int(no_coding_q) * 3
+                test_points = calculate_mcq_points(int(no_mcq_q)) + int(no_coding_q) * 3
                 bonus_points = 0.75 * (1 if test_current_status == 'passed' else 0)
                 points = (test_points + bonus_points) / no_of_people_involved
             elif no_coding_q:
@@ -187,7 +189,7 @@ def calculate_points(self, test_platform_name, test_type, test_current_status,
                 bonus_points = 1 * (1 if test_current_status == 'passed' else 0)
                 points = (test_points + bonus_points) / no_of_people_involved
             elif no_mcq_q:
-                test_points = self.calculate_mcq_points(int(no_mcq_q))
+                test_points = calculate_mcq_points(int(no_mcq_q))
                 bonus_points = 0.5 * (1 if test_current_status == 'passed' else 0)
                 points = (test_points + bonus_points) / no_of_people_involved
             else:
@@ -199,6 +201,8 @@ def calculate_points(self, test_platform_name, test_type, test_current_status,
         else:
             pass
         return round(points, 2)
+
+      
 def assigned_test_points(test,request):
     try:
         platform_name = None
@@ -214,6 +218,7 @@ def assigned_test_points(test,request):
                                                question__form_name='online_test').first()
             if platform:
                 platform_name = platform.answer
+
         MCQ_question_answer = Answer.objects.filter(
             object_id=test.id, content_type__model='test', question__title='Number of MCQ questions'
         ).first()
@@ -226,7 +231,7 @@ def assigned_test_points(test,request):
         if coding_question_answer:
             coding_answers = coding_question_answer.answer
         employee_associated = test.engineer.all()
-        points = calculate_points(
+        points =calculate_points(
             test_type=test_type,
             test_current_status=test.status,
             test_platform_name=platform_name,
@@ -235,10 +240,10 @@ def assigned_test_points(test,request):
         )
         for engineer in employee_associated:
             answers = test.engineer_feedback.all()
-            answer = answers.filter(question__title="Upload Documents").first()
+            answer = answers.first()
             if 1 <= answer.created.month <= 6:
-                cycle_start = datetime(datetime.now().year + 1, 1, 1)
-                cycle_end = datetime(datetime.now().year + 1, 6, 30)
+                cycle_start = datetime(datetime.now().year, 1, 1)
+                cycle_end = datetime(datetime.now().year, 6, 30)
             else:
                 cycle_start = datetime(datetime.now().year, 7, 1)
                 cycle_end = datetime(datetime.now().year, 12, 31)
@@ -253,4 +258,3 @@ def assigned_test_points(test,request):
 
     except Exception as error:
         write_exception(error, request)
-
