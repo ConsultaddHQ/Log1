@@ -1,6 +1,6 @@
 from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
-from notification.models import Notification, FCMDevice
+from notification.models import Notification, FCMDevice, UserNotification
 
 
 @admin.register(Notification)
@@ -20,4 +20,5 @@ class FCMDeviceAdmin(ExportActionModelAdmin):
 @admin.register(UserNotification)
 class UserNotificationAdmin(ExportActionModelAdmin):
     list_display = ('id','count', 'user')
+
 
