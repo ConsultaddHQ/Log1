@@ -13,6 +13,7 @@ from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
+from notification.models import FCMDevice
 from utils_app.models import Choice
 from utils_app.slack_notification import MessageCard as slack
 from marketing.models import Submission, Interview, Question, Answer
@@ -446,3 +447,40 @@ def test_platform(request, platform):
             question.save()
     except Exception as error:
         write_exception(error, request)
+
+@shared_task()
+def schedule_push_notification(user_id,count):
+    try:
+        message_body = {
+            "body": "Add supervisor feedback", "title": "Add supervisor feedback", "category": "PopUp",
+            "data": {
+               'supervisor_id':user_id,
+                'count':count
+            },
+        }
+        registration_ids = list(
+            FCMDevice.objects.filter(
+                object_id=user_id, content_type__model='user').values_list('device_id', flat=True))
+        delay = timedelta(hours=2).total_seconds()
+        sleep(delay)
+        push_notification_consultant(registration_ids, message_body)
+        content_type = ContentType.objects.get(model='interview')
+        notification = UserNotification.objects.filter(user=user_id,content_type=content_type).first()
+        notification.is_active=True
+        notification.save()
+    except Exception as error:
+        write_exception(error, None)
+        return str(error), False
+
+@shared_task()
+def delete_supervisor_notification():
+    try:
+        notifications = UserNotification.objects.all()
+        for notification in notifications:
+            interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.user).all()
+            if not interviews:
+                notification.delete()
+    except Exception as error:
+        write_exception(error, None)
+        return str(error), False
+
