@@ -1,8 +1,8 @@
 from datetime import datetime
-from decimal import Decimal
 from django.db.models import F
 
 from employee.models import User
+from decimal import Decimal
 from marketing.models import Test, Answer
 from django.core.management import BaseCommand
 from engineering.models import Cycle, EngineerPoint
