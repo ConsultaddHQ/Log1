@@ -148,7 +148,7 @@ class UserNotification(TimeStampedModel):
     user = models.ForeignKey(
         User, on_delete=models.CASCADE,
         related_name='pushnotification',
-        verbose_name='Supervisor'
+        verbose_name='User'
     )
 
     def save(self, *args, **kwargs):
