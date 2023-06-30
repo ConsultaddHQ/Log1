@@ -18,4 +18,4 @@ class FCMDeviceAdmin(ExportActionModelAdmin):
 
 @admin.register(UserNotification)
 class UserNotificationAdmin(ExportActionModelAdmin):
-    list_display = ('id','count', 'supervisor')
+    list_display = ('id','count', 'user')

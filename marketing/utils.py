@@ -514,7 +514,7 @@ def delete_supervisor_notification():
     try:
         notifications = UserNotification.objects.all()
         for notification in notifications:
-            interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.supervisor).all()
+            interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.user)
             if not interviews:
                 notification.delete()
     except Exception as error:
