@@ -1,9 +1,13 @@
-from django.db.models import Q
-from datetime import timedelta, date, timezone
+from django.db.models import Q,F
+from django.utils import timezone
+from datetime import timedelta, date
 from django.core.management import BaseCommand
 
-from django.utils import timezone
+
 from project.models import ProjectSupport
+from employee.models import User
+from notification.models import UserNotification
+from django.contrib.auth.models import ContentType
 from utils_app.utils import create_cron_error, create_cron_object
 from notification.utils import create_notification, push_notification
 
@@ -16,14 +20,21 @@ class Command(BaseCommand):
         try:
             today = date.today()
             thirty_days_ago = today - timedelta(days=30)
+            fourteen_days_ago = today - timedelta(days=14)
+
 
             # Query to fetch the project support instances
-            breakpoint()
             project_support_persons = ProjectSupport.objects.filter(
-                ~Q(project__feedbacks__created__gte=thirty_days_ago) &
+                (~Q(project__feedbacks__created__gte=thirty_days_ago)|Q(project__feedbacks__created__gte=fourteen_days_ago,project__created__lte=thirty_days_ago))&
                 Q(project__support_required=True,statuses__frequency__in=['is_active','less_active'])
             )
+            content_type = ContentType.objects.get(model='consultant')
             for support_person in project_support_persons:
+                notification, created = UserNotification.objects.get_or_create(user=User.objects.get(id=support_person.support.id),
+                                                                               content_type=content_type)
+                if created:
+                    notification.is_active = True
+                    notification.save()
                 data = {
                     "title": "consultant feedback due",
                     "category": "alert",
@@ -39,7 +50,7 @@ class Command(BaseCommand):
 
                 # Push Notification
                 message_body = {
-                    "body": f"your {support_person.project.consultant.name} updates were not given for last weeks",
+                    "body": f"your {support_person.project.consultant.name} feedback were not given form last 30 days",
                     "title":"project update due",
                     "category": "alert",
                     "show_in_foreground": True,
