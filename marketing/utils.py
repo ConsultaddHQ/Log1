@@ -2,6 +2,7 @@ import csv
 import json
 from time import sleep
 from pytz import timezone
+from django.utils import timezone as tz
 from celery import shared_task
 from django.http import HttpResponse
 from datetime import datetime, timedelta
@@ -507,7 +508,7 @@ def schedule_push_notification(user_id,count,type):
                      'is_deleted': False,
                      'target': 'log1',
                      'target_id': user_id,
-                     'timestamp': str(timezone.now()),
+                     'timestamp': str(tz.now()),
                  },
              }
         if type == 'consultant':
@@ -522,7 +523,7 @@ def schedule_push_notification(user_id,count,type):
                     'is_deleted': False,
                     'target': 'log1',
                     'target_id': user_id,
-                    'timestamp': str(timezone.now()),
+                    'timestamp': str(tz .now()),
                 },
             }
 
