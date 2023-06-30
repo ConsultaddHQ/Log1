@@ -1,5 +1,6 @@
 import csv
 import pandas as pd
+from decimal import Decimal
 from datetime import datetime
 from django.shortcuts import get_object_or_404
 from django.contrib.contenttypes.models import ContentType
@@ -239,21 +240,21 @@ def assigned_test_points(test,request):
             no_of_people_involved=len(employee_associated)
         )
         for engineer in employee_associated:
-            answers = test.engineer_feedback.all()
-            answer = answers.first()
-            if 1 <= answer.created.month <= 6:
-                cycle_start = datetime(datetime.now().year, 1, 1)
-                cycle_end = datetime(datetime.now().year, 6, 30)
+            # answers = test.engineer_feedback.all()
+            # answer = answers.first()
+            if 1 <= test.created.month <= 6:
+                cycle_start = datetime(test.created.year, 1, 1)
+                cycle_end = datetime(test.created.year, 6, 30)
             else:
-                cycle_start = datetime(datetime.now().year, 7, 1)
-                cycle_end = datetime(datetime.now().year, 12, 31)
+                cycle_start = datetime(test.created.year, 7, 1)
+                cycle_end = datetime(test.created.year, 12, 31)
 
             cycle=Cycle.objects.get_or_create(start_date=cycle_start, end_date=cycle_end)
             previous_points = EngineerPoint.objects.filter(engineer=engineer, is_active=True)
             engineer_point,created= EngineerPoint.objects.get_or_create(engineer=engineer,cycle=cycle[0])
             if created:
                 previous_points.update(is_active=False)
-            engineer_point.points=engineer_point.points+points
+            engineer_point.points = Decimal(str(engineer_point.points)) + Decimal(str(points))
             engineer_point.save()
 
     except Exception as error:

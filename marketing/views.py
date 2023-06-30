@@ -3563,8 +3563,8 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             if not  employee_id:
                 return Response({'error': "user not found"}, status=400)
             engineer = User.objects.get(employee_id=employee_id)
-            tests = Test.objects.filter(engineer=engineer,engineer_feedback__created__lte='2023-06-30',
-                    engineer_feedback__created__gte='2023-01-01').distinct()
+            tests = Test.objects.filter(engineer=engineer,created__lte='2023-06-30',
+                    created__gte='2023-01-01').distinct()
 
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
             offline_type_of_test = Question.objects.filter(title='Select type of test', form_name='offline_test')
@@ -3684,7 +3684,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             from api_key.models import APIKey
             employee_info = {}
-            tests = Test.objects.filter(engineer_feedback__created__lte='2023-06-30',engineer_feedback__created__gte='2023-01-01').distinct()
+            tests = Test.objects.filter(created__lte='2023-06-30',created__gte='2023-01-01').distinct()
             for test in tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0

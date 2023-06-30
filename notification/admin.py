@@ -22,5 +22,3 @@ class UserNotificationAdmin(ExportActionModelAdmin):
     list_display = ('id','count', 'user')
     list_filter = ('content_type',)
     search_fields = ('id', 'user__employee_name')
-
-
