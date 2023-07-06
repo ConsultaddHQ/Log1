@@ -3401,14 +3401,24 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             from functools import reduce
             from api_key.models import APIKey
-            points =0
+            points = 0
             employee_id = request.GET.get('employee_id', None)
-            if not  employee_id:
+            if not employee_id:
                 return Response({'error': "user not found"}, status=400)
             engineer = User.objects.get(employee_id=employee_id)
-            tests = Test.objects.filter(engineer=engineer,engineer_feedback__created__lte='2023-06-01',
-                    engineer_feedback__created__gte='2023-01-01').distinct()
+            tests = Test.objects.filter(
+                (Q(engineer=engineer) | Q(assign_to=engineer)), created__lte="2023-06-30", created__gte="2023-01-01",
+                status__in=['passed', 'failed', 'assigned', 'feedback_due']
+            ).order_by('id').distinct('id')
 
+            submitted_tests = Test.objects.filter(
+                engineer=engineer, created__lte="2023-06-30", created__gte="2023-01-01", status__in=['passed', 'failed', 'assigned', 'feedback_due']
+            ).order_by('id').distinct('id')
+
+            assigned_tests = Test.objects.filter(
+                assign_to=engineer, created__lte="2023-06-30", created__gte="2023-01-01", status__in=['passed', 'failed', 'assigned', 'feedback_due']
+            ).order_by('id').distinct('id')
+            diff = set(tests.values_list('id', flat=True)).difference(set(submitted_tests.values_list('id', flat=True)).union(set(assigned_tests.values_list('id', flat=True))))
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
             offline_type_of_test = Question.objects.filter(title='Select type of test', form_name='offline_test')
             online_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True), content_type__model='test', question=online_type_of_test[0]).values_list('object_id', flat=True)
@@ -3431,7 +3441,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 content_type__model='test', question=coding_question
             ).values_list('answer', flat=True)
             total_coding = reduce(lambda x, y: int(x) + int(y), coding_question_answer) if coding_question_answer else 0
-            for test in tests:
+            for test in submitted_tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0
                 online_test = Answer.objects.filter(object_id=test.id, content_type__model='test',
@@ -3471,15 +3481,20 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 "Name": engineer.employee_name,
                 "Total point": points,
                 "Total Test": tests.count(),
+                "assigned but not part": diff,
                 "Total MCQ questions": total_mcqs,
-                "Total Coding Questions": total_coding,
+                "Online Test": len(online_test_id),
                 "Offline Test": len(offline_test_id),
+                "Total Coding Questions": total_coding,
+                "submitted_tests": submitted_tests.count(),
+                "Total Assigned Tests": assigned_tests.count(),
+                "Total Online Test Failed": failed_online_test.count(),
+                "Total  Online Passed Test": passed_online_test.count(),
                 "Total Offline Test Passed": passed_offline_test.count(),
                 "Total Offline Test Failed": failed_offline_test.count(),
-                "Online Test": len(online_test_id),
-                "Total  Online Passed Test": passed_online_test.count(),
-                "Total Online Test Failed": failed_online_test.count(),
+                "assigned_id": assigned_tests.values_list('id', flat=True),
                 "Total FeedbackDue Online Test": feedback_due_online_test.count(),
+                "submitted_tests_id": submitted_tests.values_list('id', flat=True),
                 "Total FeedbackDue Offline Test": feedback_due_offline_test.count(),
             }
             return Response({"message": data}, status=200)
@@ -3515,7 +3530,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             else:
                 pass
         elif test_type.lower() == 'offline':
-            test_points = 5
+            test_points = 10
             bonus_points = 2 * (1 if test_current_status == 'passed' else 0)
             points = (test_points + bonus_points) / no_of_people_involved
         else:
