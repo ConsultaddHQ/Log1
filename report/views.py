@@ -1060,7 +1060,8 @@ class EngineerReportXposedViewSets(GenericViewSet):
             resp = {}
             count = 1
             emp_info = {}
-            cycle_info = request.GET.get('cycle', None)
+            # cycle_info = request.GET.get('cycle', 1)
+            cycle_info = 1
             if request.GET.get('emp_id') is None and request.GET.get('project_id') is None:
                 return Response({"message": "Employee ID and project ID does not exist"}, status=200)
             if request.GET.get('emp_id'):
@@ -1149,7 +1150,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     "support_start": support.start, "support_end": support.end,
                     "handover_received": handover_received, "handover_given": handover_given,
                     "is_remote": support.project.is_remote, "client": support.project.submission.client,
-                    "support_id": support.id, "skills": technology, "support_duration": 0,
+                    "support_id": support.id, "skills": technology, "support_duration": support_duration,
                     "training_duration": f'{training_duration} days', "project_start": project.start_date,
                     "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id
                 }

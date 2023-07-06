@@ -371,7 +371,7 @@ class ConsultantViewSets(ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles or 'legal' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
@@ -1313,7 +1313,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles or 'legal' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             instance = WorkAuth.objects.filter(consultant=request.data['consultant'], is_current=True)
@@ -1352,7 +1352,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
-        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
+        if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles or 'legal' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             work_auth = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
