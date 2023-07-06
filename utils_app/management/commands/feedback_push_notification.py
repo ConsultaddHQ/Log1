@@ -24,10 +24,18 @@ class Command(BaseCommand):
 
 
             # Query to fetch the project support instances
+
+            active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago) & Q(
+                statuses__frequency__in=['is_active', 'less_active'])
+
+            initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
+                project__created__gte=thirty_days_ago)
+
             project_support_persons = ProjectSupport.objects.filter(
-                (~Q(project__feedbacks__created__gte=thirty_days_ago)|Q(project__feedbacks__created__gte=fourteen_days_ago,project__created__lte=thirty_days_ago))&
-                Q(project__support_required=True,statuses__frequency__in=['is_active','less_active'])
-            )
+                Q(project__support_required=True,
+                  project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"]) &
+                (active_projects | initial_projects)).order_by('project__id').distinct('project__id')
+
             content_type = ContentType.objects.get(model='consultant')
             for support_person in project_support_persons:
                 notification, created = UserNotification.objects.get_or_create(user=User.objects.get(id=support_person.support.id),

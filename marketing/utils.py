@@ -2,9 +2,10 @@ import csv
 import json
 from time import sleep
 from pytz import timezone
-from django.utils import timezone as tz
+from django.db.models import Q
 from celery import shared_task
 from django.http import HttpResponse
+from django.utils import timezone as tz
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
@@ -116,7 +117,14 @@ def change_to_feedback_due():
         delete_supervisor_notification.delay()
 
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
-        supervisor_list = User.objects.filter(screening__status="feedback_due").distinct()
+        interviews = Interview.objects.filter(
+            ~Q(supervisor_feedback__question__form_name='interview') &
+            Q(start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
+            status__in=["cancelled", "next_round"]).order_by('id').distinct('id')
+
+        supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
+        supervisor_list = User.objects.filter(id__in=supervisor_ids)
+
         for supervisor in supervisor_list:
             content_type = ContentType.objects.get(model='interview')
             notification,created = UserNotification.objects.get_or_create(user=supervisor,content_type=content_type)
