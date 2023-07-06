@@ -1150,7 +1150,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     "support_start": support.start, "support_end": support.end,
                     "handover_received": handover_received, "handover_given": handover_given,
                     "is_remote": support.project.is_remote, "client": support.project.submission.client,
-                    "support_id": support.id, "skills": technology, "support_duration": support_duration,
+                    "support_id": support.id, "skills": technology, "support_duration": 0,
                     "training_duration": f'{training_duration} days', "project_start": project.start_date,
                     "consultant_name": support.project.submission.consultant.name, "project_id": support.project_id
                 }
