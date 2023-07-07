@@ -119,7 +119,7 @@ def change_to_feedback_due():
         interviews = Interview.objects.filter(
             ~Q(supervisor_feedback__question__form_name='interview') &
             Q(start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
-            status__in=["cancelled", "next_round"]).order_by('id').distinct('id')
+            status__in=["cancelled", "next_round", "offer", "failed"]).order_by('id').distinct('id')
 
         supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
         supervisor_list = User.objects.filter(id__in=supervisor_ids)

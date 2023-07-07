@@ -170,7 +170,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     if notification.count < 4:
                         schedule_push_notification.delay(user_id, notification.count, 'project')
 
-            return Response({"message": "Remind you in next 2 hour"}, status=200)
+            return Response({"message": "Notification snoozed for next 2 hours"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -193,7 +193,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     interviews = Interview.objects.filter(
                         ~Q(supervisor_feedback__question__form_name='interview') &
                         Q(supervisor=pk, start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
-                        status__in=["cancelled", "next_round"]).order_by('id').distinct('id')
+                        status__in=["cancelled", "next_round", "offer", "failed"]).order_by('id').distinct('id')
                     if interviews:
                         for interview in interviews:
                             feedback_due = {
@@ -220,7 +220,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
 
                 if notification.content_type == project_content_type:
                     seven_days_ago = today - timedelta(days=7)
-                    two_days_ago = today - timedelta(days=2)
+                    one_day_ago = today - timedelta(days=1)
 
                     active_projects = Q(
                         ~Q(project__updates__created__gte=seven_days_ago) &
@@ -233,7 +233,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                           statuses__frequency__in=['terminate', 'handover', 'independent']))
 
                     training_projects = Q(
-                        ~Q(project__updates__created__gte=two_days_ago),
+                        ~Q(project__updates__created__gte=one_day_ago),
                         Q(statuses__is_current=True, statuses__frequency='training'))
 
                     project_supports = ProjectSupport.objects.filter(
@@ -265,12 +265,15 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                 if notification.content_type == consultant_content_type:
                     thirty_days_ago = today - timedelta(days=30)
                     fourteen_days_ago = today - timedelta(days=14)
+                    sixty_days_ago = today - timedelta(days=60)
 
                     active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago) & Q(
-                        statuses__frequency__in=['is_active', 'less_active'],project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
+                        project__start_date__gte=sixty_days_ago,
+                        statuses__frequency__in=['active', 'less_active'],
+                        project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
 
                     initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
-                        project__created__gte=thirty_days_ago)
+                        project__start_date__lte=thirty_days_ago)
 
                     project_supports = ProjectSupport.objects.filter(
                         Q(support=pk, project__support_required=True) &

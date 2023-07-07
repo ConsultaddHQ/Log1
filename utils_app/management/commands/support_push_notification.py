@@ -21,7 +21,7 @@ class Command(BaseCommand):
             # start_of_last_week = today - timedelta(days=today.weekday(), weeks=1)
             # end_of_last_week = start_of_last_week + timedelta(days=6)
             seven_days_ago = today - timedelta(days=7)
-            two_days_ago = today - timedelta(days=2)
+            one_day_ago = today - timedelta(days=1)
 
             # Query to fetch the project support person
             # user case send the notification to user on daily base if can not submit the feedback script run daily
@@ -36,7 +36,7 @@ class Command(BaseCommand):
                   statuses__frequency__in=['terminate', 'handover', 'independent'])
             )
             training_projects = Q(
-                ~Q(project__updates__created__gte=two_days_ago),
+                ~Q(project__updates__created__gte=one_day_ago),
                 Q(statuses__is_current=True, statuses__frequency='training')
             )
             project_support_persons = ProjectSupport.objects.filter(

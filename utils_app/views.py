@@ -146,9 +146,6 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
                     )
             return Response({"message": "updated technologies"}, status=202)
 
-            data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
-                    'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
-            return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

@@ -21,10 +21,14 @@ class Command(BaseCommand):
             today = date.today()
             thirty_days_ago = today - timedelta(days=30)
             fourteen_days_ago = today - timedelta(days=14)
+            sixty_days_ago = today - timedelta(days=60)
+
 
             # Query to fetch the project support instances
             active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago,) & Q(
-                statuses__frequency__in=['is_active', 'less_active'],project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
+                project__created__gte=sixty_days_ago,
+                statuses__frequency__in=['active', 'less_active'],
+                project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
 
             initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
                 project__created__gte=thirty_days_ago)
