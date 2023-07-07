@@ -1,13 +1,14 @@
 import os
 import pytz
+import json
 import difflib
-from datetime import date
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse
 from django.db.models.functions import Lower
-from django.db.models import F, Q, Max, Count
+from django.db.models import F, Max, Count
 from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
@@ -16,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+import project.models
 from engineering.utils import assigned_test_points
 from marketing.utils import *
 from marketing.serializers import *
@@ -2889,7 +2891,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.status = request.data.get('status')
             test.submitted_by = request.user
             test.save()
-            assigned_test_points(test,request)
+            assigned_test_points(test, request)
             # Activity
             desc = f"Test status updated to {test.get_status_display()} by {request.user.employee_name}"
             create_activity(test.submission.id, 'submission', request.user, desc, 'update')
@@ -2942,7 +2944,24 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
-
+            test_type = test.engineer_feedback.filter(question__title='Select type of test').first().answer
+            rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
+            rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
+            payload = {
+                'id': test.id,
+                'type': test_type,
+                'coder_rating': rating,
+                'feedback': test.feedback,
+                'client': test.submission.client,
+                'status': test.get_status_display(),
+                'coder_remark': test.engineer_remarks,
+                'vendor': test.submission.vendor.name,
+                'consultant_name': test.submission.consultant.name,
+                'test_url': f'https://app.log1.com/#/details/{test.submission.id}/test?id={test.id}',
+                'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
+                'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in test.engineer.filter()],
+            }
+            slack.send_test_feedback(payload, 'url')
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)
         except Exception as error:
@@ -3401,18 +3420,37 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             from functools import reduce
             from api_key.models import APIKey
-            points =0
+            points = 0
             employee_id = request.GET.get('employee_id', None)
-            if not  employee_id:
+            if not employee_id:
                 return Response({'error': "user not found"}, status=400)
             engineer = User.objects.get(employee_id=employee_id)
-            tests = Test.objects.filter(engineer=engineer,engineer_feedback__created__lte='2023-06-01',
-                    engineer_feedback__created__gte='2023-01-01').distinct()
+            tests = Test.objects.filter(
+                (Q(engineer=engineer) | Q(assign_to=engineer)), created__lte="2023-06-30", created__gte="2023-01-01",
+                status__in=['passed', 'failed', 'assigned', 'feedback_due']
+            ).order_by('id').distinct('id')
 
+            submitted_tests = Test.objects.filter(
+                engineer=engineer, created__lte="2023-06-30", created__gte="2023-01-01",
+                status__in=['passed', 'failed', 'assigned', 'feedback_due']
+            ).order_by('id').distinct('id')
+
+            assigned_tests = Test.objects.filter(
+                assign_to=engineer, created__lte="2023-06-30", created__gte="2023-01-01",
+                status__in=['passed', 'failed', 'assigned', 'feedback_due']
+            ).order_by('id').distinct('id')
+            # diff = set(tests.values_list('id', flat=True)).difference(set(assigned_tests.values_list('id', flat=True)).union(set(submitted_tests.values_list('id', flat=True))))
+            diff = set(assigned_tests.values_list('id', flat=True)).difference(
+                (set(submitted_tests.values_list('id', flat=True))))
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
             offline_type_of_test = Question.objects.filter(title='Select type of test', form_name='offline_test')
-            online_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True), content_type__model='test', question=online_type_of_test[0]).values_list('object_id', flat=True)
-            offline_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True), content_type__model='test', question=offline_type_of_test[0]).values_list('object_id', flat=True)
+            online_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+                                                   content_type__model='test',
+                                                   question=online_type_of_test[0]).values_list('object_id', flat=True)
+            offline_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+                                                    content_type__model='test',
+                                                    question=offline_type_of_test[0]).values_list('object_id',
+                                                                                                  flat=True)
             passed_online_test = Test.objects.filter(id__in=online_test_id, status='passed')
             passed_offline_test = Test.objects.filter(id__in=offline_test_id, status='passed')
             failed_online_test = Test.objects.filter(id__in=online_test_id, status='failed')
@@ -3431,7 +3469,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 content_type__model='test', question=coding_question
             ).values_list('answer', flat=True)
             total_coding = reduce(lambda x, y: int(x) + int(y), coding_question_answer) if coding_question_answer else 0
-            for test in tests:
+            for test in submitted_tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0
                 online_test = Answer.objects.filter(object_id=test.id, content_type__model='test',
@@ -3471,15 +3509,20 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 "Name": engineer.employee_name,
                 "Total point": points,
                 "Total Test": tests.count(),
+                "assigned but not part": diff,
                 "Total MCQ questions": total_mcqs,
-                "Total Coding Questions": total_coding,
+                "Online Test": len(online_test_id),
                 "Offline Test": len(offline_test_id),
+                "Total Coding Questions": total_coding,
+                "submitted_tests": submitted_tests.count(),
+                "Total Assigned Tests": assigned_tests.count(),
+                "Total Online Test Failed": failed_online_test.count(),
+                "Total  Online Passed Test": passed_online_test.count(),
                 "Total Offline Test Passed": passed_offline_test.count(),
                 "Total Offline Test Failed": failed_offline_test.count(),
-                "Online Test": len(online_test_id),
-                "Total  Online Passed Test": passed_online_test.count(),
-                "Total Online Test Failed": failed_online_test.count(),
+                "assigned_id": assigned_tests.values_list('id', flat=True),
                 "Total FeedbackDue Online Test": feedback_due_online_test.count(),
+                "submitted_tests_id": submitted_tests.values_list('id', flat=True),
                 "Total FeedbackDue Offline Test": feedback_due_offline_test.count(),
             }
             return Response({"message": data}, status=200)
@@ -3527,7 +3570,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             from api_key.models import APIKey
             employee_info = {}
-            tests = Test.objects.filter(engineer_feedback__created__lte='2023-06-01',engineer_feedback__created__gte='2022-01-01').distinct()
+            tests = Test.objects.filter(created__lte='2023-06-30',created__gte='2023-01-01').distinct()
             for test in tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0

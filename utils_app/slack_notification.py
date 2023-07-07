@@ -1244,3 +1244,100 @@ class MessageCard:
             return res, msg
         except Exception as error:
             return error, "error"
+
+    @staticmethod
+    def send_test_feedback(payload, url):
+        try:
+            coders = ""
+            for i in payload.get('coders'):
+                coders = coders + " " + f"`{i}`"
+            card_data = {
+                "blocks": [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":speech_balloon:  Test Feedback",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Consultant name:* `{payload.get('consultant_name')}`"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Status:* :v: {payload.get('status')}"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"`TST-{payload.get('id')}` :: {payload.get('client')} :: {payload.get('vendor')} ::"
+                                    f" {payload.get('type')}"
+                        }
+                    },
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": " :computer: Engineer Feedback",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Assigned Coder:*  {coders}\n "
+                                    f"*Performance Rating:* {payload.get('coder_rating')} \n "
+                                    f"*Feedback*:  {payload.get('coder_remark')}"
+                        }
+                    },
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": ":lower_left_fountain_pen:  Marketer Feedback",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Marketer Name:* {payload.get('marketer')} \n*Feedback:* {payload.get('feedback')}"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "*Please click button to redirect to Test Details* "
+                        },
+                        "accessory": {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Test Details",
+                                "emoji": True
+                            },
+                            "value": "click_me_123",
+                            "url": f"{payload.get('test_url')}",
+                            "action_id": "button-action"
+                        }
+                    },
+                    {
+                        "type": "divider"
+                    }
+                ]
+            }
+            res, msg = post_msg_using_webhook(url, card_data)
+            return res, msg
+        except Exception as error:
+            return error, "error"
