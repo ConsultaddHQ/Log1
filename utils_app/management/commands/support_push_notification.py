@@ -21,20 +21,27 @@ class Command(BaseCommand):
             # start_of_last_week = today - timedelta(days=today.weekday(), weeks=1)
             # end_of_last_week = start_of_last_week + timedelta(days=6)
             seven_days_ago = today - timedelta(days=7)
+            one_day_ago = today - timedelta(days=1)
 
             # Query to fetch the project support person
             # user case send the notification to user on daily base if can not submit the feedback script run daily
+            active_projects = Q(
+                ~Q(project__updates__created__gte=seven_days_ago) &
+                Q(project__support_required=True, statuses__is_current=True,
+                  statuses__frequency__in=['is_active', 'less_active'], start__lte=seven_days_ago)
+            )
+            terminated_projects = Q(
+                ~Q(project__updates__created__gte=seven_days_ago) &
+                Q(statuses__is_current=True, statuses__created__lte=F('end') - timedelta(days=4),
+                  statuses__frequency__in=['terminate', 'handover', 'independent'])
+            )
+            training_projects = Q(
+                ~Q(project__updates__created__gte=one_day_ago),
+                Q(statuses__is_current=True, statuses__frequency='training')
+            )
             project_support_persons = ProjectSupport.objects.filter(
-                Q(
-                    ~Q(project__updates__created__gte=seven_days_ago) &
-                    Q(project__support_required=True, statuses__is_current=True,
-                      statuses__frequency__in=['is_active', 'less_active'],
-                      start__gte=seven_days_ago)
-                ) | Q(
-                    Q(project__updates__created__gte=F('end') - timedelta(days=4)) & Q(
-                        statuses__frequency__in=['terminate', 'handover', 'independent'])
-                )
-            ).order_by('id').distinct('id')
+                Q(active_projects | terminated_projects| training_projects)
+            ).order_by('project__id').distinct('project__id')
 
             content_type = ContentType.objects.get(model='project')
 

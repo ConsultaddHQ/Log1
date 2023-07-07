@@ -2,13 +2,13 @@ import os
 import pytz
 import json
 import difflib
-from datetime import date
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse
 from django.db.models.functions import Lower
-from django.db.models import F, Q, Max, Count
+from django.db.models import F, Max, Count
 from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
@@ -2294,161 +2294,6 @@ class InterviewViewSets(ModelViewSet):
                     {"passed_reasons": passed_reasons, "failure_reasons": tuple(failed_reasons_list)}, status=200
                 )
             return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['post'], detail=False, url_path='remind_me_later')
-    def remind_me_later(self, request):
-        try:
-            type_list = request.data.get("types",[])
-            if 'interview' in type_list:
-                content_type = ContentType.objects.get(model='interview')
-                notification = UserNotification.objects.filter(user=request.user.id, content_type=content_type).first()
-                interviews = Interview.objects.filter(status="feedback_due", supervisor=request.user.id)
-                if interviews:
-                    notification.is_active = False
-                    notification.count += 1
-                    notification.save()
-                    if notification.count < 3:
-                        schedule_push_notification.delay(request.user.id, notification.count,'interview')
-                else:
-                    if notification:
-                        notification.delete()
-
-            if 'consultant' in type_list:
-                content_type = ContentType.objects.get(model='consultant')
-                notification = UserNotification.objects.filter(user=request.user.id, content_type=content_type).first()
-                if notification:
-                    notification.is_active=False
-                    notification.count += 1
-                    notification.save()
-                    if notification.count < 3:
-                        schedule_push_notification.delay(request.user.id, notification.count, 'consultant')
-
-            if 'project' in type_list:
-                content_type = ContentType.objects.get(model='project')
-                notification = UserNotification.objects.filter(user=request.user.id, content_type=content_type).first()
-                if notification:
-                    notification.is_active=False
-                    notification.count += 1
-                    notification.save()
-                    if notification.count < 3:
-                        schedule_push_notification.delay(request.user.id, notification.count, 'project')
-
-            return Response({"message":"Done"}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=['get'], detail=True, url_path='supervisor_feedback_due')
-    def supervisor_feedback_due(self, request,pk):
-        try:
-            interview_content_type = ContentType.objects.get(model='interview')
-            support_content_type = ContentType.objects.get(model='project')
-            consultant_content_type = ContentType.objects.get(model='consultant')
-            notifications = UserNotification.objects.filter(user=pk,is_active=True)
-
-            interview_due_list = []
-            support_due_list = []
-            consultant_due_list = []
-
-            for notification in notifications:
-                if notification.content_type == interview_content_type:
-                    interviews = Interview.objects.filter(status="feedback_due", supervisor=pk)
-                    if interviews:
-                        for interview in interviews:
-                            feedback_due = {
-                                "round": interview.round,
-                                "interview_id":interview.id,
-                                "schedule": interview.end_time,
-                                "client": interview.submission.client,
-                                "position": interview.submission.lead.position.name,
-                                "vendor": interview.submission.lead.vendor_company.name,
-                                "consultant_name": interview.submission.consultant_marketing.consultant.name,
-                                "call_given_by":'Consultant' if interview.supervisor.employee_id==9999 else 'Interviewee',
-                            }
-                            interview_due_list.append(feedback_due)
-                    else:
-                        notification.delete()
-
-                if notification.content_type == support_content_type:
-                    today = date.today()
-                    seven_days_ago = today - timedelta(days=7)
-                    project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk)&(Q(
-                            ~Q(project__updates__created__gte=seven_days_ago) &
-                            Q(project__support_required=True, statuses__is_current=True,
-                              statuses__frequency__in=['is_active', 'less_active'],
-                              start__gte=seven_days_ago)
-                        ) | Q(
-                            Q(project__updates__created__gte=F('end') - timedelta(days=4)) & Q(
-                                statuses__frequency__in=['terminate', 'handover', 'independent'])
-                        )
-                    )).order_by('id').distinct('id')
-                    if project_supports:
-                        for project_support in project_supports:
-                            support_due = {
-                                "project_id": project_support.project.id,
-                                "client": project_support.project.submission.client,
-                                "consultant_name": project_support.project.consultant.name,
-                                "job title": project_support.project.submission.lead.job_title,
-                                "vendor": project_support.project.submission.lead.vendor_company.name,
-                                "project_status": project_support.project.statuses.filter(
-                                    is_current=True).values_list('status', flat=True).first(),
-                                "support_status": project_support.statuses.filter(
-                                    is_current=True).values_list('frequency', flat=True).first(),
-                            }
-                            support_due_list.append(support_due)
-                    else:
-                        notification.delete()
-
-
-                if notification.content_type == consultant_content_type:
-                    today = date.today()
-                    thirty_days_ago = today - timedelta(days=30)
-                    fourteen_days_ago = today - timedelta(days=14)
-
-                    project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk)&((~Q(project__feedbacks__created__gte=thirty_days_ago) | Q(
-                            project__feedbacks__created__gte=fourteen_days_ago,
-                            project__created__lte=thirty_days_ago)) &
-                        Q(project__support_required=True, statuses__frequency__in=['is_active', 'less_active']))
-                    ).order_by('id').distinct('id')
-
-                    if project_supports:
-                        for project_support in project_supports:
-                            support_due = {
-                                "project_id":project_support.project.id,
-                                "client": project_support.project.submission.client,
-                                "consultant_name": project_support.project.consultant.name,
-                                "job_title": project_support.project.submission.lead.job_title,
-                                "vendor": project_support.project.submission.lead.vendor_company.name,
-                                "project_status": project_support.project.statuses.filter(
-                                    is_current=True).values_list('status', flat=True).first(),
-                                "support_status": project_support.statuses.filter(
-                                    is_current=True).values_list('frequency', flat=True).first(),
-                            }
-                            consultant_due_list.append(support_due)
-                    else:
-                        notification.delete()
-
-            data = {
-                "consultant": {
-                    "count": sum(notification.count for notification in notifications if notification.content_type == consultant_content_type),
-                    "consultant": consultant_due_list
-                },
-                "interview": {
-                    "count": sum(notification.count for notification in notifications if notification.content_type == interview_content_type),
-                    "interview": interview_due_list
-                },
-                "support": {
-                    "count": sum(notification.count for notification in notifications if notification.content_type == support_content_type),
-                    "project": support_due_list
-                }
-            }
-
-            return Response({"data": data},status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
