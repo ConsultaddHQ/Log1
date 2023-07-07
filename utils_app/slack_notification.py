@@ -1248,7 +1248,6 @@ class MessageCard:
     @staticmethod
     def send_test_feedback(payload, url):
         try:
-            breakpoint()
             coders = ""
             for i in payload.get('coders'):
                 coders = coders + " " + f"`{i}`"
@@ -1338,7 +1337,6 @@ class MessageCard:
                     }
                 ]
             }
-            breakpoint()
             res, msg = post_msg_using_webhook(url, card_data)
             return res, msg
         except Exception as error:

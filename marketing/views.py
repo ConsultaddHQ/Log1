@@ -2891,7 +2891,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.status = request.data.get('status')
             test.submitted_by = request.user
             test.save()
-            assigned_test_points(test,request)
+            assigned_test_points(test, request)
             # Activity
             desc = f"Test status updated to {test.get_status_display()} by {request.user.employee_name}"
             create_activity(test.submission.id, 'submission', request.user, desc, 'update')
