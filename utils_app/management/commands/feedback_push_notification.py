@@ -23,15 +23,14 @@ class Command(BaseCommand):
             fourteen_days_ago = today - timedelta(days=14)
 
             # Query to fetch the project support instances
-            active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago) & Q(
-                statuses__frequency__in=['is_active', 'less_active'])
+            active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago,) & Q(
+                statuses__frequency__in=['is_active', 'less_active'],project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
 
             initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
                 project__created__gte=thirty_days_ago)
 
             project_support_persons = ProjectSupport.objects.filter(
-                Q(project__support_required=True,
-                  project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"]) &
+                Q(project__support_required=True) &
                 (active_projects | initial_projects)).order_by('project__id').distinct('project__id')
 
             content_type = ContentType.objects.get(model='consultant')

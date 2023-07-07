@@ -1,13 +1,11 @@
 import csv
 import json
-from time import sleep
 from pytz import timezone
 
-from django.db.models import Q
+from datetime import datetime
 from celery import shared_task
+from django.db.models import Q
 from django.http import HttpResponse
-from django.utils import timezone as tz
-from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
 
@@ -494,61 +492,6 @@ def test_platform(request, platform):
     except Exception as error:
         write_exception(error, request)
 
-@shared_task()
-def schedule_push_notification(user_id,count,type):
-    try:
-        if type == 'interview':
-            message_body = {
-                "body": "Add supervisor feedback", "title": "Add supervisor feedback", "category": "PopUp",
-                "data": {
-                    'supervisor_id': user_id,
-                    'count': count
-                },
-            }
-        if type == 'project':
-             message_body = {
-                 "body": f"your projets updates were not given for last weeks",
-                 "title": "project update due",
-                 "category": "alert",
-                 "show_in_foreground": True,
-                 "click_action": "https://app.log1.com/#/engineering_module",
-                 "data": {
-                     'is_read': False,
-                     'is_deleted': False,
-                     'target': 'log1',
-                     'target_id': user_id,
-                     'timestamp': str(tz.now()),
-                 },
-             }
-        if type == 'consultant':
-            message_body = {
-                "body": f"your project consultant feedback were not given form last 30 days",
-                "title": "project update due",
-                "category": "alert",
-                "show_in_foreground": True,
-                # "click_action": f"https://app.log1.com/#/project/{support_person.project.id}/project_update",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'log1',
-                    'target_id': user_id,
-                    'timestamp': str(tz .now()),
-                },
-            }
-
-        registration_ids = list(
-            FCMDevice.objects.filter(
-                object_id=user_id, content_type__model='user').values_list('device_id', flat=True))
-        delay = timedelta(hours=2).total_seconds()
-        sleep(delay)
-        push_notification_consultant(registration_ids, message_body)
-        content_type = ContentType.objects.get(model=type)
-        notification = UserNotification.objects.filter(user=user_id,content_type=content_type).first()
-        notification.is_active=True
-        notification.save()
-    except Exception as error:
-        write_exception(error, None)
-        return str(error), False
 
 @shared_task()
 def delete_supervisor_notification():
