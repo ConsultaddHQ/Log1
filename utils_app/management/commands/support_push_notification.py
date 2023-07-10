@@ -40,7 +40,8 @@ class Command(BaseCommand):
                 Q(statuses__is_current=True, statuses__frequency='training')
             )
             project_support_persons = ProjectSupport.objects.filter(
-                Q(active_projects | terminated_projects| training_projects)
+                Q(active_projects | terminated_projects| training_projects),
+                is_proxy_support=False
             ).order_by('project__id').distinct('project__id')
 
             content_type = ContentType.objects.get(model='project')
@@ -56,13 +57,13 @@ class Command(BaseCommand):
                     "title": "project update due",
                     "category": "alert",
                     "description": f"your {support_person.project.consultant.name} updates were not given for last weeks",
-                    "target_type": "log1",
+                    "target_type": "user",
                     "target_id": support_person.support.id,
                     "sender_id": support_person.support.id,
                     "recipient_user_type": "user",
                     "sender_user_type": "user",
                 }
-                create_notification([support_person.support.id], data)
+                create_notification([support_person.support], data)
 
                 # Push Notification
                 message_body = {
