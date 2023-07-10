@@ -145,7 +145,6 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
                         display_name=technology, name=technology
                     )
             return Response({"message": "updated technologies"}, status=202)
-
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

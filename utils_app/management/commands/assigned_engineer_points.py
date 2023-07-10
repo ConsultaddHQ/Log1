@@ -1,17 +1,17 @@
+import csv
 from datetime import datetime
-from django.db.models import F
-
-from employee.models import User
-from decimal import Decimal
-from marketing.models import Test, Answer
 from django.core.management import BaseCommand
+from django.contrib.auth.models import ContentType
+from requests import Response
 from engineering.models import Cycle, EngineerPoint
+from log1.utils import ERROR_MSG
+from marketing.models import Test, Question, Answer
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
-           tests = Test.objects.filter(created__lte='2022-12-31',
-                          created__gte='2022-07-01').order_by(F('created').asc()).distinct()
+           tests = Test.objects.filter(engineer_feedback__created__lte='2023-06-01',
+                    engineer_feedback__created__gte='2023-01-01').distinct()
            for test in tests:
                self.assigned_test_points(test)
            print("Done")
@@ -53,20 +53,20 @@ class Command(BaseCommand):
                 no_of_people_involved=len(employee_associated)
             )
             for engineer in employee_associated:
-                # answers = test.engineer_feedback.all()
-                # answer = answers.first()
-                if 1 <= test.created.month <= 6:
-                    cycle_start = datetime(test.created.year, 1, 1)
-                    cycle_end = datetime(test.created.year, 6, 30)
+                answers = test.engineer_feedback.all()
+                answer = answers.filter(question__title="Select type of test").first()
+                if 1 <= answer.created.month <= 6:
+                    cycle_start = datetime(answer.created.year + 1, 1, 1)
+                    cycle_end = datetime(answer.created.year + 1, 6, 30)
                 else:
-                    cycle_start = datetime(test.created.year, 7, 1)
-                    cycle_end = datetime(test.created.year, 12, 31)
+                    cycle_start = datetime(answer.created.year, 7, 1)
+                    cycle_end = datetime(answer.created.year, 12, 31)
                 cycle = Cycle.objects.get_or_create(start_date=cycle_start, end_date=cycle_end)
                 previous_points = EngineerPoint.objects.filter(engineer=engineer, is_active=True)
                 engineer_point, created = EngineerPoint.objects.get_or_create(engineer=engineer, cycle=cycle[0])
                 if created:
                     previous_points.update(is_active=False)
-                engineer_point.points = Decimal(str(engineer_point.points)) + Decimal(str(points))
+                engineer_point.points = engineer_point.points + points
                 engineer_point.save()
         except Exception as error:
             print(error)

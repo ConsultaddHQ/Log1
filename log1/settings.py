@@ -265,13 +265,10 @@ logging.config.dictConfig({
 })
 
 # Celery settings
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL')
-CELERYBEAT_SCHEDULER = os.environ.get('CELERYBEAT_SCHEDULER')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
-BROKER_TRANSPORT_OPTIONS = os.environ.get('BROKER_TRANSPORT_OPTIONS')
+CELERYBEAT_SCHEDULER = 'djcelery.schedulers.DatabaseScheduler'
+BROKER_TRANSPORT_OPTIONS = {'visibility_timeout': 3600}  # 1 hour.
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_TASK_ALWAYS_EAGER = False
 
 # Notifications settings
 NOTIFICATIONS_CHANNELS = {
