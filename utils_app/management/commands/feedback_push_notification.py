@@ -23,18 +23,18 @@ class Command(BaseCommand):
             fourteen_days_ago = today - timedelta(days=14)
             sixty_days_ago = today - timedelta(days=60)
 
-
             # Query to fetch the project support instances
             active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago,) & Q(
-                project__created__gte=sixty_days_ago,
+                project__start_date__lte=sixty_days_ago,
                 statuses__frequency__in=['active', 'less_active'],
+                statuses__is_current=True,
                 project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
 
             initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
-                project__created__gte=thirty_days_ago)
+                project__start_date__gte=thirty_days_ago)
 
             project_support_persons = ProjectSupport.objects.filter(
-                Q(project__support_required=True) &
+                Q(project__support_required=True, is_proxy_support=False) &
                 (active_projects | initial_projects)).order_by('project__id').distinct('project__id')
 
             content_type = ContentType.objects.get(model='consultant')
@@ -47,15 +47,16 @@ class Command(BaseCommand):
                 data = {
                     "title": "consultant feedback due",
                     "category": "alert",
-                    "description": f"your {support_person.project.consultant.name} feedback were not given form last 30 days",
-                    "target_type": "log1",
-                    "target_id": support_person.support.id,
-                    "sender_id": support_person.support.id,
-                    "recipient_user_type": "user",
+                    "target_type": "user",
                     "sender_user_type": "user",
+                    "recipient_user_type": "user",
+                    "sender_id": support_person.support.id,
+                    "target_id": support_person.support.id,
+                    "description":
+                        f"your {support_person.project.consultant.name} feedback were not given form last 30 days"
                 }
 
-                create_notification([support_person.support.id], data)
+                create_notification([support_person.support], data)
 
                 # Push Notification
                 message_body = {
@@ -65,11 +66,11 @@ class Command(BaseCommand):
                     "show_in_foreground": True,
                     "click_action": "https://app.log1.com/#/engineering_module",
                     "data": {
+                        'target': 'log1',
                         'is_read': False,
                         'is_deleted': False,
-                        'target': 'log1',
-                        'target_id':support_person.support.id,
                         'timestamp': str(timezone.now()),
+                        'target_id': support_person.support.id
                     },
                 }
                 push_notification([support_person.support.id], message_body)
