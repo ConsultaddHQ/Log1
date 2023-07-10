@@ -1279,7 +1279,7 @@ class MessageCard:
                         "text": {
                             "type": "mrkdwn",
                             "text": f"`TST-{payload.get('id')}` :: {payload.get('client')} :: {payload.get('vendor')} ::"
-                                    f" {payload.get('type')}"
+                                    f" {payload.get('type').capitalize()}"
                         }
                     },
                     {
@@ -1294,7 +1294,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"*Assigned Coder:*  {coders}\n "
+                            "text": f"*Submitted By:*  {coders}\n "
                                     f"*Performance Rating:* {payload.get('coder_rating')} \n "
                                     f"*Feedback*:  {payload.get('coder_remark')}"
                         }
@@ -1311,7 +1311,7 @@ class MessageCard:
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"*Marketer Name:* {payload.get('marketer')} \n*Feedback:* {payload.get('feedback')}"
+                            "text": f"*Marketer Name:* `{payload.get('marketer')}` \n*Feedback:* {payload.get('feedback')}"
                         }
                     },
                     {
