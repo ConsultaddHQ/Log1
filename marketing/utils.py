@@ -1,22 +1,26 @@
 import csv
 import json
-import pandas as pd
 from pytz import timezone
+
+from datetime import datetime
+from celery import shared_task
+from django.db.models import Q
 from django.http import HttpResponse
-from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
 
 from constance import config
 from employee.models import User
+from utils_app.models import Choice
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
+from notification.models import FCMDevice, UserNotification
+from marketing.models import Submission, Interview, Question, Answer
+
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
-from utils_app.models import Choice
+from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
-from marketing.models import Submission, Interview, Question, Answer
-from utils_app.utils import generate_s3_url
 
 
 def vendor_account_manager(vendor_company):
@@ -89,6 +93,16 @@ def date_filter(queryset, timestamp, field_str):
 # Change status of scheduled and rescheduled Interviews to feedback_due
 def change_to_feedback_due():
     try:
+        """
+            Updates the status of interviews and sends push notifications for feedback.
+
+            - Retrieves interviews that have a start time earlier than or equal to the current UTC time
+              and have a status of 'scheduled' or 'rescheduled'.
+            - Updates the status of the retrieved interviews to 'feedback_due'.
+            - Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
+            - Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
+            - Sends push notifications to supervisors with the necessary information.
+            """
         tz = timezone('US/Eastern')
         time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
         previous_interviews = Interview.objects.filter(
@@ -97,6 +111,37 @@ def change_to_feedback_due():
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
+
+        # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
+        delete_supervisor_notification.delay()
+
+        # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
+        interviews = Interview.objects.filter(
+            ~Q(supervisor_feedback__question__form_name='interview') &
+            Q(start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
+            status__in=["cancelled", "next_round", "offer", "failed"]).order_by('id').distinct('id')
+
+        supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
+        supervisor_list = User.objects.filter(id__in=supervisor_ids)
+
+        for supervisor in supervisor_list:
+            content_type = ContentType.objects.get(model='interview')
+            notification,created = UserNotification.objects.get_or_create(user=supervisor,content_type=content_type)
+            if created:
+                notification.is_active=True
+                notification.save()
+                message_body = {
+                    "body": "interview feedback due", "title": "interview feedback due", "category": "PopUp",
+                    "data": {
+                        'supervisor_id': supervisor.id,
+                        'count': 1
+                    },
+                }
+                registration_ids = list(
+                    FCMDevice.objects.filter(
+                        object_id=supervisor.id, content_type__model='user').values_list('device_id', flat=True))
+                push_notification_consultant(registration_ids, message_body)
+
     except Exception as error:
         write_exception(message=error)
         return None
@@ -446,3 +491,18 @@ def test_platform(request, platform):
             question.save()
     except Exception as error:
         write_exception(error, request)
+
+
+@shared_task()
+def delete_supervisor_notification():
+    try:
+        content_type = ContentType.objects.get(model='interview')
+        notifications = UserNotification.objects.filter(content_type=content_type)
+        for notification in notifications:
+            interviews = Interview.objects.filter(status="feedback_due", supervisor=notification.user)
+            if not interviews:
+                notification.delete()
+    except Exception as error:
+        write_exception(error, None)
+        return str(error), False
+
