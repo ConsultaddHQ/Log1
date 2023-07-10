@@ -1,13 +1,8 @@
 import os
-from time import sleep
-from datetime import timedelta
-from celery import shared_task
 from pyfcm import FCMNotification
-from log1.utils import write_exception
-from django.utils import timezone as tz
 from django.contrib.contenttypes.models import ContentType
 
-from notification.models import Notification, FCMDevice, UserNotification
+from notification.models import Notification, FCMDevice
 
 push_service = FCMNotification(api_key=os.environ.get('FCM_SERVER_KEY'))
 
@@ -64,14 +59,27 @@ def create_notification(user_list, data):
 
 def push_notification(object_ids, message_body):
     try:
-        if os.environ.get('ENV', 'local') != 'prod':
-            object_ids = [448, 447, 504]
-        for obj_id in object_ids:
-            registration_ids = list(
-                FCMDevice.objects.filter(object_id=obj_id, content_type__model='user'
-                                         ).values_list('device_id', flat=True))
-            message_body['data']['count'] = Notification.objects.filter(recipient_object_id=obj_id, unread=True,
-                                                                        deleted=False).count()
+        if os.environ.get('ENV', 'local') == 'prod':
+            for obj_id in object_ids:
+                registration_ids = list(
+                    FCMDevice.objects.filter(object_id=obj_id, content_type__model='user'
+                                             ).values_list('device_id', flat=True))
+                message_body['data']['count'] = Notification.objects.filter(recipient_object_id=obj_id, unread=True,
+                                                                            deleted=False).count()
+                push_service.notify_multiple_devices(
+                    registration_ids=registration_ids,
+                    message_title=message_body['title'],
+                    message_body=message_body['body'],
+                    data_message=message_body,
+                )
+        return False
+    except Exception as error:
+        return error
+
+
+def push_notification_consultant(registration_ids, message_body):
+    try:
+        if os.environ.get('ENV', 'local') == 'prod':
             push_service.notify_multiple_devices(
                 registration_ids=registration_ids,
                 message_title=message_body['title'],
@@ -81,76 +89,3 @@ def push_notification(object_ids, message_body):
         return False
     except Exception as error:
         return error
-
-
-def push_notification_consultant(registration_ids, message_body):
-    try:
-        if os.environ.get('ENV', 'local') != 'prod':
-            registration_ids = list(
-                FCMDevice.objects.filter(
-                    object_id__in=[504, 448, 447, 1], content_type__model='user').values_list('device_id', flat=True))
-        response = push_service.notify_multiple_devices(
-            registration_ids=registration_ids,
-            message_title=message_body['title'],
-            message_body=message_body['body'],
-            data_message=message_body,
-        )
-        print(response)
-    except Exception as error:
-        return error
-
-@shared_task()
-def schedule_push_notification(user_id,count,type):
-    try:
-        if type == 'interview':
-            message_body = {
-                "body": "Add supervisor feedback", "title": "Add supervisor feedback", "category": "PopUp",
-                "data": {
-                    'supervisor_id': user_id,
-                    'count': count
-                },
-            }
-        if type == 'project':
-             message_body = {
-                 "body": f"your projets updates were not given for last weeks",
-                 "title": "project update due",
-                 "category": "alert",
-                 "show_in_foreground": True,
-                 "click_action": "https://app.log1.com/#/engineering_module",
-                 "data": {
-                     'is_read': False,
-                     'is_deleted': False,
-                     'target': 'log1',
-                     'target_id': user_id,
-                     'timestamp': str(tz.now()),
-                 },
-             }
-        if type == 'consultant':
-            message_body = {
-                "body": f"your project consultant feedback were not given form last 30 days",
-                "title": "project update due",
-                "category": "alert",
-                "show_in_foreground": True,
-                # "click_action": f"https://app.log1.com/#/project/{support_person.project.id}/project_update",
-                "data": {
-                    'is_read': False,
-                    'is_deleted': False,
-                    'target': 'log1',
-                    'target_id': user_id,
-                    'timestamp': str(tz .now()),
-                },
-            }
-
-        registration_ids = list(
-            FCMDevice.objects.filter(
-                object_id=user_id, content_type__model='user').values_list('device_id', flat=True))
-        delay = timedelta(hours=2).total_seconds()
-        sleep(delay)
-        push_notification_consultant(registration_ids, message_body)
-        content_type = ContentType.objects.get(model=type)
-        notification = UserNotification.objects.filter(user=user_id,content_type=content_type).first()
-        notification.is_active=True
-        notification.save()
-    except Exception as error:
-        write_exception(error, None)
-        return str(error), False

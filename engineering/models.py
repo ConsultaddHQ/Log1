@@ -119,7 +119,7 @@ class Cycle(models.Model):
             return f"Cycle ({self.start_date} to {self.end_date})"
 
 class EngineerPoint(TimeStampedModel):
-    points = models.DecimalField(_('points'), default=0.0, max_digits=10 ,decimal_places=2)
+    points = models.IntegerField(_('points'), default=0)
     is_active = models.BooleanField(_('Is active'), default=True)
     cycle = models.ForeignKey(
         Cycle, on_delete=models.PROTECT,
