@@ -2962,7 +2962,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
                            test.engineer.filter()],
             }
-            slack.send_test_feedback(payload, config.slack_test_feedback_url)
+            slack.send_test_feedback(payload, config.slack_test_channel_url)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)
         except Exception as error:
