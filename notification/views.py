@@ -237,7 +237,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                         Q(statuses__is_current=True, statuses__frequency='training'))
 
                     project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk) & (active_projects | terminated_projects | training_projects)).exclude(
+                        Q(support=pk, is_proxy_support=False) & (active_projects | terminated_projects | training_projects)).exclude(
                         project__updates__created__gte=seven_days_ago).order_by('project__id').distinct('project__id')
 
                     if project_supports:
@@ -268,7 +268,8 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     sixty_days_ago = today - timedelta(days=60)
 
                     active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago) & Q(
-                        project__start_date__gte=sixty_days_ago,
+                        statuses__is_current=True,
+                        project__start_date__lte=sixty_days_ago,
                         statuses__frequency__in=['active', 'less_active'],
                         project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
 
