@@ -3558,7 +3558,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             else:
                 pass
         elif test_type.lower() == 'offline':
-            test_points = 5
+            test_points = 10
             bonus_points = 2 * (1 if test_current_status == 'passed' else 0)
             points = (test_points + bonus_points) / no_of_people_involved
         else:

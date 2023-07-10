@@ -1060,7 +1060,8 @@ class EngineerReportXposedViewSets(GenericViewSet):
             resp = {}
             count = 1
             emp_info = {}
-            cycle_info = request.GET.get('cycle', None)
+            # cycle_info = request.GET.get('cycle', 1)
+            cycle_info = 1
             if request.GET.get('emp_id') is None and request.GET.get('project_id') is None:
                 return Response({"message": "Employee ID and project ID does not exist"}, status=200)
             if request.GET.get('emp_id'):
