@@ -274,10 +274,10 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                         project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
 
                     initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
-                        project__start_date__lte=thirty_days_ago)
+                        project__start_date__gte=thirty_days_ago)
 
                     project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk, project__support_required=True) &
+                        Q(support=pk, project__support_required=True, is_proxy_support=False) &
                         (active_projects | initial_projects)).order_by('project__id').distinct('project__id')
 
                     if project_supports:
