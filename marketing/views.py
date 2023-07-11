@@ -2960,7 +2960,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'coder_remark': test.engineer_remarks,
                 'vendor': test.submission.vendor.name,
                 'consultant_name': test.submission.consultant.name,
-                'emoji': ':v:' if test.get_status_display() == 'Passed' else ':thumbsdown:',
+                'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
                 'test_url': f'https://app.log1.com/#/details/{test.submission.id}/test?id={test.id}',
                 'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
                 'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
