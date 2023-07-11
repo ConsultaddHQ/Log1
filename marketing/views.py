@@ -1,6 +1,7 @@
 import os
 import json
 import pytz
+import json
 import difflib
 from datetime import date, timedelta
 
@@ -8,7 +9,7 @@ from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse
 from django.db.models.functions import Lower
-from django.db.models import F, Q, Max, Count
+from django.db.models import F, Max, Count
 from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
@@ -17,6 +18,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+import project.models
+from engineering.utils import assigned_test_points
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -2957,6 +2960,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'coder_remark': test.engineer_remarks,
                 'vendor': test.submission.vendor.name,
                 'consultant_name': test.submission.consultant.name,
+                'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
                 'test_url': f'https://app.log1.com/#/details/{test.submission.id}/test?id={test.id}',
                 'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
                 'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
@@ -3440,17 +3444,17 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 assign_to=engineer, created__lte="2023-06-30", created__gte="2023-01-01",
                 status__in=['passed', 'failed', 'assigned', 'feedback_due']
             ).order_by('id').distinct('id')
-            diff = set(assigned_tests.values_list('id', flat=True)).difference((set(submitted_tests.values_list('id', flat=True))))
+            diff = set(assigned_tests.values_list('id', flat=True)).difference(
+                (set(submitted_tests.values_list('id', flat=True))))
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
             offline_type_of_test = Question.objects.filter(title='Select type of test', form_name='offline_test')
-            online_test_id = Answer.objects.filter(
-                object_id__in=tests.filter().values_list('id', flat=True),
-                content_type__model='test', question=online_type_of_test[0]
-            ).values_list('object_id', flat=True)
-            offline_test_id = Answer.objects.filter(
-                object_id__in=tests.filter().values_list('id', flat=True),
-                content_type__model='test', question=offline_type_of_test[0]
-            ).values_list('object_id', flat=True)
+            online_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+                                                   content_type__model='test',
+                                                   question=online_type_of_test[0]).values_list('object_id', flat=True)
+            offline_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+                                                    content_type__model='test',
+                                                    question=offline_type_of_test[0]).values_list('object_id',
+                                                                                                  flat=True)
             passed_online_test = Test.objects.filter(id__in=online_test_id, status='passed')
             passed_offline_test = Test.objects.filter(id__in=offline_test_id, status='passed')
             failed_online_test = Test.objects.filter(id__in=online_test_id, status='failed')
@@ -3570,8 +3574,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             from api_key.models import APIKey
             employee_info = {}
-            tests = Test.objects.filter(created__lte='2023-06-30', created__gte='2023-01-01').distinct()
-
+            tests = Test.objects.filter(created__lte='2023-06-30',created__gte='2023-01-01').distinct()
             for test in tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0
