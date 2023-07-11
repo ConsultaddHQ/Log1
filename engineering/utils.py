@@ -220,7 +220,6 @@ def assigned_test_points(test, request):
                                              question__form_name='online_test').first()
             if platform:
                 platform_name = platform.answer
-
         MCQ_question_answer = Answer.objects.filter(
             object_id=test.id, content_type__model='test', question__title='Number of MCQ questions'
         ).first()
@@ -233,7 +232,7 @@ def assigned_test_points(test, request):
         if coding_question_answer:
             coding_answers = coding_question_answer.answer
         employee_associated = test.engineer.all()
-        points =calculate_points(
+        points = calculate_points(
             test_type=test_type,
             test_current_status=test.status,
             test_platform_name=platform_name,
