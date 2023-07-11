@@ -107,6 +107,7 @@ class TrainingAgenda(TimeStampedModel):
     def __str__(self):
         return str(self.project.id)
 
+
 class Cycle(models.Model):
     is_current = models.BooleanField(_('Is current'), default=True)
     start_date = models.DateField(_('Start Date'))
@@ -117,6 +118,7 @@ class Cycle(models.Model):
             return f"Current Cycle ({self.start_date} to {self.end_date})"
         else:
             return f"Cycle ({self.start_date} to {self.end_date})"
+
 
 class EngineerPoint(TimeStampedModel):
     points = models.DecimalField(_('points'), default=0.0, max_digits=10 ,decimal_places=2)
