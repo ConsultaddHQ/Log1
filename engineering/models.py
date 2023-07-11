@@ -121,7 +121,7 @@ class Cycle(models.Model):
 
 
 class EngineerPoint(TimeStampedModel):
-    points = models.DecimalField(_('points'), default=0.0, max_digits=10 ,decimal_places=2)
+    points = models.DecimalField(_('points'), default=0.0, max_digits=10, decimal_places=2)
     is_active = models.BooleanField(_('Is active'), default=True)
     cycle = models.ForeignKey(
         Cycle, on_delete=models.PROTECT,
