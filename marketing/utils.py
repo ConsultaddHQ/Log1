@@ -505,4 +505,3 @@ def delete_supervisor_notification():
     except Exception as error:
         write_exception(error, None)
         return str(error), False
-
