@@ -1,4 +1,5 @@
 import os
+import json
 import pytz
 import json
 import difflib
@@ -28,6 +29,7 @@ from activity.views import create_activity
 from employee.models import User, Team, Role
 from employee.serializers import TeamSerializer
 from django.contrib.auth.models import ContentType
+from engineering.utils import assigned_test_points
 from activity.serializers import ActivitySerializer
 from utils_app.calendar import GoogleCalendar, Calendar
 from utils_app.mailing import send_email_without_template
@@ -2892,6 +2894,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             test.submitted_by = request.user
             test.save()
             assigned_test_points(test, request)
+
             # Activity
             desc = f"Test status updated to {test.get_status_display()} by {request.user.employee_name}"
             create_activity(test.submission.id, 'submission', request.user, desc, 'update')
@@ -2944,8 +2947,8 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             object_ids = [user.id for user in user_list]
             push_notification(object_ids, message_body)
+
             test_type = test.engineer_feedback.filter(question__title='Select type of test').first().answer
-            rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
             rating = test.engineer_feedback.filter(question__title='Rate your performance').first().answer
             payload = {
                 'id': test.id,
@@ -2957,11 +2960,13 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'coder_remark': test.engineer_remarks,
                 'vendor': test.submission.vendor.name,
                 'consultant_name': test.submission.consultant.name,
+                'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
                 'test_url': f'https://app.log1.com/#/details/{test.submission.id}/test?id={test.id}',
                 'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
-                'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in test.engineer.filter()],
+                'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
+                           test.engineer.filter()],
             }
-            slack.send_test_feedback(payload, 'url')
+            slack.send_test_feedback(payload, config.slack_test_channel_url)
             serializer = TestCreateSerializer(test)
             return Response({"data": serializer.data, "message": "Test feedback added"}, status=202)
         except Exception as error:
@@ -3439,7 +3444,6 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 assign_to=engineer, created__lte="2023-06-30", created__gte="2023-01-01",
                 status__in=['passed', 'failed', 'assigned', 'feedback_due']
             ).order_by('id').distinct('id')
-            # diff = set(tests.values_list('id', flat=True)).difference(set(assigned_tests.values_list('id', flat=True)).union(set(submitted_tests.values_list('id', flat=True))))
             diff = set(assigned_tests.values_list('id', flat=True)).difference(
                 (set(submitted_tests.values_list('id', flat=True))))
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
