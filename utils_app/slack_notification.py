@@ -1270,7 +1270,7 @@ class MessageCard:
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Status:* :v: {payload.get('status')}"
+                                "text": f"*Status:* {payload.get('emoji')} {payload.get('status')}"
                             }
                         ]
                     },
