@@ -20,6 +20,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 import project.models
 from engineering.utils import assigned_test_points
+from constance import config
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -843,7 +844,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            pending_before = date.today() - timedelta(days=15)
+            pending_before = date.today() - timedelta(days=25)
             test_lst = Test.objects.filter(
                 status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
             ).exclude(modified__gte=pending_before)
@@ -2961,7 +2962,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'vendor': test.submission.vendor.name,
                 'consultant_name': test.submission.consultant.name,
                 'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
-                'test_url': f'https://app.log1.com/#/details/{test.submission.id}/test?id={test.id}',
+                'test_url': f'{config.APP_URL}#/details/{test.submission.id}/test?id={test.id}',
                 'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
                 'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
                            test.engineer.filter()],
