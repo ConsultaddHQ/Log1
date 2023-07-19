@@ -90,7 +90,7 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours', 'work_type', 'timesheet_frequency', 'support')
-#support id name is current true
+
     @staticmethod
     def get_status(obj):
         try:
