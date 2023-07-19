@@ -402,3 +402,32 @@ class TimetrackEventFeedback(models.Model):
         related_name='feedback',
         verbose_name='event'
     )
+
+
+class ConsultantSupportFeedback(TimeStampedModel):
+    subject = models.CharField(_('Subject'), max_length=50)
+    feedback = models.CharField(_('Feedback'), max_length=150)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE,
+        related_name='feedback_project',
+        verbose_name='Project'
+    )
+    support_person = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='feedback_support',
+        verbose_name='Support employee'
+    )
+    created_by = models.ForeignKey(
+        Consultant, on_delete=models.CASCADE,
+        related_name='feedback_consultant',
+        verbose_name='Consultant'
+    )
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(ConsultantSupportFeedback, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.created_by.name} - {self.support_person.employee_name} - {self.project.submission.client}'

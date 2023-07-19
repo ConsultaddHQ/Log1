@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, F
 from datetime import date, datetime
 from rest_framework import serializers
 
@@ -9,7 +9,7 @@ from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ConsultantSupportFeedback
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -86,11 +86,11 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
     total_hours = serializers.SerializerMethodField()
-
+    support = serializers.SerializerMethodField()
     class Meta:
         model = Project
-        fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours', 'work_type', 'timesheet_frequency')
-
+        fields = ('id', 'client', 'start_date', 'employer', 'status', 'total_hours', 'work_type', 'timesheet_frequency', 'support')
+#support id name is current true
     @staticmethod
     def get_status(obj):
         try:
@@ -121,6 +121,18 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
             total_hours = total_hours + int(timesheet.hours) + int(timesheet.additional_hours)
         return f"{total_hours}hrs"
 
+    @staticmethod
+    def get_support(obj):
+        queryset = SupportStatus.objects.filter(support__project=obj, is_current=True)\
+            .annotate(support__id=F('support__support_id'), support__name=F('support__support__employee_name'))\
+            .values('support__id', 'support__name').first()
+        print(queryset)
+        if queryset:
+            return {
+                'id': queryset.get('support__id'),
+                'name': queryset.get('support__name')
+            }
+        return None
 
 class TimeSheetSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
@@ -493,3 +505,40 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
             "all": True if len(consultants) > 50 else False
         }
         return data
+
+
+class ConsultantSupportFeedbackSerializer(serializers.ModelSerializer):
+    subject = serializers.SerializerMethodField()
+    feedback = serializers.SerializerMethodField()
+    client = serializers.SerializerMethodField()
+    support = serializers.SerializerMethodField()
+    created_by = serializers.SerializerMethodField()
+    created_date = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ConsultantSupportFeedback
+        fields = ('id', 'subject', 'feedback', 'client', 'support', 'created_by', 'created_date')
+
+    @staticmethod
+    def get_subject(obj):
+        return obj.subject
+
+    @staticmethod
+    def get_feedback(obj):
+        return obj.feedback
+
+    @staticmethod
+    def get_client(obj):
+        return obj.project.submission.client
+
+    @staticmethod
+    def get_support(obj):
+        return obj.support_person.employee_name
+
+    @staticmethod
+    def get_created_by(obj):
+        return obj.created_by.name
+
+    @staticmethod
+    def get_created_date(obj):
+        return obj.created.date()

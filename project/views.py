@@ -34,13 +34,13 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ConsultantSupportFeedback
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ConsultantSupportFeedbackSerializer
 
 
 # Route - /project/
@@ -2078,6 +2078,49 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                     request=None
                 )
             return Response({"data": data[first: last], "url": file_url, "total": len(data)}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+# Route - /consultant_support/<consultant_id>/feedback/
+class ConsultantSupportFeedbackViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin):
+    queryset = ConsultantSupportFeedback.objects.all()
+    serializer_class = ConsultantSupportFeedbackSerializer
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            queryset = self.queryset.filter(created_by_id=kwargs.get('consultant_id'), id=kwargs.get('pk')).first()
+            serializer = self.serializer_class(queryset)
+            return Response({'data': serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({'error': str(error)}, status=400)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            if kwargs.get('consultant_id'):
+                queryset = self.queryset.filter(created_by_id=kwargs.get('consultant_id'))
+            else:
+                queryset = self.queryset
+            serializer = self.serializer_class(queryset, many=True)
+            return Response({"count": len(queryset), "data": serializer.data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            ConsultantSupportFeedback.objects.create(
+                subject=request.data.get('subject'),
+                feedback=request.data.get('feedback'),
+                project_id=request.data.get('project'),
+                support_person_id=request.data.get('support_person'),
+                created_by_id=kwargs.get('consultant_id')
+            )
+            return Response({"data": 'Feedback created'}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

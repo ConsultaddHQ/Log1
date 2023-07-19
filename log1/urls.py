@@ -24,7 +24,7 @@ from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringRe
     EngineerReportXposedViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
-    ConsultantRevisionViewSet
+    ConsultantRevisionViewSet, ConsultantSupportFeedbackViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
     TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
@@ -90,6 +90,7 @@ router.register(r'project/(?P<project_id>[0-9]+)/training', TrainingAgendaViewSe
 router.register(r'project/(?P<project_id>[0-9]+)/checklist', TrainingCheckListViewSet)
 router.register(r'finance/(?P<consultant_id>[0-9]+)/leave', LeaveManagementViewSets)
 router.register(r'engineer_detail', MarketingAPIViewSet)
+router.register(r'consultant_support(?:/(?P<consultant_id>[0-9]+))?/feedback', ConsultantSupportFeedbackViewSet)
 
 router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)
