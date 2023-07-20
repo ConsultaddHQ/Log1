@@ -113,5 +113,6 @@ class TimesheetRequestAdmin(ExportActionModelAdmin):
 @admin.register(ConsultantSupportFeedback)
 class ConsultantSupportFeedbackAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
-    list_display = ('id', 'created_by', 'support_person', 'project')
-    search_fields = ('id', 'consultant__name', 'consultant__email')
+    list_display = ('id', 'created_by', 'support_person', 'project', 'subject')
+    search_fields = ('id', 'created_by__name', 'created_by__email')
+

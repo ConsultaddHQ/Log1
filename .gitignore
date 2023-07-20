@@ -25,3 +25,7 @@ mailkey.json
 mailtoken.json
 calendar.json
 update_db.sh
+/attachment/swagger.py
+/dashboard/swagger.py
+/employee/swagger.py
+/log1/swagger.py

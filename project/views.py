@@ -2083,44 +2083,18 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
-# Route - /consultant_support/<consultant_id>/feedback/
+# Route - /consultant_support_feedback/
 class ConsultantSupportFeedbackViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin):
     queryset = ConsultantSupportFeedback.objects.all()
     serializer_class = ConsultantSupportFeedbackSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            queryset = self.queryset.filter(created_by_id=kwargs.get('consultant_id'), id=kwargs.get('pk')).first()
-            serializer = self.serializer_class(queryset)
-            return Response({'data': serializer.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({'error': str(error)}, status=400)
-
     def list(self, request, *args, **kwargs):
         try:
-            if kwargs.get('consultant_id'):
-                queryset = self.queryset.filter(created_by_id=kwargs.get('consultant_id'))
-            else:
-                queryset = self.queryset
-            serializer = self.serializer_class(queryset, many=True)
-            return Response({"count": len(queryset), "data": serializer.data}, status=200)
+            serializer = self.serializer_class(self.queryset, many=True)
+            return Response({"count": len(self.queryset), "data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    def create(self, request, *args, **kwargs):
-        try:
-            ConsultantSupportFeedback.objects.create(
-                subject=request.data.get('subject'),
-                feedback=request.data.get('feedback'),
-                project_id=request.data.get('project'),
-                support_person_id=request.data.get('support_person'),
-                created_by_id=kwargs.get('consultant_id')
-            )
-            return Response({"data": 'Feedback created'}, status=201)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

@@ -123,7 +123,7 @@ class ProjectTimeSheetSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_support(obj):
-        queryset = SupportStatus.objects.filter(support__project=obj, is_current=True)\
+        queryset = SupportStatus.objects.filter(support__project=obj, is_current=True, support__project__status__frquency__in=['active','less_active'])\
             .annotate(support__id=F('support__support_id'), support__name=F('support__support__employee_name'))\
             .values('support__id', 'support__name').first()
         print(queryset)

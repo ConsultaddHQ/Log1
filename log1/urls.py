@@ -17,7 +17,7 @@ from attachment.views import AttachmentView, AttachmentGetView
 from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
 from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
-    TimetrackEventMobileViewSet
+    TimetrackEventMobileViewSet, ConsultantSupportFeedbackMobileViewSet
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
@@ -90,7 +90,7 @@ router.register(r'project/(?P<project_id>[0-9]+)/training', TrainingAgendaViewSe
 router.register(r'project/(?P<project_id>[0-9]+)/checklist', TrainingCheckListViewSet)
 router.register(r'finance/(?P<consultant_id>[0-9]+)/leave', LeaveManagementViewSets)
 router.register(r'engineer_detail', MarketingAPIViewSet)
-router.register(r'consultant_support(?:/(?P<consultant_id>[0-9]+))?/feedback', ConsultantSupportFeedbackViewSet)
+router.register(r'consultant_support_feedback', ConsultantSupportFeedbackViewSet)
 
 router.register(r'city', CityViewSet)
 router.register(r'choice', ChoiceViewSet)
@@ -125,6 +125,7 @@ router.register(r'timesheet', TimeSheetViewSet)
 router.register(r'payroll', PayrollScheduleViewSet)
 router.register(r'event', TimetrackEventMobileViewSet)
 router.register(r'consultant_leave', ConsultantLeaveViewSet)
+router.register(r'consultant_support/(?P<consultant_id>[0-9]+)/feedback', ConsultantSupportFeedbackMobileViewSet)
 
 router.register(r'utility', UtilityViewSet)
 router.register(r'util', TeamsTargetViewSet)
