@@ -3448,10 +3448,10 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 (set(submitted_tests.values_list('id', flat=True))))
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
             offline_type_of_test = Question.objects.filter(title='Select type of test', form_name='offline_test')
-            online_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+            online_test_id = Answer.objects.filter(object_id__in=submitted_tests.filter().values_list('id', flat=True),
                                                    content_type__model='test',
                                                    question=online_type_of_test[0]).values_list('object_id', flat=True)
-            offline_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+            offline_test_id = Answer.objects.filter(object_id__in=submitted_tests.filter().values_list('id', flat=True),
                                                     content_type__model='test',
                                                     question=offline_type_of_test[0]).values_list('object_id',
                                                                                                   flat=True)

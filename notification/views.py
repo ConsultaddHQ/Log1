@@ -230,7 +230,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                                           project__start_date__gte=date.today())
 
                     project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk, is_proxy_support=False, statuses__is_current=True,
+                        Q(support=pk, end__isnull=True, is_proxy_support=False, statuses__is_current=True,
                           project__support_required=True) & (
                                 active_projects | training_projects)).order_by('project__id').distinct('project__id')
 
@@ -259,19 +259,21 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                 if notification.content_type == consultant_content_type:
                     thirty_days_ago = today - timedelta(days=30)
                     fourteen_days_ago = today - timedelta(days=14)
-                    sixty_days_ago = today - timedelta(days=60)
 
-                    active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago) & Q(
-                        statuses__is_current=True,
-                        project__start_date__lte=sixty_days_ago,
-                        statuses__frequency__in=['active', 'less_active'],
-                        project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
+                    active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago,
+                                         project__feedbacks__feedback_type__in=["independent", "2_week",
+                                                                                "engineering_issue"]) & Q(
+                        project__start_date__lte=thirty_days_ago
+                    )
 
-                    initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
-                        project__start_date__gte=thirty_days_ago)
+                    initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago,
+                                          project__feedbacks__feedback_type__in=['independent', '2_week',
+                                                                                 'engineering_issue']) & Q(
+                        project__start_date__gte=thirty_days_ago, project__start_date__lte=fourteen_days_ago)
 
                     project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk, project__support_required=True, is_proxy_support=False) &
+                        Q(support=pk, end__isnull=True, project__support_required=True, is_proxy_support=False,
+                          statuses__is_current=True, statuses__frequency__in=['active', 'less_active'], ) &
                         (active_projects | initial_projects)).order_by('project__id').distinct('project__id')
 
                     if project_supports:
