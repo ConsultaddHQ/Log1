@@ -222,23 +222,17 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     seven_days_ago = today - timedelta(days=7)
                     one_day_ago = today - timedelta(days=1)
 
-                    active_projects = Q(
-                        ~Q(project__updates__created__gte=seven_days_ago) &
-                        Q(project__support_required=True, start__lte=seven_days_ago,
-                          statuses__is_current=True, statuses__frequency__in=['is_active', 'less_active'])
-                    )
-                    terminated_projects = Q(
-                        ~Q(project__updates__created__gte=seven_days_ago),
-                        Q(statuses__is_current=True, statuses__created__lte=F('end') - timedelta(days=4),
-                          statuses__frequency__in=['terminate', 'handover', 'independent']))
+                    active_projects = Q(~Q(project__updates__created__gte=seven_days_ago), start__lte=seven_days_ago,
+                                        statuses__created__lte=seven_days_ago,
+                                        statuses__frequency__in=['active', 'less_active'])
 
-                    training_projects = Q(
-                        ~Q(project__updates__created__gte=one_day_ago),
-                        Q(statuses__is_current=True, statuses__frequency='training'))
+                    training_projects = Q(~Q(project__updates__created__gte=one_day_ago),
+                                          project__start_date__gte=date.today())
 
                     project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk, is_proxy_support=False) & (active_projects | terminated_projects | training_projects)).exclude(
-                        project__updates__created__gte=seven_days_ago).order_by('project__id').distinct('project__id')
+                        Q(support=pk, is_proxy_support=False, statuses__is_current=True,
+                          project__support_required=True) & (
+                                active_projects | training_projects)).order_by('project__id').distinct('project__id')
 
                     if project_supports:
                         for project_support in project_supports:
