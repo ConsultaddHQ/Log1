@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime, timedelta, date
 from django.core.management import BaseCommand
 
@@ -92,4 +93,6 @@ class Command(BaseCommand):
             if submission_data:
                 send_email(mail_data, "marketing@consultadd.com")
         except Exception as error:
-            create_cron_error(job, error)
+            _, _, tb = sys.exc_info()
+            lineno = tb.tb_lineno
+            create_cron_error(job, f"{lineno} - {error}")
