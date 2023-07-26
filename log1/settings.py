@@ -217,6 +217,7 @@ DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 RESET_TOKEN_EXPIRY_TIME = 1
 
 # Logger Configuration
+LOGGING_CONFIG = None
 ## ----- logging integrations starts here ----- ##
 logging_conf = {
     'version': 1,
@@ -264,53 +265,6 @@ logging_conf = {
         }
     }
 }
-
-if(os.environ.get('ENV', False) == "staging"):
-    import sentry_sdk
-    from sentry_sdk.integrations.django import DjangoIntegration
-
-    # Sentry setup
-    sentry_sdk.init(
-        dsn="https://c616aaedbbb7487da7b2a9d58dc438a5@o4505515806031872.ingest.sentry.io/4505516027150336",
-        integrations=[
-            DjangoIntegration(),
-        ],
-
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for performance monitoring.
-        # We recommend adjusting this value in production.
-        traces_sample_rate=1.0,
-
-        # If you wish to associate users to errors (assuming you are using
-        # django.contrib.auth) you may enable sending PII data.
-        send_default_pii=True,
-        environment='production',
-    )
-
-    # Rollbar setup
-    ROLLBAR = {
-        'access_token': 'c8d1b32f710543ddbe87ef306072e1d7',
-        'environment': 'production',
-        'code_version': '1.0',
-        'root': BASE_DIR,
-    }
-
-    logging_conf['handlers']['sentry'] = {
-                'level': 'ERROR',  # Capture logs with ERROR level and above
-                'class': 'sentry_sdk.integrations.logging.EventHandler',
-            }
-    logging_conf['handlers']['rollbar'] = {
-                'level': 'ERROR', 
-                'access_token': ROLLBAR['access_token'],
-                'class': 'rollbar.logger.RollbarHandler',
-            }
-
-    logging_conf['loggers']['']['handlers'] = ['sentry', 'rollbar', 'console', 'file']
-    print(logging_conf)
-    ## ----- logging integrations ends here ----- ##
-
-LOGGING_CONFIG = None
-logging.config.dictConfig(logging_conf)
 
 # Celery settings
 CELERY_TASK_SERIALIZER = 'json'
