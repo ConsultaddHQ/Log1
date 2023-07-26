@@ -220,6 +220,7 @@ def assigned_test_points(test, request):
                                              question__form_name='online_test').first()
             if platform:
                 platform_name = platform.answer
+
         MCQ_question_answer = Answer.objects.filter(
             object_id=test.id, content_type__model='test', question__title='Number of MCQ questions'
         ).first()

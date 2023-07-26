@@ -10,11 +10,12 @@ from engineering.models import Cycle, EngineerPoint
 class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
-           tests = Test.objects.filter(created__lte='2022-12-31',
-                          created__gte='2022-07-01').order_by(F('created').asc()).distinct()
-           for test in tests:
+            tests = Test.objects.filter(created__lte='2023-06-30',
+                                       status__in=['passed', 'failed', 'assigned', 'feedback_due'],
+                          created__gte='2023-01-01').order_by(F('created').asc()).distinct()
+            for test in tests:
                self.assigned_test_points(test)
-           print("Done")
+            print("Done")
         except Exception as error:
             print(error)
     def assigned_test_points(self, test):
@@ -97,7 +98,7 @@ class Command(BaseCommand):
             else:
                 pass
         elif test_type.lower() == 'offline':
-            test_points = 5
+            test_points = 10
             bonus_points = 2 * (1 if test_current_status == 'passed' else 0)
             points = (test_points + bonus_points) / no_of_people_involved
         else:

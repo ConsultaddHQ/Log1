@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, date
 
+from pytz import timezone
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
@@ -191,9 +192,14 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             for notification in notifications:
                 if notification.content_type == interview_content_type:
                     interviews = Interview.objects.filter(
-                        ~Q(supervisor_feedback__question__form_name='interview') &
-                        Q(supervisor=pk, start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
-                        status__in=["cancelled", "next_round", "offer", "failed"]).order_by('id').distinct('id')
+                        supervisor=pk, start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"),
+                        end_time__lte=datetime.now(timezone('US/Eastern')).replace(tzinfo=timezone('UTC')) - timedelta(
+                            hours=4)
+                    ).exclude(
+                        status__in=["cancelled", "next_round", "offer", "failed", "scheduled", "rescheduled"]
+                    ).exclude(
+                        supervisor_feedback__question__form_name='interview'
+                    ).order_by('id').distinct('id')
                     if interviews:
                         for interview in interviews:
                             feedback_due = {
@@ -222,23 +228,17 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                     seven_days_ago = today - timedelta(days=7)
                     one_day_ago = today - timedelta(days=1)
 
-                    active_projects = Q(
-                        ~Q(project__updates__created__gte=seven_days_ago) &
-                        Q(project__support_required=True, start__lte=seven_days_ago,
-                          statuses__is_current=True, statuses__frequency__in=['is_active', 'less_active'])
-                    )
-                    terminated_projects = Q(
-                        ~Q(project__updates__created__gte=seven_days_ago),
-                        Q(statuses__is_current=True, statuses__created__lte=F('end') - timedelta(days=4),
-                          statuses__frequency__in=['terminate', 'handover', 'independent']))
+                    active_projects = Q(~Q(project__updates__created__gte=seven_days_ago), start__lte=seven_days_ago,
+                                        statuses__created__lte=seven_days_ago,
+                                        statuses__frequency__in=['active', 'less_active'])
 
-                    training_projects = Q(
-                        ~Q(project__updates__created__gte=one_day_ago),
-                        Q(statuses__is_current=True, statuses__frequency='training'))
+                    training_projects = Q(~Q(project__updates__created__gte=one_day_ago),
+                                          project__start_date__gte=date.today())
 
                     project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk, is_proxy_support=False) & (active_projects | terminated_projects | training_projects)).exclude(
-                        project__updates__created__gte=seven_days_ago).order_by('project__id').distinct('project__id')
+                        Q(support=pk, end__isnull=True, is_proxy_support=False, statuses__is_current=True,
+                          project__support_required=True) & (
+                                active_projects | training_projects)).order_by('project__id').distinct('project__id')
 
                     if project_supports:
                         for project_support in project_supports:
@@ -265,19 +265,21 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
                 if notification.content_type == consultant_content_type:
                     thirty_days_ago = today - timedelta(days=30)
                     fourteen_days_ago = today - timedelta(days=14)
-                    sixty_days_ago = today - timedelta(days=60)
 
-                    active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago) & Q(
-                        statuses__is_current=True,
-                        project__start_date__lte=sixty_days_ago,
-                        statuses__frequency__in=['active', 'less_active'],
-                        project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
+                    active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago,
+                                         project__feedbacks__feedback_type__in=["independent", "2_week",
+                                                                                "engineering_issue"]) & Q(
+                        project__start_date__lte=thirty_days_ago
+                    )
 
-                    initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
-                        project__start_date__gte=thirty_days_ago)
+                    initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago,
+                                          project__feedbacks__feedback_type__in=['independent', '2_week',
+                                                                                 'engineering_issue']) & Q(
+                        project__start_date__gte=thirty_days_ago, project__start_date__lte=fourteen_days_ago)
 
                     project_supports = ProjectSupport.objects.filter(
-                        Q(support=pk, project__support_required=True, is_proxy_support=False) &
+                        Q(support=pk, end__isnull=True, project__support_required=True, is_proxy_support=False,
+                          statuses__is_current=True, statuses__frequency__in=['active', 'less_active'], ) &
                         (active_projects | initial_projects)).order_by('project__id').distinct('project__id')
 
                     if project_supports:
