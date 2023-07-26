@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, date
 
+from pytz import timezone
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
@@ -191,9 +192,14 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             for notification in notifications:
                 if notification.content_type == interview_content_type:
                     interviews = Interview.objects.filter(
-                        ~Q(supervisor_feedback__question__form_name='interview') &
-                        Q(supervisor=pk, start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
-                        status__in=["cancelled", "next_round", "offer", "failed"]).order_by('id').distinct('id')
+                        supervisor=pk, start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"),
+                        end_time__lte=datetime.now(timezone('US/Eastern')).replace(tzinfo=timezone('UTC')) - timedelta(
+                            hours=4)
+                    ).exclude(
+                        status__in=["cancelled", "next_round", "offer", "failed", "scheduled", "rescheduled"]
+                    ).exclude(
+                        supervisor_feedback__question__form_name='interview'
+                    ).order_by('id').distinct('id')
                     if interviews:
                         for interview in interviews:
                             feedback_due = {
