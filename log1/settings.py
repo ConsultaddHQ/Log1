@@ -75,6 +75,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'log1.middleware.AddressLogMiddleware',
+    'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
 ]
 
 ROOT_URLCONF = 'log1.urls'
@@ -216,8 +217,8 @@ DEFAULT_FILE_STORAGE = 'utils_app.storage.PublicMediaStorage'
 RESET_TOKEN_EXPIRY_TIME = 1
 
 # Logger Configuration
-LOGGING_CONFIG = None
-logging.config.dictConfig({
+## ----- logging integrations starts here ----- ##
+logging_conf = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
@@ -262,7 +263,54 @@ logging.config.dictConfig({
             'handlers': ['access']
         }
     }
-})
+}
+
+if(os.environ.get('ENV', False) == "staging"):
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    # Sentry setup
+    sentry_sdk.init(
+        dsn="https://c616aaedbbb7487da7b2a9d58dc438a5@o4505515806031872.ingest.sentry.io/4505516027150336",
+        integrations=[
+            DjangoIntegration(),
+        ],
+
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        # We recommend adjusting this value in production.
+        traces_sample_rate=1.0,
+
+        # If you wish to associate users to errors (assuming you are using
+        # django.contrib.auth) you may enable sending PII data.
+        send_default_pii=True,
+        environment='production',
+    )
+
+    # Rollbar setup
+    ROLLBAR = {
+        'access_token': 'c8d1b32f710543ddbe87ef306072e1d7',
+        'environment': 'production',
+        'code_version': '1.0',
+        'root': BASE_DIR,
+    }
+
+    logging_conf['handlers']['sentry'] = {
+                'level': 'ERROR',  # Capture logs with ERROR level and above
+                'class': 'sentry_sdk.integrations.logging.EventHandler',
+            }
+    logging_conf['handlers']['rollbar'] = {
+                'level': 'ERROR', 
+                'access_token': ROLLBAR['access_token'],
+                'class': 'rollbar.logger.RollbarHandler',
+            }
+
+    logging_conf['loggers']['']['handlers'] = ['sentry', 'rollbar', 'console', 'file']
+    print(logging_conf)
+    ## ----- logging integrations ends here ----- ##
+
+LOGGING_CONFIG = None
+logging.config.dictConfig(logging_conf)
 
 # Celery settings
 CELERY_TASK_SERIALIZER = 'json'
@@ -339,6 +387,7 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_new_recruit_on_bench', ('URL', 'Slack New Recruit On Bench Channel')),
     ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
     ('slack_consultadd_compete_url', ('URL', 'Slack Consultadd Compete Channel')),
+    ('slack_test_channel_url', ('URL', 'Slack Test Channel')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
@@ -359,6 +408,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
         'slack_joined_url', 'slack_marketing_report_url', 'slack_general_url', 'slack_offer_failure_url',
         'slack_products_dev', 'slack_new_recruit_on_bench', 'slack_pre_joining_feedback_url',
         'slack_recruitment_url', 'slack_pool_channel_url', 'slack_exit_interview_url', 'slack_candidate_feedback_url',
-        'slack_engineering_private_url', 'slack_consultadd_compete_url'
+        'slack_engineering_private_url', 'slack_consultadd_compete_url', 'slack_test_channel_url'
     ),
 }

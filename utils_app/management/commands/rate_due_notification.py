@@ -93,7 +93,7 @@ class Command(BaseCommand):
                 },
             }
             if len(data) > 0:
-                send_email_attachment_multiple(mail_data, "admin@consultadd.com")
+                send_email_attachment_multiple(mail_data, "product@consultadd.com")
             delete_temp_file([file.name])
         except Exception as error:
             print(error)
