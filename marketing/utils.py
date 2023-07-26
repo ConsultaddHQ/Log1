@@ -2,10 +2,9 @@ import csv
 import json
 from pytz import timezone
 
-from datetime import datetime
 from celery import shared_task
-from django.db.models import Q
 from django.http import HttpResponse
+from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
 
@@ -117,9 +116,14 @@ def change_to_feedback_due():
 
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
         interviews = Interview.objects.filter(
-            ~Q(supervisor_feedback__question__form_name='interview') &
-            Q(start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
-            status__in=["cancelled", "next_round", "offer", "failed"]).order_by('id').distinct('id')
+            start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"),
+            end_time__lte=datetime.now(timezone('US/Eastern')).replace(tzinfo=timezone('UTC')) - timedelta(
+                hours=4)
+        ).exclude(
+            status__in=["cancelled", "next_round", "offer", "failed", "scheduled", "rescheduled"]
+        ).exclude(
+            supervisor_feedback__question__form_name='interview'
+        ).order_by('id').distinct('id')
 
         supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
         supervisor_list = User.objects.filter(id__in=supervisor_ids)
