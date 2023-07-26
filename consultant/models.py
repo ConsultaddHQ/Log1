@@ -149,7 +149,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
 
     def send_mail(self, mail_data):
         try:
-            res, msg = send_email(mail_data, "admin@consultadd.com")
+            res, msg = send_email(mail_data, "product@consultadd.com")
             if not msg:
                 return res, "error"
             return res, "ok"
