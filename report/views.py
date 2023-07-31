@@ -792,8 +792,16 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__marketing_team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
+
+                termination_reason = request.data.get("termination_reason", None)
+                termination_mapping = {
+                    "resign": "terminated-resigned",
+                    "fired": "terminated-fired",
+                }
+                is_start_with = termination_mapping.get(termination_reason, "terminated")
+
                 termination_count = Project.objects.filter(
-                    statuses__status__istartswith='terminated',
+                    statuses__status__istartswith=is_start_with,
                     submission__marketing_team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
