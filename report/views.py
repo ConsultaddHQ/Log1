@@ -761,7 +761,8 @@ class MarketingReportViewSets(GenericViewSet):
                 end = date.today()
             end = end + timedelta(days=1) if type(end) is not str else datetime.strptime(end, '%Y-%m-%d').date() + timedelta(days=1)
             data, url = list(), ""
-            total_bench = total_submissions = total_interviews = total_joining = total_offers = total_termination = 0
+            total_bench = total_submissions = total_interviews = total_joining = total_offers \
+                = total_termination = total_completion = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
                 team_id = team.id
@@ -786,6 +787,11 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__marketing_team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
+                completion_count = Project.objects.filter(
+                    statuses__status='complete',
+                    submission__marketing_team__id=team_id,
+                    statuses__created__gte=start, statuses__created__lte=end,
+                ).order_by('id').distinct('id').count()
                 termination_count = Project.objects.filter(
                     statuses__status__istartswith='terminated',
                     submission__marketing_team__id=team_id,
@@ -804,6 +810,7 @@ class MarketingReportViewSets(GenericViewSet):
                     "interview_count": interview_count,
                     "bench_consultant": bench_consultant,
                     "submission_count": submission_count,
+                    "completion_count": completion_count,
                     "termination_count": termination_count,
                 })
                 total_offers += offer_count
@@ -811,6 +818,7 @@ class MarketingReportViewSets(GenericViewSet):
                 total_bench += bench_consultant
                 total_interviews += interview_count
                 total_submissions += submission_count
+                total_completion += completion_count
                 total_termination += termination_count
             data.append({
                 "id": 0,
