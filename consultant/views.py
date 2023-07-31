@@ -932,7 +932,15 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             for team in teams:
                 consultant_marketing.teams.add(get_object_or_404(Team, name=team))
 
-            marketer_ids = request.data.get('marketers', [])
+            if request.data.get('is_select', True):
+                marketer_ids = User.objects.filter(
+                    is_active=True,
+                    account_login=True,
+                    team__name__in=teams
+                ).values_list('id', flat=True)
+            else:
+                marketer_ids = request.data.get('marketers', [])
+
             for marketer_id in marketer_ids:
                 marketer = get_object_or_404(User, id=marketer_id)
                 consultant_marketing.marketer.add(marketer)
@@ -1061,6 +1069,17 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 for team_id in team_ids:
                     team = get_object_or_404(Team, id=team_id)
                     consultant_marketing.teams.add(team)
+
+                marketer_ids = User.objects.filter(
+                    is_active=True,
+                    account_login=True,
+                    team__in=team_ids
+                ).values_list('id', flat=True)
+
+                for marketer_id in marketer_ids:
+                    marketer = get_object_or_404(User, id=marketer_id)
+                    consultant_marketing.marketer.add(marketer)
+
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
                 teams_string = ", ".join(team.name for team in consultant_marketing.teams.all())
 
