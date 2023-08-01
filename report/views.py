@@ -793,18 +793,26 @@ class MarketingReportViewSets(GenericViewSet):
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
 
-                termination_reason = request.data.get("termination_reason", None)
+                termination_type = request.GET.get("termination_type", None)
                 termination_mapping = {
-                    "resign": "terminated-resigned",
-                    "fired": "terminated-fired",
+                    "Resigned": "terminated-resigned",
+                    "Fired": "terminated-fired",
                 }
-                is_start_with = termination_mapping.get(termination_reason, "terminated")
+                is_start_with = termination_mapping.get(termination_type, "terminated")
 
-                termination_count = Project.objects.filter(
-                    statuses__status__istartswith=is_start_with,
-                    submission__marketing_team__id=team_id,
-                    statuses__created__gte=start, statuses__created__lte=end,
-                ).order_by('id').distinct('id').count()
+                if termination_type == "Other":
+                    termination_count = Project.objects.filter(
+                        statuses__status=is_start_with,
+                        submission__marketing_team__id=team_id,
+                        statuses__created__gte=start, statuses__created__lte=end,
+                    ).order_by('id').distinct('id').count()
+                else:
+                    termination_count = Project.objects.filter(
+                        statuses__status__istartswith=is_start_with,
+                        submission__marketing_team__id=team_id,
+                        statuses__created__gte=start, statuses__created__lte=end,
+                    ).order_by('id').distinct('id').count()
+
                 scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
                 scrum_master = None
                 if scrum_masters:

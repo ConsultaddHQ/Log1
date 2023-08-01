@@ -652,7 +652,7 @@ class ProjectV2Serializer(serializers.ModelSerializer):
     def get_status(obj):
         status = obj.statuses.filter(is_current=True)
         if status:
-            return status.first().status
+            return status.first().get_status_display()
         return None
 
     def get_permission(self, obj):
