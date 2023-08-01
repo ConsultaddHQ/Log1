@@ -82,10 +82,13 @@ def date_filter(queryset, timestamp, field_str):
         #             datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
         lte = lte_date
         gte = timestamp.get('gte', None)
-        if lte:
-            filters[f"{field_str}__lte"] = lte
-        if gte:
-            filters[f"{field_str}__gte"] = gte
+        if lte and gte and lte == gte:  # Check if lte and gte are the same date
+            filters[f"{field_str}__date"] = lte  # Use "__date" for exact date matching
+        else:
+            if lte:
+                filters[f"{field_str}__lte"] = lte
+            if gte:
+                filters[f"{field_str}__gte"] = gte
     return queryset.filter(**filters)
 
 
