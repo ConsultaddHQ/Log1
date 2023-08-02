@@ -42,7 +42,7 @@ class Command(BaseCommand):
             from pytz import timezone
             slack_data = {}
             tz = timezone('EST')
-            today_date = tz.localize(datetime.strptime("2023-05-15", "%Y-%m-%d"))
+            today_date = tz.localize(datetime.now())
             screening_types = (
                 ('interview', 'Interview'),
                 ('ip_screening', 'IP Screening'),
