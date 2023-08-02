@@ -1,5 +1,7 @@
 import csv
 import json
+import os
+
 from pytz import timezone
 
 from celery import shared_task
@@ -112,7 +114,8 @@ def change_to_feedback_due():
             interview.save()
 
         # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
-        delete_supervisor_notification.delay()
+        if os.environ.get('ENV') == 'prod':
+            delete_supervisor_notification.delay()
 
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
         interviews = Interview.objects.filter(
