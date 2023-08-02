@@ -65,7 +65,11 @@ class Command(BaseCommand):
                 }
 
                 reply_to = [config.RELATIONS]
-                mail_id, mail_res, from_email = send_email(mail_data, "marketing@consultadd.com", reply_to)
+                try:
+                    send_email(mail_data, "marketing@consultadd.com", None)
+                    mail_res = True
+                except Exception as e:
+                    mail_res = False
 
                 submission_data.append({
                     "scrum_masters": cc,
