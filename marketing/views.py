@@ -1474,7 +1474,7 @@ class InterviewViewSets(ModelViewSet):
                     # post_msg_using_webhook(config.slack_announcement_url, data)
 
                 # if interview.guest_type in ['coder', 'assistance']:
-                # coder_request_notification(interview, "Coding request", request)
+                    # coder_request_notification(interview, "Coding request", request)
 
                 data = queryset.annotate(
                     rank=F('submission__rank'),
@@ -1936,7 +1936,7 @@ class InterviewViewSets(ModelViewSet):
 
             # if interview.guest_type in ['coder', 'assistance']:
             #     title = "Interview cancelled, coding is not required"
-            # coder_request_notification(interview, title, request)
+                # coder_request_notification(interview, title, request)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
@@ -2592,18 +2592,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 writer = csv.writer(file)
                 writer.writerow(['Test Id', 'Consultant Name', 'Marketer Name', 'Client', 'Job Title', 'Company Name',
                                  'Link', 'Created At', 'Deadline', 'Skills', 'Submitted By', 'Status',
-                                 'Marketer Feedback', 'Engineer Associated', 'Test Mode'])
+                                 'Marketer Feedback', 'Engineer Associated', 'Test Type'])
                 for obj in queryset:
                     engineer_associated = [obj.employee_name for obj in obj.engineer.all()]
-                    test_mode = obj.engineer_feedback.filter(question__title='Select type of test').values(
-                        'answer').first()
+                    test_type = obj.engineer_feedback.filter(question__title='Select type of test'
+                                                             ).values('answer').first()
                     writer.writerow([
                         obj.id, obj.submission.consultant.name, obj.submission.created_by.employee_name,
                         obj.submission.client, obj.submission.lead.job_title, obj.submission.lead.vendor_company.name,
                         obj.link, obj.created.date(), obj.deadline, obj.skills,
                         obj.submitted_by.employee_name if obj.submitted_by else None, obj.get_status_display(),
                         obj.feedback, engineer_associated,
-                        test_mode.get('answer') if test_mode else 'offline' if obj.is_offline else 'online'
+                        test_type.get('answer') if test_type else 'offline' if obj.is_offline else 'online',
                     ])
                 file.close()
                 url = generate_s3_url(file_name)
@@ -3336,8 +3336,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             for team in teams:
                 data = {
                     "id": team.id, "team_name": team.name,
-                    "employee": team.employees.filter(is_active=True).exclude(role__name='admin').values('id',
-                                                                                                         'employee_name'),
+                    "employee": team.employees.filter(is_active=True).exclude(role__name='admin'
+                                                                              ).values('id', 'employee_name'),
                     "scrum": team.employees.filter(
                         is_active=True, role__name='admin').values('id', 'employee_name')
                 }
