@@ -33,5 +33,3 @@ jellyfish1.csv
 client_companies.csv
 client_companies_lcs.csv
 **/swagger.py
-/utils_app/management/commands/client_company.py
-/utils_app/management/commands/vendor_company.py
