@@ -25,3 +25,11 @@ mailkey.json
 mailtoken.json
 calendar.json
 update_db.sh
+vendor_company_lcs.csv
+vendor_companies_jellyfish.csv
+lcs2.csv
+jellyfish.csv
+jellyfish1.csv
+client_companies.csv
+client_companies_lcs.csv
+**/swagger.py
