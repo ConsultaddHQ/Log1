@@ -2599,15 +2599,18 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 writer = csv.writer(file)
                 writer.writerow(['Test Id', 'Consultant Name', 'Marketer Name', 'Client', 'Job Title', 'Company Name',
                                  'Link', 'Created At', 'Deadline', 'Skills', 'Submitted By', 'Status',
-                                 'Marketer Feedback', 'Engineer Associated'])
+                                 'Marketer Feedback', 'Engineer Associated', 'Test Type'])
                 for obj in queryset:
                     engineer_associated = [obj.employee_name for obj in obj.engineer.all()]
+                    test_type = obj.engineer_feedback.filter(question__title='Select type of test'
+                                                             ).values('answer').first()
                     writer.writerow([
                         obj.id, obj.submission.consultant.name, obj.submission.created_by.employee_name,
                         obj.submission.client, obj.submission.lead.job_title, obj.submission.lead.vendor_company.name,
                         obj.link, obj.created.date(), obj.deadline, obj.skills,
                         obj.submitted_by.employee_name if obj.submitted_by else None, obj.get_status_display(),
-                        obj.feedback, engineer_associated
+                        obj.feedback, engineer_associated,
+                        test_type.get('answer') if test_type else 'offline' if obj.is_offline else 'online',
                     ])
                 file.close()
                 url = generate_s3_url(file_name)
@@ -3217,7 +3220,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             if query:
                 marketers = marketers.filter(employee_name__istartswith=query)
             marketers_data, counts = self.filter_marketers(marketers, filters, request)
-            return Response({"data": marketers_data[first: last], "count": counts, "total": len(marketers_data)}, status=200)
+            return Response({"data": marketers_data[first: last], "count": counts, "total": len(marketers_data)},
+                            status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -3339,7 +3343,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             for team in teams:
                 data = {
                     "id": team.id, "team_name": team.name,
-                    "employee": team.employees.filter(is_active=True).exclude(role__name='admin').values('id', 'employee_name'),
+                    "employee": team.employees.filter(is_active=True).exclude(role__name='admin'
+                                                                              ).values('id', 'employee_name'),
                     "scrum": team.employees.filter(
                         is_active=True, role__name='admin').values('id', 'employee_name')
                 }
@@ -3582,7 +3587,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             from api_key.models import APIKey
             employee_info = {}
-            tests = Test.objects.filter(created__lte='2023-06-30',created__gte='2023-01-01').distinct()
+            tests = Test.objects.filter(created__lte='2023-06-30', created__gte='2023-01-01').distinct()
             for test in tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0
@@ -3636,7 +3641,8 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 writer = csv.writer(file)
                 writer.writerow(['Employee Id', 'Employee Name', 'Total Test', 'Total Points'])
                 for emp_id in employee_info.keys():
-                    writer.writerow([emp_id, employee_info[emp_id]['name'], employee_info[emp_id]['no_of_test_given'], employee_info[emp_id]['total_points']])
+                    writer.writerow([emp_id, employee_info[emp_id]['name'], employee_info[emp_id]['no_of_test_given'],
+                                     employee_info[emp_id]['total_points']])
                 file.flush()
             return Response({"data": employee_info}, status=200)
         except Exception as error:
