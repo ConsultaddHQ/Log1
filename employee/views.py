@@ -567,15 +567,26 @@ class ResetPasswordViewSets(GenericViewSet):
         users = User.objects.filter(email__iexact=email)
 
         active_user_found = False
+        password_usable_user_found = False
+
         for user in users:
-            if user.is_active and user.has_usable_password():
+            if user.is_active:
                 active_user_found = True
+                if user.has_usable_password():
+                    password_usable_user_found = True
+                    break
 
         # No active user found, raise a validation error
         if not active_user_found:
             raise exceptions.ValidationError({
                 'message': [_(
-                    "There is no active user associated with this e-mail address or the password can not be changed")],
+                    "There is no active user associated with this e-mail address")],
+            })
+
+        if active_user_found and not password_usable_user_found:
+            raise exceptions.ValidationError({
+                'message': [_(
+                    "The password for the active user cannot be changed")],
             })
         ip = request.META['REMOTE_ADDR']
         for user in users:
