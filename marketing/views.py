@@ -42,6 +42,7 @@ from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+from tracking.models import Devices, ExportData
 
 
 # Route - /vendor_company/
@@ -709,7 +710,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             url = ""
             if export:
                 url = export_to_csv(
-                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "submission_details_list"
                 )
 
             if sub_data == "error":
@@ -1305,6 +1306,13 @@ class InterviewViewSets(ModelViewSet):
             serializer = InterviewListSerializer(queryset, many=True)
             if serializer.data:
                 report = get_interview_report(serializer.data, request)
+                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
+                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+                if devices_cookies:
+                    ExportData.objects.create(
+                    name="interview_list",
+                    device=devices_cookies
+                )
                 return report
             return Response({"message": "No Data to Extract"}, status=400)
         except Exception as error:
@@ -2603,7 +2611,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         obj.feedback, engineer_associated
                     ])
                 file.close()
-                url = generate_s3_url(file_name)
+                url = generate_s3_url(file_name, request, "get_marketing_list_data")
 
             data = TestListSerializer(queryset[first:last], many=True).data
             return Response({"counts": counts, "data": data, "url": url}, status=200)

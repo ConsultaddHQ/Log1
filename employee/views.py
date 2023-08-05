@@ -23,6 +23,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from api_key.models import APIKey
+from tracking.models import Devices, Location
 from project.models import Project, ProjectSupport
 from consultant.models import Consultant
 from utils_app.calendar import GoogleCalendar
@@ -34,6 +35,8 @@ from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handove
     DefaultCalendar, CertificateInfo, Certificate
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer
+
+from tracking.utils import get_address_by_location, generate_unique_cookies
 
 
 # Route - /auth/
@@ -81,6 +84,9 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         try:
             employee_id = request.data.get('employee_id', None)
+            latitude = request.data.get('latitude', None)
+            longitude = request.data.get('longitude', None)
+            
             if not employee_id.isnumeric():
                 return Response({"message": "Enter valid Employee Id"}, status=400)
 
@@ -94,6 +100,31 @@ class EmployeeAuthViewSets(GenericViewSet):
             user = queryset.first()
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:
+                # need to check if cookies id is available or not
+                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
+                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+                other_device = Devices.objects.filter(user=user).last()
+                
+                if not devices_cookies:
+                    device_id = other_device.device_id if other_device else 0
+                    cookie_value = generate_unique_cookies()
+                    devices_cookies = Devices.objects.create(
+                        device_id=device_id,
+                        cookies_value=cookie_value,
+                        user=user,
+                    )
+                    # ip address and location needs to determine here
+                    if latitude and longitude:
+                        location_data = get_address_by_location(latitude, longitude)
+                        if location_data:
+                            location = Location.objects.create(
+                                place_name=location_data["address"]["town"],
+                                state=location_data["address"]["state"],
+                                country=location_data["address"]["country"],
+                                pin_code=location_data["address"]["postcode"],
+                                device=devices_cookies
+                            )
+                
                 if not user.account_login:
                     return Response({"message": "Your account is not active"}, status=400)
                 user.last_login = datetime.now()
@@ -109,7 +140,7 @@ class EmployeeAuthViewSets(GenericViewSet):
                     fcm_token.object_id = user.id
                     fcm_token.save()
 
-                return Response({"data": self.login_serializer_class(user).data}, status=202)
+                return Response({"data": self.login_serializer_class(user).data, "cookie":devices_cookies.cookies_value}, status=202)
             return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
         except Exception as error:
             write_exception(message=error)
@@ -344,7 +375,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:
-            return Response({"data": UserDashboardSerializer(request.user).data}, status=200)
+            cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
+            devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+            location = Location.objects.filter(device=devices_cookies).first()
+            return Response({"data": UserDashboardSerializer(request.user).data, 
+                            "is_location_recoded":True if location else False}, status=200)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 

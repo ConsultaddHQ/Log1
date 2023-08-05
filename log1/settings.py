@@ -59,6 +59,7 @@ PROJECT_APPS = [
     'messaging.apps.MessagingConfig',
     'engineering.apps.EngineeringConfig',
     'dashboard.apps.DashboardConfig',
+    'tracking.apps.TrackingConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -140,6 +141,7 @@ CORS_ALLOW_HEADERS = [
     'authorization',
     'accept-encoding',
     'x-requested-with',
+    'X-Id-Token',
 ]
 
 # Swagger

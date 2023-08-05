@@ -94,7 +94,7 @@ def get_engineer_detail_csv(payload, request):
                 ])
                 count += 1
         file.close()
-        file_url = generate_s3_url(file.name)
+        file_url = generate_s3_url(file.name, request, "get_engineer_detail")
         return file_url
     except Exception as error:
         write_exception(error, request)
@@ -139,7 +139,7 @@ def get_team_structure_xlsx(payload, counts, request):
         result.to_excel(writer, sheet_name='Count', index=None)
 
         writer.save()
-        file_url = generate_s3_url(f'team_structure_{filename}.xlsx')
+        file_url = generate_s3_url(f'team_structure_{filename}.xlsx', request, "get_team_structure")
         return file_url
     except Exception as error:
         write_exception(error, request)
@@ -162,7 +162,7 @@ def get_remote_project_csv(payload, request):
                 data['project_detail']['client'], data['project_detail']['timezone'], data['project_detail']['status']
             ])
         file.close()
-        file_url = generate_s3_url(file.name)
+        file_url = generate_s3_url(file.name, request, "get_remote_project")
         return file_url
     except Exception as error:
         write_exception(error, request)

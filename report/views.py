@@ -737,7 +737,7 @@ class MarketingReportViewSets(GenericViewSet):
                 ]
                 if export:
                     url = export_to_csv(
-                        data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                        data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "marketing_report"
                     )
             return Response({"data": data, "total": total, "file_url": url}, status=200)
         except Exception as error:
@@ -835,7 +835,8 @@ class MarketingReportViewSets(GenericViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    "marketing_team_report"
                 )
             return Response({"data": data, "file_url": url}, status=200)
         except Exception as error:
@@ -943,7 +944,8 @@ class MarketingReportViewSets(GenericViewSet):
                 ]
                 if export:
                     url = export_to_csv(
-                        data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                        data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                        "marketing_consultant_wise_report"
                     )
             return Response({'data': data, "total": total, "file_url": url}, status=200)
         except Exception as error:
@@ -995,7 +997,8 @@ class MarketingReportViewSets(GenericViewSet):
             url = ""
             if export:
                 url = export_to_csv(
-                    data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    "marketting_supervisor_list_report"
                 )
             return Response({'data': data, "total": supervisors.count(), "file_url": url}, status=200)
         except Exception as error:
