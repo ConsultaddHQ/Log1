@@ -171,7 +171,6 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 start = datetime.strptime(start, "%Y-%m-%d").date()
                 end = request.data['end_week']
                 end = datetime.strptime(end, "%Y-%m-%d").date()
-                breakpoint()
                 if week_id and week_id != 0:
                     timesheet = TimeSheet.objects.filter(id=week_id,project=project,status__in=["submitted", "rejected"]).first()
                     timesheet.start = start
