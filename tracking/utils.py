@@ -1,10 +1,11 @@
-from geopy.geocoders import Nominatim
+import time
+import uuid
 import string
 import random
-import uuid
-import time
+from geopy.geocoders import Nominatim
 
 app = Nominatim(user_agent="log1 location")
+
 
 def get_address_by_location(latitude, longitude, language="en"):
     """This function returns an address as raw from a location
@@ -15,7 +16,7 @@ def get_address_by_location(latitude, longitude, language="en"):
         return app.reverse(coordinates, language=language).raw
     except:
         return get_address_by_location(latitude, longitude)
-    
+
 
 def generate_unique_cookies():
     unique_id = str(uuid.uuid4().hex)

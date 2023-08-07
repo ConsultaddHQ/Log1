@@ -109,26 +109,28 @@ class EmployeeAuthViewSets(GenericViewSet):
                     device_id = other_device.device_id if other_device else 0
                     cookie_value = generate_unique_cookies()
                     devices_cookies = Devices.objects.create(
+                        user=user,
                         device_id=device_id,
                         cookies_value=cookie_value,
-                        user=user,
                     )
+
                     # ip address and location needs to determine here
                     if latitude and longitude:
                         location_data = get_address_by_location(latitude, longitude)
                         if location_data:
-                            location = Location.objects.create(
-                                place_name=location_data["address"]["town"],
+                            Location.objects.create(
+                                device=devices_cookies,
                                 state=location_data["address"]["state"],
+                                place_name=location_data["address"]["town"],
                                 country=location_data["address"]["country"],
-                                pin_code=location_data["address"]["postcode"],
-                                device=devices_cookies
+                                pin_code=location_data["address"]["postcode"]
                             )
-                
+
                 if not user.account_login:
                     return Response({"message": "Your account is not active"}, status=400)
                 user.last_login = datetime.now()
                 user.save()
+
                 fcm_token = request.data.get("fcm_token", None)
                 if fcm_token:
                     fcm_token, created = FCMDevice.objects.get_or_create(
@@ -140,7 +142,9 @@ class EmployeeAuthViewSets(GenericViewSet):
                     fcm_token.object_id = user.id
                     fcm_token.save()
 
-                return Response({"data": self.login_serializer_class(user).data, "cookie":devices_cookies.cookies_value}, status=202)
+                return Response({
+                    "data": self.login_serializer_class(user).data, "cookie": devices_cookies.cookies_value
+                }, status=202)
             return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
         except Exception as error:
             write_exception(message=error)
