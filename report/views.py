@@ -844,6 +844,7 @@ class MarketingReportViewSets(GenericViewSet):
                 "joined_count": total_joining,
                 "bench_consultant": total_bench,
                 "interview_count": total_interviews,
+                "completion_count": total_completion,
                 "submission_count": total_submissions,
                 "termination_count": total_termination,
             })
