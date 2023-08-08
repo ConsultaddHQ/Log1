@@ -218,7 +218,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     attachments = Attachment.objects.filter(object_id=timesheet.id, is_active=True,
                                                             attachment_type='timesheet')
                     for attachment in attachments:
-                        if attachment.id in perv_attachments:
+                        if str(attachment.id) in perv_attachments:
                             continue
                         attachment.is_active = False
                         attachment.save()
