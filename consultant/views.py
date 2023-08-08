@@ -1273,8 +1273,6 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 consultant_marketing.save()
 
-                name = consultant_marketing.consultant.name
-
                 if len(add_marketers_ids) > 1:
                     marketer_str = "marketers"
                 else:
@@ -1285,35 +1283,35 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 else:
                     team_str = "team"
 
-                activity_description = ""
-                notification_title = ""
+
+                employee_name = request.user.employee_name
+
+                # Initialize a list to store activity descriptions
+                employee_description_parts = ""
 
                 if add_teams_ids:
-                    activity_description += f"{request.user.employee_name} is assigned to {team_str} - {add_teams_names}\n"
-                    notification_title += f"{consultant_marketing.consultant.name} is assigned to {team_str} - {add_teams_names}"
+                    employee_description_parts += f"assigned {team_str} - {', '.join(add_teams_names)}. "
 
                 if add_marketers_ids:
-                    activity_description += f"{request.user.employee_name} assigned following {marketer_str} - {', '.join(add_marketers_names)}\n"
-                    notification_title += f"{request.user.employee_name} assigned following {marketer_str} - {', '.join(add_marketers_names)}"
+                    employee_description_parts += f"assigned {marketer_str} - {', '.join(add_marketers_names)}. "
 
                 if removed_marketers_ids:
-                    activity_description += f"{request.user.employee_name} removed following marketers - {', '.join(remove_marketers_names)}\n"
-                    notification_title += f"{', '.join(remove_marketers_names)} is unassigned from {name}'s marketing"
+                    employee_description_parts += f"removed  {marketer_str} - {', '.join(remove_marketers_names)}. "
 
                 if removed_teams_ids:
-                    activity_description += f"{request.user.employee_name} removed from {remove_teams_names}\n"
-                    notification_title += f"{name} is removed from {remove_teams_names}"
+                    employee_description_parts += f"removed {team_str} - {', '.join(remove_teams_names)}. "
 
-                if activity_description:
-                    # Create a single activity
-                    create_activity(consultant_marketing.consultant.id, 'consultant', request.user,
-                                    activity_description.strip(), 'updated')
-
-                if notification_title:
-                    # Send a single notification
-                    send_notification_for_user(consultant_marketing.consultant, request.user, notification_title,
+                if employee_description_parts:
+                    # Combine employee-related activity descriptions into a single message
+                    employee_activity_description = f"{employee_name} - {employee_description_parts}"
+                    create_activity(
+                        consultant_marketing.consultant.id, 'consultant', request.user,
+                        employee_activity_description, 'updated'
+                    )
+                    send_notification_for_user(consultant_marketing.consultant, request.user, f"{employee_name} update the consultant marketing",
                                                'consultantmarketing')
-                return Response({"message": "Team removed"}, status=202)
+
+                return Response({"message": "Successfully updated"}, status=202)
             else:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
         except Exception as error:
