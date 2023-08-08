@@ -4,6 +4,8 @@ from itertools import chain
 from datetime import timedelta, datetime
 
 from dateutil import tz
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db.models.functions import Lower
 from django.contrib.auth import authenticate
@@ -391,9 +393,16 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             current_password = request.data.get('cur_password')
             new_password = request.data.get('new_password')
             if request.user.check_password(current_password):
-                request.user.set_password(new_password)
-                request.user.save()
-                return Response({"message": "password updated"}, status=200)
+                try:
+                    validate_password(new_password)
+                    request.user.set_password(new_password)
+                    request.user.save()
+                    return Response({"message": "password updated"}, status=200)
+                except ValidationError as errors:
+                    e = ''
+                    for error in errors:
+                        e += error
+                    return Response({"message": e}, status=400)
             return Response({"message": "Wrong Password"}, status=400)
         except Exception as error:
             write_exception(error, request)
