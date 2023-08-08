@@ -171,7 +171,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 start = datetime.strptime(start, "%Y-%m-%d").date()
                 end = request.data['end_week']
                 end = datetime.strptime(end, "%Y-%m-%d").date()
-                if week_id and week_id != 0:
+                if week_id and week_id != '0':
                     timesheet = TimeSheet.objects.filter(id=week_id,project=project,status__in=["submitted", "rejected"]).first()
                     timesheet.start = start
                     timesheet.end = end
@@ -181,7 +181,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     if available_timesheet:
                         timesheet = available_timesheet.first()
                         available_week = f"{timesheet.start} - {timesheet.end}"
-                        return Response({"error": f"Timesheet already exit {available_week}"}, status=400)
+                        return Response({"error": f"Timesheet already exist {available_week}"}, status=400)
 
                     timesheet = TimeSheet.objects.create(
                         start=start, end=end, project=project, status='request',
