@@ -510,15 +510,16 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def apply(self, request, pk, *args, **kwargs):
         try:
             data = request.data
+            consultant = request.user
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
             # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
             leave = Leave.objects.create(
                 leave_type=leave_type,
-                consultant=request.user,
+                consultant=consultant,
                 applied_on=date.today(),
                 to_date=data.get('to_date'),
                 from_date=data.get('from_date'),
-                description=data.get('description', None),
+                description=data.get('description', None)
             )
 
             if data['duration_type'] == 'hourly':
@@ -533,7 +534,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                 total_days = check_days(start, end, request)
                 leave.total_hours = total_days * 8
 
-            leave.status = 'applied'
+            leave.status = 'applied' if not consultant.approval_required else 'pending'
             leave.save()
             leave_type.balance = leave_type.balance - leave.total_hours
             leave_type.save()

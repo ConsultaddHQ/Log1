@@ -309,6 +309,7 @@ class Leave(TimeStampedModel):
         ('applied', 'Applied'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
+        ('pending', 'Pending 1st Level')
     )
     attachment = GenericRelation(Attachment)
     to_date = models.DateField(_("To Date"))

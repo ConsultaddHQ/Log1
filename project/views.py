@@ -1839,6 +1839,34 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=["put"], detail=True, url_name="initial_approval")
+    def initial_approval(self, request, *args, **kwargs):
+        try:
+            mark_as = request.data.get("status", None)
+            if not mark_as:
+                return Response({"message": "status ot found"})
+            consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
+            if not consultant.approval_required:
+                return Response({"message": "approval not required"}, status=400)
+
+            leave = get_object_or_404(Leave, id=kwargs.get('pk'), consultant=consultant)
+            consultant_leave = leave.leave_type
+            leave.remarks = request.data.get('remarks', None)
+            leave.save()
+
+            if mark_as.upper() == "REJECTED":
+                consultant_leave.balance += leave.total_hours
+                consultant_leave.save()
+                leave.status = "rejected"
+            elif mark_as.upper() == "APPROVED":
+                leave.status = "applied"
+            leave.save()
+
+            return Response({"data": "consultant"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /timesheet_event/
 class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, RetrieveModelMixin, UpdateModelMixin,
