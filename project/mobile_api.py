@@ -197,7 +197,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     is_active=True,
                 )
             if not timesheet:
-                return Response({"error": "something went wrong"}, status=400)
+                return Response({"error": "SOMETHING WENT WRONG"}, status=400)
 
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
