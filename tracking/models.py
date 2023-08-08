@@ -34,6 +34,7 @@ class Location(TimeStampedModel):
         return f"Device {self.id}"
 
 
+#name should be a choice field
 class ExportData(TimeStampedModel):
     created = models.DateTimeField(_('Created'), default=timezone.now)
     name = models.CharField(_('Data value type'), max_length=40, null=False, blank=False)

@@ -20,14 +20,14 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    def retrieve(self, request, *args, **kwargs):
-        try:
-            user = get_object_or_404(User, id=kwargs.get('pk'))
-            serializer = TrackingDetailSerializer(user)
-            return Response({"data": serializer.data}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+    # def retrieve(self, request, *args, **kwargs):
+    #     try:
+    #         user = get_object_or_404(User, id=kwargs.get('pk'))
+    #         serializer = TrackingDetailSerializer(user)
+    #         return Response({"data": serializer.data}, status=200)
+    #     except Exception as error:
+    #         write_exception(error, request)
+    #         return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -91,6 +91,29 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
         except Exception as error:
             write_exception(message=error)
             return Response({"message": "Unable to fetch location", "error": str(error)}, status=400)
-    
-    
-    
+
+    @action(methods=['GET'], detail=True, url_path='get_locations')
+    def get_device_locations(self, request, *args, **kwargs):
+        try:
+            device = get_object_or_404(Devices, id=kwargs.get('pk'))
+            location_data = device.location.all().values(
+                'display_name', 'modified'
+            )
+            return Response({"data": location_data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    # @action(methods=['GET'], detail=True, url_path='get_export_info')
+    # def get_device_export(self, request, *args, **kwargs):
+    #     try:
+    #         data = {}
+    #         device = get_object_or_404(Devices, id=kwargs.get('pk'))
+    #         export_dates = set(device.export_data.all().values('created'))
+    #         for date in export_dates:
+    #             exported_items = device.export_data.filter(created=data)
+    #             data =
+    #         return Response({"data": location_data}, status=200)
+    #     except Exception as error:
+    #         write_exception(error, request)
+    #         return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
