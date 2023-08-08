@@ -10,8 +10,8 @@ from log1.utils import write_exception, ERROR_MSG, get_page_limits
 
 from employee.models import User
 from tracking.models import Devices, Location
-from tracking.utils import get_address_by_location, string_to_decimal_point_converter
 from tracking.serializers import TrackingSerializer, TrackingDetailSerializer
+from tracking.utils import get_address_by_location, string_to_decimal_point_converter
 
 
 class TrackingViewSets(GenericViewSet, RetrieveModelMixin):

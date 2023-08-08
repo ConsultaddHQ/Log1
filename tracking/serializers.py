@@ -5,6 +5,7 @@ from rest_framework.authtoken.models import Token
 from tracking.models import Devices, Location, ExportData
 from employee.models import User
 
+
 class TrackingSerializer(serializers.ModelSerializer):
     active_login = serializers.SerializerMethodField()
     export_click = serializers.SerializerMethodField()
@@ -16,7 +17,7 @@ class TrackingSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_export_click(obj):
         devices = obj.devices.all()
-        all_count = 0;
+        all_count = 0
         for device in devices:
             all_count += len(device.export_data.all())
         return all_count
@@ -42,13 +43,13 @@ class TrackingDetailSerializer(serializers.ModelSerializer):
         for device in devices:
             device_location = device.location.all().first()
             if device_location:
-                locations.append( {
-                    "device_id":device.device_id,
-                    "place":device_location.place_name,
-                    "state":device_location.state,
-                    "pin_code":device_location.pin_code,
-                    "country":device_location.country,
-                    "display_name":device_location.display_name,
+                locations.append({
+                    "device_id": device.device_id,
+                    "state": device_location.state,
+                    "country": device_location.country,
+                    "place": device_location.place_name,
+                    "pin_code": device_location.pin_code,
+                    "display_name": device_location.display_name,
                 })
         return locations
 
@@ -66,8 +67,8 @@ class TrackingDetailSerializer(serializers.ModelSerializer):
                     
         for key, value in result_data.items():
             data.append({
-                "type":key,
-                "count":value,
+                "type": key,
+                "count": value,
             })
         return data
     
