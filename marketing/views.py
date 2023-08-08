@@ -1235,6 +1235,9 @@ class InterviewViewSets(ModelViewSet):
                 if 'client' in filters and len(filters["client"]) > 0:
                     queryset = queryset.filter(submission__client__in=filters["client"])
 
+                if 'screening_type' in filters and len(filters["screening_type"]) > 0:
+                    queryset = queryset.filter(screening_type__in=filters["screening_type"])
+
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
 
