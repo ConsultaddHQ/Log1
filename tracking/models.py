@@ -21,10 +21,13 @@ class Devices(TimeStampedModel):
 
 
 class Location(TimeStampedModel):
-    place_name = models.CharField(_('Place'), max_length=20, null=False, blank=False)
-    country = models.CharField(_('Country'), max_length=20,  null=False, blank=False)
+    place_name = models.CharField(_('Place'), max_length=30, null=False, blank=False)
+    country = models.CharField(_('Country'), max_length=30,  null=False, blank=False)
     pin_code = models.IntegerField(_('Pin code'), default=0, null=False, blank=False)
-    state = models.CharField(_('State name'), max_length=20,  null=False, blank=False)
+    state = models.CharField(_('State name'), max_length=30,  null=False, blank=False)
+    display_name = models.CharField(_('Display name'), max_length=200, null=False, blank=False, default="")
+    latitude = models.CharField(_("Latitude"),max_length=10, null=True, blank=False, default="")
+    longitude = models.CharField(_("Longitude"),max_length=10, null=False, blank=False, default="")
     device = models.ForeignKey(Devices, on_delete=models.CASCADE, related_name='location', verbose_name='devices')
 
     def __str__(self):

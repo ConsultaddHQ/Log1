@@ -23,3 +23,9 @@ def generate_unique_cookies():
     random_string = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
     cookies = unique_id[:10] + random_string
     return cookies
+
+
+def string_to_decimal_point_converter(input_string):
+    two_digit_float = float(input_string)
+    two_digit_float = round(two_digit_float, 2)
+    return str(two_digit_float)

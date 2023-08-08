@@ -36,7 +36,7 @@ from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handove
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer
 
-from tracking.utils import get_address_by_location, generate_unique_cookies
+from tracking.utils import get_address_by_location, generate_unique_cookies, string_to_decimal_point_converter
 
 
 # Route - /auth/
@@ -116,15 +116,31 @@ class EmployeeAuthViewSets(GenericViewSet):
 
                     # ip address and location needs to determine here
                     if latitude and longitude:
-                        location_data = get_address_by_location(latitude, longitude)
+                        latitude = string_to_decimal_point_converter(latitude)
+                        longitude = string_to_decimal_point_converter(longitude)
+                        location_data = Location.objects.filter(latitude=latitude,longitude=longitude).first()
                         if location_data:
                             Location.objects.create(
-                                device=devices_cookies,
-                                state=location_data["address"]["state"],
-                                place_name=location_data["address"]["town"],
-                                country=location_data["address"]["country"],
-                                pin_code=location_data["address"]["postcode"]
+                                latitude=latitude,
+                                longitude=longitude,
+                                place_name=location_data.place_name,
+                                state=location_data.state,
+                                country=location_data.country,
+                                pin_code=location_data.pin_code,
+                                display_name=location_data.display_name,
+                                device=devices_cookies
                             )
+                        else:
+                            location_data = get_address_by_location(latitude, longitude)
+                            if location_data:
+                                Location.objects.create(
+                                    device=devices_cookies,
+                                    state=location_data["address"]["state"],
+                                    place_name=location_data["address"]["town"],
+                                    country=location_data["address"]["country"],
+                                    pin_code=location_data["address"]["postcode"],
+                                    display_name = location_data["display_name"]
+                                )
 
                 if not user.account_login:
                     return Response({"message": "Your account is not active"}, status=400)

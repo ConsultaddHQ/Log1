@@ -10,7 +10,7 @@ from log1.utils import write_exception, ERROR_MSG, get_page_limits
 
 from employee.models import User
 from tracking.models import Devices, Location
-from tracking.utils import get_address_by_location
+from tracking.utils import get_address_by_location, string_to_decimal_point_converter
 from tracking.serializers import TrackingSerializer, TrackingDetailSerializer
 
 
@@ -56,16 +56,34 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
             # ip address and location needs to determine here
             if latitude and longitude:
-                location_data = get_address_by_location(latitude, longitude)
+                latitude = string_to_decimal_point_converter(latitude)
+                longitude = string_to_decimal_point_converter(longitude)
+                location_data = Location.objects.filter(latitude=latitude,longitude=longitude).first()
                 if location_data:
                     Location.objects.create(
-                        place_name=location_data["address"]["town"],
-                        state=location_data["address"]["state"],
-                        country=location_data["address"]["country"],
-                        pin_code=location_data["address"]["postcode"],
+                        latitude=latitude,
+                        longitude=longitude,
+                        place_name=location_data.place_name,
+                        state=location_data.state,
+                        country=location_data.country,
+                        pin_code=location_data.pin_code,
+                        display_name=location_data.display_name,
                         device=devices_cookies
                     )
-                return Response({"cookie": devices_cookies.cookies_value}, status=201)
+                else:
+                    location_data = get_address_by_location(latitude, longitude)
+                    if location_data:
+                        Location.objects.create(
+                            latitude=latitude,
+                            longitude=longitude,
+                            place_name=location_data["address"]["town"] if 'town' in location_data["address"] else location_data["address"]['city'] ,
+                            state=location_data["address"]["state"],
+                            country=location_data["address"]["country"],
+                            pin_code=location_data["address"]["postcode"],
+                            display_name = location_data["display_name"],
+                            device=devices_cookies
+                        )
+                return Response({"data":"location added"}, status=201)
             return Response(
                 {"message": "latitude or longitude not proper", "error": "latitude or longitude not proper"},
                 status=400
@@ -73,3 +91,6 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
         except Exception as error:
             write_exception(message=error)
             return Response({"message": "Unable to fetch location", "error": str(error)}, status=400)
+    
+    
+    
