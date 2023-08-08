@@ -10,7 +10,7 @@ from log1.utils import write_exception, ERROR_MSG, get_page_limits
 
 from employee.models import User
 from tracking.models import Devices, Location
-from tracking.serializers import TrackingSerializer, TrackingDetailSerializer
+from tracking.serializers import TrackingSerializer
 from tracking.utils import get_address_by_location, string_to_decimal_point_converter
 
 
@@ -19,15 +19,6 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     serializer_class = TrackingSerializer
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-
-    # def retrieve(self, request, *args, **kwargs):
-    #     try:
-    #         user = get_object_or_404(User, id=kwargs.get('pk'))
-    #         serializer = TrackingDetailSerializer(user)
-    #         return Response({"data": serializer.data}, status=200)
-    #     except Exception as error:
-    #         write_exception(error, request)
-    #         return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -104,16 +95,43 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @action(methods=['GET'], detail=True, url_path='get_export_info')
-    # def get_device_export(self, request, *args, **kwargs):
-    #     try:
-    #         data = {}
-    #         device = get_object_or_404(Devices, id=kwargs.get('pk'))
-    #         export_dates = set(device.export_data.all().values('created'))
-    #         for date in export_dates:
-    #             exported_items = device.export_data.filter(created=data)
-    #             data =
-    #         return Response({"data": location_data}, status=200)
-    #     except Exception as error:
-    #         write_exception(error, request)
-    #         return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+    @action(methods=['GET'], detail=True, url_path='get_export_info')
+    def get_device_export(self, request, *args, **kwargs):
+        try:
+            data = []
+            export_type = request.GET.get('export_type', None)
+            device = get_object_or_404(Devices, id=kwargs.get('pk'))
+            if export_type:
+                exports = device.export_data.filter(name=export_type).values('created')
+            else:
+                exports = device.export_data.all().values('created')
+            exported_dates = set(exports.all().values('created'))
+            for date in exported_dates:
+                exported_items = exports.filter(created=data)
+                data.append({
+                    "date": date.strptime("%Y-%m-%d"), "count": len(exported_items)
+                })
+            return Response({"data": data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['GET'], detail=False, url_path='device_list')
+    def get_device_list(self, request, *args, **kwargs):
+        try:
+            employee = get_object_or_404(User, id=kwargs.get('emp_id'))
+            device_list = employee.devices.all().values_list('device_id', flat=True)
+            return Response({"data": device_list}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['GET'], detail=True, url_path='export_list')
+    def get_export_list(self, request, *args, **kwargs):
+        try:
+            device = get_object_or_404(Devices, id=kwargs.get('pk'))
+            export_types = set(device.export_data.all().values_list('name'))
+            return Response({"data": export_types}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
