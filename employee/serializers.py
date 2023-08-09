@@ -238,6 +238,3 @@ class CertificateInfoSerializer(serializers.ModelSerializer):
             "name": obj.certificate.name, "organization": obj.certificate.issued_by
         }
 
-class ChangePasswordSerializer(serializers.Serializer):
-    cur_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True)
