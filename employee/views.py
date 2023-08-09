@@ -63,17 +63,19 @@ class EmployeeAuthViewSets(GenericViewSet):
             user = User.objects.filter(employee_id__exact=employee_id)
             if user:
                 return Response({"message": "User already exist",
-                                 "data": self.serializer_class(user, many=True).data[0]['email']}, status=406)
+                                 "data": self.serializer_class(user, many=True).data[0]['email']},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
             user = User.objects.create_user(
                 employee_id, email, name, team, gender, phone, password
             )
             for i in role:
                 r = Role.objects.get(name=i)
                 user.role.add(r)
-            return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
+            return Response({"message": "Success", "data": self.serializer_class(user).data},
+                            status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(message=error)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
@@ -84,20 +86,20 @@ class EmployeeAuthViewSets(GenericViewSet):
         try:
             employee_id = request.data.get('employee_id', None)
             if not employee_id.isnumeric():
-                return Response({"message": "Enter valid Employee Id"}, status=400)
+                return Response({"message": "Enter valid Employee Id"}, status=status.HTTP_400_BAD_REQUEST)
 
             if employee_id:
                 queryset = User.objects.filter(employee_id=employee_id)
                 if not queryset:
-                    return Response({"message": "This user not found"}, status=400)
+                    return Response({"message": "This user not found"}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                return Response({"message": "Employee Id is Empty"}, status=400)
+                return Response({"message": "Employee Id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
 
             user = queryset.first()
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:
                 if not user.account_login:
-                    return Response({"message": "Your account is not active"}, status=400)
+                    return Response({"message": "Your account is not active"}, status=status.HTTP_400_BAD_REQUEST)
                 user.last_login = datetime.now()
                 user.save()
                 fcm_token = request.data.get("fcm_token", None)
@@ -111,11 +113,12 @@ class EmployeeAuthViewSets(GenericViewSet):
                     fcm_token.object_id = user.id
                     fcm_token.save()
 
-                return Response({"data": self.login_serializer_class(user).data}, status=202)
-            return Response({"message": "Incorrect Password", "error": "Incorrect Password"}, status=400)
+                return Response({"data": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": "Incorrect Password", "error": "Incorrect Password"},
+                            status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(message=error)
-            return Response({"message": "Unable to Login", "error": str(error)}, status=400)
+            return Response({"message": "Unable to Login", "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /employee/
@@ -129,10 +132,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             user = get_object_or_404(User, id=kwargs.get('pk'))
             serializer = self.serializer_class(user)
-            return Response({"data": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -160,10 +163,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             users = users.filter(employee_name__istartswith=query)
             users = users.annotate(name=F('employee_name')).order_by(Lower('name'))
             data = users.values('id', 'employee_id', 'email', 'name')
-            return Response({"data": data}, status=200)
+            return Response({"data": data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -172,10 +175,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             serializer.is_valid(raise_exception=True)
             serializer.save()
             serializer = self.serializer_class(user)
-            return Response({"result": serializer.data, "message": "User Updated"}, status=202)
+            return Response({"result": serializer.data, "message": "User Updated"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"error": str(error)}, status=400)
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -191,17 +194,19 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             user = User.objects.filter(employee_id__exact=employee_id)
             if user:
                 return Response({"message": "User already exist",
-                                 "data": self.serializer_class(user, many=True).data[0]['email']}, status=406)
+                                 "data": self.serializer_class(user, many=True).data[0]['email']},
+                                status=status.HTTP_406_NOT_ACCEPTABLE)
             user = User.objects.create_user(
                 employee_id, email, name, team, gender, phone, password
             )
             for i in role:
                 r = Role.objects.get(id=i)
                 user.role.add(r)
-            return Response({"message": "Success", "data": self.serializer_class(user).data}, status=201)
+            return Response({"message": "Success", "data": self.serializer_class(user).data},
+                            status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['put'], detail=False, url_path='technology')
     def technology(self, request):
@@ -210,11 +215,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             if technology:
                 request.user.technology = technology
                 request.user.save()
-                return Response({"message": "Technologies Updated"}, status=202)
-            return Response({"message": "Input is empty"}, status=400)
+                return Response({"message": "Technologies Updated"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": "Input is empty"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=False, url_path='bulk_register')
     def bulk_register(self, request, *args, **kwargs):
@@ -227,7 +232,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             elif file_extension == 'xlsx':
                 df = pd.read_excel(file)
             else:
-                return Response({"message": "File format not supported"}, status=400)
+                return Response({"message": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
 
             created, failed, already = 0, 0, 0
             error = ""
@@ -265,10 +270,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 "Created": created,
                 "Already Exist": already,
             }
-            return Response({"message": "Success", "data": data}, status=201)
+            return Response({"message": "Success", "data": data}, status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['put'], detail=False, url_path='profile')
     def profile(self, request):
@@ -299,11 +304,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 user.save()
                 if len(desc) > 0:
                     create_activity(user.id, 'user', request.user, desc, 'updated')
-                return Response({"message": f"{user.employee_name}'s Profile updated"}, status=202)
-            return Response({"message": DONT_HAVE_ACCESS}, status=401)
+                return Response({"message": f"{user.employee_name}'s Profile updated"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['put'], detail=False, url_path='account')
     def account(self, request):
@@ -316,16 +321,17 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                     user.account_login = account_login
                     user.save()
                 else:
-                    return Response({"message": "Parameter is not correct", "error": str(account_login)}, status=400)
+                    return Response({"message": "Parameter is not correct", "error": str(account_login)},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
             if account_login:
                 message = "Activated"
             else:
                 message = "Deactivated"
-            return Response({"message": f"Account {message}"}, status=202)
+            return Response({"message": f"Account {message}"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='profile_activity')
     def profile_activity(self, request):
@@ -333,31 +339,31 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             user_id = request.GET.get('employee')
             content_type = ContentType.objects.get(model='user')
             activities = Activity.objects.filter(content_type=content_type, activity_type="updated", object_id=user_id
-                                                ).order_by('-created').values()
+                                                 ).order_by('-created').values()
             all_activities = []
             for activity in activities:
                 if 's team from ' in activity['desc'] or 'changed role to ' in activity['desc']:
                     all_activities.append(activity)
 
-            return Response({"data": all_activities}, status=200)
+            return Response({"data": all_activities}, status=status.HTTP_200_OK)
         except Exception as error:
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)        
-    
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:
-            return Response({"data": UserDashboardSerializer(request.user).data}, status=200)
+            return Response({"data": UserDashboardSerializer(request.user).data}, status=status.HTTP_200_OK)
         except Exception as error:
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='role')
     def role(self, request):
         try:
             roles = Role.objects.all().values('id', 'name', 'display_name')
-            return Response({"data": roles}, status=200)
+            return Response({"data": roles}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
@@ -370,10 +376,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 teams = Team.objects.filter(dept=department).values('id', 'name')
             else:
                 teams = Team.objects.all().values('id', 'name')
-            return Response({"data": teams}, status=200)
+            return Response({"data": teams}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request):
@@ -385,7 +391,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         fcm_token = FCMDevice.objects.filter(object_id=token.user.id, content_type__model='user')
         if fcm_token:
             fcm_token.delete()
-        return Response(status=204)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
@@ -397,14 +403,14 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                     validate_password(new_password)
                     request.user.set_password(new_password)
                     request.user.save()
-                    return Response({"message": "password updated"}, status=200)
+                    return Response({"message": "password updated"}, status=status.HTTP_200_OK)
                 except ValidationError as errors:
                     e = ''.join(error for error in errors)
-                    return Response({"message": e}, status=400)
-            return Response({"message": "Wrong Password"}, status=400)
+                    return Response({"message": e}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='directory')
     def directory(self, request):
@@ -427,11 +433,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                     users = users.filter(role__id=role)
                 total = users.count()
                 serializer = UserDirectorySerializer(users[first:last], many=True)
-                return Response({"data": serializer.data, "total": total}, status=200)
-            return Response({"message": DONT_HAVE_ACCESS}, status=403)
+                return Response({"data": serializer.data, "total": total}, status=status.HTTP_200_OK)
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN_FORBIDDEN)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['put'], detail=False, url_path='update')
     def update_user(self, request):
@@ -447,25 +453,25 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             if request.FILES.get('image'):
                 employee.avatar = request.FILES['image']
             employee.save()
-            return Response({"message": "User Profile Updated"}, status=202)
+            return Response({"message": "User Profile Updated"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='shifts')
     def shift_timings(self, request):
         try:
             data = User.SHIFT_CHOICE
-            return Response({"data": data}, status=200)
+            return Response({"data": data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='get_projects')
     def projects(self, request):
         try:
             projects = ProjectSupport.objects.filter(
-                statuses__frequency__in=['active', 'less_active'],  end=None,
+                statuses__frequency__in=['active', 'less_active'], end=None,
                 statuses__is_current=True, is_proxy_support=False, support=request.user
             ).exclude(project__statuses__is_current=True,
                       project__statuses__status__istartswith='terminated' or 'cancelled').annotate(
@@ -474,10 +480,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 client=F('project__submission__client'), vendor=F('project__submission__lead__vendor_company__name'),
             ).values("project_id", "client", "consultant_name", "employer", "vendor")
 
-            return Response({"data": projects}, status=200)
+            return Response({"data": projects}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='projects')
     def verify_project(self, request):
@@ -495,11 +501,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 client=F('submission__client'), vendor=F('submission__lead__vendor_company__name'),
             ).values("id", "client", "consultant_name", "employer", "vendor")
             if not project:
-                return Response({"data": [], "message": "No Project Found"}, status=200)
-            return Response({"data": project, "message": "Project Found"}, status=200)
+                return Response({"data": [], "message": "No Project Found"}, status=status.HTTP_200_OK)
+            return Response({"data": project, "message": "Project Found"}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='associated_to')
     def associated(self, request):
@@ -510,10 +516,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             if primary_team not in request.user.associated_to.all() and primary_team.dept != 'Recruitment':
                 assigned_teams.append({"id": primary_team.id, "name": primary_team.name})
             assigned_teams.extend(associated_teams)
-            return Response({"data": assigned_teams}, status=200)
+            return Response({"data": assigned_teams}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /password/
@@ -584,13 +590,14 @@ class ResetPasswordViewSets(GenericViewSet):
                 }
                 res, error = user.send_mail(mail_data)
                 if error == "ok":
-                    return Response({"message": f"Mail sent on {user.email}", "data": res}, status=200)
+                    return Response({"message": f"Mail sent on {user.email}", "data": res}, status=status.HTTP_200_OK)
                 else:
                     write_info(message=res, function='token_request')
-                    return Response({"message": "Something went wrong", "error": str(res)}, status=400)
+                    return Response({"message": "Something went wrong", "error": str(res)},
+                                    status=status.HTTP_400_BAD_REQUEST)
             else:
-                return Response({"message": "User is not active"}, status=400)
-        return Response({"message": "Something went wrong"}, status=400)
+                return Response({"message": "User is not active"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"message": "Something went wrong"}, status=status.HTTP_400_BAD_REQUEST)
 
     def valid_token(self, data):
         """
@@ -656,11 +663,11 @@ class ResetPasswordViewSets(GenericViewSet):
         try:
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
-                return Response({'message': 'OTP Verified'}, status=200)
-            return Response({'message': 'Invalid OTP'}, status=400)
+                return Response({'message': 'OTP Verified'}, status=status.HTTP_200_OK)
+            return Response({'message': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
@@ -686,15 +693,15 @@ class ResetPasswordViewSets(GenericViewSet):
                     reset_password_token.user.set_password(password)
                     reset_password_token.user.save()
                     ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
-                    return Response({'message': 'Password changed successfully'}, status=200)
+                    return Response({'message': 'Password changed successfully'}, status=status.HTTP_200_OK)
                 except ValidationError as errors:
                     e = ''.join(error for error in errors)
-                    return Response({"message": e}, status=400)
+                    return Response({"message": e}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                return Response({'message': 'Invalid OTP'}, status=400)
+                return Response({'message': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /assets/
@@ -710,10 +717,10 @@ class AssetsViewSets(ModelViewSet):
         try:
             asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
             serializer = self.serializer_class(asset)
-            return Response({"data": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def list(self, request, *args, **kwargs):
         try:
@@ -734,10 +741,10 @@ class AssetsViewSets(ModelViewSet):
                 "number_asset": number_asset.values(*self.field_list),
                 "job_board_asset": job_board_asset.values(*self.field_list),
             }
-            return Response({"data": data}, status=200)
+            return Response({"data": data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -752,11 +759,11 @@ class AssetsViewSets(ModelViewSet):
             serializer = self.serializer_class(asset, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response({"data": serializer.data, "message": "Asset added"}, status=201)
-            return Response({"message": str(serializer.errors)}, status=400)
+                return Response({"data": serializer.data, "message": "Asset added"}, status=status.HTTP_201_CREATED)
+            return Response({"message": str(serializer.errors)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -783,10 +790,10 @@ class AssetsViewSets(ModelViewSet):
                 desc = f"{request.user.employee_name.title()} updated {final_string} of " \
                        f"{serializer.data['asset_type']} asset"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
-            return Response({"data": serializer.data, "message": "Asset updated"}, status=202)
+            return Response({"data": serializer.data, "message": "Asset updated"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -795,13 +802,13 @@ class AssetsViewSets(ModelViewSet):
             asset.save()
             desc = f"{request.user.employee_name.title()} deleted {asset.asset_type} asset"
             create_activity(asset.id, 'asset', request.user, desc, 'deleted')
-            return Response(status=204)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, *args, **kwargs):
-        return Response({"detail": "Method PATCH not allowed."}, status=405)
+        return Response({"detail": "Method PATCH not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
@@ -809,7 +816,7 @@ class AssetsViewSets(ModelViewSet):
         assets = request.data.get('assets', [])
         try:
             if len(assets) < 1:
-                return Response({"message": "Please select Asset"}, status=404)
+                return Response({"message": "Please select Asset"}, status=status.HTTP_404_NOT_FOUND)
 
             for asset_id in assets:
                 asset = get_object_or_404(Asset, id=asset_id, owner=request.user)
@@ -824,10 +831,10 @@ class AssetsViewSets(ModelViewSet):
                     names)
                 desc = f"{request.user.employee_name.title()} shared {asset.asset_type} asset to {user_list}"
                 create_activity(asset.id, 'asset', request.user, desc, 'updated')
-            return Response({"message": "Asset shared"}, status=202)
+            return Response({"message": "Asset shared"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['put'], detail=True, url_path='un_share')
     def un_share(self, request, pk):
@@ -838,10 +845,10 @@ class AssetsViewSets(ModelViewSet):
             desc = f"{request.user.employee_name} Unshared {user.employee_name} from {asset.asset_type} asset"
             create_activity(asset.id, 'asset', request.user, desc, 'updated')
             serializer = self.serializer_class(asset)
-            return Response({"data": serializer.data}, status=202)
+            return Response({"data": serializer.data}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=False, url_path='bulk_upload')
     def bulk_upload(self, request):
@@ -854,13 +861,13 @@ class AssetsViewSets(ModelViewSet):
             elif file_extension == 'xlsx':
                 df = pd.read_excel(file)
             else:
-                return Response({"message": "File format not supported"}, status=400)
+                return Response({"message": "File format not supported"}, status=status.HTTP_400_BAD_REQUEST)
             if not df.empty:
                 created, updated, failed = 0, 0, 0
                 if not {'Username', 'Provider', 'Password', 'Asset Type', 'Email', 'Technology',
                         'Remarks', 'Phone Number', 'Alternate Email', 'Alternate Number'
                         }.issubset(set(df.columns)):
-                    return Response({"message": "Invalid Data Format"}, status=404)
+                    return Response({"message": "Invalid Data Format"}, status=status.HTTP_404_NOT_FOUND)
 
                 for index, row in df.iterrows():
                     if pd.isnull(row["Username"]):
@@ -914,11 +921,12 @@ class AssetsViewSets(ModelViewSet):
                 message = "mail send fail"
                 if result:
                     message = "mail sent successfully"
-                return Response({"message": "Upload Complete", "count": mail_data['context'], "mail":message}, status=201)
-            return Response({"message": "Empty File"}, status=404)
+                return Response({"message": "Upload Complete", "count": mail_data['context'], "mail": message},
+                                status=status.HTTP_201_CREATED)
+            return Response({"message": "Empty File"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /users/
@@ -940,10 +948,10 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             ).values('id', 'name', 'type')
 
             result_list = list(chain(consultants[:5], users[:5]))
-            return Response({"data": result_list}, status=200)
+            return Response({"data": result_list}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='calendar_info')
     def calendar_info(self, request):
@@ -952,9 +960,9 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             if data:
                 json_data = json.loads(data)
                 if 'emails' not in json_data:
-                    return Response({"message": "Please select user"}, status=400)
+                    return Response({"message": "Please select user"}, status=status.HTTP_400_BAD_REQUEST)
                 if len(json_data["emails"]) < 1:
-                    return Response({"message": "Please select user"}, status=400)
+                    return Response({"message": "Please select user"}, status=status.HTTP_400_BAD_REQUEST)
 
                 # 2021-02-11T09:00:00 datetime format (EST)
                 tz_est = tz.gettz('US/Eastern')
@@ -970,7 +978,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
                 else:
                     end = f"{datetime.now().astimezone(tz_est).strftime('%Y-%m-%dT23:59:59Z')}"
             else:
-                return Response({"message": "Provide correct input"}, status=400)
+                return Response({"message": "Provide correct input"}, status=status.HTTP_400_BAD_REQUEST)
 
             payload = {
                 "start": start, "end": end, "user_emails": json_data["emails"]
@@ -978,11 +986,12 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             calendar = GoogleCalendar()
             resp, msg = calendar.get_calendar_schedule(payload, request)
             if msg != 'error':
-                return Response({"data": resp}, status=200)
-            return Response({"message": resp['message'], "error": resp['error']['error']}, status=400)
+                return Response({"data": resp}, status=status.HTTP_200_OK)
+            return Response({"message": resp['message'], "error": resp['error']['error']},
+                            status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /handover/
@@ -1003,12 +1012,12 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
                 handover.save()
                 desc = f"{request.user.employee_name} handed-over {user.employee_name} to {handover_to_name}"
                 create_activity(user.id, 'user', request.user, desc, 'created')
-                return Response({"message": f"User handed over to {handover_to_name}"}, status=201)
+                return Response({"message": f"User handed over to {handover_to_name}"}, status=status.HTTP_201_CREATED)
             else:
-                return Response({"message": "You don't have permission to Handover"}, status=403)
+                return Response({"message": "You don't have permission to Handover"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1026,38 +1035,39 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
                     desc = f"{request.user.employee_name} changed handover of {user.employee_name} from " \
                            f"{prev_handover}  to {handover_to_name}"
                     create_activity(user.id, 'user', request.user, desc, 'update')
-                    return Response({"message": f"User handed over to {handover_to_name}"}, status=202)
+                    return Response({"message": f"User handed over to {handover_to_name}"},
+                                    status=status.HTTP_202_ACCEPTED)
                 else:
-                    return Response({"message": "Handover not found"}, status=404)
+                    return Response({"message": "Handover not found"}, status=status.HTTP_404_NOT_FOUND)
             else:
-                return Response({"message": "You don't have permission to Handover"}, status=403)
+                return Response({"message": "You don't have permission to Handover"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         try:
             if 'superadmin' in request.user.roles:
                 user_id = kwargs.get('pk', None)
                 if not user_id:
-                    return Response({"message": f"User is not provided"}, status=400)
+                    return Response({"message": f"User is not provided"}, status=status.HTTP_400_BAD_REQUEST)
                 user = get_object_or_404(User, id=user_id)
                 handovers = Handover.objects.filter(user_id=user_id)
                 if handovers:
                     desc = f"{request.user.employee_name} removed handover of {user.employee_name}"
                     create_activity(user.id, 'user', request.user, desc, 'update')
                     handovers.delete()
-                    return Response({"message": f"User handover removed"}, status=202)
+                    return Response({"message": f"User handover removed"}, status=status.HTTP_202_ACCEPTED)
                 else:
-                    return Response({"message": "Handover not found"}, status=404)
+                    return Response({"message": "Handover not found"}, status=status.HTTP_404_NOT_FOUND)
             else:
-                return Response({"message": "You don't have permission to Handover"}, status=403)
+                return Response({"message": "You don't have permission to Handover"}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, *args, **kwargs):
-        return Response({"detail": "Method PATCH not allowed."}, status=405)
+        return Response({"detail": "Method PATCH not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
 # Route - /login/
@@ -1070,9 +1080,9 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
         try:
             api_key = request.data.get('log1_api_key', None)
             if not api_key:
-                return Response({"message": "Api Key not found"}, status=401)
+                return Response({"message": "Api Key not found"}, status=status.HTTP_401_UNAUTHORIZED)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"message": "Unauthorized"}, status=401)
+                return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
             team = request.data.get('team', None)
             if isinstance(team, str):
@@ -1094,10 +1104,10 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
                 user.role.add(user_role)
                 user.save()
 
-            return Response({"message": "User Created in Log1", "user_id": user.id}, status=201)
+            return Response({"message": "User Created in Log1", "user_id": user.id}, status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": result, "error": str(error)}, status=400)
+            return Response({"message": result, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['post'], detail=False, url_path='bulk_create')
     def create_bulk(self, request):
@@ -1105,9 +1115,9 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
         try:
             api_key = request.data.get('log1_api_key', None)
             if not api_key:
-                return Response({"message": "Api Key not found"}, status=401)
+                return Response({"message": "Api Key not found"}, status=status.HTTP_401_UNAUTHORIZED)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"message": "Unauthorized"}, status=401)
+                return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
             roles, record_list = [], []
             records = request.data.get('data')
@@ -1138,57 +1148,57 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             result["users"] = users
             result["msg"] = f"{len(users)} users  Created"
 
-            return Response({"result": result}, status=201)
+            return Response({"result": result}, status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": result, "error": str(error)}, status=400)
+            return Response({"message": result, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         try:
             api_key = request.data.get('log1_api_key', None)
             if not api_key:
-                return Response({"message": "Api Key not found"}, status=401)
+                return Response({"message": "Api Key not found"}, status=status.HTTP_401_UNAUTHORIZED)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"message": "Unauthorized"}, status=401)
+                return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
             user = get_object_or_404(User, id=kwargs.get('pk'))
             if user:
                 user.delete()
-                return Response({"message": "User Removed"}, status=204)
-            return Response({"message": "User not found"}, status=400)
+                return Response({"message": "User Removed"}, status=status.HTTP_204_NO_CONTENT)
+            return Response({"message": "User not found"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['delete'], detail=False, url_path='bulk_delete')
     def delete_bulk(self, request, ):
         try:
             api_key = request.data.get('log1_api_key', None)
             if not api_key:
-                return Response({"message": "Api Key not found"}, status=401)
+                return Response({"message": "Api Key not found"}, status=status.HTTP_401_UNAUTHORIZED)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"message": "Unauthorized"}, status=401)
+                return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
             users = User.objects.filter(employee_id__in=request.data.get('users', [])).delete()
             data = {"msg": f"{len(users)} users  removed from beats"}
-            return Response({"result": data}, status=204)
+            return Response({"result": data}, status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['put'], detail=True, url_path='update_user')
     def update_user(self, request, pk):
         try:
             api_key = request.data.get('log1_api_key', None)
             if not api_key:
-                return Response({"message": "Api Key not found"}, status=401)
+                return Response({"message": "Api Key not found"}, status=status.HTTP_401_UNAUTHORIZED)
             if not APIKey.objects.is_valid(api_key):
-                return Response({"message": "Unauthorized"}, status=401)
+                return Response({"message": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
 
             user = User.objects.filter(employee_id=pk).first()
             user_previous_data = User.objects.filter(employee_id=pk).values()
 
             if not user:
-                return Response({"message": "User not exists"}, status=400)
+                return Response({"message": "User not exists"}, status=status.HTTP_400_BAD_REQUEST)
 
             user_roles = request.data.get('role', [])
             user_previous_role = user.role.all()
@@ -1206,10 +1216,10 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             user.team = Team.objects.get(name=request.data['team']) if request.data.get('team') else user.team
             user.save()
             return Response({'data': user_previous_data, 'role': user_previous_role.values(),
-                             "result": "User updated on log1 successfully"}, status=201)
+                             "result": "User updated on log1 successfully"}, status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /calendar_info/
@@ -1225,21 +1235,21 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
                 obj, msg = DefaultCalendar.objects.get_or_create(user=request.user)
                 obj.emails = request.data['emails']
                 obj.save()
-                return Response({"message": "Emails set as default"}, status=200)
+                return Response({"message": "Emails set as default"}, status=status.HTTP_200_OK)
 
-            return Response({"message": "No emails provided to set set default"}, status=400)
+            return Response({"message": "No emails provided to set set default"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='get_default')
     def default(self, request, *args, **kwargs):
         try:
             default = DefaultCalendar.objects.filter(user=request.user).first()
             if not default:
-                return Response({"data": []}, status=200)
+                return Response({"data": []}, status=status.HTTP_200_OK)
             if not default.emails:
-                return Response({"data": []}, status=200)
+                return Response({"data": []}, status=status.HTTP_200_OK)
             data = {"emails": default.emails}
             start = f"{datetime.now().astimezone(tz.gettz('US/Eastern')).strftime('%Y-%m-%dT00:00:00Z')}"
             end = f"{datetime.now().astimezone(tz.gettz('US/Eastern')).strftime('%Y-%m-%dT23:59:59Z')}"
@@ -1249,11 +1259,12 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
             calendar = GoogleCalendar()
             resp, msg = calendar.get_calendar_schedule(payload, request)
             if msg != 'error':
-                return Response({"data": resp}, status=200)
-            return Response({"message": resp['message'], "error": resp['error']['error']}, status=400)
+                return Response({"data": resp}, status=status.HTTP_200_OK)
+            return Response({"message": resp['message'], "error": resp['error']['error']},
+                            status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /employee_certificate/
@@ -1267,10 +1278,10 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
         try:
             certificates = CertificateInfo.objects.filter(employee=request.user)
             serializer = self.serializer_class(certificates, many=True)
-            return Response({"data": serializer.data}, status=200)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -1282,7 +1293,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
                     name__icontains=certificate_name, issued_by=organization
                 )
                 if available_certificate:
-                    return Response({"message": "Certificate Info Already Exists"}, status=400)
+                    return Response({"message": "Certificate Info Already Exists"}, status=status.HTTP_400_BAD_REQUEST)
                 certificate = Certificate.objects.create(name=certificate_name, issued_by=organization)
             CertificateInfo.objects.create(
                 expiry_date=request.data.get('expiry_date', None), issued_date=request.data.get('issued_date'),
@@ -1292,10 +1303,10 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             user = get_object_or_404(User, id=request.user.id)
             user.have_certificate = True
             user.save()
-            return Response({"message": "Certificate Added"}, status=200)
+            return Response({"message": "Certificate Added"}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -1303,20 +1314,20 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             serializer = self.serializer_class(certificate_info, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
-                return Response({"message": "Certificate Info Updated"}, status=202)
-            return Response({"message": "Please provide correct certificate info"}, status=400)
+                return Response({"message": "Certificate Info Updated"}, status=status.HTTP_202_ACCEPTED)
+            return Response({"message": "Please provide correct certificate info"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
         try:
             certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
             certificate_info.delete()
-            return Response(status=204)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(['PUT'], detail=False, url_path='mark_certificate')
     def mark_certificate(self, request, *args, **kwargs):
@@ -1324,10 +1335,10 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             user = get_object_or_404(User, id=request.user.id)
             user.have_certificate = request.data.get('have_certificate')
             user.save()
-            return Response({"data": "Data updated successfully"}, status=202)
+            return Response({"data": "Data updated successfully"}, status=status.HTTP_202_ACCEPTED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(['GET'], detail=False, url_path='get_all')
     def get_all(self, request, *args, **kwargs):
@@ -1337,16 +1348,16 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             organization_name = request.GET.get('organization_name', 'false')
             certificates = Certificate.objects.all()
             if organization:
-                certificates = certificates.filter().order_by('issued_by')\
+                certificates = certificates.filter().order_by('issued_by') \
                     .distinct('issued_by').values_list('issued_by', flat=True)
-                return Response({"data": certificates}, status=200)
+                return Response({"data": certificates}, status=status.HTTP_200_OK)
 
             if organization_name:
                 certificates = certificates.filter(issued_by=organization_name)
             if query:
                 certificates = certificates.filter(name__icontains=query.lstrip().replace(':amp:', '&'))
             certificates = certificates.filter().values('id', 'name', 'issued_by')
-            return Response({"data": certificates}, status=200)
+            return Response({"data": certificates}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": str(error)}, status=400)
+            return Response({"message": str(error)}, status=status.HTTP_400_BAD_REQUEST)
