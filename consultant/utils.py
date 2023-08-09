@@ -735,6 +735,16 @@ def candidate_filter(request):
                         date_of_birth__gte=filters['dob'].get('gte', None)
                     )
 
+            if 'created' in filters:
+                if 'lte' in filters['created'] and filters['created'].get('lte'):
+                    lte = (datetime.strptime(
+                        filters['created']['lte'], '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
+                    consultants = consultants.filter(created__lte=lte)
+                if 'gte' in filters['created']:
+                    consultants = consultants.filter(
+                        created__gte=filters['created'].get('gte', None)
+                    )
+
         if query:
             query = query.lstrip().replace(':amp:', '&')
             consultants = consultants.filter(
