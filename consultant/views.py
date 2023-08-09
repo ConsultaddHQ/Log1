@@ -1333,7 +1333,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             action = "added to pool" if in_pool else "removed from pool"
             desc = f"{consultant_marketing.consultant.name} {action} by {request.user.employee_name}"
             create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"message": "Updated in_pool status"}, status=202)
+            return Response({"message": "Updated in pool status"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
