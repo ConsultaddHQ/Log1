@@ -237,4 +237,3 @@ class CertificateInfoSerializer(serializers.ModelSerializer):
         return {
             "name": obj.certificate.name, "organization": obj.certificate.issued_by
         }
-
