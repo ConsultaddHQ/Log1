@@ -35,7 +35,8 @@ from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG,
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time, \
     DefaultCalendar, CertificateInfo, Certificate
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
-    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer
+    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer, \
+    ChangePasswordSerializer
 
 
 # Route - /auth/
@@ -683,12 +684,19 @@ class ResetPasswordViewSets(GenericViewSet):
         try:
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
-                reset_password_token.user.set_password(password)
-                reset_password_token.user.save()
-                ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
-                return Response({'message': 'Password changed successfully'}, status=200)
+                try:
+                    validate_password(request.data.get('password'))
+                    reset_password_token.user.set_password(password)
+                    reset_password_token.user.save()
+                    ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
+                    return Response({'message': 'Password changed successfully'}, status=200)
+                except ValidationError as errors:
+                    e = ''
+                    for error in errors:
+                        e += error
+                    return Response({"message": e}, status=400)
             else:
-                return Response({'message': 'Invalid OTP'}, status=200)
+                return Response({'message': 'Invalid OTP'}, status=400)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
