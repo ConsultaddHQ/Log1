@@ -119,7 +119,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['GET'], detail=False, url_path='device_list')
     def get_device_list(self, request, *args, **kwargs):
         try:
-            employee = get_object_or_404(User, id=kwargs.get('emp_id'))
+            employee = get_object_or_404(User, employee_id=request.GET['emp_id'])
             device_list = employee.devices.all().values_list('device_id', flat=True)
             return Response({"data": device_list}, status=200)
         except Exception as error:

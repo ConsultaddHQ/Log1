@@ -6,10 +6,11 @@ from employee.models import User
 class TrackingSerializer(serializers.ModelSerializer):
     active_login = serializers.SerializerMethodField()
     export_click = serializers.SerializerMethodField()
+    devices = serializers.SerializerMethodField()
     
     class Meta:
         model = User
-        fields = ('id', 'employee_id', 'email', 'employee_name', 'active_login', 'export_click')
+        fields = ('id', 'employee_id', 'email', 'employee_name', 'active_login', 'export_click', 'devices')
 
     @staticmethod
     def get_export_click(obj):
@@ -24,6 +25,10 @@ class TrackingSerializer(serializers.ModelSerializer):
         login_count = len(obj.devices.all())
         return login_count
     
+    @staticmethod
+    def get_devices(obj):
+        return obj.devices.all().values_list('id', flat=True)
+        
     
 # class TrackingDetailSerializer(serializers.ModelSerializer):
 #     location = serializers.SerializerMethodField()
