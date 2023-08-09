@@ -35,8 +35,7 @@ from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG,
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time, \
     DefaultCalendar, CertificateInfo, Certificate
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
-    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer, \
-    ChangePasswordSerializer
+    AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer
 
 
 # Route - /auth/
