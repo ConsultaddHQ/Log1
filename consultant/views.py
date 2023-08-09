@@ -1323,17 +1323,17 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
         try:
             try:
                 consultant_marketing = ConsultantMarketing.objects.get(id=pk, status="open")
-                in_pool = request.data.get('in_pool')
+                in_pool = request.GET.get('in_pool',False)
                 consultant_marketing.in_pool = in_pool
                 consultant_marketing.save()
             except ConsultantMarketing.DoesNotExist:
                 # Handle the case where the consultant is not found
-                return Response({"error": "Marketing cycle stopped"}, status=404)
+                return Response({"error": "Marketing cycle not found"}, status=404)
 
             action = "added to pool" if in_pool else "removed from pool"
             desc = f"{consultant_marketing.consultant.name} {action} by {request.user.employee_name}"
             create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
-            return Response({"message": "Marketing cycle stopped"}, status=202)
+            return Response({"message": "Updated in_pool status"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
