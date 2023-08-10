@@ -105,11 +105,11 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
                 exports = device.export_data.filter(name=export_type).values('created')
             else:
                 exports = device.export_data.all().values('created')
-            exported_dates = set(exports.all().values('created'))
+            exported_dates = set(exports.all().values_list('created', flat=True))
             for date in exported_dates:
-                exported_items = exports.filter(created=data)
+                exported_items = exports.filter(created=date.strftime('%Y-%m-%d'))
                 data.append({
-                    "date": date.strptime("%Y-%m-%d"), "count": len(exported_items)
+                    "date": date.strftime("%Y-%m-%d"), "count": len(exported_items)
                 })
             return Response({"data": data}, status=200)
         except Exception as error:

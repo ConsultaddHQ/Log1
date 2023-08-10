@@ -136,7 +136,7 @@ class EmployeeAuthViewSets(GenericViewSet):
                                 Location.objects.create(
                                     device=devices_cookies,
                                     state=location_data["address"]["state"],
-                                    place_name=location_data["address"]["town"],
+                                    place_name=location_data["address"]["town"] if 'town' in location_data["address"] else location_data["address"]["city"],
                                     country=location_data["address"]["country"],
                                     pin_code=location_data["address"]["postcode"],
                                     display_name = location_data["display_name"]

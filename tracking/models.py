@@ -31,7 +31,7 @@ class Location(TimeStampedModel):
     device = models.ForeignKey(Devices, on_delete=models.CASCADE, related_name='location', verbose_name='devices')
 
     def __str__(self):
-        return f"Device {self.id}"
+        return f"Location {self.id}"
 
 
 #name should be a choice field
@@ -41,4 +41,4 @@ class ExportData(TimeStampedModel):
     device = models.ForeignKey(Devices, on_delete=models.CASCADE, related_name='export_data', verbose_name='devices')
 
     def __str__(self):
-        return f"Device {self.id}"
+        return f"Data {self.id}"
