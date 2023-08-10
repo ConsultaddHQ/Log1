@@ -94,7 +94,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             locations_qs = device.location.all()
 
             if 'start' and 'end' in filter_json:
-                locations_qs = locations_qs.filter(start__gte=filter_json['start'], end__lte=filter_json['end'])
+                locations_qs = locations_qs.filter(created__gte=filter_json['start'], created__lte=filter_json['end'])
 
             location_data = locations_qs.values('display_name', 'modified')
             return Response({"data": location_data}, status=200)
