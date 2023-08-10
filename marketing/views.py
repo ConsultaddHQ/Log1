@@ -710,7 +710,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             url = ""
             if export:
                 url = export_to_csv(
-                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "submission_details_list"
+                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Submission Details List"
                 )
 
             if sub_data == "error":

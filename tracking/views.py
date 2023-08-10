@@ -1,4 +1,5 @@
-from django.db.models import F
+import json
+from django.db.models import F, Q
 from rest_framework.mixins import *
 from django.db.models.functions import Lower
 from rest_framework.decorators import action
@@ -17,8 +18,8 @@ from tracking.utils import get_address_by_location, string_to_decimal_point_conv
 class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     queryset = User.objects.all()
     serializer_class = TrackingSerializer
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated,)
+    # authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -26,11 +27,13 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             query = request.GET.get('query', None)
             users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
             if query:
-                users = users.filter(employee_name__istartswith=query)
+                users = users.filter(Q(employee_name__istartswith=query) | Q(employee_id__istartswith=query))
 
             users = users.annotate(name=F('employee_name')).order_by(Lower('name'))
             serializer_data = self.serializer_class(users, many=True).data
-            serializer_data.sort(key=lambda x: -x['active_login'])
+            serializer_data.sort(
+                key=lambda x: -x[request.GET.get('sort_by') if request.GET.get('sort_by') != 'null' else 'active_login']
+            )
 
             return Response({"data": serializer_data[first: last], "total": len(serializer_data)}, status=200)
         except Exception as error:
@@ -86,10 +89,14 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     @action(methods=['GET'], detail=True, url_path='get_locations')
     def get_device_locations(self, request, *args, **kwargs):
         try:
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
             device = get_object_or_404(Devices, id=kwargs.get('pk'))
-            location_data = device.location.all().values(
-                'display_name', 'modified'
-            )
+            locations_qs = device.location.all()
+
+            if 'start' and 'end' in filter_json:
+                locations_qs = locations_qs.filter(start__gte=filter_json['start'], end__lte=filter_json['end'])
+
+            location_data = locations_qs.values('display_name', 'modified')
             return Response({"data": location_data}, status=200)
         except Exception as error:
             write_exception(error, request)
@@ -101,13 +108,18 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             data = []
             export_type = request.GET.get('export_type', None)
             device = get_object_or_404(Devices, id=kwargs.get('pk'))
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
+
+            export_qs = device.export_data.all()
+
+            if 'start' and 'end' in filter_json:
+                export_qs = export_qs.filter(created__gte=filter_json['start'], created__lte=filter_json['end'])
             if export_type:
-                exports = device.export_data.filter(name=export_type).values('created')
-            else:
-                exports = device.export_data.all().values('created')
-            exported_dates = set(exports.all().values_list('created', flat=True))
+                export_qs = export_qs.filter(name=export_type).values('created')
+
+            exported_dates = set(export_qs.values_list('created', flat=True))
             for date in exported_dates:
-                exported_items = exports.filter(created=date.strftime('%Y-%m-%d'))
+                exported_items = export_qs.filter(created=date.strftime('%Y-%m-%d'))
                 data.append({
                     "date": date.strftime("%Y-%m-%d"), "count": len(exported_items)
                 })
