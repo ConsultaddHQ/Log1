@@ -19,8 +19,8 @@ from tracking.utils import get_address_by_location, string_to_decimal_point_conv
 class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     queryset = User.objects.all()
     serializer_class = TrackingSerializer
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated,)
+    # authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -124,9 +124,9 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
 
             exported_dates = set(export_qs.values_list('created', flat=True))
             for date in exported_dates:
-                exported_items = export_qs.filter(created=date.strftime('%Y-%m-%d'))
+                exported_items = export_qs.filter(created=date)
                 data.append({
-                    "date": date.strftime("%Y-%m-%d"), "count": len(exported_items)
+                    "date": date.strftime("%Y-%m-%d"), "count": exported_items.count()
                 })
             return Response({"data": data}, status=200)
         except Exception as error:
