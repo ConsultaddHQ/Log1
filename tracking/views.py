@@ -19,8 +19,8 @@ from tracking.utils import get_address_by_location, string_to_decimal_point_conv
 class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     queryset = User.objects.all()
     serializer_class = TrackingSerializer
-    # permission_classes = (IsAuthenticated,)
-    # authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -109,7 +109,6 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     def get_device_export(self, request, *args, **kwargs):
         try:
             data = []
-            export_type = request.GET.get('export_type', None)
             device = get_object_or_404(Devices, id=kwargs.get('pk'))
             filter_json = json.loads(request.GET.get('filter_json', '{}'))
 
@@ -120,8 +119,8 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
                 end = (datetime.strptime(filter_json['end'], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
                 export_qs = export_qs.filter(created__gte=start, created__lt=end)
 
-            if export_type:
-                export_qs = export_qs.filter(name=export_type).values('created')
+            if 'export_type' in filter_json:
+                export_qs = export_qs.filter(name=filter_json['export_type']).values('created')
 
             exported_dates = set(export_qs.values_list('created', flat=True))
             for date in exported_dates:
@@ -148,7 +147,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     def get_export_list(self, request, *args, **kwargs):
         try:
             device = get_object_or_404(Devices, id=kwargs.get('pk'))
-            export_types = set(device.export_data.all().values_list('name'))
+            export_types = set(device.export_data.all().values_list('name', flat=True))
             return Response({"data": export_types}, status=200)
         except Exception as error:
             write_exception(error, request)
