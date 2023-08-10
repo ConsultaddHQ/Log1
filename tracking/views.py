@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import json
 from django.db.models import F, Q
 from rest_framework.mixins import *
@@ -52,7 +53,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             if latitude and longitude:
                 latitude = string_to_decimal_point_converter(latitude)
                 longitude = string_to_decimal_point_converter(longitude)
-                location_data = Location.objects.filter(latitude=latitude,longitude=longitude).first()
+                location_data = Location.objects.filter(latitude=latitude, longitude=longitude).first()
                 if location_data:
                     Location.objects.create(
                         latitude=latitude,
@@ -94,7 +95,9 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             locations_qs = device.location.all()
 
             if 'start' and 'end' in filter_json:
-                locations_qs = locations_qs.filter(created__gte=filter_json['start'], created__lte=filter_json['end'])
+                start = filter_json['start']
+                end = (datetime.strptime(filter_json['end'], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+                locations_qs = locations_qs.filter(created__gte=start, created__lt=end)
 
             location_data = locations_qs.values('display_name', 'modified')
             return Response({"data": location_data}, status=200)
@@ -113,7 +116,10 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             export_qs = device.export_data.all()
 
             if 'start' and 'end' in filter_json:
-                export_qs = export_qs.filter(created__gte=filter_json['start'], created__lte=filter_json['end'])
+                start = filter_json['start']
+                end = (datetime.strptime(filter_json['end'], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+                export_qs = export_qs.filter(created__gte=start, created__lt=end)
+
             if export_type:
                 export_qs = export_qs.filter(name=export_type).values('created')
 
