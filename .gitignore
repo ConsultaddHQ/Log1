@@ -8,6 +8,7 @@
 /htmlcov
 .idea
 .env
+env/
 /static
 /media
 /logs
