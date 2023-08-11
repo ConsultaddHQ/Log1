@@ -981,28 +981,35 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     @action(methods=['get'], detail=False, url_path='similar_submission')
     def submission_check(self, request):
         try:
+            f_vendor = f_client = f_consultant = None
             filter_by = request.GET.get('filter_by', None)
             if request.GET.get('lead_id') == "0":
                 try:
                     obj = get_object_or_404(VendorCompany, id=request.GET.get('company_id'))
-                    vendor_company = obj.name
+                    vendor_company_id = obj.id
                 except VendorCompany.DoesNotExist:
-                    vendor_company = ""
+                    vendor_company_id = None
             else:
                 lead = get_object_or_404(Lead, id=request.GET.get('lead_id'))
-                vendor_company = lead.vendor_company.name
+                vendor_company_id = lead.vendor_company_id
 
-            f_vendor = Q(lead__vendor_company__name__icontains=vendor_company)
-            f_client = Q(client__icontains=request.GET.get('client'))
-            f_consultant = Q(consultant_marketing__consultant__id=request.GET.get('consultant_id'))
+            if vendor_company_id:
+                f_vendor = Q(lead__vendor_company_id=vendor_company_id)
+            if request.GET.get('client', None):
+                f_client = Q(client__istartswith=request.GET['client'])
+            if request.GET.get('consultant_id', None):
+                f_consultant = Q(consultant_marketing__consultant__id=request.GET['consultant_id'])
 
-            if filter_by == "client":
-                queryset = Submission.objects.filter(f_client, f_consultant)
-            elif filter_by == "vendor":
-                queryset = Submission.objects.filter(f_vendor, f_consultant)
+            if filter_by == "client" and f_client:
+                filter_qs = f_client & f_consultant
+            elif filter_by == "vendor" and f_vendor:
+                filter_qs = f_vendor & f_consultant
+            elif f_client and f_vendor and f_consultant:
+                filter_qs = f_client & f_vendor & f_consultant
             else:
-                queryset = Submission.objects.filter(f_vendor, f_consultant, f_client)
+                filter_qs = Q(consultant_marketing__consultant__id=request.GET['consultant_id'])
 
+            queryset = Submission.objects.filter(filter_qs)
             data = queryset.annotate(
                 marketer_name=F('created_by__employee_name'),
                 consultant_name=F('consultant_marketing__consultant__name'),
@@ -1228,6 +1235,9 @@ class InterviewViewSets(ModelViewSet):
 
                 if 'client' in filters and len(filters["client"]) > 0:
                     queryset = queryset.filter(submission__client__in=filters["client"])
+
+                if 'screening_type' in filters and len(filters["screening_type"]) > 0:
+                    queryset = queryset.filter(screening_type__in=filters["screening_type"])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])

@@ -81,7 +81,7 @@ def create_cron_error(job, description):
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
         if os.environ.get('ENV', 'local') == 'prod':
-            send_email_without_template(mail_data, 'log1.consultadd@gmail.com')
+            send_email_without_template(mail_data, 'log1.consultadd@gmail.com', None, None)
     except Exception as error:
         write_exception(message=error)
 
