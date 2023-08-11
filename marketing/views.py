@@ -2614,7 +2614,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                         test_type.get('answer') if test_type else 'offline' if obj.is_offline else 'online',
                     ])
                 file.close()
-                url = generate_s3_url(file_name, request, "get_marketing_list_data")
+                url = generate_s3_url(file_name, request, "Marketing List Data")
 
             data = TestListSerializer(queryset[first:last], many=True).data
             return Response({"counts": counts, "data": data, "url": url}, status=200)

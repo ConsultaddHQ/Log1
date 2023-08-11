@@ -537,7 +537,7 @@ class ProjectViewSets(ModelViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "project_list"
+                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Project List"
                 )
             return Response({"counts": data_count, "data": serializer.data, "file_url": url}, status=200)
         except Exception as error:
@@ -1968,7 +1968,8 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                 {"name": "feedback", "display_name": "Feedback"},
             ]
             file_url = export_to_csv(
-                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "event_feedback"
+                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                request, "Event Feedback"
             )
             return Response({"data": file_url}, status=200)
         except Exception as error:
@@ -2075,8 +2076,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 ]
                 file_url = export_to_csv(
                     data, columns, f"consultant_rate_revision_{datetime.now().strftime('%d-%B-%Y')}.csv",
-                    None, 
-                    "consultant_rate_revision"
+                    None, "Consultant Rate Revision"
                 )
             return Response({"data": data[first: last], "url": file_url, "total": len(data)}, status=200)
         except Exception as error:

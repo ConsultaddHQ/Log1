@@ -28,7 +28,7 @@ class Command(BaseCommand):
                         data.get('type'), data.get('round'), data.get('client'), data.get('start'), data.get('position')
                     ])
             file.close()
-            file_url = generate_s3_url(file.name, request, "Get Interview List")
+            file_url = generate_s3_url(file.name)
             return file_url
         except Exception as error:
             write_info(message=f"{error}", function='create_csv_file')

@@ -17,13 +17,14 @@ TECHNOLOGIES = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 
 
 def generate_s3_url(filename, request=None, export_type=None):
     try:
-        cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
-        devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
-        if devices_cookies:
-            ExportData.objects.create(
-                name=export_type,
-                device=devices_cookies
-            )
+        if request:
+            cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
+            devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+            if devices_cookies:
+                ExportData.objects.create(
+                    name=export_type,
+                    device=devices_cookies
+                )
         file = open(f'{filename}', 'rb')
         session = boto3.Session()
         s3 = session.client(
