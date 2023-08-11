@@ -122,7 +122,6 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             if 'export_type' in filter_json:
                 export_qs = export_qs.filter(name=filter_json['export_type']).values('created')
 
-<<<<<<< HEAD
             exported_dates = []
             for exported_date in export_qs.values_list('created', flat=True):
                 exported_dates.append(exported_date.strftime("%Y-%m-%d"))
@@ -131,13 +130,6 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
                 exported_items = export_qs.filter(created__date=date)
                 data.append({
                     "date": date, "count": exported_items.count()
-=======
-            exported_dates = set(export_qs.values_list('created', flat=True))
-            for date in exported_dates:
-                exported_items = export_qs.filter(created=date)
-                data.append({
-                    "date": date.strftime("%Y-%m-%d"), "count": exported_items.count()
->>>>>>> 8f54f58094aafadf95e48dc9106c4ec0885cdc26
                 })
             return Response({"data": data}, status=200)
         except Exception as error:
