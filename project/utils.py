@@ -208,11 +208,17 @@ def create_notification_and_send_push(timesheet, request, category):
     target_content_type = ContentType.objects.get(model='timesheet')
     recipient_content_type = ContentType.objects.get(model='consultant')
 
+    work_type = timesheet.project.submission.work_type
+    if work_type == "c2c":
+        action = "Timesheet"
+    else:
+        action = "Paystubs"
+
     if timesheet.remark or len(timesheet.remark) != 0:
-        title = f"Timesheet {category} for week end {str(timesheet.end)} for client " \
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
                 f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
     else:
-        title = f"Timesheet {category} for week end {str(timesheet.end)} for client " \
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
                 f"{timesheet.project.submission.client}"
 
     Notification.objects.create(

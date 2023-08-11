@@ -35,6 +35,8 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
+from tracking.views import TrackingViewSets
+
 
 router = DefaultRouter()
 schema_view = get_swagger_view(title='Log1')
@@ -102,6 +104,8 @@ router.register(r'support_report', EngineeringReportViewSets)
 router.register(r'marketing_report', MarketingReportViewSets)
 
 router.register(r'comment', CommentViewSet)
+# tracking app
+router.register(r'tracking', TrackingViewSets)
 
 router.register(r'impersonate', ImpersonateViewSets)
 
