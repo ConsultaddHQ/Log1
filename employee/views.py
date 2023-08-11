@@ -193,9 +193,15 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             query = request.GET.get('query', '')
             teams = request.GET.get('teams', None)
+            is_active = request.GET.get('is_active', None)
             user_type = request.GET.get('type', None)
             associate = json.loads(request.GET.get('associate', 'false'))
-            users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
+            users = User.objects.exclude(role__name='consultant')
+            if is_active:
+                users = users.filter(is_active=True, account_login=True)
+            else:
+                users = users.exclude(account_login=False)
+
             if user_type:
                 users = users.filter(role__name__iexact=user_type)
             elif teams:
