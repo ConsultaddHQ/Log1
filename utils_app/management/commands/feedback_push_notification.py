@@ -49,11 +49,11 @@ class Command(BaseCommand):
                 data = {
                     "title": "consultant feedback due",
                     "category": "alert",
-                    "target_type": "user",
+                    "target_type": "feedback",
                     "sender_user_type": "user",
                     "recipient_user_type": "user",
                     "sender_id": support_person.support.id,
-                    "target_id": support_person.support.id,
+                    "target_id": support_person.project.consultant.id,
                     "description":
                         f"your {support_person.project.consultant.name} feedback were not given form last 30 days"
                 }
@@ -72,7 +72,7 @@ class Command(BaseCommand):
                         'is_read': False,
                         'is_deleted': False,
                         'timestamp': str(timezone.now()),
-                        'target_id': support_person.support.id
+                        'target_id': support_person.project.consultant.id
                     },
                 }
                 push_notification([support_person.support.id], message_body)
