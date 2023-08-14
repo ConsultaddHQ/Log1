@@ -15,16 +15,23 @@ TECHNOLOGIES = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
 
 
+def add_export_log(export_type, request):
+    try:
+        cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
+        devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+        if devices_cookies:
+            ExportData.objects.create(
+                name=export_type,
+                device=devices_cookies
+            )
+    except Exception as error:
+        write_exception(message=error, request=request)
+
+
 def generate_s3_url(filename, request=None, export_type=None):
     try:
         if request:
-            cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
-            devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
-            if devices_cookies:
-                ExportData.objects.create(
-                    name=export_type,
-                    device=devices_cookies
-                )
+            add_export_log(export_type, request)
         file = open(f'{filename}', 'rb')
         session = boto3.Session()
         s3 = session.client(

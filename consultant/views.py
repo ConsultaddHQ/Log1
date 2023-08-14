@@ -19,6 +19,7 @@ from project.utils import fetch_scrum_masters
 from utils_app.utils import get_timezone
 from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
+from utils_app.utils import get_timezone, add_export_log
 from activity.serializers import Activity, ActivitySerializer
 from project.models import ProjectStatus, ConsultantFeedback, FEEDBACK_CHOICES
 from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
@@ -175,7 +176,7 @@ class ConsultantV2ViewSets(ModelViewSet):
             response['Content-Disposition'] = "attachment; filename=Consultants.csv"
             for consultant in consultants:
                 writer.writerow([consultant.name, consultant.email, consultant.phone_no])
-
+            add_export_log("Consultant Info", request)
             return response
         except Exception as error:
             write_exception(error, request)
