@@ -1455,3 +1455,137 @@ def log1_consultant_feedback(view_func):
         }
     )(view_func)
     return decorated_view
+
+
+def consultant_auth_register(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                "name": openapi.Schema(type=openapi.TYPE_STRING, description='Name of consultant'),
+                "company": openapi.Schema(type=openapi.TYPE_STRING, description='Company of consultant'),
+                "website": openapi.Schema(type=openapi.TYPE_STRING, description='Website of consultant'),
+                "designation": openapi.Schema(type=openapi.TYPE_STRING, description='Designation of consultant'),
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email of consultant')
+            },
+            ['email']
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"result": "mail sent"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view
+
+
+def consultant_auth_login(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email of consultant'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password of consultant'),
+                'uuid': openapi.Schema(type=openapi.TYPE_STRING, description='UUID of consultant'),
+                'fcm_token': openapi.Schema(type=openapi.TYPE_STRING, description='FCM token of consultant'),
+                'device_type': openapi.Schema(type=openapi.TYPE_STRING, description='Device type of consultant')
+            },
+            ['email', 'password']
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {"token": 12344, "id": 1122, "name": "test",
+                                                         "project": {"id": 1, "start_date": "2022-01-01",
+                                                                     "client": "Apple", "employer": "Consultadd"},
+                                                         "email": "consultant@test.com", "is_active": True,
+                                                         "first_login": True}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view
+
+
+def consultant_auth_app_version(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            200: {'description': 'Success', 'response': {"result": "3.0.1"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view
+
+
+def list_consultant_app(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            200: {'description': 'Success', 'response': {"results": [
+                {"id": 1121, "token": "08197a32ac85c8a42018e0aa6908a43457ead083", "email": "chintan.limbanii@gmail.com",
+                 "name": "Chintan Sureshbhai Limbani", "is_active": True, "project": [], "first_login": True}]}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view
+
+
+def consultant_app_change_password(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {'name': 'first_login', 'description': 'Is this the first login', 'type': openapi.TYPE_BOOLEAN,
+             'required': True},
+        ],
+        body_params=[
+            {
+                'new_password': openapi.Schema(type=openapi.TYPE_STRING, description='New Password of consultant'),
+                'current_password': openapi.Schema(type=openapi.TYPE_STRING,
+                                                   description='Current Password of consultant'),
+            },
+            ['new_password', 'current_password']
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"result": "Password Updated"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view
+
+
+def consultant_app_logout(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {'name': 'HTTP_UUID', 'description': 'UUID of consultant', 'type': openapi.TYPE_STRING, 'required': True},
+        ],
+        responses={
+            204: {'description': 'No Content'},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view
+
+
+def consultant_password_token_request(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email ID of consultant')
+            },
+            ['email']
+        ],
+        responses={
+            200: {'description': 'Success', 'description': {"status": "OK"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view
+
+
+def consultant_password_confirm_password(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password of consultant'),
+                'token': openapi.Schema(type=openapi.TYPE_STRING, description='Token of consultant'),
+            },
+            ['password', 'token']
+        ],
+        responses={
+            200: {'description': 'Success', 'description': {"status": "OK"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+    return decorated_view

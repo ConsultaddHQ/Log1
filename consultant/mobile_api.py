@@ -13,9 +13,9 @@ from rest_framework.viewsets import GenericViewSet
 
 from constance import config
 
-# from consultant.swagger import consultant_auth_register, consultant_auth_login, consultant_auth_app_version, \
-#     list_consultant_app, consultant_app_change_password, consultant_app_logout, consultant_password_token_request, \
-#     consultant_password_confirm_password
+from consultant.swagger import consultant_auth_register, consultant_auth_login, consultant_auth_app_version, \
+    list_consultant_app, consultant_app_change_password, consultant_app_logout, consultant_password_token_request, \
+    consultant_password_confirm_password
 from project.models import Project
 # from utils_app.mailing import send_email
 from utils_app.thred_mail import send_email
@@ -35,7 +35,7 @@ class ConsultantAuthViewSet(GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantLoginSerializer
 
-    # @consultant_auth_register
+    @consultant_auth_register
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
@@ -81,7 +81,7 @@ class ConsultantAuthViewSet(GenericViewSet):
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
-    # @consultant_auth_login
+    @consultant_auth_login
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
         """
@@ -129,7 +129,7 @@ class ConsultantAuthViewSet(GenericViewSet):
         write_info(message=email, function='ConsultantAuthViewSet_login', request=request)
         return Response({"error": "Incorrect Email Id OR Password"}, status=400)
 
-    # @consultant_auth_app_version
+    @consultant_auth_app_version
     @action(methods=['get'], detail=False, url_path='app_version')
     def app_version(self, request):
         try:
@@ -147,7 +147,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    # @list_consultant_app
+    @list_consultant_app
     def list(self, request, *args, **kwargs):
         try:
             queryset = Consultant.objects.all()
@@ -157,7 +157,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    # @consultant_app_change_password
+    @consultant_app_change_password
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
         try:
@@ -186,7 +186,7 @@ class ConsultantAppViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    # @consultant_app_logout
+    @consultant_app_logout
     @action(methods=['delete'], detail=False, url_path='logout')
     def logout(self, request):
         try:
@@ -206,7 +206,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
     serializer_class = EmailSerializer
     queryset = Consultant.objects.all()
 
-    # @consultant_password_token_request
+    @consultant_password_token_request
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -264,7 +264,7 @@ class ConsultantResetPasswordViewSet(GenericViewSet):
                     return Response({'error': str(res)}, status=400)
         return Response({'status': 'OK'}, status=200)
 
-    # @consultant_password_confirm_password
+    @consultant_password_confirm_password
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
         serializer = PasswordTokenSerializer(data=request.data)
