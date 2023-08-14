@@ -99,7 +99,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
                 end = (datetime.strptime(filter_json['end'], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
                 locations_qs = locations_qs.filter(created__gte=start, created__lt=end)
 
-            location_data = locations_qs.values('display_name', 'modified')
+            location_data = locations_qs.values('display_name', 'modified').order_by('-id')
             return Response({"data": location_data}, status=200)
         except Exception as error:
             write_exception(error, request)
