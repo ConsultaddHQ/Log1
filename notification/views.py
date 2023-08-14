@@ -13,10 +13,10 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from marketing.models import Interview
-from notification.swagger import create_fcm_token, list_emp_notify, emp_notify_mark_as_read, emp_notify_mark_all_read, \
-    emp_notify_count, emp_notify_push_notification, emp_notify_remind_me_later, emp_notify_notification_due, \
-    list_con_notify, con_notify_count, con_notify_mark_as_delete, con_notify_mark_not_delete, \
-    con_notify_mark_all_delete, con_notify_mark_as_read, con_notify_mark_all_read
+# from notification.swagger import create_fcm_token, list_emp_notify, emp_notify_mark_as_read, emp_notify_mark_all_read, \
+#     emp_notify_count, emp_notify_push_notification, emp_notify_remind_me_later, emp_notify_notification_due, \
+#     list_con_notify, con_notify_count, con_notify_mark_as_delete, con_notify_mark_not_delete, \
+#     con_notify_mark_all_delete, con_notify_mark_as_read, con_notify_mark_all_read
 from project.models import ProjectSupport
 from consultant.permissions import ConsultantIsAuthenticated
 from log1.utils import get_page_limits, write_exception, ERROR_MSG
@@ -32,7 +32,7 @@ class FCMDeviceViewSet(GenericViewSet, CreateModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @create_fcm_token
+    # @create_fcm_token
     def create(self, request, *args, **kwargs):
         try:
             fcm_token = request.data.get('fcm_token', None)
@@ -61,7 +61,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
     authentication_classes = (TokenAuthentication,)
     serializer_class = NotificationSerializer
 
-    @list_emp_notify
+    # @list_emp_notify
     @never_cache
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
@@ -80,7 +80,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @emp_notify_mark_as_read
+    # @emp_notify_mark_as_read
     @action(methods=['get'], detail=True, url_path='mark_as_read')
     def mark_as_read(self, request, pk):
         try:
@@ -92,7 +92,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @emp_notify_mark_all_read
+    # @emp_notify_mark_all_read
     @action(methods=['get'], detail=False, url_path='mark_all_read')
     def mark_all_read(self, request):
         try:
@@ -102,7 +102,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @emp_notify_count
+    # @emp_notify_count
     @action(methods=['get'], detail=False, url_name='count')
     def count(self, request):
         try:
@@ -113,7 +113,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @emp_notify_push_notification
+    # @emp_notify_push_notification
     @action(methods=['get'], detail=False, url_name='push_notification')
     def push_notification(self, request):
         consultant_id = request.GET.get('consultant_id')
@@ -139,7 +139,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @emp_notify_remind_me_later
+    # @emp_notify_remind_me_later
     @action(methods=['post'], detail=False, url_path='remind_me_later')
     def remind_me_later(self, request):
         try:
@@ -186,7 +186,7 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @emp_notify_notification_due
+    # @emp_notify_notification_due
     @action(methods=['get'], detail=True, url_path='notification_due')
     def notification_due(self, request, pk):
         try:
@@ -346,7 +346,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @list_con_notify
+    # @list_con_notify
     @never_cache
     def list(self, request, *args, **kwargs):
         try:
@@ -359,7 +359,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @con_notify_count
+    # @con_notify_count
     @action(methods=['get'], detail=False, url_name='count')
     def count(self, request):
         try:
@@ -370,7 +370,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @con_notify_mark_as_delete
+    # @con_notify_mark_as_delete
     @action(methods=['get'], detail=True, url_name='mark_as_delete')
     def mark_as_delete(self, request, pk):
         try:
@@ -387,7 +387,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @con_notify_mark_not_delete
+    # @con_notify_mark_not_delete
     @action(methods=['get'], detail=True, url_name='mark_not_delete')
     def mark_not_delete(self, request, pk):
         try:
@@ -404,7 +404,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @con_notify_mark_all_delete
+    # @con_notify_mark_all_delete
     @action(methods=['get'], detail=False, url_name='mark_all_delete')
     def mark_all_delete(self, request):
         try:
@@ -414,7 +414,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @con_notify_mark_as_read
+    # @con_notify_mark_as_read
     @action(methods=['get'], detail=True, url_name='mark_as_read')
     def mark_as_read(self, request, pk):
         try:
@@ -431,7 +431,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @con_notify_mark_all_read
+    # @con_notify_mark_all_read
     @action(methods=['get'], detail=False, url_name='mark_all_read')
     def mark_all_read(self, request):
         try:

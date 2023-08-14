@@ -20,24 +20,24 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 import project.models
 from engineering.utils import assigned_test_points
-from marketing.swagger import retrieve_v2_submission, v2_submission_tabs, v2_submission_documents, \
-    v2_submission_profile, v2_submission_resume, v2_submission_activities, v2_submission_employer, \
-    v2_submission_interviews, v2_submission_tests, v2_submission_support, v2_submission_project, list_vendor_company, \
-    create_vendor_company, retrieve_vendor_contact, list_vendor_contact, create_vendor_contact, list_lead, \
-    retrieve_lead, create_lead, update_lead, destroy_lead, lead_get_archived, lead_put_archived, v2_submission_fields, \
-    list_submission, submission_create, update_submission, submission_feedback_due, submission_feedback_check, \
-    submission_resume, submission_suggestions, submission_did_you_mean, submission_client, submission_work_type, \
-    submission_similar_submission, retrieve_vendor_layer, create_vendor_layer, update_vendor_layer, \
-    destroy_vendor_layer, retrieve_interview, list_interview, interview_export, interview_export_detail, \
-    create_interview, update_interview, destroy_interview, interview_status, interview_reschedule, interview_cancel, \
-    interview_fields, interview_update_notes, interview_put_upload_recording, interview_delete_upload_recording, \
-    interview_recording, interview_suggestions, interview_repeat, interview_assign_guest, interview_guest_feedback, \
-    interview_feedback_questions, interview_put_supervisor_feedback, interview_post_supervisor_feedback, \
-    interview_reasons, test_list, create_test, update_test, test_fields, get_test_status, get_test_platform, \
-    test_assign, test_submit, test_feedback, test_engineer_feedback, list_question, create_question, question_parent, \
-    list_marketing_team, retrieve_marketing_team, create_marketing_team, update_marketing_team, \
-    marketing_team_update_shift, marketing_team_get_teams, marketing_team_compare_teams, marketing_team_move_employee, \
-    marketing_team_update_scrum, marketing_team_remove_team, engineer_detail_test
+# from marketing.swagger import retrieve_v2_submission, v2_submission_tabs, v2_submission_documents, \
+#     v2_submission_profile, v2_submission_resume, v2_submission_activities, v2_submission_employer, \
+#     v2_submission_interviews, v2_submission_tests, v2_submission_support, v2_submission_project, list_vendor_company, \
+#     create_vendor_company, retrieve_vendor_contact, list_vendor_contact, create_vendor_contact, list_lead, \
+#     retrieve_lead, create_lead, update_lead, destroy_lead, lead_get_archived, lead_put_archived, v2_submission_fields, \
+#     list_submission, submission_create, update_submission, submission_feedback_due, submission_feedback_check, \
+#     submission_resume, submission_suggestions, submission_did_you_mean, submission_client, submission_work_type, \
+#     submission_similar_submission, retrieve_vendor_layer, create_vendor_layer, update_vendor_layer, \
+#     destroy_vendor_layer, retrieve_interview, list_interview, interview_export, interview_export_detail, \
+#     create_interview, update_interview, destroy_interview, interview_status, interview_reschedule, interview_cancel, \
+#     interview_fields, interview_update_notes, interview_put_upload_recording, interview_delete_upload_recording, \
+#     interview_recording, interview_suggestions, interview_repeat, interview_assign_guest, interview_guest_feedback, \
+#     interview_feedback_questions, interview_put_supervisor_feedback, interview_post_supervisor_feedback, \
+#     interview_reasons, test_list, create_test, update_test, test_fields, get_test_status, get_test_platform, \
+#     test_assign, test_submit, test_feedback, test_engineer_feedback, list_question, create_question, question_parent, \
+#     list_marketing_team, retrieve_marketing_team, create_marketing_team, update_marketing_team, \
+#     marketing_team_update_shift, marketing_team_get_teams, marketing_team_compare_teams, marketing_team_move_employee, \
+#     marketing_team_update_scrum, marketing_team_remove_team, engineer_detail_test
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -68,7 +68,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
     serializer_class = VendorCompanySerializer
     authentication_classes = (TokenAuthentication,)
 
-    @list_vendor_company
+    # @list_vendor_company
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get("query", "").lstrip().replace(':amp:', '&')
@@ -81,7 +81,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_vendor_company
+    # @create_vendor_company
     def create(self, request, *args, **kwargs):
         if not ('admin' in request.user.roles or 'superadmin' in request.user.roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
@@ -118,7 +118,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
     serializer_class = VendorContactSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @retrieve_vendor_contact
+    # @retrieve_vendor_contact
     def retrieve(self, request, *args, **kwargs):
         try:
             contact = VendorContact.objects.filter(company_id=kwargs.get('pk'), created_by=request.user)
@@ -128,7 +128,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @list_vendor_contact
+    # @list_vendor_contact
     def list(self, request, *args, **kwargs):
         try:
             contact = VendorContact.objects.filter(company_id=request.GET.get('company'), created_by=request.user)
@@ -138,7 +138,7 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_vendor_contact
+    # @create_vendor_contact
     def create(self, request, *args, **kwargs):
         email = request.data.get('email', None)
         company = request.data.get('company', None)
@@ -216,7 +216,7 @@ class LeadViewSets(ModelViewSet):
         ).values('id', 'job_desc', 'city', 'job_title', 'position_name', 'primary_skill', 'company_id',
                  'company_name', 'is_w2', 'status', 'created', 'modified', 'submission_count', 'position_type')
 
-    @list_lead
+    # @list_lead
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
@@ -261,7 +261,7 @@ class LeadViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @retrieve_lead
+    # @retrieve_lead
     def retrieve(self, request, *args, **kwargs):
         try:
             queryset = Lead.objects.filter(id=kwargs.get('pk'))
@@ -273,7 +273,7 @@ class LeadViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_lead
+    # @create_lead
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
@@ -296,7 +296,7 @@ class LeadViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_lead
+    # @update_lead
     def update(self, request, *args, **kwargs):
         try:
             queryset = Lead.objects.filter(id=kwargs.get('pk'), owner=request.user)
@@ -336,7 +336,7 @@ class LeadViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @destroy_lead
+    # @destroy_lead
     def destroy(self, request, *args, **kwargs):
         try:
             lead = get_object_or_404(Lead, id=kwargs.get('pk'))
@@ -367,8 +367,8 @@ class LeadViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @lead_get_archived
-    @lead_put_archived
+    # @lead_get_archived
+    # @lead_put_archived
     @action(methods=['get', 'put'], detail=False, url_path='archived')
     def archived(self, request):
         try:
@@ -403,7 +403,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
     serializer_class = SubmissionSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @retrieve_v2_submission
+    # @retrieve_v2_submission
     def retrieve(self, request, *args, **kwargs):
         try:
             permission = {"update": False}
@@ -422,7 +422,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_tabs
+    # @v2_submission_tabs
     @action(methods=['get'], detail=True, url_path='tabs')
     def tabs(self, request, pk):
         try:
@@ -437,7 +437,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_fields
+    # @v2_submission_fields
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, pk):
         try:
@@ -454,7 +454,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_documents
+    # @v2_submission_documents
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, pk):
         try:
@@ -478,7 +478,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_profile
+    # @v2_submission_profile
     @action(methods=['get'], detail=True, url_path='profile')
     def profile(self, request, pk):
         try:
@@ -489,7 +489,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_activities
+    # @v2_submission_activities
     @action(methods=['get'], detail=True, url_path='activities')
     def activities(self, request, pk):
         try:
@@ -499,7 +499,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_resume
+    # @v2_submission_resume
     @action(methods=['get'], detail=True, url_path='resume')
     def resume(self, request, pk):
         try:
@@ -516,7 +516,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_employer
+    # @v2_submission_employer
     @action(methods=['get'], detail=False, url_path='employer')
     def employer(self, request):
         try:
@@ -538,7 +538,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_interviews
+    # @v2_submission_interviews
     @action(methods=['get'], detail=True, url_path='interviews')
     def interviews(self, request, pk):
         try:
@@ -550,7 +550,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_tests
+    # @v2_submission_tests
     @action(methods=['get'], detail=True, url_path='tests')
     def tests(self, request, pk):
         try:
@@ -561,7 +561,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_support
+    # @v2_submission_support
     @action(methods=['get'], detail=True, url_path='support')
     def support(self, request, pk):
         try:
@@ -576,7 +576,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_submission_project
+    # @v2_submission_project
     @action(methods=['get'], detail=True, url_path='project')
     def project(self, request, pk):
         try:
@@ -633,7 +633,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(message=error)
             return error, "error"
 
-    @list_submission
+    # @list_submission
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
@@ -762,7 +762,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error), "url": ""}, status=400)
 
-    @submission_create
+    # @submission_create
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
@@ -820,7 +820,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_submission
+    # @update_submission
     def update(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
@@ -882,7 +882,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @submission_feedback_due
+    # @submission_feedback_due
     @action(methods=['get'], detail=False, url_path='feedback_due')
     def marketer_feedback_due(self, request):
         try:
@@ -904,7 +904,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @submission_feedback_check
+    # @submission_feedback_check
     @action(methods=['get'], detail=True, url_path="feedback_check")
     def feedback_check(self, request, pk):
         try:
@@ -925,7 +925,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @submission_resume
+    # @submission_resume
     @action(methods=['put'], detail=True, url_path='resume')
     def resume(self, request, pk):
         try:
@@ -944,7 +944,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Suggestions for Submission
-    @submission_suggestions
+    # @submission_suggestions
     @action(methods=['get'], detail=False, url_path='suggestions')
     def suggestions(self, request):
         first, last = get_page_limits(request)
@@ -989,7 +989,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Suggestions for Client Name (Did you mean)
-    @submission_did_you_mean
+    # @submission_did_you_mean
     @action(methods=['get'], detail=False, url_path='did_you_mean')
     def did_you_mean(self, request):
         try:
@@ -1002,7 +1002,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @submission_client
+    # @submission_client
     @action(methods=['get'], detail=False, url_path='client')
     def clients(self, request):
         try:
@@ -1019,7 +1019,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @submission_work_type
+    # @submission_work_type
     @action(methods=['get'], detail=False, url_path='work_type')
     def work_type(self, request):
         try:
@@ -1028,7 +1028,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @submission_similar_submission
+    # @submission_similar_submission
     @action(methods=['get'], detail=False, url_path='similar_submission')
     def submission_check(self, request):
         try:
@@ -1073,7 +1073,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
     serializer_class = VendorLayerSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @retrieve_vendor_layer
+    # @retrieve_vendor_layer
     def retrieve(self, request, *args, **kwargs):
         try:
             vendor_layer = VendorLayer.objects.filter(submission_id=kwargs.get('pk')).order_by('level')
@@ -1083,7 +1083,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_vendor_layer
+    # @create_vendor_layer
     def create(self, request, *args, **kwargs):
         try:
             level = 0
@@ -1108,7 +1108,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_vendor_layer
+    # @update_vendor_layer
     def update(self, request, *args, **kwargs):
         try:
             data = request.data.get('data')
@@ -1121,7 +1121,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @destroy_vendor_layer
+    # @destroy_vendor_layer
     def destroy(self, request, *args, **kwargs):
         try:
             vendor_layer = get_object_or_404(VendorLayer, id=kwargs.get('pk'))
@@ -1303,7 +1303,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(message=error, request=request)
             return queryset, filter_by_status
 
-    @retrieve_interview
+    # @retrieve_interview
     def retrieve(self, request, *args, **kwargs):
         try:
             change_to_feedback_due()
@@ -1320,7 +1320,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @list_interview
+    # @list_interview
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
@@ -1346,7 +1346,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_export
+    # @interview_export
     @action(methods=['get'], detail=False, url_path='export')
     def export(self, request, *args, **kwargs):
         query = request.GET.get('query', None)
@@ -1414,7 +1414,7 @@ class InterviewViewSets(ModelViewSet):
         ]
         return details
 
-    @interview_export_detail
+    # @interview_export_detail
     @action(methods=['get'], detail=False, url_path='export_detail')
     def export_detail(self, request, *args, **kwargs):
         query = request.GET.get('query', None)
@@ -1446,7 +1446,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_interview
+    # @create_interview
     def create(self, request, *args, **kwargs):
         try:
             # Change status of past Interview to feedback due
@@ -1566,7 +1566,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_interview
+    # @update_interview
     def update(self, request, *args, **kwargs):
         # Change status of past Screening to feedback due
         change_to_feedback_due()
@@ -1688,7 +1688,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @destroy_interview
+    # @destroy_interview
     def destroy(self, request, *args, **kwargs):
         interview_id = kwargs.get('pk')
         try:
@@ -1745,7 +1745,7 @@ class InterviewViewSets(ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @interview_status
+    # @interview_status
     @action(methods=['put'], detail=True, url_path='status')
     def status(self, request, *args, **kwargs):
         # Change status of past Screening to feedback due
@@ -1823,7 +1823,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_reschedule
+    # @interview_reschedule
     @action(methods=['put'], detail=True, url_path='reschedule')
     def reschedule(self, request, pk):
         # Change status of past Screening to feedback due
@@ -1950,7 +1950,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_cancel
+    # @interview_cancel
     @action(methods=['put'], detail=True, url_path='cancel_interview')
     def cancel_interview(self, request, pk):
         try:
@@ -2024,7 +2024,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_fields
+    # @interview_fields
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, pk):
         try:
@@ -2045,7 +2045,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_update_notes
+    # @interview_update_notes
     @action(methods=['put'], detail=True, url_path='update_notes')
     def update_notes(self, request, pk):
         try:
@@ -2069,8 +2069,8 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_put_upload_recording
-    @interview_delete_upload_recording
+    # @interview_put_upload_recording
+    # @interview_delete_upload_recording
     @action(methods=['put', 'delete'], detail=True, url_path='upload_recording')
     def upload_recording(self, request, pk):
         try:
@@ -2109,7 +2109,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_recording
+    # @interview_recording
     @action(methods=['get'], detail=True, url_path='recording')
     def recording(self, request, pk):
         try:
@@ -2125,7 +2125,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_suggestions
+    # @interview_suggestions
     @action(methods=['get'], detail=False, url_path='suggestions')
     def interview_suggestions(self, request):
         first, last = get_page_limits(request)
@@ -2166,7 +2166,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_repeat
+    # @interview_repeat
     @action(methods=['get'], detail=False, url_path='repeat')
     def repeat_interviews(self, request):
         try:
@@ -2193,7 +2193,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    @interview_assign_guest
+    # @interview_assign_guest
     @action(methods=['put'], detail=True, url_path='assign_guest')
     def assign_guest(self, request, pk):
         try:
@@ -2277,7 +2277,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    @interview_guest_feedback
+    # @interview_guest_feedback
     @action(methods=['put'], detail=True, url_path='guest_feedback')
     def guest_feedback(self, request, pk):
         try:
@@ -2302,7 +2302,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    @interview_feedback_questions
+    # @interview_feedback_questions
     @action(methods=['get'], detail=False, url_path='feedback_questions')
     def feedback_questions(self, request):
         try:
@@ -2316,8 +2316,8 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    @interview_post_supervisor_feedback
-    @interview_put_supervisor_feedback
+    # @interview_post_supervisor_feedback
+    # @interview_put_supervisor_feedback
     @action(methods=['post', 'put'], detail=True, url_path='supervisor_feedback')
     def feedback(self, request, pk):
         try:
@@ -2362,7 +2362,7 @@ class InterviewViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @interview_reasons
+    # @interview_reasons
     @action(methods=['get'], detail=False, url_path='reasons')
     def reason(self, request):
         try:
@@ -2546,7 +2546,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(message=error)
             return error, "error"
 
-    @test_list
+    # @test_list
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
@@ -2691,7 +2691,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_test
+    # @create_test
     def create(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
@@ -2769,7 +2769,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_test
+    # @update_test
     def update(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
@@ -2804,7 +2804,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @test_fields
+    # @test_fields
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, pk):
         try:
@@ -2830,7 +2830,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @get_test_status
+    # @get_test_status
     @action(methods=['get'], detail=False, url_path='test_status')
     def test_status(self, request):
         try:
@@ -2839,7 +2839,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @get_test_platform
+    # @get_test_platform
     @action(methods=['get'], detail=False, url_path='test_platform')
     def test_platform(self, request):
         try:
@@ -2849,7 +2849,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @test_assign
+    # @test_assign
     @action(methods=['put'], detail=True, url_path='assign')
     def assign_test(self, request, pk):
         try:
@@ -2926,7 +2926,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @test_submit
+    # @test_submit
     @action(methods=['put'], detail=True, url_path='submit')
     def submit_test(self, request, pk):
         try:
@@ -2972,7 +2972,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @test_feedback
+    # @test_feedback
     @action(methods=['put'], detail=True, url_path='feedback')
     def submit_test_feedback(self, request, pk):
         try:
@@ -3062,7 +3062,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @test_engineer_feedback
+    # @test_engineer_feedback
     @action(methods=['post'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
@@ -3116,7 +3116,7 @@ class QuestionViewSets(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    @list_question
+    # @list_question
     def list(self, request, *args, **kwargs):
         try:
             question_field = request.GET.get("form_name", None)
@@ -3129,7 +3129,7 @@ class QuestionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_question
+    # @create_question
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
@@ -3169,7 +3169,7 @@ class QuestionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @question_parent
+    # @question_parent
     @action(methods=['get'], detail=True, url_path='parent')
     def parent(self, request, pk):
         try:
@@ -3293,7 +3293,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @list_marketing_team
+    # @list_marketing_team
     def list(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
@@ -3308,7 +3308,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @retrieve_marketing_team
+    # @retrieve_marketing_team
     def retrieve(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
@@ -3321,7 +3321,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @create_marketing_team
+    # @create_marketing_team
     def create(self, request, *args, **kwargs):
         try:
             if 'superadmin' not in request.user.roles and 'admin' not in request.user.roles:
@@ -3339,7 +3339,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @update_marketing_team
+    # @update_marketing_team
     def update(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
@@ -3378,7 +3378,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     #         write_exception(error, request)
     #         return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @marketing_team_update_shift
+    # @marketing_team_update_shift
     @action(methods=['put'], detail=False, url_path='update_shift')
     def shift(self, request, **kwargs):
         try:
@@ -3395,7 +3395,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @marketing_team_get_teams
+    # @marketing_team_get_teams
     @action(methods=['get'], detail=False, url_path='teams')
     def teams(self, request, **kwargs):
         try:
@@ -3419,7 +3419,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @marketing_team_compare_teams
+    # @marketing_team_compare_teams
     @action(methods=['get'], detail=False, url_path='compare_teams')
     def compare_team(self, request):
         try:
@@ -3442,7 +3442,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @marketing_team_move_employee
+    # @marketing_team_move_employee
     @action(methods=['put'], detail=True, url_path='move_employee')
     def move_employee(self, request, **kwargs):
         try:
@@ -3471,7 +3471,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @marketing_team_update_scrum
+    # @marketing_team_update_scrum
     @action(methods=['put'], detail=True, url_path='update_scrum')
     def update_scrum(self, request, **kwargs):
         try:
@@ -3499,7 +3499,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    @marketing_team_remove_team
+    # @marketing_team_remove_team
     @action(methods=['delete'], detail=True, url_path='remove_team')
     def remove(self, request, pk):
         try:
@@ -3523,7 +3523,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     queryset = Test.objects.all()
     serializer_class = TestUpdateSerializer
 
-    @engineer_detail_test
+    # @engineer_detail_test
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         try:

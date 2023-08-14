@@ -17,10 +17,10 @@ from constance import config
 from employee.models import User
 from attachment.models import Attachment
 from consultant.models import Consultant
-from project.swagger import list_payroll, list_timesheet, retrieve_timesheet, timesheet_frequency, \
-    timesheet_set_frequency, update_timesheet, timesheet_history, timesheet_contact_us, timesheet_cancel, \
-    timesheet_attachments, timesheet_request, consultant_leave_balance, consultant_leave_apply, \
-    consultant_leave_history, consultant_leave_type, consultant_leave_holiday, list_event, event_feedback
+# from project.swagger import list_payroll, list_timesheet, retrieve_timesheet, timesheet_frequency, \
+#     timesheet_set_frequency, update_timesheet, timesheet_history, timesheet_contact_us, timesheet_cancel, \
+#     timesheet_attachments, timesheet_request, consultant_leave_balance, consultant_leave_apply, \
+#     consultant_leave_history, consultant_leave_type, consultant_leave_holiday, list_event, event_feedback
 from utils_app.mailing import send_email
 from utils_app.aws_utils import get_s3_object
 from log1.utils import write_exception, ERROR_MSG
@@ -41,7 +41,7 @@ class PayrollScheduleViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @list_payroll
+    # @list_payroll
     def list(self, request, *args, **kwargs):
         try:
             queryset = PayrollSchedule.objects.filter(pay_date__year=datetime.today().year).order_by('id')
@@ -89,7 +89,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             start_date = end_date + timedelta(days=1)
             end_date = end_date + timedelta(days=days + 1)
 
-    @list_timesheet
+    # @list_timesheet
     def list(self, request, *args, **kwargs):
         try:
             projects = Project.objects.filter(
@@ -106,7 +106,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
-    @retrieve_timesheet
+    # @retrieve_timesheet
     def retrieve(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'), consultant=request.user)
@@ -119,7 +119,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @timesheet_frequency
+    # @timesheet_frequency
     @action(methods=['GET'], detail=True, url_path='frequency')
     def frequency(self, request, pk):
         try:
@@ -134,7 +134,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @timesheet_set_frequency
+    # @timesheet_set_frequency
     @action(methods=['POST'], detail=True, url_path='set_frequency')
     def frequency(self, request, pk):
         try:
@@ -162,7 +162,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @update_timesheet
+    # @update_timesheet
     def update(self, request, *args, **kwargs):
         try:
             screenshot = False
@@ -287,7 +287,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @timesheet_history
+    # @timesheet_history
     @action(methods=['GET'], detail=True, url_path='history')
     def history(self, request, pk):
         try:
@@ -304,7 +304,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @timesheet_contact_us
+    # @timesheet_contact_us
     @action(methods=['POST'], detail=False, url_path='contact_us')
     def contact_us(self, request):
         message = request.data.get('message')
@@ -375,7 +375,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @timesheet_cancel
+    # @timesheet_cancel
     @action(methods=['PUT'], detail=True, url_path='cancel')
     def cancel_timesheet(self, request, pk):
         try:
@@ -398,7 +398,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @timesheet_attachments
+    # @timesheet_attachments
     @action(methods=['GET'], detail=True, url_path='attachments')
     def attachments(self, request, pk):
         try:
@@ -431,7 +431,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @timesheet_request
+    # @timesheet_request
     @action(methods=['POST'], detail=True, url_path='request')
     def request_timesheet(self, request, pk):
         try:
@@ -509,7 +509,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @consultant_leave_balance
+    # @consultant_leave_balance
     @action(methods=['GET'], detail=True, url_path='balance')
     def balance(self, request, pk):
         try:
@@ -522,7 +522,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @consultant_leave_apply
+    # @consultant_leave_apply
     @action(methods=['POST'], detail=True, url_path='apply')
     def apply(self, request, pk, *args, **kwargs):
         try:
@@ -570,7 +570,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @consultant_leave_history
+    # @consultant_leave_history
     @action(methods=['GET'], detail=True, url_path='history')
     def history(self, request, *args, **kwargs):
         try:
@@ -583,7 +583,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @consultant_leave_type
+    # @consultant_leave_type
     @action(methods=['GET'], detail=True, url_path='type')
     def type(self, request, pk):
         try:
@@ -597,7 +597,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @consultant_leave_holiday
+    # @consultant_leave_holiday
     @action(methods=['GET'], detail=False, url_path='holiday')
     def holiday(self, request):
         try:
@@ -617,7 +617,7 @@ class TimetrackEventMobileViewSet(GenericViewSet, ListModelMixin, RetrieveModelM
     permission_classes = (ConsultantIsAuthenticated,)
     authentication_classes = (ConsultantTokenAuthentication,)
 
-    @list_event
+    # @list_event
     def list(self, request, *args, **kwargs):
         try:
             mark_in_active()
@@ -639,7 +639,7 @@ class TimetrackEventMobileViewSet(GenericViewSet, ListModelMixin, RetrieveModelM
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
-    @event_feedback
+    # @event_feedback
     @action(methods=['put'], detail=True, url_path='feedback')
     def feedback(self, request, **kwargs):
         try:

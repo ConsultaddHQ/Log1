@@ -10,22 +10,22 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from consultant.swagger import beats_consultant_create, list_v2_consultant, v2_consultant_filters, v2_consultant_export, \
-    list_consultant, retrieve_consultant, update_consultant, consultant_create, consultant_activities, \
-    consultant_set_password, consultant_search, consultant_education_post, consultant_education_put, \
-    consultant_experience_post, consultant_experience_put, consultant_marketing, consultant_documents, \
-    consultant_payroll_employer_get, consultant_payroll_employer_post, consultant_payroll_employer_put, \
-    consultant_rate_revision_get, consultant_rate_revision_post, consultant_margin, list_consultant_bench, \
-    list_consultant_marketing, create_consultant_marketing, update_consultant_marketing, \
-    consultant_marketing_stop_marketing, consultant_marketing_remarketing, consultant_marketing_previous_marketing, \
-    consultant_marketing_marketer_assignment, consultant_marketing_team_assignment, \
-    consultant_marketing_remove_marketer, consultant_marketing_remove_team, retrieve_consultant_profile, \
-    list_consultant_profile, create_consultant_profile, update_consultant_profile, create_consultant_poc, \
-    update_consultant_poc, create_consultant_work_auth, update_consultant_work_auth, list_consultant_exit, \
-    create_consultant_exit, update_consultant_exit, consultant_exit_cancel, consultant_exit_reason, \
-    list_consultant_feedback, create_consultant_feedback, update_consultant_feedback, consultant_feedback_types, \
-    consultant_feedback_department, consultant_feedback_project, consultant_feedback_request, consultant_petition_login, \
-    log1_consultant_project, log1_consultant_feedback
+# from consultant.swagger import beats_consultant_create, list_v2_consultant, v2_consultant_filters, v2_consultant_export, \
+#     list_consultant, retrieve_consultant, update_consultant, consultant_create, consultant_activities, \
+#     consultant_set_password, consultant_search, consultant_education_post, consultant_education_put, \
+#     consultant_experience_post, consultant_experience_put, consultant_marketing, consultant_documents, \
+#     consultant_payroll_employer_get, consultant_payroll_employer_post, consultant_payroll_employer_put, \
+#     consultant_rate_revision_get, consultant_rate_revision_post, consultant_margin, list_consultant_bench, \
+#     list_consultant_marketing, create_consultant_marketing, update_consultant_marketing, \
+#     consultant_marketing_stop_marketing, consultant_marketing_remarketing, consultant_marketing_previous_marketing, \
+#     consultant_marketing_marketer_assignment, consultant_marketing_team_assignment, \
+#     consultant_marketing_remove_marketer, consultant_marketing_remove_team, retrieve_consultant_profile, \
+#     list_consultant_profile, create_consultant_profile, update_consultant_profile, create_consultant_poc, \
+#     update_consultant_poc, create_consultant_work_auth, update_consultant_work_auth, list_consultant_exit, \
+#     create_consultant_exit, update_consultant_exit, consultant_exit_cancel, consultant_exit_reason, \
+#     list_consultant_feedback, create_consultant_feedback, update_consultant_feedback, consultant_feedback_types, \
+#     consultant_feedback_department, consultant_feedback_project, consultant_feedback_request, consultant_petition_login, \
+#     log1_consultant_project, log1_consultant_feedback
 from consultant.utils import *
 from api_key.models import APIKey
 from consultant.serializers import *
@@ -116,7 +116,7 @@ class ConsultantV2ViewSets(ModelViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @list_v2_consultant
+    # @list_v2_consultant
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -153,7 +153,7 @@ class ConsultantV2ViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_consultant_filters
+    # @v2_consultant_filters
     @action(methods=['get'], detail=False, url_path='filters')
     def filters(self, request):
         try:
@@ -179,7 +179,7 @@ class ConsultantV2ViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @v2_consultant_export
+    # @v2_consultant_export
     @action(methods=['get'], detail=False, url_path='export')
     def export(self, request):
         try:
@@ -243,7 +243,7 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(message=error)
             return error, 'error'
 
-    @list_consultant
+    # @list_consultant
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -289,7 +289,7 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @retrieve_consultant
+    # @retrieve_consultant
     def retrieve(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -307,7 +307,7 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_create
+    # @consultant_create
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'finance' in roles):
@@ -391,7 +391,7 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_consultant
+    # @update_consultant
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles or 'legal' in roles):
@@ -450,7 +450,7 @@ class ConsultantViewSets(ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         return Response({"detail": "Method DELETE not allowed."}, status=405)
 
-    @consultant_activities
+    # @consultant_activities
     @action(methods=['get'], detail=True, url_path='activities')
     def activities(self, request, pk):
         try:
@@ -463,7 +463,7 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_set_password
+    # @consultant_set_password
     @action(methods=['post'], detail=False, url_path='set_password')
     def set_consultant_password(self, request):
         try:
@@ -477,7 +477,7 @@ class ConsultantViewSets(ModelViewSet):
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_search
+    # @consultant_search
     @action(methods=['get'], detail=False, url_path='search')
     def search(self, request):
         try:
@@ -494,8 +494,8 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_education_post
-    @consultant_education_put
+    # @consultant_education_post
+    # @consultant_education_put
     @action(methods=['post', 'put'], detail=True, url_path='education')
     def education(self, request, pk):
         roles = request.user.roles
@@ -546,8 +546,8 @@ class ConsultantViewSets(ModelViewSet):
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_experience_post
-    @consultant_experience_put
+    # @consultant_experience_post
+    # @consultant_experience_put
     @action(methods=['post', 'put'], detail=True, url_path='experience')
     def experience(self, request, pk):
         roles = request.user.roles
@@ -599,7 +599,7 @@ class ConsultantViewSets(ModelViewSet):
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_marketing
+    # @consultant_marketing
     @action(methods=['get'], detail=True, url_path='marketing')
     def marketing(self, request, pk):
         try:
@@ -616,7 +616,7 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_documents
+    # @consultant_documents
     @action(methods=['get'], detail=True, url_path='documents')
     def documents(self, request, pk):
         try:
@@ -628,9 +628,9 @@ class ConsultantViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_payroll_employer_get
-    @consultant_payroll_employer_post
-    @consultant_payroll_employer_put
+    # @consultant_payroll_employer_get
+    # @consultant_payroll_employer_post
+    # @consultant_payroll_employer_put
     @action(methods=['get', 'post', 'put'], detail=True, url_path='payroll_employer')
     def payroll_employer(self, request, pk):
         if request.method == 'GET':
@@ -678,8 +678,8 @@ class ConsultantViewSets(ModelViewSet):
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_rate_revision_get
-    @consultant_rate_revision_post
+    # @consultant_rate_revision_get
+    # @consultant_rate_revision_post
     @action(methods=['get', 'post'], detail=True, url_path='rate_revision')
     def rate_revision(self, request, pk):
         if request.method == 'GET':
@@ -722,7 +722,7 @@ class ConsultantViewSets(ModelViewSet):
                 write_exception(error, request)
                 return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_margin
+    # @consultant_margin
     @action(methods=['get'], detail=True, url_path='margin')
     def margin(self, request, pk):
         try:
@@ -776,7 +776,7 @@ class ConsultantBenchViewSets(ListModelMixin, GenericViewSet):
     serializer_class = ConsultantBenchSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @list_consultant_bench
+    # @list_consultant_bench
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         visa = request.GET.get('visa', [])
@@ -898,7 +898,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     authentication_classes = (TokenAuthentication,)
     serializer_class = ConsultantMarketingCycleSerializer
 
-    @list_consultant_marketing
+    # @list_consultant_marketing
     def list(self, request, *args, **kwargs):
         try:
             close_marketing()
@@ -912,7 +912,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_consultant_marketing
+    # @create_consultant_marketing
     def create(self, request, *args, **kwargs):
         try:
             qs = Consultant.objects.filter(id=request.data['consultant'])
@@ -987,7 +987,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_consultant_marketing
+    # @update_consultant_marketing
     def update(self, request, *args, **kwargs):
         try:
             consultant_marketing = get_object_or_404(ConsultantMarketing, id=kwargs.get('pk'))
@@ -1010,7 +1010,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @consultant_marketing_stop_marketing
+    # @consultant_marketing_stop_marketing
     @action(methods=['put'], detail=True, url_path='stop_marketing')
     def stop_marketing(self, request, pk):
         try:
@@ -1027,7 +1027,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_marketing_remarketing
+    # @consultant_marketing_remarketing
     @action(methods=['get'], detail=False, url_path='remarketing')
     def remarketing(self, request):
         try:
@@ -1040,7 +1040,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_marketing_previous_marketing
+    # @consultant_marketing_previous_marketing
     @action(methods=['get'], detail=False, url_path='previous_marketing')
     def previous_marketing(self, request):
         try:
@@ -1055,7 +1055,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Marketer assignment
-    @consultant_marketing_marketer_assignment
+    # @consultant_marketing_marketer_assignment
     @action(methods=["put"], detail=True, url_path='marketer_assignment')
     def marketer_assignment(self, request, pk):
         try:
@@ -1094,7 +1094,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Team Assignment
-    @consultant_marketing_team_assignment
+    # @consultant_marketing_team_assignment
     @action(methods=['put'], detail=True, url_path='team_assignment')
     def team_assignment(self, request, pk):
         try:
@@ -1126,7 +1126,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Remove assigned Marketer from Consultant
-    @consultant_marketing_remove_marketer
+    # @consultant_marketing_remove_marketer
     @action(methods=['put'], detail=True, url_path='remove_marketer')
     def remove_marketer(self, request, pk):
         try:
@@ -1162,7 +1162,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     # Remove team from Consultant
-    @consultant_marketing_remove_team
+    # @consultant_marketing_remove_team
     @action(methods=['put'], detail=True, url_path='remove_team')
     def remove_team(self, request, pk):
         try:
@@ -1203,7 +1203,7 @@ class ConsultantProfileViewSets(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
 
     # Return Consultant Profile by ID
-    @retrieve_consultant_profile
+    # @retrieve_consultant_profile
     def retrieve(self, request, *args, **kwargs):
         try:
             profile_id = kwargs.get('pk')
@@ -1214,7 +1214,7 @@ class ConsultantProfileViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @list_consultant_profile
+    # @list_consultant_profile
     def list(self, request, *args, **kwargs):
         try:
             consultant_id = request.GET.get('con_id', None)
@@ -1226,7 +1226,7 @@ class ConsultantProfileViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_consultant_profile
+    # @create_consultant_profile
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
@@ -1262,7 +1262,7 @@ class ConsultantProfileViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_consultant_profile
+    # @update_consultant_profile
     def update(self, request, *args, **kwargs):
         try:
             profile = get_object_or_404(ConsultantProfile, id=kwargs.get('pk'))
@@ -1294,7 +1294,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     serializer_class = ConsultantPOCSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @create_consultant_poc
+    # @create_consultant_poc
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
@@ -1330,7 +1330,7 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_consultant_poc
+    # @update_consultant_poc
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
@@ -1366,7 +1366,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
     serializer_class = WorkAuthSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @create_consultant_work_auth
+    # @create_consultant_work_auth
     def create(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles or 'legal' in roles):
@@ -1406,7 +1406,7 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_consultant_work_auth
+    # @update_consultant_work_auth
     def update(self, request, *args, **kwargs):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles or 'legal' in roles):
@@ -1449,7 +1449,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     serializer_class = ExitDetailConsultantSerializer
     authentication_classes = (TokenAuthentication,)
 
-    @list_consultant_exit
+    # @list_consultant_exit
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
@@ -1496,7 +1496,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_consultant_exit
+    # @create_consultant_exit
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
@@ -1550,7 +1550,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_consultant_exit
+    # @update_consultant_exit
     def update(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
@@ -1583,7 +1583,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    @consultant_exit_cancel
+    # @consultant_exit_cancel
     @action(methods=['put'], detail=True, url_path='cancel')
     def cancel_termination(self, request, pk):
         try:
@@ -1619,7 +1619,7 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_exit_reason
+    # @consultant_exit_reason
     @action(methods=['get'], detail=False, url_path='reason')
     def termination_reason(self, request):
         try:
@@ -1635,7 +1635,7 @@ class ConsultantImportViewSet(GenericViewSet, CreateModelMixin):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantSerializer
 
-    @beats_consultant_create
+    # @beats_consultant_create
     def create(self, request, *args, **kwargs):
         try:
             api_key = request.GET.get('api_key', None)
@@ -1667,7 +1667,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     queryset = ConsultantFeedback.objects.all()
     authentication_classes = (TokenAuthentication,)
 
-    @list_consultant_feedback
+    # @list_consultant_feedback
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query')
@@ -1687,7 +1687,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @create_consultant_feedback
+    # @create_consultant_feedback
     def create(self, request, *args, **kwargs):
         try:
             user_list = []
@@ -1746,7 +1746,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @update_consultant_feedback
+    # @update_consultant_feedback
     def update(self, request, *args, **kwargs):
         try:
             user_list = []
@@ -1798,18 +1798,18 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_feedback_types
+    # @consultant_feedback_types
     @action(methods=['get'], detail=False, url_path='feedback_types')
     def feedback_types(self, request, *args, **kwargs):
         return Response({"data": FEEDBACK_CHOICES}, status=200)
 
-    @consultant_feedback_department
+    # @consultant_feedback_department
     @action(methods=['get'], detail=False, url_path='department')
     def department(self, request, *args, **kwargs):
         data = ['Engineering', 'Marketing', 'Legal', 'Recruitment', 'Relations', 'Finance']
         return Response({"data": data}, status=200)
 
-    @consultant_feedback_project
+    # @consultant_feedback_project
     @action(methods=['get'], detail=False, url_path='project')
     def project(self, request, consultant_id):
         try:
@@ -1822,7 +1822,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @consultant_feedback_request
+    # @consultant_feedback_request
     @action(methods=['post'], detail=False, url_path='request_feedback')
     def request_feedback(self, request, consultant_id):
         try:
@@ -1876,7 +1876,7 @@ class ConsultantPetitionAuthViewSet(GenericViewSet):
     queryset = Consultant.objects.all()
     serializer_class = ConsultantPetitionLoginSerializer
 
-    @consultant_petition_login
+    # @consultant_petition_login
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
         try:
@@ -1912,7 +1912,7 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             return Response({"message": "Unauthorized"}, status=401)
         return True
 
-    @log1_consultant_project
+    # @log1_consultant_project
     @action(methods=['GET'], detail=False, url_path='project')
     def project(self, request):
         self.verify_api_key(request.GET['api_key'])
@@ -1949,7 +1949,7 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             write_exception(message=error)
             return Response({"data": []}, status=200)
 
-    @log1_consultant_feedback
+    # @log1_consultant_feedback
     @action(methods=['GET'], detail=False, url_path='feedback')
     def feedback(self, request):
         self.verify_api_key(request.GET['api_key'])
