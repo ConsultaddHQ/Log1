@@ -9,6 +9,8 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
+from dashboard.swagger import list_dashboard_data, marketing_performance, dashboard_history, pending_status, \
+    list_quick_actions_data, add_consultant
 from project.models import Project
 from consultant.models import Consultant
 from log1.utils import ERROR_MSG, write_exception
@@ -21,6 +23,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @list_dashboard_data
     def list(self, request, *args, **kwargs):
         team_name = request.GET.get("team", None)
         filter_for = request.GET.get("filter_for", None)
@@ -160,6 +163,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
 
+    @marketing_performance
     @action(methods=['get'], detail=False, url_path='performance')
     def marketing_performance(self, request):
         team_name = request.GET.get("team", None)
@@ -320,6 +324,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
 
+    @dashboard_history
     @action(methods=['get'], detail=False, url_path='history')
     def dashboard_history(self, request):
         team_name = request.GET.get("team", None)
@@ -369,6 +374,7 @@ class MarketingDashboardViewSet(GenericViewSet, ListModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
 
+    @pending_status
     @action(methods=['get'], detail=False, url_path='pending_status')
     def pending_status(self, request):
         try:
@@ -406,6 +412,7 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @list_quick_actions_data
     def list(self, request, *args, **kwargs):
         try:
             quick_action = QuickActions.objects.get_or_create(user=request.user)
@@ -440,6 +447,7 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": error}, status=400)
 
+    @add_consultant
     @action(methods=['post', 'delete'], detail=False, url_path='add_consultant')
     def add_consultant(self, request):
         try:

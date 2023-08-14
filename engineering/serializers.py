@@ -500,6 +500,7 @@ class TeamStructureSerializer(serializers.ModelSerializer):
     current_project = serializers.SerializerMethodField()
 
     class Meta:
+        ref_name = 'EngineeringTeamStructureSerializer'
         model = User
         fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_project', 'team', 'is_scrum')
 

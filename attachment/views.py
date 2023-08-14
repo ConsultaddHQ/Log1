@@ -8,6 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import RetrieveModelMixin, CreateModelMixin, DestroyModelMixin
 
+from attachment.swagger import attachment_retrieve, attachment_create, attachment_delete, get_attachment_retrieve, \
+    get_attachment_upload
 from project.models import Project
 from activity.views import create_activity
 from project.utils import get_project_check_list
@@ -23,6 +25,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @attachment_retrieve
     def retrieve(self, request, *args, **kwargs):
         obj_type = request.GET.get("obj_type", None)
         object_id = request.GET.get('object_id', None)
@@ -43,6 +46,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @attachment_create
     def create(self, request, *args, **kwargs):
         try:
             content_type = ContentType.objects.get(model=request.data['obj_type'])
@@ -75,6 +79,7 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @attachment_delete
     def destroy(self, request, *args, **kwargs):
         try:
             content_type = self.request.GET.get('type', None)
@@ -112,6 +117,7 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @get_attachment_retrieve
     def retrieve(self, request, *args, **kwargs):
         try:
             attachment = get_object_or_404(Attachment, id=kwargs.get('pk'))
@@ -124,6 +130,7 @@ class AttachmentGetView(RetrieveModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @get_attachment_upload
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
         try:

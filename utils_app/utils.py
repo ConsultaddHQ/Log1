@@ -1,6 +1,8 @@
 import os
 import csv
 import boto3
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from pytz import timezone
 from datetime import datetime
 from geopy.geocoders import Nominatim
@@ -124,3 +126,52 @@ def export_to_csv(payload, columns, filename, request=None):
     except Exception as error:
         write_exception(error, request)
         return ""
+
+
+def generate_swagger_auto_schema(query_params=[], body_params=[], responses={}, methods=[]):
+    def decorator(view_func):
+        query_parameters = []
+        if len(query_params):
+            for param_details in query_params:
+                parameter = openapi.Parameter(
+                    param_details['name'],
+                    openapi.IN_QUERY,
+                    description=param_details['description'],
+                    type=param_details['type'],
+                    required=param_details.get('required', False)
+                )
+                query_parameters.append(parameter)
+
+        request_body_schema = None
+        if len(body_params):
+            body_parameters = {}
+            for param_name, param_schema in body_params[0].items():
+                body_parameters[param_name] = param_schema
+
+            request_body_schema = openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties=body_parameters,
+                required=body_params[1] if len(body_params[1]) else []
+            )
+
+        if len(responses):
+            swagger_responses = {}
+            for status_code, data in responses.items():
+                response = openapi.Response(
+                    description=data.get('description'),
+                    examples={
+                        'application/json': data.get('response')
+                    }
+                )
+                swagger_responses[status_code] = response
+
+        decorated_view = swagger_auto_schema(
+            manual_parameters=query_parameters,
+            request_body=request_body_schema,
+            responses=swagger_responses,
+            methods=methods
+        )(view_func)
+
+        return decorated_view
+
+    return decorator

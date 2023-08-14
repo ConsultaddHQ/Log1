@@ -10,6 +10,8 @@ from django.contrib.contenttypes.models import ContentType
 
 from utils_app.models import City, Choice
 from log1.utils import write_exception, ERROR_MSG
+from utils_app.swagger import list_choice, create_choice, create_util, utility_get_technology, utility_add_technology, \
+    list_city, city_country
 
 
 class UtilSerializer(serializers.Serializer):
@@ -23,6 +25,7 @@ class CityViewSet(ListModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @list_city
     def list(self, request, *args, **kwargs):
         try:
             queryset = self.queryset
@@ -38,6 +41,7 @@ class CityViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @city_country
     @action(methods=['get'], detail=False, url_path='country')
     def country(self, request):
         try:
@@ -60,6 +64,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @list_choice
     def list(self, request, *args, **kwargs):
         try:
             field = request.GET.get('field', None)
@@ -74,6 +79,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @create_choice
     def create(self, request, *args, **kwargs):
         try:
             model = request.data.get('model', None)
@@ -96,6 +102,7 @@ class TeamsTargetViewSet(CreateModelMixin, GenericViewSet):
     queryset = City.objects.all()
     serializer_class = UtilSerializer
 
+    @create_util
     def create(self, request, *args, **kwargs):
         try:
             api_key = request.query_params.get('api_key', None)
@@ -119,6 +126,7 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @utility_get_technology
     @action(methods=['get'], detail=False, url_path='technology')
     def technology(self, request):
         try:
@@ -130,6 +138,7 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @utility_add_technology
     @action(methods=['put'], detail=False, url_path='add_technology')
     def add_technology(self, request):
         try:

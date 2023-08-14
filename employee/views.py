@@ -23,6 +23,12 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from api_key.models import APIKey
+from employee.swagger import register, login, get_all_employees, update_employee, account, associated, bulk_register, \
+    change_password, directory, projects, logout, me, profile, profile_activity, verify_project, role, shift_timings, \
+    team, technology, update_user, get_all_certificates, create_certificate, update_certificate, mark_certificate, \
+    get_all, create_default_calender, default, login_create_log1_user, login_create_bulk, login_delete_employee, \
+    login_delete_bulk, login_update_user, handover_create, handover_update, handover_delete, handover_patch, users_list, \
+    users_calendar_info, reset_password_token_request, reset_password_token_verify, reset_password_confirm_password
 from project.models import Project, ProjectSupport
 from consultant.models import Consultant
 from utils_app.calendar import GoogleCalendar
@@ -42,6 +48,7 @@ class EmployeeAuthViewSets(GenericViewSet):
     serializer_class = UserSerializer
     login_serializer_class = UserSerializerLogin
 
+    @register
     @action(methods=['post'], detail=False, url_path='register')
     def register(self, request):
         """
@@ -73,6 +80,7 @@ class EmployeeAuthViewSets(GenericViewSet):
             write_exception(message=error)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @login
     @action(methods=['post'], detail=False, url_path='login')
     def login(self, request):
         """
@@ -132,6 +140,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @get_all_employees
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query', '')
@@ -163,6 +172,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @update_employee
     def update(self, request, *args, **kwargs):
         try:
             user = get_object_or_404(User, id=kwargs.get('pk'))
@@ -201,6 +211,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @technology
     @action(methods=['put'], detail=False, url_path='technology')
     def technology(self, request):
         try:
@@ -214,6 +225,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @bulk_register
     @action(methods=['post'], detail=False, url_path='bulk_register')
     def bulk_register(self, request, *args, **kwargs):
         try:
@@ -268,6 +280,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @profile
     @action(methods=['put'], detail=False, url_path='profile')
     def profile(self, request):
         try:
@@ -303,6 +316,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @account
     @action(methods=['put'], detail=False, url_path='account')
     def account(self, request):
         try:
@@ -325,6 +339,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @profile_activity
     @action(methods=['get'], detail=False, url_path='profile_activity')
     def profile_activity(self, request):
         try:
@@ -340,7 +355,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             return Response({"data": all_activities}, status=200)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)        
-    
+
+    @me
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:
@@ -348,6 +364,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @role
     @action(methods=['get'], detail=False, url_path='role')
     def role(self, request):
         try:
@@ -357,6 +374,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @team
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
@@ -373,6 +391,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @logout
     @action(methods=['get'], detail=False, url_path='logout')
     def logout(self, request):
         """
@@ -385,6 +404,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             fcm_token.delete()
         return Response(status=204)
 
+    @change_password
     @action(methods=['post'], detail=False, url_path='change_password')
     def change_password(self, request):
         try:
@@ -399,6 +419,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @directory
     @action(methods=['get'], detail=False, url_path='directory')
     def directory(self, request):
         first, last = get_page_limits(request)
@@ -426,6 +447,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @update_user
     @action(methods=['put'], detail=False, url_path='update')
     def update_user(self, request):
         try:
@@ -445,6 +467,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @shift_timings
     @action(methods=['get'], detail=False, url_path='shifts')
     def shift_timings(self, request):
         try:
@@ -454,6 +477,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @projects
     @action(methods=['get'], detail=False, url_path='get_projects')
     def projects(self, request):
         try:
@@ -472,6 +496,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @verify_project
     @action(methods=['get'], detail=False, url_path='projects')
     def verify_project(self, request):
         try:
@@ -494,6 +519,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @associated
     @action(methods=['get'], detail=False, url_path='associated_to')
     def associated(self, request):
         try:
@@ -517,6 +543,7 @@ class ResetPasswordViewSets(GenericViewSet):
     serializer_class = EmailSerializer
     pass_serializer_class = PasswordTokenSerializer
 
+    @reset_password_token_request
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
         serializer = self.serializer_class(data=request.data)
@@ -620,6 +647,7 @@ class ResetPasswordViewSets(GenericViewSet):
             write_exception(message=error)
             return False
 
+    @reset_password_token_verify
     @action(methods=['post'], detail=False, url_path='token_verify')
     def token_verify(self, request):
         """
@@ -644,6 +672,7 @@ class ResetPasswordViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @reset_password_confirm_password
     @action(methods=['post'], detail=False, url_path='confirm_password')
     def confirm_password(self, request):
         """
@@ -904,6 +933,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @users_list
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query', '').lstrip().replace(':amp:', '&')
@@ -922,6 +952,7 @@ class AllUsersViewSet(GenericViewSet, ListModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @users_calendar_info
     @action(methods=['get'], detail=False, url_path='calendar_info')
     def calendar_info(self, request):
         try:
@@ -969,6 +1000,7 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @handover_create
     def create(self, request, *args, **kwargs):
         try:
             if 'superadmin' in request.user.roles:
@@ -987,6 +1019,7 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @handover_update
     def update(self, request, *args, **kwargs):
         try:
             if 'superadmin' in request.user.roles:
@@ -1012,6 +1045,7 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @handover_delete
     def destroy(self, request, *args, **kwargs):
         try:
             if 'superadmin' in request.user.roles:
@@ -1033,6 +1067,7 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @handover_patch
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
@@ -1042,6 +1077,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
     serializer_class = UserSerializer
     queryset = User.objects.all()
 
+    @login_create_log1_user
     def create(self, request, *args, **kwargs):
         result = {}
         try:
@@ -1076,6 +1112,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             write_exception(error, request)
             return Response({"message": result, "error": str(error)}, status=400)
 
+    @login_create_bulk
     @action(methods=['post'], detail=False, url_path='bulk_create')
     def create_bulk(self, request):
         result = {}
@@ -1120,6 +1157,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             write_exception(error, request)
             return Response({"message": result, "error": str(error)}, status=400)
 
+    @login_delete_employee
     def destroy(self, request, *args, **kwargs):
         try:
             api_key = request.data.get('log1_api_key', None)
@@ -1136,6 +1174,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @login_delete_bulk
     @action(methods=['delete'], detail=False, url_path='bulk_delete')
     def delete_bulk(self, request, ):
         try:
@@ -1152,6 +1191,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @login_update_user
     @action(methods=['put'], detail=True, url_path='update_user')
     def update_user(self, request, pk):
         try:
@@ -1190,12 +1230,13 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
 
 
 # Route - /calendar_info/
-class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
+class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin):
     serializer_class = UserSerializer
     queryset = DefaultCalendar.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @create_default_calender
     def create(self, request, *args, **kwargs):
         try:
             if type(request.data['emails']) is list:
@@ -1209,6 +1250,7 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @default
     @action(methods=['get'], detail=False, url_path='get_default')
     def default(self, request, *args, **kwargs):
         try:
@@ -1240,6 +1282,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
     serializer_class = CertificateInfoSerializer
     authentication_classes = (TokenAuthentication,)
 
+    @get_all_certificates
     def list(self, request, *args, **kwargs):
         try:
             certificates = CertificateInfo.objects.filter(employee=request.user)
@@ -1249,6 +1292,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @create_certificate
     def create(self, request, *args, **kwargs):
         try:
             certificate_name = request.data.get('certificate_name', None)
@@ -1274,6 +1318,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @update_certificate
     def update(self, request, *args, **kwargs):
         try:
             certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
@@ -1295,6 +1340,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @mark_certificate
     @action(['PUT'], detail=False, url_path='mark_certificate')
     def mark_certificate(self, request, *args, **kwargs):
         try:
@@ -1306,6 +1352,7 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
             write_exception(error, request)
             return Response({"message": str(error)}, status=400)
 
+    @get_all
     @action(['GET'], detail=False, url_path='get_all')
     def get_all(self, request, *args, **kwargs):
         try:

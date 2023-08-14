@@ -35,7 +35,7 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
-
+from .swagger import urlpatterns as swagger_urls
 router = DefaultRouter()
 schema_view = get_swagger_view(title='Log1')
 
@@ -148,7 +148,7 @@ urlpatterns = [
     path('api/v2/', include(router_v2.urls)),
     path('api/explorer/', include('explorer.urls')),
     path('api/swagger/', schema_view),
-
+    path('',include(swagger_urls))
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 if os.getenv('DEBUG', 'False') == 'True':

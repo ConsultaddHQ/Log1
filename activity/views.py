@@ -8,6 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import RetrieveModelMixin, ListModelMixin, CreateModelMixin
 
+from activity.swagger import retrieve_comment, create_comment
 from legal.models import Petition
 from consultant.models import Consultant
 from employee.models import User, tag_users
@@ -69,6 +70,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @retrieve_comment
     def retrieve(self, request, *args, **kwargs):
         object_id = kwargs.get('pk')
         model = request.GET.get('model')
@@ -92,6 +94,7 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @create_comment
     def create(self, request, *args, **kwargs):
         model = request.data.get('model', None)
         try:

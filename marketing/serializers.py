@@ -719,6 +719,7 @@ class TeamStructureSerializer(serializers.ModelSerializer):
     assign_consultant = serializers.SerializerMethodField()
 
     class Meta:
+        ref_name = 'MarketingTeamStructureSerializer'
         model = User
         fields = ('id', 'employee_id', 'employee_name', 'shift', 'technology', 'current_offers', 'assign_consultant',
                   'team', 'is_scrum')
