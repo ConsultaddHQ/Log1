@@ -648,6 +648,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                             Q(consultant_marketing__status='open',
                               consultant_marketing__consultant__pocs__poc=request.user)
                         )
+                    elif filter_for == 'handover':
+                        pass
                     else:
                         queryset = queryset.filter(
                             Q(created_by=request.user) |
