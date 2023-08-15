@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import CreateModelMixin, ListModelMixin
 
+from impersonate.swagger import create_impersonate, impersonate_users
 from log1.utils import write_exception
 from employee.models import User, Handover
 from employee.serializers import Token, UserSerializerLogin, HandoverSerializer, HandoverUserSerializer
@@ -17,6 +18,7 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @create_impersonate
     def create(self, request, *args, **kwargs):
         try:
             user_id = request.data.get('id')
@@ -37,6 +39,7 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
             write_exception(error, request)
             return Response({"message": {'success': False, 'message': str(error)}}, status=400)
 
+    @impersonate_users
     @action(methods=['get'], detail=False, url_path='users')
     def users(self, request):
         try:
