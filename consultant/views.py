@@ -1168,23 +1168,31 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 marketer_data = {}
 
                 marketers = queryset.first().marketer.all()
-                for marketer in marketers:
-                    team = get_object_or_404(Team, id=marketer.team.id)
+                teams = queryset.first().teams.all()
 
-                    marketer_info = {
-                        'id': marketer.id,
-                        'name': marketer.employee_name
-                    }
-
+                for team in teams:
                     if team.name in marketer_data:
-                        marketer_data[team.name]['marketers'].append(marketer_info)
+                        continue
                     else:
                         team_info = {
                             'team_id': team.id,
                             'team_name': team.name,
-                            'marketers': [marketer_info]
+                            'marketers': []
                         }
                         marketer_data[team.name] = team_info
+
+                for marketer in marketers:
+
+                    if marketer.team:
+                        team = get_object_or_404(Team, id=marketer.team.id)
+
+                        marketer_info = {
+                            'id': marketer.id,
+                            'name': marketer.employee_name
+                        }
+                        if team in teams:
+                            marketer_data[team.name]['marketers'].append(marketer_info)
+
 
                 for team_info in marketer_data.values():
                     team_marketer_ids = set(marketer['id'] for marketer in team_info['marketers'])
@@ -1198,7 +1206,6 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                     team_info['is_all'] = set(marketer['id'] for marketer in all_marketers_info).issubset(
                         team_marketer_ids)
                     team_info['all_marketers'] = all_marketers_info
-
 
                 return Response({"data": list(marketer_data.values())}, status=200)
             else:
