@@ -11,14 +11,18 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
-# from engineering.swagger import list_engineering, retrieve_engineering, engineering_filters, engineering_activity, \
-#     engineering_timesheet, engineering_guidelines, engineering_support_required, list_project_updates, \
-#     retrieve_project_updates, create_project_updates, update_project_updates, project_updates_blocker, \
-#     project_updates_add_document, project_updates_remove_document, list_project_summary, create_project_summary, \
-#     update_project_summary, project_summary_technology, project_summary_get_resource, project_summary_put_resource, \
-#     project_summary_get_document, project_summary_put_document, project_summary_delete_document, list_project_training, \
-#     create_project_training, update_project_training, delete_project_training, list_project_checklist, \
-#     update_project_checklist
+from engineering.swagger import list_engineering, retrieve_engineering, engineering_filters, engineering_activity, \
+    engineering_timesheet, engineering_guidelines, engineering_support_required, list_project_updates, \
+    retrieve_project_updates, create_project_updates, update_project_updates, project_updates_blocker, \
+    project_updates_add_document, project_updates_remove_document, list_project_summary, create_project_summary, \
+    update_project_summary, project_summary_technology, project_summary_get_resource, project_summary_put_resource, \
+    project_summary_get_document, project_summary_put_document, project_summary_delete_document, list_project_training, \
+    create_project_training, update_project_training, delete_project_training, list_project_checklist, \
+    update_project_checklist, list_engineer_report, engineer_report_remote_project, engineer_report_project, \
+    engineer_report_test, engineer_report_interview, engineer_report_terminated, engineer_report_category, \
+    engineer_report_summary, list_team_structure, retrieve_team_structure, create_team_structure, update_team_structure, \
+    team_structure_export, team_structure_update_shift, team_structure_teams, team_structure_move_employee, \
+    team_structure_update_scrum, team_structure_remove_team, team_structure_compare_teams
 from engineering.utils import *
 from employee.models import Team, Role
 from engineering.serializers import *
@@ -39,7 +43,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     serializer_class = EngineeringSerializer
     authentication_classes = (TokenAuthentication,)
 
-    # @list_engineering
+    @list_engineering
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query', None)
@@ -246,7 +250,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    # @retrieve_engineering
+    @retrieve_engineering
     def retrieve(self, request, *args, **kwargs):
         try:
             qs = Project.objects.filter(id=kwargs.get('pk', None))
@@ -258,7 +262,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    # @engineering_filters
+    @engineering_filters
     @action(methods=['get'], detail=False, url_path="filters")
     def filters(self, request):
         try:
@@ -293,7 +297,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
-    # @engineering_activity
+    @engineering_activity
     @action(methods=['get'], detail=True, url_path="activity")
     def activity(self, request, pk):
         try:
@@ -307,7 +311,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @engineering_timesheet
+    @engineering_timesheet
     @action(methods=['get'], detail=True, url_path="timesheet")
     def timesheet(self, request, pk):
         try:
@@ -329,7 +333,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @engineering_guidelines
+    @engineering_guidelines
     @action(methods=['get'], detail=False, url_path='guidelines')
     def guidelines(self, request):
         try:
@@ -350,7 +354,7 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @engineering_support_required
+    @engineering_support_required
     @action(methods=['put'], detail=True, url_path='support_required')
     def support(self, request, **kwargs):
         try:
@@ -375,7 +379,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     serializer_class = ProjectUpdateSerializer
     authentication_classes = (TokenAuthentication,)
 
-    # @list_project_updates
+    @list_project_updates
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
@@ -385,7 +389,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @retrieve_project_updates
+    @retrieve_project_updates
     def retrieve(self, request, *args, **kwargs):
         try:
             update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
@@ -395,7 +399,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @create_project_updates
+    @create_project_updates
     def create(self, request, *args, **kwargs):
         try:
             data = request.data.copy()
@@ -427,7 +431,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @update_project_updates
+    @update_project_updates
     def update(self, request, *args, **kwargs):
         try:
             update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
@@ -450,7 +454,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    # @project_updates_blocker
+    @project_updates_blocker
     @action(methods=['put'], detail=True, url_path='blocker')
     def blocker(self, request, *args, **kwargs):
         try:
@@ -468,7 +472,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @project_updates_add_document
+    @project_updates_add_document
     @action(methods=['put'], detail=True, url_path='add_document')
     def add_document(self, request, *args, **kwargs):
         try:
@@ -490,7 +494,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @project_updates_remove_document
+    @project_updates_remove_document
     @action(methods=['put'], detail=True, url_path='remove_document')
     def remove_document(self, request, *args, **kwargs):
         try:
@@ -516,7 +520,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectDescriptionSerializer
 
-    # @list_project_summary
+    @list_project_summary
     def list(self, request, *args, **kwargs):
         try:
             resume, description_data, recording = None, None, list()
@@ -576,7 +580,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @create_project_summary
+    @create_project_summary
     def create(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
@@ -604,7 +608,7 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @update_project_summary
+    @update_project_summary
     def update(self, request, *args, **kwargs):
         try:
             description = ProjectDescription.objects.get(id=kwargs.get('pk'))
@@ -626,15 +630,15 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @project_summary_technology
+    @project_summary_technology
     @action(methods=['get'], detail=False, url_path='technology')
     def technology(self, request, *args, **kwargs):
         data = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security']
         return Response({"data": data}, status=200)
 
-    # @project_summary_get_resource
-    # @project_summary_put_resource
+    @project_summary_get_resource
+    @project_summary_put_resource
     @action(methods=['get', 'put'], detail=False, url_path='resource')
     def resource(self, request, project_id):
         try:
@@ -658,9 +662,9 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @project_summary_get_document
-    # @project_summary_put_document
-    # @project_summary_delete_document
+    @project_summary_get_document
+    @project_summary_put_document
+    @project_summary_delete_document
     @action(methods=['get', 'put', 'delete'], detail=False, url_path='document')
     def document(self, request, project_id):
         try:
@@ -702,7 +706,7 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     serializer_class = TrainingAgendaSerializer
     authentication_classes = (TokenAuthentication,)
 
-    # @list_project_training
+    @list_project_training
     def list(self, request, *args, **kwargs):
         try:
             agendas = TrainingAgenda.objects.filter(project_id=kwargs.get('project_id'))
@@ -712,7 +716,7 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @create_project_training
+    @create_project_training
     def create(self, request, *args, **kwargs):
         try:
             old_position = 0
@@ -739,7 +743,7 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @update_project_training
+    @update_project_training
     def update(self, request, *args, **kwargs):
         try:
             qs = TrainingAgenda.objects.filter(id=kwargs.get('pk'), created_by=request.user)
@@ -759,7 +763,7 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @delete_project_training
+    @delete_project_training
     def destroy(self, request, *args, **kwargs):
         try:
             qs = TrainingAgenda.objects.filter(id=kwargs.get('pk'), created_by=request.user)
@@ -786,7 +790,7 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
     serializer_class = TrainingCheckListSerializer
     authentication_classes = (TokenAuthentication,)
 
-    # @list_project_checklist
+    @list_project_checklist
     def list(self, request, *args, **kwargs):
         try:
             checklist = TrainingCheckList.objects.filter(project_id=kwargs.get('project_id')).order_by('position')
@@ -796,7 +800,7 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @update_project_checklist
+    @update_project_checklist
     def update(self, request, *args, **kwargs):
         try:
             checklist = get_object_or_404(TrainingCheckList, id=kwargs.get('pk'))
@@ -984,6 +988,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
                     )
         return queryset
 
+    @list_engineer_report
     def list(self, request, *args, **kwargs):
         try:
             first, last = get_page_limits(request)
@@ -1053,6 +1058,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @engineer_report_remote_project
     @action(methods=['get'], detail=False, url_path='remote_project')
     def remote_project(self, request, *args, **kwargs):
         try:
@@ -1163,6 +1169,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @engineer_report_project
     @action(methods=['get'], detail=True, url_path='project')
     def project(self, request, **kwargs):
         try:
@@ -1187,6 +1194,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @engineer_report_test
     @action(methods=['get'], detail=True, url_path='test')
     def test(self, request, **kwargs):
         try:
@@ -1224,6 +1232,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @engineer_report_interview
     @action(methods=['get'], detail=True, url_path='interview')
     def interview(self, request, **kwargs):
         try:
@@ -1264,6 +1273,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @engineer_report_terminated
     @action(methods=['get'], detail=True, url_path='terminated')
     def terminated(self, request, **kwargs):
         try:
@@ -1290,6 +1300,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @engineer_report_category
     @action(methods=['get'], detail=False, url_path='category')
     def category(self, request):
         data = [
@@ -1300,6 +1311,7 @@ class EngineerReportViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         ]
         return Response({"data": data}, status=200)
 
+    @engineer_report_summary
     @action(methods=['get'], detail=True, url_path='summary')
     def summary(self, request, **kwargs):
         try:
@@ -1442,6 +1454,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @list_team_structure
     def list(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
@@ -1457,6 +1470,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @retrieve_team_structure
     def retrieve(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
@@ -1469,6 +1483,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @create_team_structure
     def create(self, request, *args, **kwargs):
         try:
             if 'superadmin' not in request.user.roles and 'scrum_master' not in request.user.roles:
@@ -1485,6 +1500,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @update_team_structure
     def update(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
@@ -1501,6 +1517,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @team_structure_export
     @action(methods=['get'], detail=False, url_path='export')
     def export(self, request, **kwargs):
         try:
@@ -1519,6 +1536,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @team_structure_update_shift
     @action(methods=['put'], detail=False, url_path='update_shift')
     def shift(self, request, **kwargs):
         try:
@@ -1535,6 +1553,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @team_structure_teams
     @action(methods=['get'], detail=False, url_path='teams')
     def teams(self, request, **kwargs):
         try:
@@ -1558,6 +1577,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @team_structure_move_employee
     @action(methods=['put'], detail=True, url_path='move_employee')
     def move_employee(self, request, **kwargs):
         try:
@@ -1586,6 +1606,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @team_structure_update_scrum
     @action(methods=['put'], detail=True, url_path='update_scrum')
     def update_scrum(self, request, **kwargs):
         try:
@@ -1610,6 +1631,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @team_structure_remove_team
     @action(methods=['delete'], detail=True, url_path='remove_team')
     def remove(self, request, pk):
         try:
@@ -1628,6 +1650,7 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
+    @team_structure_compare_teams
     @action(methods=['get'], detail=False, url_path='compare_teams')
     def compare_team(self, request):
         try:
