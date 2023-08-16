@@ -27,7 +27,7 @@ class TrackingSerializer(serializers.ModelSerializer):
     
     @staticmethod
     def get_devices(obj):
-        return obj.devices.all().values_list('id', flat=True)
+        return obj.devices.all().values_list('id', flat=True).order_by('id')
         
     
 # class TrackingDetailSerializer(serializers.ModelSerializer):
