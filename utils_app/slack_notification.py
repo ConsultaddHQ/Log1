@@ -73,6 +73,7 @@ class MessageCard:
                         "text": {
                             "type": "mrkdwn",
                             "text": f"`I-{obj.id}` :: {obj.round if obj.round else 1}R :: "
+                                    f"{obj.submission.get_work_type_display()} :: "
                                     f"{get_display_choice(obj.screening_type, 'screening_type', request)} :: "
                                     f"{get_display_choice(obj.interview_mode, 'interview_mode', request)} :: "
                                     f"{obj.start_time.date().strftime('%m/%d/%Y')} :: "
@@ -975,7 +976,8 @@ class MessageCard:
                                     "type": "mrkdwn",
                                     "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
                                             f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
-                                            f"   *Time:* {data.get('start', None).split('::')[1]}"
+                                            f"   *Time:* {data.get('start', None).split('::')[1]}\n\t   "
+                                            f"*Project Type:* {data.get('project_type')}"
                                 },
                                 {
                                     "type": "mrkdwn",
