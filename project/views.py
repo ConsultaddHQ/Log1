@@ -37,7 +37,7 @@ from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOr
     SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active
+    mark_in_active, create_notification_and_send_push
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
     TimesheetRequestSerializer, TimetrackEventSerializer
@@ -537,7 +537,7 @@ class ProjectViewSets(ModelViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Project List"
                 )
             return Response({"counts": data_count, "data": serializer.data, "file_url": url}, status=200)
         except Exception as error:
@@ -1491,41 +1491,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 timesheet.status_updated_by = request.user
                 timesheet.save()
                 if request.data.get('status') == 'rejected':
-                    sender_content_type = ContentType.objects.get(model='user')
-                    target_content_type = ContentType.objects.get(model='timesheet')
-                    recipient_content_type = ContentType.objects.get(model='consultant')
-
-                    if timesheet.remark or len(timesheet.remark) != 0:
-                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
-                                f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
-                    else:
-                        title = f"Timesheet rejected for week end {str(timesheet.end)} for client " \
-                                f"{timesheet.project.submission.client}"
-
-                    Notification.objects.create(
-                        category="rejected", recipient_content_type=recipient_content_type,
-                        title=title, recipient_object_id=timesheet.project.consultant.id,
-                        sender_content_type=sender_content_type, target_content_type=target_content_type,
-                        description=title, target_object_id=timesheet.id, sender_object_id=request.user.id,
-                    )
-
-                    # Push Notification
-                    message_body = {
-                        "body": title, "title": "Timesheet Rejected", "category": "rejected",
-                        "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
-                        "data": {
-                            'target': 'timesheet', 'target_id': timesheet.id,
-                            'is_read': False, 'is_deleted': False, 'timestamp': str(timezone.now()),
-                        },
-                    }
-                    object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
-                    registration_ids = list(
-                        FCMDevice.objects.filter(
-                            object_id__in=list(object_ids), content_type__model='consultanttoken'
-                        ).values_list('device_id', flat=True))
-                    push_notification_consultant(registration_ids, message_body)
+                    create_notification_and_send_push(timesheet, request, "rejected")
                     serializer = self.serializer_class(timesheet)
                 else:
+                    create_notification_and_send_push(timesheet, request, "Approved")
                     serializer = self.serializer_class(timesheet)
                 return Response({"data": serializer.data, "message": "Timesheet is updated"}, status=202)
             return Response({"message": "You don't have access"}, status=400)
@@ -1968,7 +1937,8 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                 {"name": "feedback", "display_name": "Feedback"},
             ]
             file_url = export_to_csv(
-                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                request, "Event Feedback"
             )
             return Response({"data": file_url}, status=200)
         except Exception as error:
@@ -2075,7 +2045,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 ]
                 file_url = export_to_csv(
                     data, columns, f"consultant_rate_revision_{datetime.now().strftime('%d-%B-%Y')}.csv",
-                    request=None
+                    None, "Consultant Rate Revision"
                 )
             return Response({"data": data[first: last], "url": file_url, "total": len(data)}, status=200)
         except Exception as error:

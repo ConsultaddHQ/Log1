@@ -1,6 +1,7 @@
 import os
 import json
 from pytz import timezone
+from django.utils import timezone as tz
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 
@@ -11,8 +12,11 @@ from consultant.models import Consultant
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from utils_app.mailing import send_email as mail
+from notification.models import Notification,FCMDevice
 from consultant.utils import send_notification_for_user
 from log1.utils import password_generator, write_exception
+from django.contrib.contenttypes.models import ContentType
+from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from engineering.models import TrainingCheckList, ProjectDescription
 from project.models import Project, TimeSheet, ConsultantLeave, TimetrackEvent
@@ -197,6 +201,49 @@ def diff_month_days(start, end):
     if type(end) == str:
         end = datetime.strptime(str(end), '%Y-%m-%d')
     return (end.year - start.year) * 12 + end.month - start.month
+
+
+def create_notification_and_send_push(timesheet, request, category):
+    sender_content_type = ContentType.objects.get(model='user')
+    target_content_type = ContentType.objects.get(model='timesheet')
+    recipient_content_type = ContentType.objects.get(model='consultant')
+
+    work_type = timesheet.project.submission.work_type
+    if work_type == "c2c":
+        action = "Timesheet"
+    else:
+        action = "Paystubs"
+
+    if timesheet.remark or len(timesheet.remark) != 0:
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
+                f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
+    else:
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
+                f"{timesheet.project.submission.client}"
+
+    Notification.objects.create(
+        category=category, recipient_content_type=recipient_content_type,
+        title=title, recipient_object_id=timesheet.project.consultant.id,
+        sender_content_type=sender_content_type, target_content_type=target_content_type,
+        description=title, target_object_id=timesheet.id, sender_object_id=request.user.id,
+    )
+
+    # Push Notification
+    message_body = {
+        "body": title, "title": f"Timesheet {category}", "category": category,
+        "show_in_foreground": True, "click_action": "FLUTTER_NOTIFICATION_CLICK",
+        "data": {
+            'target': 'timesheet', 'target_id': timesheet.id,
+            'is_read': False, 'is_deleted': False, 'timestamp': str(tz.now()),
+        },
+    }
+
+    object_ids = timesheet.project.consultant.consultant_token.all().values_list('key', flat=True)
+    registration_ids = list(
+        FCMDevice.objects.filter(
+            object_id__in=list(object_ids), content_type__model='consultanttoken'
+        ).values_list('device_id', flat=True))
+    push_notification_consultant(registration_ids, message_body)
 
 
 class ProjectUtil:
