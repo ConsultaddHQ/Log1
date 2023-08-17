@@ -34,7 +34,7 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
     mark_in_active, create_notification_and_send_push
@@ -827,6 +827,129 @@ class ProjectViewSets(ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='w2_remote')
+    def w2_remote(self, request, pk):
+        try:
+            project = get_object_or_404(Project, id=pk)
+            data = {
+                'id': project.id,
+                'consultant_name': project.consultant.name if project.consultant else None,
+                'client_name': project.submission.client,
+                'vendor_company': project.submission.lead.vendor_company.name,
+                'rate': project.rate,
+                'remote_engineer': project.consultant.name if project.is_remote else None,
+                'country': project.consultant.country,
+                'marketer_name': project.submission.created_by.employee_name,
+            }
+            return  Response(data,status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
+    queryset = ProjectPaymentTerm.objects.all()
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        try:
+            project_payment_terms = []
+            for payment_term in self.queryset:
+                project =payment_term.project
+                payment_term_details = {
+                    'id': payment_term.id,
+                    'comment': payment_term.comment,
+                    'payment_term': payment_term.payment_term,
+                    'payment_term_type': payment_term.get_payment_term_type_display(),
+                    'project':{
+                        'project_id': project.id,
+                        'rate': project.rate,
+                        'country': project.consultant.country,
+                        'client_name': project.submission.client,
+                        'remote_engineer': project.consultant.name,
+                        'consultant_name': project.consultant.name,
+                        'vendor_company': project.submission.lead.vendor_company.name,
+                        'marketer_name': project.submission.created_by.employee_name,
+                    }
+
+                }
+                project_payment_terms.append(payment_term_details)
+
+            return  Response({"data": project_payment_terms}, status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            data = {
+                'id': project.id,
+                'rate': project.rate,
+                'country': project.consultant.country,
+                'client_name': project.submission.client,
+                'remote_engineer': project.consultant.name,
+                'consultant_name': project.consultant.name,
+                'marketer_name': project.submission.created_by.employee_name,
+                'vendor_company': project.submission.lead.vendor_company.name,
+            }
+            return Response({"project_info" : data},status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if 'superadmin' in roles or 'admin' in roles or 'scrum master' in roles:
+                project = get_object_or_404(Project, id=request.data.get("project_id"))
+
+                ProjectPaymentTerm.objects.create(
+                    payment_term=request.data.get("payment_term", None),
+                    payment_term_type=request.data.get("payment_term_type", None),
+                    comment=request.data.get("comment", None),
+                    created_by=request.user,
+                    project=project
+                )
+                return Response({"message":"Payment Term Created Successfully"}, status.HTTP_200_OK)
+
+            return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+       try:
+           roles = request.user.roles
+           if 'superadmin' in roles or 'admin' in roles or 'scrum master' in roles:
+               payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
+               payment_term.payment_term = request.data.get("payment_term")
+               payment_term.payment_term_type = request.data.get("payment_term_type")
+               payment_term.comment = request.data.get("comment")
+               payment_term.save()
+               return Response({"message": "Payment Term Updated Successfully"}, status.HTTP_200_OK)
+           return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+
+       except Exception as error:
+           write_exception(error, request)
+           return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='payment_term_types')
+    def payment_term_types(self, request,):
+           try:
+               payment_term_types = [{'value': value, 'display_name': display_name} for value, display_name in
+                                     ProjectPaymentTerm.PAYMENT_TERM_TYPE]
+               return Response(payment_term_types, status.HTTP_200_OK)
+
+           except Exception as error:
+               write_exception(error, request)
+               return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
 # Route - /project/<project_id>/support/
