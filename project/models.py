@@ -420,7 +420,6 @@ class ProjectPaymentTerm(TimeStampedModel):
     )
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
-        null=True, blank=True,
         verbose_name='Created By',
         related_name='project_payment',
     )
