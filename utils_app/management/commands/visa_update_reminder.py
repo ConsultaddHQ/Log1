@@ -37,9 +37,10 @@ class Command(BaseCommand):
                             'body': f"{consultant.name} {visa.get_visa_type_display()} is expiring on {expiry_date} "
                                     f"Please Update the work authorisation on log1."
                         }
-                        res, ok, _ = send_email_without_template(mail_data, "product@consultadd.com")
-                        if not ok:
-                            mail_error.append((consultant.id, res))
+                        try:
+                            send_email_without_template(mail_data, "product@consultadd.com", None, None)
+                        except Exception as e:
+                            mail_error.append((consultant.id, f"mail not send {str(e)}"))
             if len(mail_error) > 0:
                 create_cron_error(job, mail_error)
 
@@ -63,6 +64,6 @@ class Command(BaseCommand):
                 res, ok, _ = send_email(mail_data, "product@consultadd.com")
                 if not ok:
                     create_cron_error(job, res)
-                    
+
         except Exception as error:
             create_cron_error(job, error)

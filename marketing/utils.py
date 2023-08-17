@@ -1,5 +1,7 @@
+import os
 import csv
 import json
+
 from pytz import timezone
 
 from celery import shared_task
@@ -77,9 +79,9 @@ def date_filter(queryset, timestamp, field_str):
     filters = dict()
     if timestamp and type(timestamp) == dict:
         lte_date = timestamp.get('lte', None)
-        # if lte_date:
-        #     lte_date = (
-        #             datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        if lte_date:
+            lte_date = (
+                    datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
         lte = lte_date
         gte = timestamp.get('gte', None)
         if lte and gte and lte == gte:  # Check if lte and gte are the same date
@@ -115,7 +117,8 @@ def change_to_feedback_due():
             interview.save()
 
         # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
-        delete_supervisor_notification.delay()
+        if os.environ.get('ENV') == 'prod':
+            delete_supervisor_notification.delay()
 
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
         interviews = Interview.objects.filter(
