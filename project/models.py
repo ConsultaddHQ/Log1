@@ -403,6 +403,7 @@ class TimetrackEventFeedback(models.Model):
         verbose_name='event'
     )
 
+
 class ProjectPaymentTerm(TimeStampedModel):
     PAYMENT_TERM_TYPE = (
         ('on_net_pay', 'On Net Pay'),
