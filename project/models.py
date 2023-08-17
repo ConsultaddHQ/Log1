@@ -306,10 +306,11 @@ class ConsultantLeave(TimeStampedModel):
 
 class Leave(TimeStampedModel):
     LEAVE_STATUS = (
-        ('applied', 'Applied'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
-        ('pending', 'Pending 1st Level')
+        ('applied', 'Pending 2nd Level'),
+        ('pending', 'Pending 1st Level'),
+        ('rejected_1st_level', 'Rejected 1st Level')
     )
     attachment = GenericRelation(Attachment)
     to_date = models.DateField(_("To Date"))
