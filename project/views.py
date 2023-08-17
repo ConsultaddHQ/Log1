@@ -828,26 +828,6 @@ class ProjectViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['get'], detail=True, url_path='w2_remote')
-    def w2_remote(self, request, pk):
-        try:
-            project = get_object_or_404(Project, id=pk)
-            data = {
-                'id': project.id,
-                'consultant_name': project.consultant.name if project.consultant else None,
-                'client_name': project.submission.client,
-                'vendor_company': project.submission.lead.vendor_company.name,
-                'rate': project.rate,
-                'remote_engineer': project.consultant.name if project.is_remote else None,
-                'country': project.consultant.country,
-                'marketer_name': project.submission.created_by.employee_name,
-            }
-            return  Response(data,status.HTTP_200_OK)
-
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
 
 class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectPaymentTerm.objects.all()
