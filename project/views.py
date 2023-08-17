@@ -1455,6 +1455,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     "id": consultant.id,
                     "name": consultant.name,
                     "email": consultant.email,
+                    "approval_required": consultant.approval_required,
                     "pending_leave": True if consultant.leaves.filter(status='applied').order_by('created') else False,
                     "pending_request": True
                     if TimesheetRequest.objects.filter(project__consultant=consultant, status='request') else False,
@@ -1695,31 +1696,41 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
 
         try:
-            status = request.data.get('status', None)
-            if not status:
+            leave_status = request.data.get('status', None)
+            if not leave_status:
                 return Response({"message": "No action selected"}, status=200)
             leave = get_object_or_404(Leave, id=kwargs.get('pk'), consultant=consultant)
+            prev_status = leave.get_status_display()
             leave.remarks = request.data.get('remarks', None)
             leave.save()
 
             consultant_leave = leave.leave_type
-            if not status or status == leave.status:
+            if not leave_status or leave_status == leave.status:
                 return Response({"message": "Status Not Updated"}, status=200)
 
-            if status.upper() == "REJECTED":
+            if leave_status.upper() == "REJECTED":
+                leave_status = "rejected_1st_level" if leave.status == 'pending' else "rejected"
                 consultant_leave.balance += leave.total_hours
                 consultant_leave.save()
 
-            elif status.upper() == "APPROVED" and leave.status.upper() == "REJECTED":
-                consultant_leave.balance -= leave.total_hours
-                consultant_leave.save()
+            elif leave_status.upper() == "APPROVED":
+                if "rejected" in leave.status:
+                    consultant_leave.balance -= leave.total_hours
+                    consultant_leave.save()
+                    leave_status = "approved" if leave.status == 'rejected' else "applied"
+                else:
+                    leave_status = "approved" if leave.status == 'rejected' else "applied"
 
-            leave.status = status
+            leave.status = leave_status
             leave.save()
             sender_content_type = ContentType.objects.get(model='user')
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')
-            title = f"Leave {leave.status} for date {leave.from_date}"
+
+            if prev_status == 'pending' and request.data['status'] == 'approved':
+                title = f"Leave initial level approval granted from {request.user.employee_name}"
+            else:
+                title = f"Leave {leave.status} for date {leave.from_date}"
 
             Notification.objects.create(
                 category="info", recipient_content_type=recipient_content_type,
@@ -1807,6 +1818,27 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["put"], detail=True, url_name="approval_required")
+    def approval_required(self, request, *args, **kwargs):
+        try:
+            # updated_consultants = ''
+            approval = request.data.get('action', True)
+            consultant_ids = request.data.get('consultant_ids', [])
+
+            for consultant_id in consultant_ids:
+                consultant = Consultant.objects.get(id=consultant_id)
+                if consultant.approval_required == approval:
+                    continue
+                consultant.approval_required = approval
+                # updated_consultants = updated_consultants + consultant.name + ' '
+                required = '' if approval else 'not '
+                desc = f"{request.user.employee_name} marked {consultant.name} approval as {required}required"
+                create_activity(consultant.id, 'leave', request.user, desc, 'updated')
+            return Response({"message": "Consultant Approval Updated"}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /timesheet_event/
