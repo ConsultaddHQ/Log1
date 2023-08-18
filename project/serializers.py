@@ -5,8 +5,8 @@ from rest_framework import serializers
 from consultant.models import Consultant
 from utils_app.aws_utils import get_s3_object
 from employee.serializers import UserSerializer
-from project.utils import get_project_check_list, get_country
 from marketing.serializers import SubmissionSerializer
+from project.utils import get_project_check_list, get_country
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
     ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm

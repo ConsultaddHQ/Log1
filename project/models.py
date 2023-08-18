@@ -412,9 +412,9 @@ class ProjectPaymentTerm(TimeStampedModel):
         ('100%_to_consultant', '100% To Consultant')
     )
     comment = models.TextField(_("Comment"), null=True, blank=True)
+    term_end = models.DateTimeField(_("Term_End"), null=True, blank=True)
     payment_term = models.FloatField(_('Payment_Term'), null=True, blank=True)
     payment_term_type = models.CharField(_("Payment_Term_Type"), max_length=30, choices=PAYMENT_TERM_TYPE)
-    term_end = models.DateTimeField(_("Term_End"), null=True, blank=True)
     project = models.ForeignKey(
         Project, on_delete=models.PROTECT,
         related_name='project_payment_term',
