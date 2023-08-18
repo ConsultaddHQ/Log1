@@ -414,6 +414,7 @@ class ProjectPaymentTerm(TimeStampedModel):
     comment = models.TextField(_("comment"), null=True, blank=True)
     payment_term = models.FloatField(_('payment_term'), null=True, blank=True)
     payment_term_type = models.CharField(_("payment_term_type"), max_length=30, choices=PAYMENT_TERM_TYPE)
+    term_end = models.DateTimeField(_("term_end"), null=True, blank=True)
     project = models.ForeignKey(
         Project, on_delete=models.PROTECT,
         related_name='project_payment_term',

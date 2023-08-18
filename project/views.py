@@ -896,7 +896,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                payment_term.comment = request.data.get("comment")
                payment_term.save()
                des =f"{request.user} has changed the project payment term details"
-               create_activity(payment_term.id, 'ProjectPaymentTerm', request.user, des, 'updated')
+               create_activity(payment_term.id, 'projectpaymentterm', request.user, des, 'updated')
                return Response({"message": "Payment Term Updated Successfully"}, status.HTTP_200_OK)
            return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
 
