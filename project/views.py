@@ -924,9 +924,10 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
     @action(methods=['get'], detail=False, url_path='project_list')
     def project_list(self, request, ):
         try:
+            ID_MAX_LENGTH = 4
             project_list = []
             query = request.GET.get('query', '').lower().replace("po-", "")
-            if len(query) == 4:
+            if len(query) == ID_MAX_LENGTH:
                 queryset = Project.objects.filter(id=query)
             else:
                 queryset = Project.objects.exclude(submission__status='archive').filter(
@@ -942,7 +943,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
             return Response({"project_list":project_list}, status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
 
 
 
