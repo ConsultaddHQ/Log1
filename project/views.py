@@ -40,7 +40,7 @@ from project.utils import ProjectUtil, create_remote_consultant, set_consultant_
     mark_in_active, create_notification_and_send_push
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
 
 
 # Route - /project/
@@ -829,6 +829,8 @@ class ProjectViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 
+
+
 class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin):
     queryset = ProjectPaymentTerm.objects.all()
     permission_classes = (IsAuthenticated,)
@@ -836,29 +838,9 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
 
     def list(self, request, *args, **kwargs):
         try:
-            project_payment_terms = []
-            for payment_term in self.queryset:
-                project =payment_term.project
-                payment_term_details = {
-                    'id': payment_term.id,
-                    'comment': payment_term.comment,
-                    'payment_term': payment_term.payment_term,
-                    'payment_term_type': payment_term.get_payment_term_type_display(),
-                    'project':{
-                        'project_id': project.id,
-                        'rate': project.rate,
-                        'country': project.consultant.country,
-                        'client_name': project.submission.client,
-                        'remote_engineer': project.consultant.name,
-                        'consultant_name': project.consultant.name,
-                        'vendor_company': project.submission.lead.vendor_company.name,
-                        'marketer_name': project.submission.created_by.employee_name,
-                    }
-
-                }
-                project_payment_terms.append(payment_term_details)
-
-            return  Response({"data": project_payment_terms}, status.HTTP_200_OK)
+            queryset = ProjectPaymentTerm.objects.all()
+            serializer = ProjectPaymentTermSerializer(queryset, many=True)
+            return  Response({"data": serializer.data}, status.HTTP_200_OK)
 
         except Exception as error:
             write_exception(error, request)
@@ -913,6 +895,8 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                payment_term.payment_term_type = request.data.get("payment_term_type")
                payment_term.comment = request.data.get("comment")
                payment_term.save()
+               des =f"{request.user} has changed the project payment term details"
+               create_activity(payment_term.id, 'ProjectPaymentTerm', request.user, des, 'updated')
                return Response({"message": "Payment Term Updated Successfully"}, status.HTTP_200_OK)
            return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
 
@@ -923,10 +907,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
     @action(methods=['get'], detail=False, url_path='payment_term_types')
     def payment_term_types(self, request,):
            try:
-               payment_term_types = [{'value': value, 'display_name': display_name} for value, display_name in
-                                     ProjectPaymentTerm.PAYMENT_TERM_TYPE]
-               return Response(payment_term_types, status.HTTP_200_OK)
-
+               return Response(list(ProjectPaymentTerm.PAYMENT_TERM_TYPE), status.HTTP_200_OK)
            except Exception as error:
                write_exception(error, request)
                return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

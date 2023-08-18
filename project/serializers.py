@@ -9,7 +9,7 @@ from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -493,3 +493,31 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
             "all": True if len(consultants) > 50 else False
         }
         return data
+
+class ProjectPaymentTermSerializer(serializers.ModelSerializer):
+    project = serializers.SerializerMethodField()
+    payment_term_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectPaymentTerm
+        fields = ('id', 'payment_term', 'payment_term_type', 'comment', 'project')
+
+    @staticmethod
+    def get_project(obj):
+        project = obj.project
+        if project:
+            return {
+                'project_id': project.id,
+                'rate': project.rate,
+                'country': project.consultant.country,
+                'client_name': project.submission.client,
+                'remote_engineer': project.consultant.name,
+                'consultant_name': project.consultant.name,
+                'vendor_company': project.submission.lead.vendor_company.name,
+                'marketer_name': project.submission.created_by.employee_name,
+            }
+        return None
+
+    @staticmethod
+    def get_payment_term_type(obj):
+        return obj.get_payment_term_type_display()
