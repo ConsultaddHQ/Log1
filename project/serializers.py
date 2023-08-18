@@ -5,7 +5,7 @@ from rest_framework import serializers
 from consultant.models import Consultant
 from utils_app.aws_utils import get_s3_object
 from employee.serializers import UserSerializer
-from project.utils import get_project_check_list
+from project.utils import get_project_check_list, get_country
 from marketing.serializers import SubmissionSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
@@ -494,6 +494,7 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
         }
         return data
 
+
 class ProjectPaymentTermSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
     payment_term_type = serializers.SerializerMethodField()
@@ -507,17 +508,19 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
         project = obj.project
         if project:
             return {
-                'project_id': project.id,
                 'rate': project.rate,
-                'country': project.consultant.country,
+                'project_id': project.id,
                 'client_name': project.submission.client,
                 'remote_engineer': project.consultant.name,
-                'consultant_name': project.consultant.name,
-                'vendor_company': project.submission.lead.vendor_company.name,
+                'project_type':project.submission.work_type,
+                'country': get_country(project.submission.lead.city),
+                'consultant_name': project.submission.consultant.name,
                 'marketer_name': project.submission.created_by.employee_name,
+                'vendor_company': project.submission.lead.vendor_company.name,
             }
         return None
 
     @staticmethod
     def get_payment_term_type(obj):
         return obj.get_payment_term_type_display()
+
