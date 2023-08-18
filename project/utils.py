@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
-from utils_app.models import Choice
 from consultant.models import Consultant
+from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from utils_app.mailing import send_email as mail
@@ -634,3 +634,13 @@ def timesheet_submission_mail(obj, request=None):
     except Exception as error:
         write_exception(error, request)
         return None
+
+
+def get_country(city):
+    city_obj = None
+    if city:
+        split_city = city.split(",")
+        city_obj = City.objects.filter(
+            name=split_city[0], state=split_city[1]
+        )
+    return city_obj.first().country if city_obj else None
