@@ -924,9 +924,14 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
     @action(methods=['get'], detail=False, url_path='project_list')
     def project_list(self, request, ):
         try:
-            query = request.GET.get('query','')
             project_list = []
-            queryset = Project.objects.filter(statuses__status='joined', id__istartswith=query)
+            query = request.GET.get('query', '').lower().replace("po-", "")
+            if len(query) == 4:
+                queryset = Project.objects.filter(id=query)
+            else:
+                queryset = Project.objects.exclude(submission__status='archive').filter(
+                    id__istartswith=query, statuses__status='joined', statuses__is_current=True
+                )
             for project in queryset:
                 data = {
                     "id": project.id,
@@ -934,7 +939,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                     "consultant_name": project.consultant.name,
                 }
                 project_list.append(data)
-            return Response(project_list, status.HTTP_200_OK)
+            return Response({"project_list":project_list}, status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
