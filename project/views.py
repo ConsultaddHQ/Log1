@@ -1655,6 +1655,27 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
+    @action(methods=["put"], detail=True, url_name="approval_required")
+    def approval_required(self, request, *args, **kwargs):
+        try:
+            # updated_consultants = ''
+            approval = request.data.get('action', True)
+            consultant_ids = request.data.get('consultant_ids', [])
+
+            for consultant_id in consultant_ids:
+                consultant = Consultant.objects.get(id=consultant_id)
+                if consultant.approval_required == approval:
+                    continue
+                consultant.approval_required = approval
+                # updated_consultants = updated_consultants + consultant.name + ' '
+                required = '' if approval else 'not '
+                desc = f"{request.user.employee_name} marked {consultant.name} approval as {required}required"
+                create_activity(consultant.id, 'leave', request.user, desc, 'updated')
+            return Response({"message": "Consultant Approval Updated"}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Route - /finance/<consultant_id>/leave/
 class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1719,7 +1740,10 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                     consultant_leave.save()
                     leave_status = "approved" if leave.status == 'rejected' else "applied"
                 else:
-                    leave_status = "approved" if leave.status == 'rejected' else "applied"
+                    if leave.status == 'pending':
+                        leave_status = "applied"
+                    elif leave.status == 'applied':
+                        leave_status = "approved"
 
             leave.status = leave_status
             leave.save()
@@ -1818,27 +1842,6 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
-    @action(methods=["put"], detail=True, url_name="approval_required")
-    def approval_required(self, request, *args, **kwargs):
-        try:
-            # updated_consultants = ''
-            approval = request.data.get('action', True)
-            consultant_ids = request.data.get('consultant_ids', [])
-
-            for consultant_id in consultant_ids:
-                consultant = Consultant.objects.get(id=consultant_id)
-                if consultant.approval_required == approval:
-                    continue
-                consultant.approval_required = approval
-                # updated_consultants = updated_consultants + consultant.name + ' '
-                required = '' if approval else 'not '
-                desc = f"{request.user.employee_name} marked {consultant.name} approval as {required}required"
-                create_activity(consultant.id, 'leave', request.user, desc, 'updated')
-            return Response({"message": "Consultant Approval Updated"}, status=status.HTTP_202_ACCEPTED)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /timesheet_event/
