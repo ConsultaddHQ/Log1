@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
-from utils_app.models import Choice
 from consultant.models import Consultant
+from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from utils_app.mailing import send_email as mail
@@ -208,11 +208,17 @@ def create_notification_and_send_push(timesheet, request, category):
     target_content_type = ContentType.objects.get(model='timesheet')
     recipient_content_type = ContentType.objects.get(model='consultant')
 
+    work_type = timesheet.project.submission.work_type
+    if work_type == "c2c":
+        action = "Timesheet"
+    else:
+        action = "Paystubs"
+
     if timesheet.remark or len(timesheet.remark) != 0:
-        title = f"Timesheet {category} for week end {str(timesheet.end)} for client " \
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
                 f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
     else:
-        title = f"Timesheet {category} for week end {str(timesheet.end)} for client " \
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
                 f"{timesheet.project.submission.client}"
 
     Notification.objects.create(
@@ -628,3 +634,13 @@ def timesheet_submission_mail(obj, request=None):
     except Exception as error:
         write_exception(error, request)
         return None
+
+
+def get_country(city):
+    city_obj = None
+    if city:
+        split_city = city.split(",")
+        city_obj = City.objects.filter(
+            name=split_city[0], state=split_city[1]
+        )
+    return city_obj.first().country if city_obj else None

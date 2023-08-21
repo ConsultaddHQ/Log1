@@ -25,6 +25,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from api_key.models import APIKey
+from tracking.models import Devices, Location
 from project.models import Project, ProjectSupport
 from consultant.models import Consultant
 from utils_app.calendar import GoogleCalendar
@@ -37,6 +38,7 @@ from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handove
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer
 from .utils import valid_password
+from tracking.utils import get_address_by_location, generate_unique_cookies, string_to_decimal_point_converter
 
 # Route - /auth/
 class EmployeeAuthViewSets(GenericViewSet):
@@ -85,6 +87,9 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         try:
             employee_id = request.data.get('employee_id', None)
+            latitude = request.data.get('latitude', None)
+            longitude = request.data.get('longitude', None)
+            
             if not employee_id.isnumeric():
                 return Response({"message": "Enter valid Employee Id"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -98,10 +103,53 @@ class EmployeeAuthViewSets(GenericViewSet):
             user = queryset.first()
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:
+                # need to check if cookies id is available or not
+                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
+                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+                other_device = Devices.objects.filter(user=user).last()
+                
+                if not devices_cookies:
+                    device_id = other_device.device_id if other_device else 0
+                    cookie_value = generate_unique_cookies()
+                    devices_cookies = Devices.objects.create(
+                        user=user,
+                        device_id=device_id,
+                        cookies_value=cookie_value,
+                    )
+
+                    # ip address and location needs to determine here
+                    if latitude and longitude:
+                        latitude = string_to_decimal_point_converter(latitude)
+                        longitude = string_to_decimal_point_converter(longitude)
+                        location_data = Location.objects.filter(latitude=latitude,longitude=longitude).first()
+                        if location_data:
+                            Location.objects.create(
+                                latitude=latitude,
+                                longitude=longitude,
+                                place_name=location_data.place_name,
+                                state=location_data.state,
+                                country=location_data.country,
+                                pin_code=location_data.pin_code,
+                                display_name=location_data.display_name,
+                                device=devices_cookies
+                            )
+                        else:
+                            location_data = get_address_by_location(latitude, longitude)
+                            if location_data:
+                                Location.objects.create(
+                                    device=devices_cookies,
+                                    state=location_data["address"]["state"],
+                                    place_name=location_data["address"]["town"] if 'town' in location_data["address"] else location_data["address"]["city"],
+                                    country=location_data["address"]["country"],
+                                    pin_code=location_data["address"]["postcode"],
+                                    display_name = location_data["display_name"]
+                                )
+
                 if not user.account_login:
                     return Response({"message": "Your account is not active"}, status=status.HTTP_400_BAD_REQUEST)
                 user.last_login = datetime.now()
                 user.save()
+
                 fcm_token = request.data.get("fcm_token", None)
                 if fcm_token:
                     fcm_token, created = FCMDevice.objects.get_or_create(
@@ -113,9 +161,12 @@ class EmployeeAuthViewSets(GenericViewSet):
                     fcm_token.object_id = user.id
                     fcm_token.save()
 
-                return Response({"data": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
-            return Response({"message": "Incorrect Password", "error": "Incorrect Password"},
-                            status=status.HTTP_400_BAD_REQUEST)
+                return Response({
+                    "data": self.login_serializer_class(user).data, "cookie": devices_cookies.cookies_value
+                }, status=status.HTTP_202_ACCEPTED)
+            return Response(
+                {"message": "Incorrect Password", "error": "Incorrect Password"}, status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as error:
             write_exception(message=error)
             return Response({"message": "Unable to Login", "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -141,9 +192,15 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             query = request.GET.get('query', '')
             teams = request.GET.get('teams', None)
+            is_active = request.GET.get('is_active', None)
             user_type = request.GET.get('type', None)
             associate = json.loads(request.GET.get('associate', 'false'))
-            users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
+            users = User.objects.exclude(role__name='consultant')
+            if is_active:
+                users = users.filter(is_active=True, account_login=True)
+            else:
+                users = users.exclude(account_login=False)
+
             if user_type:
                 users = users.filter(role__name__iexact=user_type)
             elif teams:
@@ -352,7 +409,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:
-            return Response({"data": UserDashboardSerializer(request.user).data}, status=status.HTTP_200_OK)
+            cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
+            devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+            location = Location.objects.filter(device=devices_cookies).first()
+            return Response({"data": UserDashboardSerializer(request.user).data, 
+                            "is_location_recoded":True if location else False}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -433,7 +494,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 total = users.count()
                 serializer = UserDirectorySerializer(users[first:last], many=True)
                 return Response({"data": serializer.data, "total": total}, status=status.HTTP_200_OK)
-            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN_FORBIDDEN)
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

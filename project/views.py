@@ -34,13 +34,13 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active, create_notification_and_send_push
+    mark_in_active, create_notification_and_send_push, get_country
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
 
 
 # Route - /project/
@@ -537,7 +537,7 @@ class ProjectViewSets(ModelViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Project List"
                 )
             return Response({"counts": data_count, "data": serializer.data, "file_url": url}, status=200)
         except Exception as error:
@@ -827,6 +827,124 @@ class ProjectViewSets(ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin, RetrieveModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = ProjectPaymentTerm.objects.all()
+    serializer_class = ProjectPaymentTermSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        try:
+            query = request.GET.get('query')
+            queryset = ProjectPaymentTerm.objects.all()
+            project_type = request.data.get('project_type')
+
+            if project_type:
+                queryset.filter(project__submission__work_type=project_type)
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                queryset = queryset.filter(project__submission__consultant__name__istartswith=query)
+
+            serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
+            return  Response({"data": serializer.data}, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            data = {
+                'id': project.id,
+                'rate': project.rate,
+                'client_name': project.submission.client,
+                'remote_engineer': project.consultant.name,
+                'project_type':project.submission.work_type,
+                'country': get_country(project.submission.lead.city),
+                'consultant_name': project.submission.consultant.name,
+                'marketer_name': project.submission.created_by.employee_name,
+                'vendor_company': project.submission.lead.vendor_company.name,
+            }
+            return Response({"project_info" : data},status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not 'superadmin' in roles or not 'admin' in roles or not 'scrum master' in roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+
+            project = get_object_or_404(Project, id=request.data.get("project_id"))
+
+            ProjectPaymentTerm.objects.create(
+                payment_term=request.data.get("payment_term", None),
+                payment_term_type=request.data.get("payment_term_type", None),
+                comment=request.data.get("comment", None),
+                created_by=request.user,
+                project=project
+            )
+            return Response({"message": "Payment Term Created Successfully"}, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+       try:
+           roles = request.user.roles
+           if not 'superadmin' in roles or not 'admin' in roles or not'scrum master' in roles:
+               return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+
+           payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
+           payment_term.payment_term = request.data.get("payment_term")
+           payment_term.payment_term_type = request.data.get("payment_term_type")
+           payment_term.comment = request.data.get("comment")
+           payment_term.save()
+
+           des = f"{request.user} has changed the project payment term details"
+           create_activity(payment_term.id, 'projectpaymentterm', request.user, des, 'updated')
+           return Response({"message": "Payment Term Updated Successfully"}, status.HTTP_200_OK)
+       except Exception as error:
+           write_exception(error, request)
+           return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='payment_term_types')
+    def payment_term_types(self, request,):
+        try:
+            return Response(ProjectPaymentTerm.PAYMENT_TERM_TYPE, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='project_list')
+    def project_list(self, request, ):
+        try:
+            ID_MAX_LENGTH = 4
+            project_list = []
+            query = request.GET.get('query', '').lower().replace("po-", "")
+            if len(query) == ID_MAX_LENGTH:
+                queryset = Project.objects.filter(id=query)
+            else:
+                queryset = Project.objects.exclude(submission__status='archive').filter(
+                    id__istartswith=query, statuses__status='joined', statuses__is_current=True
+                )
+            for project in queryset:
+                data = {
+                    "id": project.id,
+                    "remote_engineer": project.submission.consultant.name,
+                    "consultant_name": project.consultant.name,
+                }
+                project_list.append(data)
+            return Response({"project_list":project_list}, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
 
 
 # Route - /project/<project_id>/support/
@@ -1455,6 +1573,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     "id": consultant.id,
                     "name": consultant.name,
                     "email": consultant.email,
+                    "approval_required": consultant.approval_required,
                     "pending_leave": True if consultant.leaves.filter(status='applied').order_by('created') else False,
                     "pending_request": True
                     if TimesheetRequest.objects.filter(project__consultant=consultant, status='request') else False,
@@ -1695,31 +1814,41 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
 
         try:
-            status = request.data.get('status', None)
-            if not status:
+            leave_status = request.data.get('status', None)
+            if not leave_status:
                 return Response({"message": "No action selected"}, status=200)
             leave = get_object_or_404(Leave, id=kwargs.get('pk'), consultant=consultant)
+            prev_status = leave.get_status_display()
             leave.remarks = request.data.get('remarks', None)
             leave.save()
 
             consultant_leave = leave.leave_type
-            if not status or status == leave.status:
+            if not leave_status or leave_status == leave.status:
                 return Response({"message": "Status Not Updated"}, status=200)
 
-            if status.upper() == "REJECTED":
+            if leave_status.upper() == "REJECTED":
+                leave_status = "rejected_1st_level" if leave.status == 'pending' else "rejected"
                 consultant_leave.balance += leave.total_hours
                 consultant_leave.save()
 
-            elif status.upper() == "APPROVED" and leave.status.upper() == "REJECTED":
-                consultant_leave.balance -= leave.total_hours
-                consultant_leave.save()
+            elif leave_status.upper() == "APPROVED":
+                if "rejected" in leave.status:
+                    consultant_leave.balance -= leave.total_hours
+                    consultant_leave.save()
+                    leave_status = "approved" if leave.status == 'rejected' else "applied"
+                else:
+                    leave_status = "approved" if leave.status == 'rejected' else "applied"
 
-            leave.status = status
+            leave.status = leave_status
             leave.save()
             sender_content_type = ContentType.objects.get(model='user')
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')
-            title = f"Leave {leave.status} for date {leave.from_date}"
+
+            if prev_status == 'pending' and request.data['status'] == 'approved':
+                title = f"Leave initial level approval granted from {request.user.employee_name}"
+            else:
+                title = f"Leave {leave.status} for date {leave.from_date}"
 
             Notification.objects.create(
                 category="info", recipient_content_type=recipient_content_type,
@@ -1807,6 +1936,27 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["put"], detail=True, url_name="approval_required")
+    def approval_required(self, request, *args, **kwargs):
+        try:
+            # updated_consultants = ''
+            approval = request.data.get('action', True)
+            consultant_ids = request.data.get('consultant_ids', [])
+
+            for consultant_id in consultant_ids:
+                consultant = Consultant.objects.get(id=consultant_id)
+                if consultant.approval_required == approval:
+                    continue
+                consultant.approval_required = approval
+                # updated_consultants = updated_consultants + consultant.name + ' '
+                required = '' if approval else 'not '
+                desc = f"{request.user.employee_name} marked {consultant.name} approval as {required}required"
+                create_activity(consultant.id, 'leave', request.user, desc, 'updated')
+            return Response({"message": "Consultant Approval Updated"}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /timesheet_event/
@@ -1937,7 +2087,8 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                 {"name": "feedback", "display_name": "Feedback"},
             ]
             file_url = export_to_csv(
-                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                request, "Event Feedback"
             )
             return Response({"data": file_url}, status=200)
         except Exception as error:
@@ -2044,7 +2195,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 ]
                 file_url = export_to_csv(
                     data, columns, f"consultant_rate_revision_{datetime.now().strftime('%d-%B-%Y')}.csv",
-                    request=None
+                    None, "Consultant Rate Revision"
                 )
             return Response({"data": data[first: last], "url": file_url, "total": len(data)}, status=200)
         except Exception as error:
