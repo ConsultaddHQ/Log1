@@ -36,7 +36,7 @@ from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handove
     DefaultCalendar, CertificateInfo, Certificate
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
     AssetSerializer, UserDirectorySerializer, HandoverSerializer, UserDashboardSerializer, CertificateInfoSerializer
-
+from .utils import valid_password
 
 # Route - /auth/
 class EmployeeAuthViewSets(GenericViewSet):
@@ -399,14 +399,13 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             current_password = request.data.get('cur_password')
             new_password = request.data.get('new_password')
             if request.user.check_password(current_password):
-                try:
-                    validate_password(new_password)
+                is_valid, message = valid_password(new_password)
+                if is_valid:
                     request.user.set_password(new_password)
                     request.user.save()
                     return Response({"message": "password updated"}, status=status.HTTP_200_OK)
-                except ValidationError as errors:
-                    e = ''.join(error for error in errors)
-                    return Response({"message": e}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             return Response({"message": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
@@ -688,15 +687,14 @@ class ResetPasswordViewSets(GenericViewSet):
         try:
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
-                try:
-                    validate_password(request.data.get('password'))
+                is_valid, message = valid_password(request.data.get('password'))
+                if is_valid:
                     reset_password_token.user.set_password(password)
                     reset_password_token.user.save()
                     ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
                     return Response({'message': 'Password changed successfully'}, status=status.HTTP_200_OK)
-                except ValidationError as errors:
-                    e = ''.join(error for error in errors)
-                    return Response({"message": e}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({'message': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
