@@ -16,7 +16,6 @@ from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
-from utils_app.thred_mail import send_email_without_template
 from utils_app.utils import export_to_csv
 from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
@@ -1190,34 +1189,5 @@ class EngineerReportXposedViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=['post'], detail=False, url_path='okr/send_mail')
-    def okr_send_mail(self, request, *args, **kwargs):
-        # self.verify_api_key(request.data.get('api_key'))
-        try:
-            mail_data = {
-                'bcc': request.data.get('bcc',[]),
-                'cc': request.data.get('cc',[]),
-                'to': request.data.get('to',[]),
-                'subject': request.data.get('subject',None),
-                'body': request.data.get('body',None),
-                'from': request.data.get('from',None)
-            }
-
-            required_keys = ['to', 'subject', 'body' , 'from']
-
-            for key in required_keys:
-                if not mail_data[key]:
-                    return Response({"message": f"Key '{key}' is missing or empty."}, status=400)
-
-            try:
-                breakpoint()
-                send_email_without_template(mail_data, request.data.get('from'), None, None)
-            except Exception as e:
-                return Response({"message": ERROR_MSG, "error": str(e)}, status=400)
-
-            return Response({}, status=200)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
 

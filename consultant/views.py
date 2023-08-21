@@ -1203,11 +1203,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                         team__name=team_info['team_name']
                     ).values('id', 'employee_name')
 
-                    marketer_ids_set = set(marketer['id'] for marketer in all_marketers_info)
-                    if marketer_ids_set and marketer_ids_set.issubset(team_marketer_ids):
-                        team_info['is_all'] = True
-                    else:
-                        team_info['is_all'] = False
+                    team_info['is_all'] = set(marketer['id'] for marketer in all_marketers_info).issubset(
+                        team_marketer_ids)
                     team_info['all_marketers'] = all_marketers_info
 
                 return Response({"data": list(marketer_data.values())}, status=200)
