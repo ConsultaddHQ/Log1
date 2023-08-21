@@ -193,7 +193,7 @@ def send_email(mail_data, from_email, request=None):
 
 
 @shared_task
-def send_email_without_template(mail_data, from_email=None, request=None, mail_id=None):
+def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
         from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
