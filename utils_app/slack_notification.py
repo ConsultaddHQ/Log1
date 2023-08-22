@@ -725,12 +725,12 @@ class MessageCard:
     @staticmethod
     def po_receive_message_card(payload, request):
         try:
-            stru = ''
+            project_count = ''
             if payload.get('w2_count', 'NA') != 0:
-                stru += f"*`W2`* - *{payload.get('w2_count', 'NA')}*"
-                stru += "  "
+                project_count += f"*`W2`* - *{payload.get('w2_count', 'NA')}*"
+                project_count += "  "
             if payload.get('c2c_count', 'NA') != 0:
-                stru += f"*`C2C`* - *{payload.get('c2c_count', 'NA')}*"
+                project_count += f"*`C2C`* - *{payload.get('c2c_count', 'NA')}*"
 
             data = {
                 "blocks": [
@@ -792,7 +792,7 @@ class MessageCard:
                         "text": {
                             "type": "mrkdwn",
                             "text": (
-                                f":trophy: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*  {stru}  "
+                                f":trophy: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*  {project_count}  "
                             )
                         }
                     },
