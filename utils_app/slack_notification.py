@@ -793,7 +793,6 @@ class MessageCard:
                             "type": "mrkdwn",
                             "text": (
                                 f":trophy: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*  {stru}  "
-                                f"*`Total`* - *{payload.get('total', 'NA')}*"
                             )
                         }
                     },
