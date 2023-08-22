@@ -16,12 +16,12 @@ from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
-from utils_app.thred_mail import send_email_without_template
 from utils_app.utils import export_to_csv
 from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
+from utils_app.thred_mail import send_email_without_template
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
@@ -1192,7 +1192,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='okr/send_mail')
     def okr_send_mail(self, request, *args, **kwargs):
-        # self.verify_api_key(request.data.get('api_key'))
+        self.verify_api_key(request.data.get('api_key'))
         try:
             mail_data = {
                 'bcc': request.data.get('bcc', []),
@@ -1210,12 +1210,11 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     return Response({"message": f"Key '{key}' is missing or empty."}, status=400)
 
             try:
-                send_email_without_template(mail_data, request.data.get('from'), None, None)
+                send_email_without_template(mail_data, request.data.get('from', 'product@consultadd.com'), None, None)
             except Exception as e:
                 return Response({"message": ERROR_MSG, "error": str(e)}, status=400)
 
-            return Response({"message":"Mail sent successfully"}, status=200)
+            return Response({"message": "Mail sent successfully"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
-
