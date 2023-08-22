@@ -195,7 +195,8 @@ def send_email(mail_data, from_email, request=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
-        from_email = "product@consultadd.com"
+        if from_email:
+            from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
@@ -218,7 +219,7 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
                 
             else:
                 message['to'] = ','.join(
-                    ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@consultadd.com']
+                    ['piyush.y@consultadd.com', 'shreyas.k@consultadd.com', 'prashant.k@consultadd.com', 'gufran.a@consultadd.com']
                 )
                 message['cc'] = ''
                 message['bcc'] = ''

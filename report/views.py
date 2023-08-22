@@ -21,6 +21,7 @@ from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
+from utils_app.thred_mail import send_email_without_template
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
@@ -1185,6 +1186,35 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 }
                 count += 1
             return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='okr/send_mail')
+    def okr_send_mail(self, request, *args, **kwargs):
+        self.verify_api_key(request.data.get('api_key'))
+        try:
+            mail_data = {
+                'bcc': request.data.get('bcc', []),
+                'cc': request.data.get('cc', []),
+                'to': request.data.get('to', []),
+                'subject': request.data.get('subject', None),
+                'body': request.data.get('body', None),
+                'from': request.data.get('from', None)
+            }
+
+            required_keys = ['to', 'subject', 'body', 'from']
+
+            for key in required_keys:
+                if not mail_data[key]:
+                    return Response({"message": f"Key '{key}' is missing or empty."}, status=400)
+
+            try:
+                send_email_without_template(mail_data, request.data.get('from', 'product@consultadd.com'), None, None)
+            except Exception as e:
+                return Response({"message": ERROR_MSG, "error": str(e)}, status=400)
+
+            return Response({"message": "Mail sent successfully"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
