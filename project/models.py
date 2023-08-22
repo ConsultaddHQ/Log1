@@ -404,3 +404,29 @@ class TimetrackEventFeedback(models.Model):
         related_name='feedback',
         verbose_name='event'
     )
+
+
+class ProjectPaymentTerm(TimeStampedModel):
+    PAYMENT_TERM_TYPE = (
+        ('on_net_pay', 'On Net Pay'),
+        ('on_gross_pay', 'On Gross Pay'),
+        ('100%_to_company', '100% To Company'),
+        ('100%_to_consultant', '100% To Consultant')
+    )
+    comment = models.TextField(_("Comment"), null=True, blank=True)
+    term_end = models.DateTimeField(_("Term_End"), null=True, blank=True)
+    payment_term = models.FloatField(_('Payment_Term'), null=True, blank=True)
+    payment_term_type = models.CharField(_("Payment_Term_Type"), max_length=30, choices=PAYMENT_TERM_TYPE)
+    project = models.ForeignKey(
+        Project, on_delete=models.PROTECT,
+        related_name='project_payment_term',
+        verbose_name='Project',
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Created By',
+        related_name='project_payment',
+    )
+
+    def __str__(self):
+        return self.payment_term_type

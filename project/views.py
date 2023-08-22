@@ -34,13 +34,13 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active, create_notification_and_send_push
+    mark_in_active, create_notification_and_send_push, get_country
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
 
 
 # Route - /project/
@@ -827,6 +827,124 @@ class ProjectViewSets(ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin, RetrieveModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = ProjectPaymentTerm.objects.all()
+    serializer_class = ProjectPaymentTermSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        try:
+            query = request.GET.get('query')
+            queryset = ProjectPaymentTerm.objects.all()
+            project_type = request.data.get('project_type')
+
+            if project_type:
+                queryset.filter(project__submission__work_type=project_type)
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                queryset = queryset.filter(project__submission__consultant__name__istartswith=query)
+
+            serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
+            return  Response({"data": serializer.data}, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            data = {
+                'id': project.id,
+                'rate': project.rate,
+                'client_name': project.submission.client,
+                'remote_engineer': project.consultant.name,
+                'project_type':project.submission.work_type,
+                'country': get_country(project.submission.lead.city),
+                'consultant_name': project.submission.consultant.name,
+                'marketer_name': project.submission.created_by.employee_name,
+                'vendor_company': project.submission.lead.vendor_company.name,
+            }
+            return Response({"project_info" : data},status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not 'superadmin' in roles or not 'admin' in roles or not 'scrum master' in roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+
+            project = get_object_or_404(Project, id=request.data.get("project_id"))
+
+            ProjectPaymentTerm.objects.create(
+                payment_term=request.data.get("payment_term", None),
+                payment_term_type=request.data.get("payment_term_type", None),
+                comment=request.data.get("comment", None),
+                created_by=request.user,
+                project=project
+            )
+            return Response({"message": "Payment Term Created Successfully"}, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+       try:
+           roles = request.user.roles
+           if not 'superadmin' in roles or not 'admin' in roles or not'scrum master' in roles:
+               return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+
+           payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
+           payment_term.payment_term = request.data.get("payment_term")
+           payment_term.payment_term_type = request.data.get("payment_term_type")
+           payment_term.comment = request.data.get("comment")
+           payment_term.save()
+
+           des = f"{request.user} has changed the project payment term details"
+           create_activity(payment_term.id, 'projectpaymentterm', request.user, des, 'updated')
+           return Response({"message": "Payment Term Updated Successfully"}, status.HTTP_200_OK)
+       except Exception as error:
+           write_exception(error, request)
+           return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='payment_term_types')
+    def payment_term_types(self, request,):
+        try:
+            return Response(ProjectPaymentTerm.PAYMENT_TERM_TYPE, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='project_list')
+    def project_list(self, request, ):
+        try:
+            ID_MAX_LENGTH = 4
+            project_list = []
+            query = request.GET.get('query', '').lower().replace("po-", "")
+            if len(query) == ID_MAX_LENGTH:
+                queryset = Project.objects.filter(id=query)
+            else:
+                queryset = Project.objects.exclude(submission__status='archive').filter(
+                    id__istartswith=query, statuses__status='joined', statuses__is_current=True
+                )
+            for project in queryset:
+                data = {
+                    "id": project.id,
+                    "remote_engineer": project.submission.consultant.name,
+                    "consultant_name": project.consultant.name,
+                }
+                project_list.append(data)
+            return Response({"project_list":project_list}, status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+
 
 
 # Route - /project/<project_id>/support/
