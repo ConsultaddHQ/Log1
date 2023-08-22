@@ -523,4 +523,3 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_payment_term_type(obj):
         return obj.get_payment_term_type_display()
-
