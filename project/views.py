@@ -840,16 +840,17 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
         try:
             query = request.GET.get('query')
             queryset = ProjectPaymentTerm.objects.all()
-            project_type = request.data.get('project_type')
+            project_type = request.GET.get('project_type')
 
             if project_type:
-                queryset.filter(project__submission__work_type=project_type)
+                queryset = queryset.filter(project__submission__work_type=project_type)
             if query:
                 query = query.lstrip().replace(':amp:', '&')
-                queryset = queryset.filter(project__submission__consultant__name__istartswith=query)
+                queryset = queryset.filter(
+                    project__submission__consultant_marketing__consultant__name__istartswith=query)
 
             serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
-            return  Response({"data": serializer.data}, status.HTTP_200_OK)
+            return  Response({"data": serializer.data, "count":len(serializer.data),}, status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
@@ -877,7 +878,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
-            if not 'superadmin' in roles or not 'admin' in roles or not 'scrum master' in roles:
+            if not 'superadmin' in roles and not 'admin' in roles and not 'scrum master' in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
 
             project = get_object_or_404(Project, id=request.data.get("project_id"))
@@ -897,7 +898,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
     def update(self, request, *args, **kwargs):
        try:
            roles = request.user.roles
-           if not 'superadmin' in roles or not 'admin' in roles or not'scrum master' in roles:
+           if not 'superadmin' in roles and not 'admin' in roles and not'scrum master' in roles:
                return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
 
            payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
@@ -936,8 +937,15 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
             for project in queryset:
                 data = {
                     "id": project.id,
-                    "remote_engineer": project.submission.consultant.name,
-                    "consultant_name": project.consultant.name,
+                    'rate': project.rate,
+                    'submission_id': project.submission.id,
+                    'client_name': project.submission.client,
+                    'remote_engineer': project.consultant.name,
+                    'project_type': project.submission.work_type,
+                    'country': get_country(project.submission.lead.city),
+                    'consultant_name': project.submission.consultant.name,
+                    'marketer_name': project.submission.created_by.employee_name,
+                    'vendor_company': project.submission.lead.vendor_company.name,
                 }
                 project_list.append(data)
             return Response({"project_list":project_list}, status.HTTP_200_OK)
