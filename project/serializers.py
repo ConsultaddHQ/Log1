@@ -510,6 +510,7 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
             return {
                 'rate': project.rate,
                 'project_id': project.id,
+                'submission_id':project.submission.id,
                 'client_name': project.submission.client,
                 'remote_engineer': project.consultant.name,
                 'project_type':project.submission.work_type,
