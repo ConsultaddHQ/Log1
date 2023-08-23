@@ -1,6 +1,6 @@
 import json
-from datetime import timedelta, datetime
 from itertools import chain
+from datetime import timedelta, datetime
 
 from dateutil import tz
 from django.utils import timezone
