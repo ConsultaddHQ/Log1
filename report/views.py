@@ -994,6 +994,7 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
+            user_status = request.GET.get('user_status', 'all')
             export = json.loads(request.GET.get('export', 'false'))
 
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
@@ -1004,7 +1005,15 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today() + timedelta(days=1)
 
-            supervisors = User.objects.filter(is_active=True, role__name='interviewee')
+            supervisors = User.objects.filter(role__name='interviewee')
+            if user_status == 'isActive':
+                supervisors = supervisors.filter(is_active=True, account_login=True)
+            elif user_status == 'inActive':
+                supervisors = supervisors.filter(
+                    Q(is_active=True, account_login=False) |
+                    Q(is_active=False, account_login=True) |
+                    Q(is_active=False, account_login=False)
+                )
             if query:
                 supervisors = supervisors.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             data = []

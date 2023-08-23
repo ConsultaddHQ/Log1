@@ -735,10 +735,26 @@ class MessageCard:
             data = {
                 "blocks": [
                     {
+                        "type": "section",
+                        "text": {
+                            "type": "plain_text",
+                            "text": " ",
+                            "emoji": True
+                        }
+                    },
+                    {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
                             "text": ":v: Offer",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "plain_text",
+                            "text": " ",
                             "emoji": True
                         }
                     },
@@ -775,26 +791,45 @@ class MessageCard:
 
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Project Type:* {payload.get('project_type', 'NA')}"
+                                "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
                             },
                             {
                                 "type": "mrkdwn",
                                 "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
                             },
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Supervisors:* \n{payload.get('supervisors', 'NA')}"
+                                "text": "*Supervisors:*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"{payload.get('supervisors', 'NA')}"
                             }
                         ]
                     },
                     {
+                        "type": "divider"
+                    },
+                    {
                         "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": (
-                                f":trophy: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*  {project_count}  "
-                            )
-                        }
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f":triangular_flag_on_post: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"{project_count}   *`Total`* - *{payload.get('total', 'NA')}*"
+                            }
+                        ]
                     },
                     {
                         "type": "actions",
@@ -806,7 +841,6 @@ class MessageCard:
                                     "emoji": True,
                                     "text": "View in Log1"
                                 },
-                                "style": "primary",
                                 "url": f"https://app.log1.com/#/details/{payload.get('submission_id')}/project?id={payload.get('project_id')}",
                                 "value": "click_me_123"
                             }
