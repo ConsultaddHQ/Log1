@@ -12,6 +12,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 
+from legal.swagger import *
 from utils_app.mailing import send_email
 from consultant.models import Consultant
 from employee.token import get_token_generator
@@ -60,6 +61,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(message=error)
             return error, 'error'
 
+    @retrieve_petition
     def retrieve(self, request, *args, **kwargs):
         try:
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
@@ -69,6 +71,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @list_petition
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
@@ -125,6 +128,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @create_petition
     def create(self, request, *args, **kwargs):
         try:
             petition = Petition.objects.filter(beneficiary_id=request.data['consultant'])
@@ -156,6 +160,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @update_petition
     def update(self, request, *args, **kwargs):
         try:
             petition = get_object_or_404(Petition, id=kwargs.get('pk'))
@@ -171,6 +176,7 @@ class PetitionViewSets(ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @petition_documents
     @action(methods=['get'], detail=False, url_path='documents')
     def documents(self, request):
         try:
@@ -210,6 +216,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_extension
     @action(methods=['post'], detail=False, url_path='extension')
     def extension(self, request):
         try:
@@ -250,6 +257,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_types
     @action(methods=['get'], detail=False, url_path='types')
     def types(self, request):
         try:
@@ -261,6 +269,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_employer
     @action(methods=['get'], detail=False, url_path='employer')
     def employer(self, request):
         try:
@@ -270,6 +279,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_types_petition_types
     @action(methods=['get'], detail=False, url_path='petition_types')
     def petition_types(self, request):
         try:
@@ -278,6 +288,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_status
     @action(methods=['get'], detail=False, url_path='petition_status')
     def petition_status(self, request):
         try:
@@ -286,6 +297,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_upload_doc
     @action(methods=['post'], detail=False, url_path='upload_doc')
     def upload_doc(self, request):
         try:
@@ -306,6 +318,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_verify_doc
     @action(methods=['put'], detail=False, url_path='verify_doc')
     def verify_doc(self, request):
         try:
@@ -334,6 +347,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_doc_request
     @action(methods=['get'], detail=True, url_path='doc_request')
     def doc_request(self, request, pk):
         try:
@@ -366,6 +380,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_doc_url
     @action(methods=['get'], detail=False, url_path='doc_url')
     def doc_url(self, request):
         try:
@@ -379,6 +394,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_upload
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
         try:
@@ -393,6 +409,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_lca
     @action(methods=['put'], detail=True, url_path='lca')
     def lca(self, request, pk):
         try:
@@ -423,6 +440,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_file
     @action(methods=['put'], detail=True, url_path='petition_file')
     def final_petition_file(self, request, pk):
         try:
@@ -454,6 +472,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_shipping_status
     @action(methods=['put'], detail=True, url_path='petition_status')
     def petition_shipping_status(self, request, pk):
         try:
@@ -541,6 +560,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_document
     @action(methods=['delete'], detail=True, url_path='document')
     def document(self, request, pk):
         try:
@@ -556,6 +576,8 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_get_comment
+    @petition_post_comment
     @action(methods=['get', 'post'], detail=True, url_path='comment')
     def comment(self, request, pk):
         try:
@@ -587,6 +609,7 @@ class PetitionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_withdraw
     @action(methods=["put"], detail=True, url_path='withdraw')
     def withdraw(self, request, pk):
         try:
@@ -607,6 +630,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
     permission_classes = (ConsultantPetitionIsAuthenticated,)
     authentication_classes = (ConsultantPetitionTokenAuthentication,)
 
+    @list_petition_docs
     def list(self, request, *args, **kwargs):
         try:
             queryset = Petition.objects.filter(beneficiary=request.user, is_active=True)
@@ -619,6 +643,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @create_petition_docs
     def create(self, request, *args, **kwargs):
         try:
             petition_id = request.data.get('petition')
@@ -674,6 +699,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @delete_petition_docs
     def destroy(self, request, *args, **kwargs):
         try:
             document_id = kwargs.get('pk')
@@ -684,6 +710,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_docs_contact_us
     @action(methods=['post'], detail=False, url_path='contact_us')
     def contact_us(self, request):
         try:
@@ -709,6 +736,8 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_docs_get_comment
+    @petition_docs_post_comment
     @action(methods=['get', 'post'], detail=True, url_path='comment')
     def comment(self, request, pk):
         try:
@@ -774,6 +803,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_docs_doc_types
     @action(methods=['get'], detail=False, url_path='doc_types')
     def doc_types(self, request):
         try:
@@ -813,6 +843,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_docs_doc_url
     @action(methods=['get'], detail=False, url_path='doc_url')
     def doc_url(self, request):
         try:
@@ -826,6 +857,7 @@ class PetitionDocsViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Des
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
+    @petition_docs_upload
     @action(methods=['post'], detail=False, url_path='upload')
     def upload(self, request):
         try:
