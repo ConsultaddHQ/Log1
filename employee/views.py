@@ -207,6 +207,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                     users = users.filter(role__name='marketer')
                 elif associate:
                     users = users.filter(Q(team__name__in=teams) | Q(associated_to__name__in=teams))
+                elif is_active:
+                    users = users.filter(Q(team__name__in=teams) | Q(associated_to__name__in=teams))
                 else:
                     users = users.filter(team__name__in=teams)
             elif user_type == 'team':

@@ -177,11 +177,11 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     timesheet.end = end
                 else:
                     query = Q(project=project, end__gte=start, start__lte=start) | Q(project=project,end__gte=end,start__lte=end)
-                    available_timesheet = TimeSheet.objects.filter(query).order_by('-created')
+                    available_timesheet = TimeSheet.objects.filter(query).exclude(status="draft").order_by('-created')
                     if available_timesheet:
                         timesheet = available_timesheet.first()
                         available_week = f"{timesheet.start} - {timesheet.end}"
-                        return Response({"error": f"Timesheet already exist {available_week}"}, status=400)
+                        return Response({"error": f"PayStubs already exist {available_week}"}, status=400)
 
                     timesheet = TimeSheet.objects.create(
                         start=start, end=end, project=project, status='request',
