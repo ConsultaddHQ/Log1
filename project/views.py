@@ -928,10 +928,12 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
             ID_MAX_LENGTH = 4
             project_list = []
             query = request.GET.get('query', '').lower().replace("po-", "")
+            project_ids_with_payment_terms = ProjectPaymentTerm.objects.values_list('project_id', flat=True)
+
             if len(query) == ID_MAX_LENGTH:
-                queryset = Project.objects.filter(id=query)
+                queryset = Project.objects.exclude(id__in=project_ids_with_payment_terms).filter(id=query)
             else:
-                queryset = Project.objects.exclude(submission__status='archive').filter(
+                queryset = Project.objects.exclude(id__in=project_ids_with_payment_terms).exclude(submission__status='archive').filter(
                     id__istartswith=query, statuses__status='joined', statuses__is_current=True
                 )
             for project in queryset:
