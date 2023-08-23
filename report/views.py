@@ -21,7 +21,7 @@ from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
-from utils_app.thred_mail import send_email_without_template
+from utils_app.thred_mail import send_email
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
@@ -1209,7 +1209,14 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 'to': request.data.get('to', []),
                 'subject': request.data.get('subject', None),
                 'body': request.data.get('body', None),
-                'from': request.data.get('from', None)
+                'from': request.data.get('from', None),
+                'template': '../templates/okr_mail_template.html',
+                'context': {
+                    'employee_name': request.data.get('employee_name', None),
+                    'employee_id': request.data.get('employee_id', None),
+                    'password': request.data.get('password', None),
+                    'url': config.OKR_URL
+                },
             }
 
             required_keys = ['to', 'subject', 'body', 'from']
@@ -1219,7 +1226,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     return Response({"message": f"Key '{key}' is missing or empty."}, status=400)
 
             try:
-                send_email_without_template(mail_data, request.data.get('from', 'product@consultadd.com'), None, None)
+                send_email(mail_data, request.data.get('from', 'product@consultadd.com'), None)
             except Exception as e:
                 return Response({"message": ERROR_MSG, "error": str(e)}, status=400)
 
