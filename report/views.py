@@ -679,13 +679,22 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
+            user_status = request.GET.get('user_status', 'all')
             export = json.loads(request.GET.get('export', 'false'))
             filter_by_team = request.GET.get('filter_by_team', None)
 
             if query:
                 employees = User.objects.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             else:
-                employees = User.objects.filter(team__dept='Marketing', role__name='marketer', is_active=True)
+                employees = User.objects.filter(team__dept='Marketing', role__name='marketer')
+            if user_status == 'isActive':
+                employees = employees.filter(is_active=True, account_login=True)
+            elif user_status == 'inActive':
+                employees = employees.filter(
+                    Q(is_active=True, account_login=False) |
+                    Q(is_active=False, account_login=True) |
+                    Q(is_active=False, account_login=False)
+                )
             if filter_by_team:
                 employees = employees.filter(team__name=filter_by_team)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
