@@ -181,7 +181,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     if available_timesheet:
                         timesheet = available_timesheet.first()
                         available_week = f"{timesheet.start} - {timesheet.end}"
-                        return Response({"error": f"PayStub already exist {available_week}"}, status=400)
+                        return Response({"error": f"PayStubs already exist {available_week}"}, status=400)
 
                     timesheet = TimeSheet.objects.create(
                         start=start, end=end, project=project, status='request',
