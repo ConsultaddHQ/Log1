@@ -78,7 +78,8 @@ class MessageCard:
                                     f"{get_display_choice(obj.interview_mode, 'interview_mode', request)} :: "
                                     f"{obj.start_time.date().strftime('%m/%d/%Y')} :: "
                                     f"{obj.start_time.time().strftime('%H:%M')} EST :: {obj.submission.client} :: "
-                                    f"{marketer_name} ::  {obj.submission.marketing_team.name}"
+                                    f"{marketer_name} ::  {obj.submission.marketing_team.name} :: "
+                                    f"{obj.submission.lead.position.display_name}"
                         }
                     }
                 ]
@@ -725,13 +726,36 @@ class MessageCard:
     @staticmethod
     def po_receive_message_card(payload, request):
         try:
+            project_count = ''
+            if payload.get('w2_count', 'NA') != 0:
+                project_count += f"*`W2`* - *{payload.get('w2_count', 'NA')}*"
+                project_count += "  "
+            if payload.get('c2c_count', 'NA') != 0:
+                project_count += f"*`C2C`* - *{payload.get('c2c_count', 'NA')}*"
+
             data = {
                 "blocks": [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "plain_text",
+                            "text": " ",
+                            "emoji": True
+                        }
+                    },
                     {
                         "type": "header",
                         "text": {
                             "type": "plain_text",
                             "text": ":v: Offer",
+                            "emoji": True
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "plain_text",
+                            "text": " ",
                             "emoji": True
                         }
                     },
@@ -767,21 +791,45 @@ class MessageCard:
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
+                                "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*Supervisors:* \n{payload.get('supervisors', 'NA')}"
+                                "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
+                            },
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": "*Supervisors:*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"{payload.get('supervisors', 'NA')}"
                             }
                         ]
                     },
                     {
+                        "type": "divider"
+                    },
+                    {
                         "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f":pushpin: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*  "
-                                    f"  `Total` - *{payload.get('total', 'NA')}*"
-                        }
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": f":triangular_flag_on_post: *`{payload.get('team', 'NA')}`* - *{payload.get('team_count', 'NA')}*"
+                            },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"{project_count}   *`Total`* - *{payload.get('total', 'NA')}*"
+                            }
+                        ]
                     },
                     {
                         "type": "actions",
@@ -793,8 +841,7 @@ class MessageCard:
                                     "emoji": True,
                                     "text": "View in Log1"
                                 },
-                                "style": "primary",
-                                "url": f"https://app.log1.com/#/details/{payload.get('submission_id')}/project?id={payload.get('project_id')}",
+                                "url": f"{config.APP_URL}#/details/{payload.get('submission_id')}/project?id={payload.get('project_id')}",
                                 "value": "click_me_123"
                             }
                         ]

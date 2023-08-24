@@ -938,10 +938,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
 
                 if marketers_value == ["all"]:
                     marketer_ids = User.objects.filter(
-                        is_active=True,
-                        account_login=True,
-                        team=team
-                    ).values_list('id', flat=True)
+                        (Q(team=team) | Q(associated_to=team)), is_active=True, account_login=True
+                    ).order_by('id').distinct('id').values_list('id', flat=True)
                 else:
                     marketer_ids = marketers_value
 
@@ -1193,15 +1191,13 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                         if team in teams:
                             marketer_data[team.name]['marketers'].append(marketer_info)
 
-
                 for team_info in marketer_data.values():
                     team_marketer_ids = set(marketer['id'] for marketer in team_info['marketers'])
 
                     all_marketers_info = User.objects.filter(
-                        is_active=True,
-                        account_login=True,
-                        team__name=team_info['team_name']
-                    ).values('id', 'employee_name')
+                        (Q(team__name=team_info['team_name']) | Q(associated_to__name=team_info['team_name'])),
+                        is_active=True, account_login=True
+                    ).order_by('id').distinct('id').values('id', 'employee_name')
 
                     team_info['is_all'] = set(marketer['id'] for marketer in all_marketers_info).issubset(
                         team_marketer_ids)
@@ -1238,9 +1234,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                         # If "all" is present, fetch all marketer IDs for the specified team and add them to updated_marketer_ids
                         team = data['team']
                         marketer_ids = User.objects.filter(
-                            is_active=True,
-                            account_login=True,
-                            team=team
+                            (Q(team_id=team) | Q(associated_to__id=team)), is_active=True, account_login=True
                         ).values_list('id', flat=True)
                         updated_marketer_ids.update(marketer_ids)
                     else:
