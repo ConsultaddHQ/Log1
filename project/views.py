@@ -1297,6 +1297,8 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
                 project.rate = request.data.get('value')
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} rate changed to " \
                        f"{request.data.get('value')} by {request.user.employee_name}"
+
+                # Activity
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             elif request.data.get('field') == 'employer':
