@@ -17,11 +17,11 @@ from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
+from utils_app.thred_mail import send_email
 from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
-from utils_app.thred_mail import send_email_without_template
 from consultant.models import ConsultantMarketing, Consultant
 from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
@@ -994,6 +994,7 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
+            user_status = request.GET.get('user_status', 'all')
             export = json.loads(request.GET.get('export', 'false'))
 
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
@@ -1004,7 +1005,15 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today() + timedelta(days=1)
 
-            supervisors = User.objects.filter(is_active=True, role__name='interviewee')
+            supervisors = User.objects.filter(role__name='interviewee')
+            if user_status == 'isActive':
+                supervisors = supervisors.filter(is_active=True, account_login=True)
+            elif user_status == 'inActive':
+                supervisors = supervisors.filter(
+                    Q(is_active=True, account_login=False) |
+                    Q(is_active=False, account_login=True) |
+                    Q(is_active=False, account_login=False)
+                )
             if query:
                 supervisors = supervisors.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             data = []
@@ -1209,7 +1218,14 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 'to': request.data.get('to', []),
                 'subject': request.data.get('subject', None),
                 'body': request.data.get('body', None),
-                'from': request.data.get('from', None)
+                'from': request.data.get('from', None),
+                'template': '../templates/okr_mail_template.html',
+                'context': {
+                    'employee_name': request.data.get('employee_name', None),
+                    'employee_id': request.data.get('employee_id', None),
+                    'password': request.data.get('password', None),
+                    'url': config.OKR_URL
+                },
             }
 
             required_keys = ['to', 'subject', 'body', 'from']
@@ -1219,7 +1235,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     return Response({"message": f"Key '{key}' is missing or empty."}, status=400)
 
             try:
-                send_email_without_template(mail_data, request.data.get('from', 'product@consultadd.com'), None, None)
+                send_email(mail_data, request.data.get('from', 'product@consultadd.com'), None)
             except Exception as e:
                 return Response({"message": ERROR_MSG, "error": str(e)}, status=400)
 
