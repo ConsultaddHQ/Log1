@@ -592,12 +592,12 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                         write_exception(error, request)
 
                 mail_data = {
-                    "template": "../templates/leave_request.html",
+                    "template": "../templates/leave_request.html", "attachments": path,
                     "to": ["siddharth.g@consultadd.com"], "cc": ["finance@consultadd.com"],
                     "subject": f"{consultant.name} applied leave for {data.get('to_date')}",
                     "context": {
-                        "consultant_name": consultant.name, "hours": leave.total_hours, "from": leave.from_date,
-                        "to": leave.to_date, "attachments": path
+                        "consultant_name": consultant.name, "hours": leave.total_hours, "start_date": leave.from_date,
+                        "end_date": leave.to_date, "url": f"{config.APP_URL}"
                     }
                 }
                 send_email_attachment_multiple(mail_data, 'product@consultadd.com', request=request)
