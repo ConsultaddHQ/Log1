@@ -270,6 +270,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             technology = request.data.get('technology')
             if technology:
+                technology = [tech for tech in technology if tech and tech != 'null']
                 request.user.technology = technology
                 request.user.save()
                 return Response({"message": "Technologies Updated"}, status=status.HTTP_202_ACCEPTED)
@@ -510,6 +511,12 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             employee.employee_name = data.get('employee_name', employee.employee_name)
             employee.team = Team.objects.get(name=data.get('team', employee.team.name))
             employee.technology = json.loads(data.get('technology')) if data.get('technology') else employee.technology
+            tech = employee.technology
+            if 'null' in tech:
+                tech.remove('null')
+            if None in tech:
+                tech.remove(None)
+            employee.technology = tech
             if request.FILES.get('image'):
                 employee.avatar = request.FILES['image']
             employee.save()
