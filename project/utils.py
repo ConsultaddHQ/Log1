@@ -345,7 +345,7 @@ class ProjectUtil:
                 recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
             total, team_count, team , w2_count, c2c_count = self.fetch_project_count("received")
-            interviews = self.project.submission.screening.exclude(status='cancelled')
+            interviews = self.project.submission.screening.exclude(status='cancelled').order_by(-'created')
             supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
                                      if interview.supervisor.slack_id else interview.supervisor.employee_name
                                     if interview.supervisor.employee_id != 9999

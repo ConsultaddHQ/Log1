@@ -714,7 +714,7 @@ class ProjectViewSets(ModelViewSet):
             if prev_rate != project.rate:
                 desc = f"Purchase order rate is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif prev_start_date != str(project.start_date):
+            elif str(prev_start_date) != str(project.start_date):
                 desc = f"Purchase order start_date is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             elif desc == f"Purchase order is updated" and prev_employer == project.employer:
@@ -1297,6 +1297,9 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
                 project.rate = request.data.get('value')
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} rate changed to " \
                        f"{request.data.get('value')} by {request.user.employee_name}"
+
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             elif request.data.get('field') == 'employer':
                 project.employer = request.data.get('value')
