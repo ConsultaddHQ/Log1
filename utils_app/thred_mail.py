@@ -260,7 +260,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 
                 file_size = False
                 if len(mail_data["attachments"]) > 0:
-                    file_size = add_attachments(message,mail_data["attachments"])
+                    file_size = add_attachments(message, mail_data["attachments"])
                     
                 if file_size:
                     return str("Email size is more then 25 MB"), False, None
