@@ -272,7 +272,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 # b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
                 # b64_string = b64_bytes.decode()
                 media = MediaIoBaseUpload(BytesIO(message.as_bytes()), mimetype='message/rfc822', resumable=True)
-                
+
             email_body = {'message': {'threadId': email_data['threadId']}}
             draft = service.users().drafts().create(userId='me', body=email_body, media_body=media).execute()
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()

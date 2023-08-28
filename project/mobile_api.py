@@ -591,16 +591,21 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                     except Exception as error:
                         write_exception(error, request)
 
+                project_obj = consultant.projects.filter(statuses__status='joined', statuses__is_current=True).order_by('-id')
+                if not project_obj.first():
+                    project_obj = consultant.projects.filter(statuses__status='joined').order_by('-id')
                 mail_data = {
                     "template": "../templates/leave_request.html", "attachments": path,
-                    "to": ["siddharth.g@consultadd.com"], "cc": ["finance@consultadd.com"],
-                    "subject": f"{consultant.name} applied leave for {data.get('to_date')}",
+                    "subject": f"Leave Requested from {consultant.name}",
+                    "to": ["siddharth.g@consultadd.com"], "cc": ["finance@consultadd.com"], "bcc": [],
                     "context": {
-                        "consultant_name": consultant.name, "hours": leave.total_hours, "start_date": leave.from_date,
-                        "end_date": leave.to_date, "url": f"{config.APP_URL}"
+                        "end_date": leave.to_date, "start_date": leave.from_date,
+                        "consultant_name": consultant.name, "hours": leave.total_hours,
+                        "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}/{project_obj.first().id}/"
                     }
                 }
                 send_email_attachment_multiple(mail_data, 'product@consultadd.com', request=request)
+
             return Response({"message": "leave applied successfully"}, status=201)
         except Exception as error:
             write_exception(error, request)
