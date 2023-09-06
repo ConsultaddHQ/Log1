@@ -50,7 +50,7 @@ class Command(BaseCommand):
                 data = {
                     "title": "project update due",
                     "category": "alert",
-                    "description": f"your {support_person.project.consultant.name} updates were not given for last weeks",
+                    "description": f"your {support_person.project.submission.client} updates were not given for last weeks",
                     "target_type": "projectupdate",
                     "target_id": support_person.project.id,
                     "sender_id": support_person.support.id,

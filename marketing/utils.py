@@ -20,7 +20,7 @@ from marketing.models import Submission, Interview, Question, Answer
 
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
-from notification.utils import push_notification_consultant
+from notification.utils import push_notification_consultant, create_notification
 from utils_app.slack_notification import MessageCard as slack
 
 
@@ -133,23 +133,35 @@ def change_to_feedback_due():
 
         supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
         supervisor_list = User.objects.filter(id__in=supervisor_ids)
-
-        for supervisor in supervisor_list:
+        for interview in interviews:
             content_type = ContentType.objects.get(model='interview')
-            notification,created = UserNotification.objects.get_or_create(user=supervisor,content_type=content_type)
+            notification,created = UserNotification.objects.get_or_create(user=interview.supervisor,content_type=content_type)
             if created:
                 notification.is_active=True
                 notification.save()
                 message_body = {
                     "body": "interview feedback due", "title": "interview feedback due", "category": "PopUp",
                     "data": {
-                        'supervisor_id': supervisor.id,
+                        'supervisor_id': interview.supervisor.id,
                         'count': 1
                     },
                 }
+                data = {
+                    "title": "interview feedback due",
+                    "category": "alert",
+                    "description": f"your {interview.submission.consultant_marketing.consultant.name} interview (I-{interview.id}) supervisor feedback is pending",
+                    "parent_type": "submission",
+                    "target_type": "interview",
+                    "parent_id": interview.submission.id,
+                    "target_id": interview.id,
+                    "sender_id": interview.supervisor.id,
+                    "recipient_user_type": "user",
+                    "sender_user_type": "user",
+                }
+                create_notification([interview.supervisor], data)
                 registration_ids = list(
                     FCMDevice.objects.filter(
-                        object_id=supervisor.id, content_type__model='user').values_list('device_id', flat=True))
+                        object_id=interview.supervisor.id, content_type__model='user').values_list('device_id', flat=True))
                 push_notification_consultant(registration_ids, message_body)
 
     except Exception as error:
