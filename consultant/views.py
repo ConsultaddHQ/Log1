@@ -263,7 +263,7 @@ class ConsultantViewSets(ModelViewSet):
                 consultants = consultants.filter(marketing__status='open').exclude(
                     status='terminated')
 
-            consultants = consultants.order_by('id').distinct('id')[:100]
+            consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
