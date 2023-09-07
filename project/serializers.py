@@ -59,10 +59,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             if obj.is_remote:
                 firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Not Assigned'
                 return {
-                    "Remote Name": f"{firstname}", "Consultant Name": f"{obj.submission.consultant.name}"
+                    "remote": f"{firstname}", "name": f"{obj.submission.consultant.name}"
                 }
             else:
-                return {"Consultant Name": obj.consultant.name}
+                return {"name": obj.consultant.name}
         return None
 
 
