@@ -115,6 +115,19 @@ def change_to_feedback_due():
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
+            data = {
+                "title": "interview feedback due",
+                "category": "alert",
+                "description": f"your {interview.submission.consultant_marketing.consultant.name} interview (I-{interview.id}) supervisor feedback is pending",
+                "parent_type": "submission",
+                "target_type": "interview",
+                "parent_id": interview.submission.id,
+                "target_id": interview.id,
+                "sender_id": interview.supervisor.id,
+                "recipient_user_type": "user",
+                "sender_user_type": "user",
+            }
+            create_notification([interview.supervisor], data)
 
         # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
         if os.environ.get('ENV') == 'prod':
@@ -131,8 +144,6 @@ def change_to_feedback_due():
             supervisor_feedback__question__form_name='interview'
         ).order_by('id').distinct('id')
 
-        supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
-        supervisor_list = User.objects.filter(id__in=supervisor_ids)
         for interview in interviews:
             content_type = ContentType.objects.get(model='interview')
             notification,created = UserNotification.objects.get_or_create(user=interview.supervisor,content_type=content_type)
