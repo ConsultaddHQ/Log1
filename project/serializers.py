@@ -5,11 +5,11 @@ from rest_framework import serializers
 from consultant.models import Consultant
 from utils_app.aws_utils import get_s3_object
 from employee.serializers import UserSerializer
-from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
+from project.utils import get_project_check_list, get_country
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -493,3 +493,34 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
             "all": True if len(consultants) > 50 else False
         }
         return data
+
+
+class ProjectPaymentTermSerializer(serializers.ModelSerializer):
+    project = serializers.SerializerMethodField()
+    payment_term_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectPaymentTerm
+        fields = ('id', 'payment_term', 'payment_term_type', 'comment', 'project')
+
+    @staticmethod
+    def get_project(obj):
+        project = obj.project
+        if project:
+            return {
+                'rate': project.rate,
+                'project_id': project.id,
+                'submission_id':project.submission.id,
+                'client_name': project.submission.client,
+                'remote_engineer': project.consultant.name,
+                'project_type':project.submission.work_type,
+                'country': get_country(project.submission.lead.city),
+                'consultant_name': project.submission.consultant.name,
+                'marketer_name': project.submission.created_by.employee_name,
+                'vendor_company': project.submission.lead.vendor_company.name,
+            }
+        return None
+
+    @staticmethod
+    def get_payment_term_type(obj):
+        return obj.get_payment_term_type_display()

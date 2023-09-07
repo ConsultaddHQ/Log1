@@ -24,7 +24,7 @@ from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringRe
     EngineerReportXposedViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
     ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
-    ConsultantRevisionViewSet
+    ConsultantRevisionViewSet, ProjectPaymentTermViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
     TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
@@ -35,6 +35,8 @@ from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadVi
 from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
+from tracking.views import TrackingViewSets
+
 
 router = DefaultRouter()
 schema_view = get_swagger_view(title='Log1')
@@ -83,6 +85,7 @@ router.register(r'engineer_report', EngineerReportViewSet)
 router.register(r'timesheet_event', TimetrackEventViewSet)
 router.register(r'eng_project', EngineeringProjectsViewSets)
 router.register(r'rate_revision', ConsultantRevisionViewSet)
+router.register(r'project_payment_term', ProjectPaymentTermViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/updates', ProjectUpdateViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/support', ProjectSupportViewSet)
 router.register(r'project/(?P<project_id>[0-9]+)/summary', ProjectSummaryViewSet)
@@ -102,6 +105,8 @@ router.register(r'support_report', EngineeringReportViewSets)
 router.register(r'marketing_report', MarketingReportViewSets)
 
 router.register(r'comment', CommentViewSet)
+# tracking app
+router.register(r'tracking', TrackingViewSets)
 
 router.register(r'impersonate', ImpersonateViewSets)
 

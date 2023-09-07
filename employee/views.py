@@ -1,37 +1,36 @@
-import os
 import json
 from itertools import chain
 from datetime import timedelta, datetime
 
 from dateutil import tz
-from django.contrib.auth.password_validation import validate_password
-from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.db.models.functions import Lower
-from django.contrib.auth import authenticate
-from django.shortcuts import get_object_or_404
-from django.db.models import Q, F, Value, CharField
-from django.contrib.auth.hashers import make_password
-from django.utils.translation import ugettext_lazy as _
-from django.contrib.contenttypes.models import ContentType
-from activity.models import Activity
-
 from rest_framework.mixins import *
 from rest_framework import exceptions
+from django.contrib.auth import authenticate
+from django.db.models.functions import Lower
 from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
 from rest_framework.authtoken.models import Token
+from django.db.models import Q, F, Value, CharField
+from django.contrib.auth.hashers import make_password
 from rest_framework.permissions import IsAuthenticated
+from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from api_key.models import APIKey
-from project.models import Project, ProjectSupport
+from .utils import valid_password
+from activity.models import Activity
 from consultant.models import Consultant
-from utils_app.calendar import GoogleCalendar
-from utils_app.thred_mail import send_email
 from notification.models import FCMDevice
 from activity.views import create_activity
+from utils_app.thred_mail import send_email
+from tracking.models import Devices, Location
+from utils_app.calendar import GoogleCalendar
+from project.models import Project, ProjectSupport
 from log1.utils import write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG, get_page_limits
+from tracking.utils import get_address_by_location, generate_unique_cookies, string_to_decimal_point_converter
 from employee.models import User, Role, Team, Asset, ResetPasswordToken, Handover, clear_expired, get_token_expiry_time, \
     DefaultCalendar, CertificateInfo, Certificate
 from employee.serializers import UserSerializer, UserSerializerLogin, EmailSerializer, PasswordTokenSerializer, \
@@ -85,6 +84,9 @@ class EmployeeAuthViewSets(GenericViewSet):
         """
         try:
             employee_id = request.data.get('employee_id', None)
+            latitude = request.data.get('latitude', None)
+            longitude = request.data.get('longitude', None)
+
             if not employee_id.isnumeric():
                 return Response({"message": "Enter valid Employee Id"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -98,10 +100,54 @@ class EmployeeAuthViewSets(GenericViewSet):
             user = queryset.first()
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:
+                # need to check if cookies id is available or not
+                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
+                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+                other_device = Devices.objects.filter(user=user).last()
+
+                if not devices_cookies:
+                    device_id = other_device.device_id if other_device else 0
+                    cookie_value = generate_unique_cookies()
+                    devices_cookies = Devices.objects.create(
+                        user=user,
+                        device_id=device_id,
+                        cookies_value=cookie_value,
+                    )
+
+                    # ip address and location needs to determine here
+                    if latitude and longitude:
+                        latitude = string_to_decimal_point_converter(latitude)
+                        longitude = string_to_decimal_point_converter(longitude)
+                        location_data = Location.objects.filter(latitude=latitude, longitude=longitude).first()
+                        if location_data:
+                            Location.objects.create(
+                                latitude=latitude,
+                                longitude=longitude,
+                                place_name=location_data.place_name,
+                                state=location_data.state,
+                                country=location_data.country,
+                                pin_code=location_data.pin_code,
+                                display_name=location_data.display_name,
+                                device=devices_cookies
+                            )
+                        else:
+                            location_data = get_address_by_location(latitude, longitude)
+                            if location_data:
+                                Location.objects.create(
+                                    device=devices_cookies,
+                                    state=location_data["address"]["state"],
+                                    place_name=location_data["address"]["town"] if 'town' in location_data[
+                                        "address"] else location_data["address"]["city"],
+                                    country=location_data["address"]["country"],
+                                    pin_code=location_data["address"]["postcode"],
+                                    display_name=location_data["display_name"]
+                                )
+
                 if not user.account_login:
                     return Response({"message": "Your account is not active"}, status=status.HTTP_400_BAD_REQUEST)
                 user.last_login = datetime.now()
                 user.save()
+
                 fcm_token = request.data.get("fcm_token", None)
                 if fcm_token:
                     fcm_token, created = FCMDevice.objects.get_or_create(
@@ -113,9 +159,12 @@ class EmployeeAuthViewSets(GenericViewSet):
                     fcm_token.object_id = user.id
                     fcm_token.save()
 
-                return Response({"data": self.login_serializer_class(user).data}, status=status.HTTP_202_ACCEPTED)
-            return Response({"message": "Incorrect Password", "error": "Incorrect Password"},
-                            status=status.HTTP_400_BAD_REQUEST)
+                return Response({
+                    "data": self.login_serializer_class(user).data, "cookie": devices_cookies.cookies_value
+                }, status=status.HTTP_202_ACCEPTED)
+            return Response(
+                {"message": "Incorrect Password", "error": "Incorrect Password"}, status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as error:
             write_exception(message=error)
             return Response({"message": "Unable to Login", "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -141,9 +190,15 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             query = request.GET.get('query', '')
             teams = request.GET.get('teams', None)
+            is_active = request.GET.get('is_active', None)
             user_type = request.GET.get('type', None)
             associate = json.loads(request.GET.get('associate', 'false'))
-            users = User.objects.exclude(role__name='consultant').exclude(account_login=False)
+            users = User.objects.exclude(role__name='consultant')
+            if is_active:
+                users = users.filter(is_active=True, account_login=True)
+            else:
+                users = users.exclude(account_login=False)
+
             if user_type:
                 users = users.filter(role__name__iexact=user_type)
             elif teams:
@@ -151,6 +206,8 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 if 'Consultadd' in teams and 'superadmin' in request.user.roles:
                     users = users.filter(role__name='marketer')
                 elif associate:
+                    users = users.filter(Q(team__name__in=teams) | Q(associated_to__name__in=teams))
+                elif is_active:
                     users = users.filter(Q(team__name__in=teams) | Q(associated_to__name__in=teams))
                 else:
                     users = users.filter(team__name__in=teams)
@@ -213,6 +270,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             technology = request.data.get('technology')
             if technology:
+                technology = [tech for tech in technology if tech and tech != 'null']
                 request.user.technology = technology
                 request.user.save()
                 return Response({"message": "Technologies Updated"}, status=status.HTTP_202_ACCEPTED)
@@ -352,7 +410,11 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     @action(methods=['get'], detail=False, url_path='me')
     def me(self, request):
         try:
-            return Response({"data": UserDashboardSerializer(request.user).data}, status=status.HTTP_200_OK)
+            cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
+            devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+            location = Location.objects.filter(device=devices_cookies).first()
+            return Response({"data": UserDashboardSerializer(request.user).data,
+                             "is_location_recoded": True if location else False}, status=status.HTTP_200_OK)
         except Exception as error:
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -399,14 +461,13 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             current_password = request.data.get('cur_password')
             new_password = request.data.get('new_password')
             if request.user.check_password(current_password):
-                try:
-                    validate_password(new_password)
+                is_valid = valid_password(new_password)
+                if is_valid:
                     request.user.set_password(new_password)
                     request.user.save()
                     return Response({"message": "password updated"}, status=status.HTTP_200_OK)
-                except ValidationError as errors:
-                    e = ''.join(error for error in errors)
-                    return Response({"message": e}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({'message': 'Password is not in valid format'}, status=status.HTTP_400_BAD_REQUEST)
             return Response({"message": "Wrong Password"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
             write_exception(error, request)
@@ -434,7 +495,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 total = users.count()
                 serializer = UserDirectorySerializer(users[first:last], many=True)
                 return Response({"data": serializer.data, "total": total}, status=status.HTTP_200_OK)
-            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN_FORBIDDEN)
+            return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
@@ -450,6 +511,12 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             employee.employee_name = data.get('employee_name', employee.employee_name)
             employee.team = Team.objects.get(name=data.get('team', employee.team.name))
             employee.technology = json.loads(data.get('technology')) if data.get('technology') else employee.technology
+            tech = employee.technology
+            if 'null' in tech:
+                tech.remove('null')
+            if None in tech:
+                tech.remove(None)
+            employee.technology = tech
             if request.FILES.get('image'):
                 employee.avatar = request.FILES['image']
             employee.save()
@@ -688,15 +755,14 @@ class ResetPasswordViewSets(GenericViewSet):
         try:
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
-                try:
-                    validate_password(request.data.get('password'))
+                is_valid = valid_password(request.data.get('password'))
+                if is_valid:
                     reset_password_token.user.set_password(password)
                     reset_password_token.user.save()
                     ResetPasswordToken.objects.filter(user=reset_password_token.user).delete()
                     return Response({'message': 'Password changed successfully'}, status=status.HTTP_200_OK)
-                except ValidationError as errors:
-                    e = ''.join(error for error in errors)
-                    return Response({"message": e}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({'message': 'Password is not in valid format'}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({'message': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as error:
