@@ -396,6 +396,7 @@ class ProjectViewSets(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         url = ""
+        status_count = {}
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         sort_by = request.GET.get('sort_by', None)
@@ -435,14 +436,12 @@ class ProjectViewSets(ModelViewSet):
             if filter_json and json.loads(filter_json):
                 filters = json.loads(filter_json)
 
-                if 'remote' in filters:
-                    projects = projects.filter(is_remote=filters['remote'])
+                created = filters.get('created', None)
+                if created:
+                    projects = date_filter(projects, created, 'created')
 
                 if 'client' in filters and len(filters["client"]) > 0:
                     projects = projects.filter(submission__client__in=filters['client'])
-
-                if 'work_type' in filters:
-                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     projects = projects.filter(submission__created_by_id__in=filters['marketer'])
@@ -456,11 +455,28 @@ class ProjectViewSets(ModelViewSet):
                         Q(submission__consultant_marketing__consultant__name__in=filters['consultant'])
                     )
 
-                created = filters.get('created', None)
-                if created:
-                    projects = date_filter(projects, created, 'created')
+                if 'remote' in filters:
+                    projects = projects.filter(is_remote=filters['remote'])
+
+                if 'work_type' in filters:
+                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'status' in filters and len(filters["status"]) > 0:
+                    status_count = {
+                        "total": projects.count(),
+                        "new": projects.filter(statuses__status='new', statuses__is_current=True).count(),
+                        "joined": projects.filter(statuses__status='joined', statuses__is_current=True).count(),
+                        "received": projects.filter(statuses__status='received', statuses__is_current=True).count(),
+                        "complete": projects.filter(statuses__status='complete', statuses__is_current=True).count(),
+                        "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
+                        "cancelled": projects.filter(statuses__status__istartswith='cancelled',
+                                                     statuses__is_current=True).count(),
+                        "terminated": projects.filter(statuses__status__istartswith='terminated',
+                                                      statuses__is_current=True).count(),
+                        "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
+                                                      start_date__lt=date.today()).count()
+                    }
+
                     not_joined = Project.objects.none()
                     if 'not_joined' in filters["status"]:
                         not_joined = projects.filter(
@@ -475,22 +491,38 @@ class ProjectViewSets(ModelViewSet):
             if filter_by_time:
                 projects = get_time_filter(projects, filter_by_time)
 
-            projects = projects.order_by('id').distinct('id')
-
-            data_count = {
-                "status": {
+            if not status_count:
+                status_count = {
                     "total": projects.count(),
                     "new": projects.filter(statuses__status='new', statuses__is_current=True).count(),
                     "joined": projects.filter(statuses__status='joined', statuses__is_current=True).count(),
                     "received": projects.filter(statuses__status='received', statuses__is_current=True).count(),
                     "complete": projects.filter(statuses__status='complete', statuses__is_current=True).count(),
                     "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
-                    "cancelled": projects.filter(statuses__status__istartswith='cancelled',
-                                                 statuses__is_current=True).count(),
-                    "terminated": projects.filter(statuses__status__istartswith='terminated',
-                                                  statuses__is_current=True).count(),
-                    "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                                  start_date__lt=date.today()).count()
+                    "cancelled": projects.filter(
+                        statuses__status__istartswith='cancelled', statuses__is_current=True
+                    ).count(),
+                    "terminated": projects.filter(
+                        statuses__status__istartswith='terminated', statuses__is_current=True
+                    ).count(),
+                    "not_joined": projects.filter(
+                        statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
+                    ).count()
+                }
+
+            projects = projects.order_by('id').distinct('id')
+
+            data_count = {
+                "status": {
+                    "new": status_count["new"],
+                    "total": status_count["total"],
+                    "joined": status_count["joined"],
+                    "received": status_count["received"],
+                    "complete": status_count["complete"],
+                    "cancelled": status_count["cancelled"],
+                    "terminated": status_count["terminated"],
+                    "not_joined": status_count["not_joined"],
+                    "on_boarded": status_count["on_boarded"]
                 },
                 "job_type": {
                     "w2": projects.filter(submission__work_type='w2').count(),
@@ -533,7 +565,9 @@ class ProjectViewSets(ModelViewSet):
                 )
 
             serializer = self.serializer_class(projects[first: last], many=True)
-            return Response({"counts": data_count, "data": serializer.data, "file_url": url}, status=200)
+            return Response({
+                "counts": data_count, "data": serializer.data, "total": projects.count(), "file_url": url
+            }, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -622,8 +656,11 @@ class ProjectViewSets(ModelViewSet):
             project.is_remote = request.data.get('is_remote', False)
             project.save()
 
+            activity_created = False
+
             if prev_employer != project.employer and request.data['status'] not in ['new', 'received', 'on_boarded']:
                 data = {"prev_employer": prev_employer, "new_employer": project.employer}
+                activity_created = True
                 send_employer_change_notification(project, data, request)
 
             util = ProjectUtil(project, request)
@@ -708,10 +745,15 @@ class ProjectViewSets(ModelViewSet):
             if prev_rate != project.rate:
                 desc = f"Purchase order rate is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif str(prev_start_date) != str(project.start_date):
+                activity_created = True
+
+            if str(prev_start_date) != str(project.start_date):
                 desc = f"Purchase order start_date is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif desc == f"Purchase order is updated" and prev_employer == project.employer:
+                activity_created = True
+
+            if not activity_created:
+                desc = f"Purchase order is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
