@@ -144,22 +144,25 @@ def change_to_feedback_due():
             supervisor_feedback__question__form_name='interview'
         ).order_by('id').distinct('id')
 
-        for interview in interviews:
+        supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
+        supervisor_list = User.objects.filter(id__in=supervisor_ids)
+
+        for supervisor in supervisor_list:
             content_type = ContentType.objects.get(model='interview')
-            notification,created = UserNotification.objects.get_or_create(user=interview.supervisor,content_type=content_type)
+            notification, created = UserNotification.objects.get_or_create(user=supervisor, content_type=content_type)
             if created:
                 notification.is_active=True
                 notification.save()
                 message_body = {
                     "body": "interview feedback due", "title": "interview feedback due", "category": "PopUp",
                     "data": {
-                        'supervisor_id': interview.supervisor.id,
+                        'supervisor_id': supervisor.id,
                         'count': 1
                     },
                 }
                 registration_ids = list(
                     FCMDevice.objects.filter(
-                        object_id=interview.supervisor.id, content_type__model='user').values_list('device_id', flat=True))
+                        object_id=supervisor.id, content_type__model='user').values_list('device_id', flat=True))
                 push_notification_consultant(registration_ids, message_body)
 
     except Exception as error:
