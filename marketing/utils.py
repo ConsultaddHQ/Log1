@@ -20,8 +20,8 @@ from marketing.models import Submission, Interview, Question, Answer
 
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
-from notification.utils import push_notification_consultant, create_notification
 from utils_app.slack_notification import MessageCard as slack
+from notification.utils import push_notification_consultant, create_notification
 
 
 def vendor_account_manager(vendor_company):
@@ -157,19 +157,6 @@ def change_to_feedback_due():
                         'count': 1
                     },
                 }
-                data = {
-                    "title": "interview feedback due",
-                    "category": "alert",
-                    "description": f"your {interview.submission.consultant_marketing.consultant.name} interview (I-{interview.id}) supervisor feedback is pending",
-                    "parent_type": "submission",
-                    "target_type": "interview",
-                    "parent_id": interview.submission.id,
-                    "target_id": interview.id,
-                    "sender_id": interview.supervisor.id,
-                    "recipient_user_type": "user",
-                    "sender_user_type": "user",
-                }
-                create_notification([interview.supervisor], data)
                 registration_ids = list(
                     FCMDevice.objects.filter(
                         object_id=interview.supervisor.id, content_type__model='user').values_list('device_id', flat=True))
