@@ -396,6 +396,7 @@ class ProjectViewSets(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         url = ""
+        status_count = {}
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         sort_by = request.GET.get('sort_by', None)
@@ -404,7 +405,6 @@ class ProjectViewSets(ModelViewSet):
         export = json.loads(request.GET.get('export', 'false'))
         filter_by_time = request.GET.get('filter_by_time', None)
         filter_by_lead = request.GET.get('filter_by_lead', None)
-        filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
             # search project by client and consultant
@@ -432,17 +432,15 @@ class ProjectViewSets(ModelViewSet):
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
-            if filter_json:
+            if filter_json and json.loads(filter_json):
                 filters = json.loads(filter_json)
 
-                if 'remote' in filters:
-                    projects = projects.filter(is_remote=filters['remote'])
+                created = filters.get('created', None)
+                if created:
+                    projects = date_filter(projects, created, 'created')
 
                 if 'client' in filters and len(filters["client"]) > 0:
                     projects = projects.filter(submission__client__in=filters['client'])
-
-                if 'work_type' in filters:
-                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     projects = projects.filter(submission__created_by_id__in=filters['marketer'])
@@ -452,25 +450,32 @@ class ProjectViewSets(ModelViewSet):
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     projects = projects.filter(
-                        Q(submission__consultant_marketing__consultant__name__in=filters['consultant']) |
-                        Q(consultant__name__in=filters['consultant'])
+                        Q(consultant__name__in=filters['consultant']) |
+                        Q(submission__consultant_marketing__consultant__name__in=filters['consultant'])
                     )
 
-                created = filters.get('created', None)
-                projects = date_filter(projects, created, 'created')
+                if 'remote' in filters:
+                    projects = projects.filter(is_remote=filters['remote'])
 
-                projects = projects.order_by('id').distinct('id')
-                data = {
-                    "total": projects,
-                    "new": projects.filter(statuses__status='new', statuses__is_current=True),
-                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
-                    "received": projects.filter(statuses__status='received', statuses__is_current=True),
-                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
-                    "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                                  start_date__lt=date.today())
-                }
+                if 'work_type' in filters:
+                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'status' in filters and len(filters["status"]) > 0:
+                    status_count = {
+                        "total": projects.count(),
+                        "new": projects.filter(statuses__status='new', statuses__is_current=True).count(),
+                        "joined": projects.filter(statuses__status='joined', statuses__is_current=True).count(),
+                        "received": projects.filter(statuses__status='received', statuses__is_current=True).count(),
+                        "complete": projects.filter(statuses__status='complete', statuses__is_current=True).count(),
+                        "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
+                        "cancelled": projects.filter(statuses__status__istartswith='cancelled',
+                                                     statuses__is_current=True).count(),
+                        "terminated": projects.filter(statuses__status__istartswith='terminated',
+                                                      statuses__is_current=True).count(),
+                        "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
+                                                      start_date__lt=date.today()).count()
+                    }
+
                     not_joined = Project.objects.none()
                     if 'not_joined' in filters["status"]:
                         not_joined = projects.filter(
@@ -478,68 +483,90 @@ class ProjectViewSets(ModelViewSet):
                         )
                     projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
                     projects = (projects | not_joined).distinct('id')
-            else:
-                if filter_by_lead:
-                    projects = projects.filter(submission__work_type=filter_by_lead)
 
-                if filter_by_time:
-                    projects = get_time_filter(projects, filter_by_time)
+            if filter_by_lead:
+                projects = projects.filter(submission__work_type=filter_by_lead)
 
-                projects = projects.order_by('id').distinct('id')
-                data = {
-                    "total": projects,
-                    "new": projects.filter(statuses__status='new', statuses__is_current=True),
-                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
-                    "received": projects.filter(statuses__status='received', statuses__is_current=True),
-                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
-                    "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                                  start_date__lt=date.today())
+            if filter_by_time:
+                projects = get_time_filter(projects, filter_by_time)
+
+            if not status_count:
+                status_count = {
+                    "total": projects.count(),
+                    "new": projects.filter(statuses__status='new', statuses__is_current=True).count(),
+                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True).count(),
+                    "received": projects.filter(statuses__status='received', statuses__is_current=True).count(),
+                    "complete": projects.filter(statuses__status='complete', statuses__is_current=True).count(),
+                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
+                    "cancelled": projects.filter(
+                        statuses__status__istartswith='cancelled', statuses__is_current=True
+                    ).count(),
+                    "terminated": projects.filter(
+                        statuses__status__istartswith='terminated', statuses__is_current=True
+                    ).count(),
+                    "not_joined": projects.filter(
+                        statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
+                    ).count()
                 }
 
-                if filter_by_status:
-                    projects = data[filter_by_status]
+            projects = projects.order_by('id').distinct('id')
 
             data_count = {
-                'new': data["new"].count(),
-                'total': data["total"].count(),
-                'joined': data["joined"].count(),
-                'received': data["received"].count(),
-                'on_boarded': data["on_boarded"].count(),
-                'not_joined': data["not_joined"].count(),
+                "status": {
+                    "new": status_count["new"],
+                    "total": status_count["total"],
+                    "joined": status_count["joined"],
+                    "received": status_count["received"],
+                    "complete": status_count["complete"],
+                    "cancelled": status_count["cancelled"],
+                    "terminated": status_count["terminated"],
+                    "not_joined": status_count["not_joined"],
+                    "on_boarded": status_count["on_boarded"]
+                },
+                "job_type": {
+                    "w2": projects.filter(submission__work_type='w2').count(),
+                    "c2c": projects.filter(submission__work_type='c2c').count(),
+                    "full_time": projects.filter(submission__work_type='full_time').count()
+                },
+                "project_type": {
+                    "in_house": projects.filter(is_remote=True).count(),
+                    "consultant": projects.filter(is_remote=False).count()
+                },
             }
 
-            if filter_json:
-                # count of project by status
-                if sort_by in ['created', 'modified']:
-                    order_by = f"-{sort_by}"
-                elif sort_by == 'consultant':
-                    order_by = '-submission__consultant_marketing__consultant__name'
-                else:
-                    order_by = '-modified'
+            if sort_by in ['created', 'modified']:
+                order_by = f"-{sort_by}"
+            elif sort_by == 'consultant':
+                order_by = '-submission__consultant_marketing__consultant__name'
+            else:
+                order_by = '-modified'
 
-                projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
+            projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
+
             if export:
-                first, last = 0, len(projects)
-            serializer = self.serializer_class(projects[first:last], many=True)
-            col_name = [
-                {"name": "consultant_name", "display_name": "Consultant Name"},
-                {"name": "marketer_name", "display_name": "Marketer Name"},
-                {"name": "client", "display_name": "Client Name"},
-                {"name": "employer", "display_name": "Employer Name"},
-                {"name": "company_name", "display_name": "Company Name"},
-                {"name": "start_date", "display_name": "Start Date"},
-                {"name": "end_date", "display_name": "End Date"},
-                {"name": "duration", "display_name": "Duration"},
-                {"name": "city", "display_name": "City"},
-                {"name": "is_remote", "display_name": "Remote"},
-                {"name": "status", "display_name": "Status"},
-                {"name": "rate", "display_name": "Rate"}
-            ]
-            if export:
+                col_name = [
+                    {"name": "consultant_name", "display_name": "Consultant Name"},
+                    {"name": "marketer_name", "display_name": "Marketer Name"},
+                    {"name": "client", "display_name": "Client Name"},
+                    {"name": "employer", "display_name": "Employer Name"},
+                    {"name": "company_name", "display_name": "Company Name"},
+                    {"name": "start_date", "display_name": "Start Date"},
+                    {"name": "end_date", "display_name": "End Date"},
+                    {"name": "duration", "display_name": "Duration"},
+                    {"name": "city", "display_name": "City"},
+                    {"name": "is_remote", "display_name": "Remote"},
+                    {"name": "status", "display_name": "Status"},
+                    {"name": "rate", "display_name": "Rate"}
+                ]
+                serializer = self.serializer_class(projects, many=True)
                 url = export_to_csv(
                     serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Project List"
                 )
-            return Response({"counts": data_count, "data": serializer.data, "file_url": url}, status=200)
+
+            serializer = self.serializer_class(projects[first: last], many=True)
+            return Response({
+                "counts": data_count, "data": serializer.data, "total": projects.count(), "file_url": url
+            }, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -628,8 +655,11 @@ class ProjectViewSets(ModelViewSet):
             project.is_remote = request.data.get('is_remote', False)
             project.save()
 
+            activity_created = False
+
             if prev_employer != project.employer and request.data['status'] not in ['new', 'received', 'on_boarded']:
                 data = {"prev_employer": prev_employer, "new_employer": project.employer}
+                activity_created = True
                 send_employer_change_notification(project, data, request)
 
             util = ProjectUtil(project, request)
@@ -714,10 +744,15 @@ class ProjectViewSets(ModelViewSet):
             if prev_rate != project.rate:
                 desc = f"Purchase order rate is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif str(prev_start_date) != str(project.start_date):
+                activity_created = True
+
+            if str(prev_start_date) != str(project.start_date):
                 desc = f"Purchase order start_date is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif desc == f"Purchase order is updated" and prev_employer == project.employer:
+                activity_created = True
+
+            if not activity_created:
+                desc = f"Purchase order is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
@@ -850,10 +885,10 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                     project__submission__consultant_marketing__consultant__name__istartswith=query)
 
             serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
-            return  Response({"data": serializer.data, "count":len(serializer.data),}, status.HTTP_200_OK)
+            return Response({"data": serializer.data, "count": len(serializer.data)}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, *args, **kwargs):
         try:
@@ -863,23 +898,23 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 'rate': project.rate,
                 'client_name': project.submission.client,
                 'remote_engineer': project.consultant.name,
-                'project_type':project.submission.work_type,
+                'project_type': project.submission.work_type,
                 'country': get_country(project.submission.lead.city),
                 'consultant_name': project.submission.consultant.name,
                 'marketer_name': project.submission.created_by.employee_name,
                 'vendor_company': project.submission.lead.vendor_company.name,
             }
-            return Response({"project_info" : data},status.HTTP_200_OK)
+            return Response({"project_info": data}, status=status.HTTP_200_OK)
 
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def create(self, request, *args, **kwargs):
         try:
             roles = request.user.roles
             if not 'superadmin' in roles and not 'admin' in roles and not 'scrum master' in roles:
-                return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+                return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
             project = get_object_or_404(Project, id=request.data.get("project_id"))
 
@@ -890,34 +925,34 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 created_by=request.user,
                 project=project
             )
-            return Response({"message": "Payment Term Created Successfully"}, status.HTTP_200_OK)
+            return Response({"message": "Payment Term Created Successfully"}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
-       try:
-           roles = request.user.roles
-           if not 'superadmin' in roles and not 'admin' in roles and not'scrum master' in roles:
-               return Response({"message": DONT_HAVE_ACCESS}, status.HTTP_403_FORBIDDEN)
+        try:
+            roles = request.user.roles
+            if not 'superadmin' in roles and not 'admin' in roles and not 'scrum master' in roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
-           payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
-           payment_term.payment_term = request.data.get("payment_term")
-           payment_term.payment_term_type = request.data.get("payment_term_type")
-           payment_term.comment = request.data.get("comment")
-           payment_term.save()
+            payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
+            payment_term.payment_term = request.data.get("payment_term")
+            payment_term.payment_term_type = request.data.get("payment_term_type")
+            payment_term.comment = request.data.get("comment")
+            payment_term.save()
 
-           des = f"{request.user} has changed the project payment term details"
-           create_activity(payment_term.id, 'projectpaymentterm', request.user, des, 'updated')
-           return Response({"message": "Payment Term Updated Successfully"}, status.HTTP_200_OK)
-       except Exception as error:
-           write_exception(error, request)
-           return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
+            des = f"{request.user} has changed the project payment term details"
+            create_activity(payment_term.id, 'projectpaymentterm', request.user, des, 'updated')
+            return Response({"message": "Payment Term Updated Successfully"}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(methods=['get'], detail=False, url_path='payment_term_types')
-    def payment_term_types(self, request,):
+    def payment_term_types(self, request):
         try:
-            return Response(ProjectPaymentTerm.PAYMENT_TERM_TYPE, status.HTTP_200_OK)
+            return Response(ProjectPaymentTerm.PAYMENT_TERM_TYPE, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -933,7 +968,8 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
             if len(query) == ID_MAX_LENGTH:
                 queryset = Project.objects.exclude(id__in=project_ids_with_payment_terms).filter(id=query)
             else:
-                queryset = Project.objects.exclude(id__in=project_ids_with_payment_terms).exclude(submission__status='archive').filter(
+                queryset = Project.objects.exclude(id__in=project_ids_with_payment_terms).exclude(
+                    submission__status='archive').filter(
                     id__istartswith=query, statuses__status='joined', statuses__is_current=True
                 )
             for project in queryset:
@@ -950,11 +986,10 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                     'vendor_company': project.submission.lead.vendor_company.name,
                 }
                 project_list.append(data)
-            return Response({"project_list":project_list}, status.HTTP_200_OK)
+            return Response({"project_list": project_list}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status.HTTP_400_BAD_REQUEST)
-
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /project/<project_id>/support/
@@ -1646,7 +1681,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             for consultant_id in consultant_ids:
                 consultant = Consultant.objects.get(id=consultant_id)
                 timesheet_list = TimeSheet.objects.filter(
-                    status='draft', project__consultant__id=consultant_id, is_active=True,)
+                    status='draft', project__consultant__id=consultant_id, is_active=True
+                )
 
                 if start is not None:
                     timesheet_list = timesheet_list.filter(start__gte=start)

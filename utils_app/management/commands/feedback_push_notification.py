@@ -55,7 +55,7 @@ class Command(BaseCommand):
                     "sender_id": support_person.support.id,
                     "target_id": support_person.project.consultant.id,
                     "description":
-                        f"your {support_person.project.consultant.name} feedback were not given form last 30 days"
+                        f"Your {support_person.project.consultant.name} feedback were not given form last 30 days"
                 }
 
                 create_notification([support_person.support], data)
