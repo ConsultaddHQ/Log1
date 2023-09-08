@@ -425,7 +425,6 @@ class ProjectViewSets(ModelViewSet):
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 projects = projects.filter(
-                    Q(id=query) |
                     Q(city__istartswith=query) |
                     Q(consultant__name__istartswith=query) |
                     Q(submission__client__istartswith=query) |
