@@ -656,8 +656,11 @@ class ProjectViewSets(ModelViewSet):
             project.is_remote = request.data.get('is_remote', False)
             project.save()
 
+            activity_created = False
+
             if prev_employer != project.employer and request.data['status'] not in ['new', 'received', 'on_boarded']:
                 data = {"prev_employer": prev_employer, "new_employer": project.employer}
+                activity_created = True
                 send_employer_change_notification(project, data, request)
 
             util = ProjectUtil(project, request)
@@ -742,10 +745,15 @@ class ProjectViewSets(ModelViewSet):
             if prev_rate != project.rate:
                 desc = f"Purchase order rate is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif str(prev_start_date) != str(project.start_date):
+                activity_created = True
+
+            if str(prev_start_date) != str(project.start_date):
                 desc = f"Purchase order start_date is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif desc == f"Purchase order is updated" and prev_employer == project.employer:
+                activity_created = True
+
+            if not activity_created:
+                desc = f"Purchase order is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
