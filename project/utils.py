@@ -118,8 +118,6 @@ def get_project_check_list(project):
     msa, work_order, offer_letter = 0, 0, 0
 
     if project.submission.get_work_type_display() != 'C2C':
-        if project.attachments.filter(attachment_type='offer_letter'):
-            offer_letter = 1
         result = get_attachment_status(project)
 
         return {

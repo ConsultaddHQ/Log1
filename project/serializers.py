@@ -17,14 +17,15 @@ class ProjectSerializer(serializers.ModelSerializer):
     client = serializers.SerializerMethodField()
     created = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
+    check_list = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'created', 'submission', 'start_date', 'client', 'city', 'end_date', 'city',
-                  'consultant_name', 'marketer_name', 'company_name', 'is_remote', 'rate', 'employer', 'work_type')
+        fields = ('id', 'status', 'created', 'submission', 'start_date', 'client', 'city', 'end_date', 'work_type',
+                  'consultant_name', 'marketer_name', 'company_name', 'is_remote', 'check_list', 'employer', 'rate')
 
     @staticmethod
     def get_created(obj):
@@ -52,6 +53,10 @@ class ProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_marketer_name(obj):
         return obj.submission.created_by.employee_name
+
+    @staticmethod
+    def get_check_list(obj):
+        return get_project_check_list(obj)
 
     @staticmethod
     def get_consultant_name(obj):
