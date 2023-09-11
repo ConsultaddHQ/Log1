@@ -1857,10 +1857,7 @@ def interview_put_supervisor_feedback(view_func):
             {
                 'form_name': openapi.Schema(
                     type=openapi.TYPE_STRING,
-                    description="Name of form"
-                )
-            },
-            {
+                    description="Name of form"),
                 'feedback_form': openapi.Schema(
                     type=openapi.TYPE_STRING,
                     description="Feedback form of the supervisor."
@@ -1956,6 +1953,224 @@ def test_list(view_func):
                      "additional_details": "Assessment: \tMICROSOFT SQL SERVER 2016/2017 PROGRAMMING\r\nNo. of questions: \t39\r\nMaximum Time Limit: \t98 Minutes\r\nEstimated\r\nCompletion Time: \t46 Minutes",
                      "platform": "Ikm"}], "url": ""}},
             400: {'description': 'Bad Request'},
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def create_test(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'submission': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="ID of the submission."
+                ),
+                'is_video': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Video required while giving the test."
+                ),
+                'is_offline': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Is the test offline."
+                ),
+                'con_informed': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Consultant is informed or not."
+                ),
+                'link': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Link of the test."
+                ),
+                'deadline': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Deadline of the test."
+                ),
+                'skills': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Skills required for the test."
+                ),
+                'con_zone': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Consultant's timezone."
+                ),
+                'additional_details': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Additional details required for the test."
+                ),
+                'platform': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="The platform on which the test will happen."
+                ),
+                'files': openapi.Schema(
+                    type=openapi.TYPE_FILE,
+                    description="Files required for the test."
+                )
+            },
+            ['submission', 'skills']
+        ],
+        responses={
+            201: {'description': 'Success', 'response': {
+                "data": {"id": 2309, "status": "new", "deadline": "2023-09-19", "is_offline": False, "feedback": None,
+                         "link": "abc.com", "additional_details": "additional info", "submit_date": None,
+                         "engineer_remarks": None, "is_video": True, "skills": ["Python", "Java", "Nodejs"],
+                         "engineers": None, "submitted_by": None, "created": "2023-09-11T06:33:40.445307Z",
+                         "attachments": [{"id": 137670, "object_id": 2309, "attachment_type": "test",
+                                          "file_name": "1658907125804.png",
+                                          "type": {"name": "test", "display_name": "Test Docs"}}],
+                         "cancel_reason": None, "assigned_to": []}, "mail": "18a82f22950f6aad",
+                "message": "Test created and mail sent"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def update_test(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'submission': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="ID of the submission."
+                ),
+                'is_video': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Video required while giving the test."
+                ),
+                'is_offline': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Is the test offline."
+                ),
+                'con_informed': openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="Consultant is informed or not."
+                ),
+                'link': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Link of the test."
+                ),
+                'deadline': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Deadline of the test."
+                ),
+                'skills': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Skills required for the test."
+                ),
+                'con_zone': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Consultant's timezone."
+                ),
+                'additional_details': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Additional details required for the test."
+                ),
+                'platform': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="The platform on which the test will happen."
+                ),
+                'files': openapi.Schema(
+                    type=openapi.TYPE_FILE,
+                    description="Files required for the test."
+                )
+            },
+            []
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {"data": {"id": 2309, "created": "2023-09-11T06:33:40.445307Z",
+                                                                  "modified": "2023-09-11T06:54:12.723111Z",
+                                                                  "link": "abc.in", "is_video": True,
+                                                                  "is_offline": False, "feedback": None,
+                                                                  "deadline": "2023-09-20", "status": "new",
+                                                                  "platform": "Codility", "cancel_reason": None,
+                                                                  "engineer_remarks": None, "submit_date": None,
+                                                                  "additional_details": "additional infos",
+                                                                  "skills": ["Python", "Java", "Nodejs", "AWS"],
+                                                                  "submission": 79247, "submitted_by": None,
+                                                                  "engineer": [], "assign_to": []},
+                                                         "message": "Test updated"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def test_fields(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            200: {'description': 'Success', 'response': {
+                "data": ["link", "is_video", "is_offline", "deadline", "submit_date", "additional_details", "skills",
+                         "platform"]}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def get_test_status(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            200: {'description': 'Success', 'response': {
+                "result": [["new", "New"], ["passed", "Passed"], ["failed", "Failed"], ["assigned", "Assigned"],
+                           ["cancelled", "Cancelled"], ["feedback_due", "Feedback Due"]]}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def get_test_platform(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            200: {'description': 'Success',
+                  'response': ["CoderByte", "Codility", "Coderpad", "CodeSignal", "Amcat", "Glider", "FilteredAI",
+                               "Kenexa", "Hackerrank  Interviewmocha", "Hirevue", "Ikm", "Mettl", "PluralSight",
+                               "LeetCode", "TestDome", "Scrum.org", "testgorilla", "Hired", "triplebyte", "Mocha",
+                               "coding game", "StudySection", "Codereport", "Hackerrank", "talentCentral",
+                               "ondemandassessment", "Adface", "CodeScreen", "Google Form", "imocha", "yourtechscore"]},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def test_assign(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'assign_to': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_STRING
+                    ),
+                    description="This is the list of IDs of the engineers."
+                )
+            },
+            ['assign_to']
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {
+                "data": {"id": 2099, "status": "assigned", "deadline": "2023-06-28", "is_offline": True,
+                         "feedback": "Successfully completed and passed the test.\r\nTotal Score: 35 out of 40\r\nTime Taken: 55 min 41 sec out of 70 min\r\nPercentage: 88%",
+                         "link": "https://mettl.com/", "additional_details": "It is for full stack end developer.",
+                         "submit_date": "2023-03-21T03:38:09.960538Z",
+                         "engineer_remarks": "The test was completed successfully.", "is_video": True,
+                         "skills": ["JavaScript", "ReactJS", "Angular", "AWS"],
+                         "engineers": [{"id": 453, "employee_name": "Prem Narayan Vishwakarma"},
+                                       {"id": 490, "employee_name": "Sandeep Makwana"},
+                                       {"id": 484, "employee_name": "Suryam Jain"}],
+                         "submitted_by": {"id": 662, "employee_name": "Pulkit Hada"},
+                         "created": "2023-03-17T20:30:49.552242Z", "attachments": [], "cancel_reason": None,
+                         "assigned_to": [{"id": 450, "employee_name": "Aayush Sharma"},
+                                         {"id": 468, "employee_name": "Abhijith Nair"}]}, "message": "Test assigned"}},
+            400: {'description': 'Bad Request'}
         }
     )(view_func)
 

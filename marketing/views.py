@@ -2675,7 +2675,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @create_test
+    @create_test
     def create(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
@@ -2753,7 +2753,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @update_test
+    @update_test
     def update(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
@@ -2788,7 +2788,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
-    # @test_fields
+    @test_fields
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, pk):
         try:
@@ -2814,7 +2814,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @get_test_status
+    @get_test_status
     @action(methods=['get'], detail=False, url_path='test_status')
     def test_status(self, request):
         try:
@@ -2823,7 +2823,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    # @get_test_platform
+    @get_test_platform
     @action(methods=['get'], detail=False, url_path='test_platform')
     def test_platform(self, request):
         try:
@@ -2833,7 +2833,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    # @test_assign
+    @test_assign
     @action(methods=['put'], detail=True, url_path='assign')
     def assign_test(self, request, pk):
         try:
