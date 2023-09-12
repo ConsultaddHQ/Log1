@@ -432,7 +432,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    # @con_notify_mark_all_read
+    @con_notify_mark_all_read
     @action(methods=['get'], detail=False, url_name='mark_all_read')
     def mark_all_read(self, request):
         try:
