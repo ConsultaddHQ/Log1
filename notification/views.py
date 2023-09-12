@@ -14,10 +14,6 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from marketing.models import Interview
 from notification.swagger import *
-# from notification.swagger import create_fcm_token, list_emp_notify, emp_notify_mark_as_read, emp_notify_mark_all_read, \
-#     emp_notify_count, emp_notify_push_notification, emp_notify_remind_me_later, emp_notify_notification_due, \
-#     list_con_notify, con_notify_count, con_notify_mark_as_delete, con_notify_mark_not_delete, \
-#     con_notify_mark_all_delete, con_notify_mark_as_read, con_notify_mark_all_read
 from project.models import ProjectSupport
 from consultant.permissions import ConsultantIsAuthenticated
 from log1.utils import get_page_limits, write_exception, ERROR_MSG
@@ -344,8 +340,8 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
 class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
-    # permission_classes = (ConsultantIsAuthenticated,)
-    # authentication_classes = (ConsultantTokenAuthentication,)
+    permission_classes = (ConsultantIsAuthenticated,)
+    authentication_classes = (ConsultantTokenAuthentication,)
 
     @list_con_notify
     @never_cache
