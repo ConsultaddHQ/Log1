@@ -2910,7 +2910,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @test_submit
+    @test_submit
     @action(methods=['put'], detail=True, url_path='submit')
     def submit_test(self, request, pk):
         try:
@@ -2956,7 +2956,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @test_feedback
+    @test_feedback
     @action(methods=['put'], detail=True, url_path='feedback')
     def submit_test_feedback(self, request, pk):
         try:
@@ -3046,7 +3046,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @test_engineer_feedback
+    @test_engineer_feedback
     @action(methods=['post'], detail=True, url_path='engineer_feedback')
     def feedback(self, request, pk):
         try:
@@ -3100,7 +3100,7 @@ class QuestionViewSets(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
-    # @list_question
+    @list_question
     def list(self, request, *args, **kwargs):
         try:
             question_field = request.GET.get("form_name", None)
@@ -3113,7 +3113,7 @@ class QuestionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @create_question
+    @create_question
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
@@ -3277,7 +3277,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @list_marketing_team
+    @list_marketing_team
     def list(self, request, **kwargs):
         try:
             first, last = get_page_limits(request)
@@ -3292,7 +3292,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @retrieve_marketing_team
+    @retrieve_marketing_team
     def retrieve(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
@@ -3305,11 +3305,11 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @create_marketing_team
+    @create_marketing_team
     def create(self, request, *args, **kwargs):
         try:
             if 'superadmin' not in request.user.roles and 'admin' not in request.user.roles:
-                return Response({"message": "You don't have access"}, status=400)
+                return Response({"message": "You don't have access"}, status=403)
 
             data = request.data
             name = data['name'].replace(' ', '')
@@ -3323,7 +3323,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @update_marketing_team
+    @update_marketing_team
     def update(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
@@ -3362,7 +3362,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
     #         write_exception(error, request)
     #         return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @marketing_team_update_shift
+    @marketing_team_update_shift
     @action(methods=['put'], detail=False, url_path='update_shift')
     def shift(self, request, **kwargs):
         try:
@@ -3379,7 +3379,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @marketing_team_get_teams
+    @marketing_team_get_teams
     @action(methods=['get'], detail=False, url_path='teams')
     def teams(self, request, **kwargs):
         try:
@@ -3403,7 +3403,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @marketing_team_compare_teams
+    @marketing_team_compare_teams
     @action(methods=['get'], detail=False, url_path='compare_teams')
     def compare_team(self, request):
         try:
@@ -3426,7 +3426,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @marketing_team_move_employee
+    @marketing_team_move_employee
     @action(methods=['put'], detail=True, url_path='move_employee')
     def move_employee(self, request, **kwargs):
         try:
@@ -3455,12 +3455,12 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @marketing_team_update_scrum
+    @marketing_team_update_scrum
     @action(methods=['put'], detail=True, url_path='update_scrum')
     def update_scrum(self, request, **kwargs):
         try:
             if 'superadmin' not in request.user.roles:
-                return Response({"message": "You do not have access to perform this action"}, status=200)
+                return Response({"message": "You do not have access to perform this action"}, status=403)
             team_id = kwargs.get('pk')
             employee_id = request.data.get('employee_id', None)
             if not employee_id:
@@ -3483,7 +3483,7 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
 
-    # @marketing_team_remove_team
+    @marketing_team_remove_team
     @action(methods=['delete'], detail=True, url_path='remove_team')
     def remove(self, request, pk):
         try:
@@ -3507,7 +3507,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
     queryset = Test.objects.all()
     serializer_class = TestUpdateSerializer
 
-    # @engineer_detail_test
+    @engineer_detail_test
     @action(methods=['get'], detail=False, url_path='test')
     def test(self, request):
         try:
@@ -3658,6 +3658,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
             pass
         return round(points, 2)
 
+    @engineer_detail_all
     @action(methods=['get'], detail=False, url_path='all')
     def get_all(self, request, *args, **kwargs):
         try:

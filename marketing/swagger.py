@@ -1,6 +1,6 @@
 from drf_yasg import openapi
 
-from log1.utils import DONT_HAVE_ACCESS
+from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG
 from utils_app.utils import generate_swagger_auto_schema
 
 
@@ -957,7 +957,7 @@ def submission_resume(view_func):
         responses={
             202: {'description': 'Success',
                   'response': {"data": {"id": 75607, "object_id": 1168, "attachment_type": "test_submit",
-                                        "file_name": "client_data.csv",
+                                        "file_name": "data.csv",
                                         "type": {"name": "test_submit", "display_name": "Test Submission Docs"}},
                                "message": "Resume updated"}},
             400: {'description': 'Bad Request'}
@@ -2148,7 +2148,7 @@ def test_assign(view_func):
                 'assign_to': openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     items=openapi.Schema(
-                        type=openapi.TYPE_STRING
+                        type=openapi.TYPE_INTEGER
                     ),
                     description="This is the list of IDs of the engineers."
                 )
@@ -2170,6 +2170,701 @@ def test_assign(view_func):
                          "created": "2023-03-17T20:30:49.552242Z", "attachments": [], "cancel_reason": None,
                          "assigned_to": [{"id": 450, "employee_name": "Aayush Sharma"},
                                          {"id": 468, "employee_name": "Abhijith Nair"}]}, "message": "Test assigned"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def test_submit(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'engineer': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_INTEGER
+                    ),
+                    description="This is the list of IDs of the engineers."
+                ),
+                'remarks': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Remarks of the test."
+                ),
+                'file': openapi.Schema(
+                    type=openapi.TYPE_FILE,
+                    description="File required for the test."
+                ),
+                'ques_answers': openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    description="Feedback form of test."
+                ),
+            },
+            ['engineer', 'remarks', 'file', 'ques_answers']
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {
+                "data": {"id": 2099, "status": "feedback_due", "deadline": "2023-06-28", "is_offline": False,
+                         "feedback": " feedback", "link": "https://mettl.com/",
+                         "additional_details": "It is for full stack end developer.",
+                         "submit_date": "2023-09-12T06:23:57.443156Z", "engineer_remarks": "good", "is_video": True,
+                         "skills": ["JavaScript", "ReactJS", "Angular", "AWS"],
+                         "engineers": [{"id": 488, "employee_name": "Aaditya sohani"},
+                                       {"id": 450, "employee_name": "Aayush Sharma"},
+                                       {"id": 468, "employee_name": "Abhijith Nair"},
+                                       {"id": 501, "employee_name": "Abhik sahu"},
+                                       {"id": 453, "employee_name": "Prem Narayan Vishwakarma"},
+                                       {"id": 490, "employee_name": "Sandeep Makwana"},
+                                       {"id": 484, "employee_name": "Suryam Jain"}],
+                         "submitted_by": {"id": 1, "employee_name": "Consultadd Admin"},
+                         "created": "2023-03-17T20:30:49.552242Z", "attachments": [], "cancel_reason": None,
+                         "assigned_to": [{"id": 450, "employee_name": "Aayush Sharma"},
+                                         {"id": 468, "employee_name": "Abhijith Nair"}]}, "mail": "Development Server",
+                "message": "Test submitted"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def test_feedback(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'feedback': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Feedback of the test."
+                ),
+                'file': openapi.Schema(
+                    type=openapi.TYPE_FILE,
+                    description="File required for the test."
+                ),
+                'status': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Status of test."
+                ),
+            },
+            ['status']
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {
+                "data": {"id": 2099, "status": " passed", "deadline": "2023-06-28", "is_offline": False,
+                         "feedback": " feedback", "link": "https://mettl.com/",
+                         "additional_details": "It is for full stack end developer.",
+                         "submit_date": "2023-09-12T06:23:57.443156Z", "engineer_remarks": "good", "is_video": True,
+                         "skills": ["JavaScript", "ReactJS", "Angular", "AWS"],
+                         "engineers": [{"id": 488, "employee_name": "Aaditya sohani"},
+                                       {"id": 450, "employee_name": "Aayush Sharma"},
+                                       {"id": 468, "employee_name": "Abhijith Nair"},
+                                       {"id": 501, "employee_name": "Abhik sahu"},
+                                       {"id": 453, "employee_name": "Prem Narayan Vishwakarma"},
+                                       {"id": 490, "employee_name": "Sandeep Makwana"},
+                                       {"id": 484, "employee_name": "Suryam Jain"}],
+                         "submitted_by": {"id": 1, "employee_name": "Consultadd Admin"},
+                         "created": "2023-03-17T20:30:49.552242Z", "attachments": [], "cancel_reason": None,
+                         "assigned_to": [{"id": 450, "employee_name": "Aayush Sharma"},
+                                         {"id": 468, "employee_name": "Abhijith Nair"}]},
+                "message": "Test feedback added"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def test_engineer_feedback(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'feedback_form': openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    description="Feedback form of test."
+                ),
+                'associates': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_INTEGER
+                    ),
+                    description="This is the list of IDs of the engineers."
+                ),
+                'remarks': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Remarks of the test."
+                ),
+            },
+            ['feedback_form', 'associates']
+        ],
+        responses={
+            201: {'description': 'Success', 'response': {"message": "Feedback submitted", "mail": "18a881d1eb2031f0"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def list_question(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {
+                'name': 'form_name',
+                'description': "Name of form by which you want to filter the questions.",
+                'type': openapi.TYPE_STRING,
+                'required': True
+            }
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"data": [
+                {"id": 44, "title": "Was coding involved in call", "category": "basic", "answer_type": "yes_question",
+                 "position": 3, "is_required": True, "options": [], "dependent": [
+                    {"id": 45, "title": "Were we able to code", "category": "dependent", "answer_type": "boolean",
+                     "position": 4, "is_required": True, "options": [], "dependent": None, "update_options": False}],
+                 "update_options": False},
+                {"id": 46, "title": "Note: It is mandatory to select at least one option from these fields.",
+                 "category": "basic", "answer_type": "note", "position": 5, "is_required": False, "options": [],
+                 "dependent": None, "update_options": False},
+                {"id": 47, "title": "What went well in call", "category": "basic", "answer_type": "multi_select",
+                 "position": 6, "is_required": False,
+                 "options": ["Coding on time", "Proper resume", "Good Mimicking", "Complete details from Marketer",
+                             "None"], "dependent": None, "update_options": False},
+                {"id": 48, "title": "Issues faced during call", "category": "basic", "answer_type": "multi_select",
+                 "position": 7, "is_required": False,
+                 "options": ["Coding failed", "Could not able to justify resume", "Client was very picky",
+                             "Technical glitches", "Insufficient Skill",
+                             "Coordination issue between Supervisor & Coder", "Incomplete details from Marketer",
+                             "Mimicking issue", "Call details not received on prior to the call",
+                             "Improper behaviour of interviewer", "Senior level Role",
+                             "JD not match with candidate profile", "Technical Issues at Consultant's end",
+                             "Technical glitches at Client’s end", "Mismatched skills and Clients on Resume",
+                             "Client asked to come on-site for next rounds", "Improper Resume",
+                             "No-one showed up Interview", "system incompatibility for coding",
+                             "Specific requirements of just SQL server", "None"], "dependent": None,
+                 "update_options": True},
+                {"id": 55, "title": "Is it a final round", "category": "basic", "answer_type": "yes_question",
+                 "position": 8, "is_required": True, "options": [], "dependent": [
+                    {"id": 56, "title": "Offer Probability", "category": "dependent", "answer_type": "slider",
+                     "position": 9, "is_required": True, "options": [], "dependent": None, "update_options": False}],
+                 "update_options": False},
+                {"id": 57, "title": "Select type of Interview Round", "category": "basic", "answer_type": "option",
+                 "position": 9, "is_required": True, "options": ["PI 1", "PI 2"], "dependent": None,
+                 "update_options": False},
+                {"id": 59, "title": "Select type of Interview Round", "category": "basic", "answer_type": "text",
+                 "position": 10, "is_required": True, "options": ["PI 1", "PI 2"], "dependent": None,
+                 "update_options": False},
+                {"id": 49, "title": "Overall Call Rating", "category": "generic", "answer_type": "rate", "position": 10,
+                 "is_required": True, "options": ["Bad", "Unsatisfied", "Okay", "Satisfied", "Good"], "dependent": None,
+                 "update_options": False},
+                {"id": 50, "title": "Remark", "category": "generic", "answer_type": "long_text", "position": 11,
+                 "is_required": True, "options": [], "dependent": None, "update_options": False},
+                {"id": 60, "title": "Select type of Interview Round", "category": "basic", "answer_type": "option",
+                 "position": 11, "is_required": True, "options": [], "dependent": None, "update_options": False},
+                {"id": 61, "title": "Select type of Interview Round", "category": "basic", "answer_type": "option",
+                 "position": 12, "is_required": True, "options": ["PI 1", "PI 2"], "dependent": None,
+                 "update_options": False},
+                {"id": 62, "title": "Select type of Interview Round", "category": "basic", "answer_type": "option",
+                 "position": 13, "is_required": True, "options": ["PI 1", "PI 2"], "dependent": None,
+                 "update_options": False},
+                {"id": 63, "title": "Select type of Interview Round", "category": "basic", "answer_type": "option",
+                 "position": 14, "is_required": True, "options": ["PI 1", "PI 2"], "dependent": None,
+                 "update_options": False}]}},
+            400: {'description': 'Bad Request'},
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def create_question(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'position': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="Position of question in form"
+                ),
+                'form_name': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Name of the form in which you want to add a question."
+                ),
+                'title': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Title of the question."
+                ),
+                'category': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Category of the question."
+                ),
+                'type': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Type of question."
+                ),
+                'options': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    description="Answer options of the question.",
+                    items=openapi.Items(type=openapi.TYPE_STRING)
+                ),
+                'description': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Description of the question."
+                ),
+                'placeholder': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Placeholder text of the question."
+                )
+
+            },
+            ['title', 'category', 'position']
+        ],
+        responses={
+            201: {'description': 'Success', 'response': {"message": "Question added to form"}},
+            400: {'description': 'Bad Request'},
+            403: {'description': DONT_HAVE_ACCESS}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def question_parent(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {
+                'name': 'value',
+                'description': "No of child question you want of that parent question.",
+                'type': openapi.TYPE_INTEGER,
+                'required': True
+            }
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"data": [
+                {"id": 13, "title": "Question 1", "category": "parent", "answer_type": "headline", "position": 1,
+                 "is_required": False, "options": [], "child": [
+                    {"id": 26, "title": "Total test cases", "category": "child", "answer_type": "integer",
+                     "position": 1, "is_required": True, "options": [], "dependent": None, "update_options": False},
+                    {"id": 25, "title": "Passed test cases", "category": "child", "answer_type": "integer",
+                     "position": 2, "is_required": True, "options": [], "dependent": None, "update_options": False},
+                    {"id": 24, "title": "Hidden test cases were present?", "category": "child",
+                     "answer_type": "yes_question", "position": 3, "is_required": True, "options": [], "dependent": [
+                        {"id": 23, "title": "Hidden count", "category": "child", "answer_type": "integer",
+                         "position": 4, "is_required": True, "options": [], "dependent": None,
+                         "update_options": False}], "update_options": False},
+                    {"id": 22, "title": "Remark", "category": "child", "answer_type": "long_text", "position": 5,
+                     "is_required": True, "options": [], "dependent": None, "update_options": False}],
+                 "dependent": None}]}},
+            400: {'description': 'Bad Request'},
+            404: {"message": ERROR_MSG, "error": "Child question not found"}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def list_marketing_team(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {
+                'name': 'filter_json',
+                'description': "JSON to filter data of particular team, skill, shift etc.",
+                'type': openapi.TYPE_OBJECT
+            },
+            {
+                'name': 'query',
+                'description': "To filter data having particular employee name",
+                'type': openapi.TYPE_STRING
+            },
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"data": [
+                {"id": 95, "employee_id": 2452, "employee_name": "Arpit Mehta", "assign_consultant": {"count": 6,
+                                                                                                      "consultant": [
+                                                                                                          {"id": 37,
+                                                                                                           "consultant_name": "Purav Thakkar"},
+                                                                                                          {"id": 1036,
+                                                                                                           "consultant_name": "Kshitiz Bhattarai"},
+                                                                                                          {"id": 875,
+                                                                                                           "consultant_name": "MIHIR UMESHKUMAR PATEL"},
+                                                                                                          {"id": 1091,
+                                                                                                           "consultant_name": "Mishan Tulsibhai Goti"},
+                                                                                                          {"id": 1070,
+                                                                                                           "consultant_name": "Mohammed Abdul Moid Arif"},
+                                                                                                          {"id": 1021,
+                                                                                                           "consultant_name": "Hari Krishna Ayyappa Narina"}]},
+                 "team": "Consultadd Canada", "is_scrum": True, "shift": "Evening Shift (5:30 PM to 2:30 AM)",
+                 "technology": [], "current_offers": {"count": 13, "project": [{"id": 57000, "client": "Luxoft/Cppib"},
+                                                                               {"id": 50385, "client": "Lazard"},
+                                                                               {"id": 36265, "client": "Ericsson"},
+                                                                               {"id": 44723, "client": "Cargil"},
+                                                                               {"id": 4377, "client": "Cummins"},
+                                                                               {"id": 41126, "client": "Ibm"},
+                                                                               {"id": 35348, "client": "Uhg"},
+                                                                               {"id": 48048, "client": "Uhg"},
+                                                                               {"id": 2404, "client": "At & T"},
+                                                                               {"id": 27773,
+                                                                                "client": "Bank Of America"},
+                                                                               {"id": 55860, "client": "Citi Bank"},
+                                                                               {"id": 54992, "client": "T Rowe"},
+                                                                               {"id": 48115, "client": "T Rowe"}]}}],
+                "count": {"shift": [{"name": "morning",
+                                     "display_name": "Morning Shift (6 AM to 3 PM)",
+                                     "count": 0}, {"name": "general",
+                                                   "display_name": "General Shift (10 AM to 7 PM)",
+                                                   "count": 0},
+                                    {"name": "evening",
+                                     "display_name": "Evening Shift (5:30 PM to 2:30 AM)",
+                                     "count": 1}, {"name": "afternoon",
+                                                   "display_name": "Afternoon Shift (12 Noon to 9 PM)",
+                                                   "count": 0}], "team": [
+                    {"id": 2, "display_name": "Boto3", "count": 0},
+                    {"id": 4, "display_name": "Induci", "count": 0},
+                    {"id": 5, "display_name": "Ioneq", "count": 0},
+                    {"id": 6, "display_name": "NetResolute", "count": 0},
+                    {"id": 8, "display_name": "OC10", "count": 0},
+                    {"id": 10, "display_name": "Pythonwise", "count": 0},
+                    {"id": 11, "display_name": "Zioqu", "count": 0},
+                    {"id": 28, "display_name": "Account Management",
+                     "count": 0},
+                    {"id": 41, "display_name": "Consultadd Canada",
+                     "count": 1},
+                    {"id": 26, "display_name": "JLA", "count": 0},
+                    {"id": 59, "display_name": "Elegant", "count": 0},
+                    {"id": 60, "display_name": "Elegantc", "count": 0},
+                    {"id": 3, "display_name": "Elegant Team", "count": 0}],
+                          "skill": [{"display_name": "Python", "count": 0},
+                                    {"display_name": "Java", "count": 0},
+                                    {"display_name": "Nodejs", "count": 0},
+                                    {"display_name": "JavaScript", "count": 0},
+                                    {"display_name": "ReactJS", "count": 0},
+                                    {"display_name": "Angular", "count": 0},
+                                    {"display_name": "SQL", "count": 0},
+                                    {"display_name": "AWS", "count": 0},
+                                    {"display_name": "DevOps", "count": 0},
+                                    {"display_name": "BA", "count": 0},
+                                    {"display_name": "DA", "count": 0},
+                                    {"display_name": "Peoplesoft", "count": 0},
+                                    {"display_name": "Workday", "count": 0},
+                                    {"display_name": "Kronos", "count": 0},
+                                    {"display_name": "Lawson", "count": 0},
+                                    {"display_name": "Full Stack", "count": 0},
+                                    {"display_name": "Salesforce", "count": 0},
+                                    {"display_name": "Cyber Security",
+                                     "count": 0},
+                                    {"display_name": "Other", "count": 0}]},
+                "total": 1}},
+            400: {'description': 'Bad Request'},
+            404: {"message": ERROR_MSG, "error": "Child question not found"}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def retrieve_marketing_team(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            200: {'description': 'Success',
+                  'response': {"data": {"count": 12, "id": 7, "name": "Nzyme", "scrum_timing": None}}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def create_marketing_team(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'name': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Name of team"
+                ),
+                'scrum_timing': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Scrum Timing of team."
+                ),
+            },
+            ['name', 'scrum_timing']
+        ],
+        responses={
+            201: {'description': 'Success', 'response': {"message": "Team added to log1"}},
+            400: {'description': 'Bad Request'},
+            403: {'description': DONT_HAVE_ACCESS}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def update_marketing_team(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'name': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Name of team"
+                ),
+                'scrum_timing': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Scrum Timing of team."
+                ),
+            },
+            []
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {"message": "Team Details Updated"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def marketing_team_update_shift(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'shift': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Name of shift"
+                ),
+                'employee_ids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    description="ID of employees.",
+                    items=openapi.Items(type=openapi.TYPE_INTEGER)
+                ),
+            },
+            ['shift', 'employee_ids']
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"message": "Shift Detail Updated"}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def marketing_team_get_teams(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {
+                'name': 'query',
+                'description': "To filter data by team name",
+                'type': openapi.TYPE_STRING
+            },
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"data": [
+                {"count": 7, "id": 28, "name": "Account Management", "scrum_timing": None,
+                 "scrum_master": [{"id": 136, "employee_name": "Kamran Adil"}]}], "total": 1}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def marketing_team_compare_teams(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {
+                'name': 'team_ids',
+                'description': "IDS of teams comma separated",
+                'type': openapi.TYPE_STRING
+            },
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {"data": [{"id": 41, "team_name": "Consultadd Canada",
+                                                                   "employee": [
+                                                                       {"id": 906, "employee_name": "Bollam omkarini"},
+                                                                       {"id": 1017,
+                                                                        "employee_name": "DEEPAK SURYAWANSHI"},
+                                                                       {"id": 634,
+                                                                        "employee_name": "Gowtham Korubilli"},
+                                                                       {"id": 1030, "employee_name": "Krupal Umbarkar"},
+                                                                       {"id": 1039, "employee_name": "Nikita Gajbhiye"},
+                                                                       {"id": 621, "employee_name": "Om Singh"},
+                                                                       {"id": 1034,
+                                                                        "employee_name": "Pranjal Singh Gour"},
+                                                                       {"id": 944, "employee_name": "Prinal Gupta"}],
+                                                                   "scrum": [
+                                                                       {"id": 95, "employee_name": "Arpit Mehta"}]},
+                                                                  {"id": 28, "team_name": "Account Management",
+                                                                   "employee": [
+                                                                       {"id": 138, "employee_name": "Bharat Bhate"},
+                                                                       {"id": 121, "employee_name": "Omkar Ghugare"},
+                                                                       {"id": 470, "employee_name": "Shibin K. Joy"},
+                                                                       {"id": 270, "employee_name": "Smriti Singh"},
+                                                                       {"id": 405, "employee_name": "Srija Reddy"},
+                                                                       {"id": 469, "employee_name": "Tushar Basra"}],
+                                                                   "scrum": [
+                                                                       {"id": 136, "employee_name": "Kamran Adil"}]}],
+                                                         "total": 2}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def marketing_team_move_employee(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'employee_ids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    description="IDS of employees.",
+                    items=openapi.Items(type=openapi.TYPE_INTEGER)
+                )
+            },
+            ['employee_ids']
+        ],
+        responses={
+            202: {'description': 'Success',
+                  'response': {"message": "Marketers moved successfully", "not_moved": []}},
+            400: {'description': 'Bad Request'}
+        },
+        methods=['put']
+    )(view_func)
+
+    return decorated_view
+
+
+def marketing_team_update_scrum(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'employee_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description="ID of employee."
+                )
+            },
+            ['employee_id']
+        ],
+        responses={
+            202: {'description': 'Success',
+                  'response': {"message": "Aman Yadav appointed as scrum master for OC10."}},
+            400: {'description': 'Bad Request'},
+            403: {'description': DONT_HAVE_ACCESS,
+                  'response': {"message": "You do not have access to perform this action"}}
+        },
+        methods=['put']
+    )(view_func)
+
+    return decorated_view
+
+
+def marketing_team_remove_team(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            204: {'description': 'Success', 'response': {"message": "Team Removed Successfully"}},
+            400: {'description': 'Bad Request'}
+        },
+    )(view_func)
+
+    return decorated_view
+
+
+def engineer_detail_test(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {
+                'name': 'employee_id',
+                'description': "Employee ID of engineer.",
+                'type': openapi.TYPE_INTEGER
+            },
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {
+                "message": {"Name": "Yash Sule", "Total point": 55.07, "Total Test": 21,
+                            "assigned but not part": [2056, 2050, 2093, 1949], "Total MCQ questions": 282,
+                            "Online Test": 18, "Offline Test": 3, "Total Coding Questions": 34, "submitted_tests": 17,
+                            "Total Assigned Tests": 21, "Total Online Test Failed": 2, "Total  Online Passed Test": 15,
+                            "Total Offline Test Passed": 2, "Total Offline Test Failed": 1,
+                            "assigned_id": [1908, 1923, 1933, 1938, 1944, 1949, 1969, 1991, 1995, 2001, 2027, 2050,
+                                            2056, 2092, 2093, 2107, 2120, 2126, 2147, 2162, 2167],
+                            "Total FeedbackDue Online Test": 1,
+                            "submitted_tests_id": [1908, 1923, 1933, 1938, 1944, 1969, 1991, 1995, 2001, 2027, 2092,
+                                                   2107, 2120, 2126, 2147, 2162, 2167],
+                            "Total FeedbackDue Offline Test": 0}}},
+            400: {'description': 'Bad Request'}
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def engineer_detail_all(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {
+                'name': 'export',
+                'description': "Do you want to export csv.",
+                'type': openapi.TYPE_BOOLEAN
+            },
+        ],
+        responses={
+            200: {'description': 'Success', 'response': {
+                "data": {"2853": {"name": "Aaditya sohani", "total_points": 2, "no_of_test_given": 1},
+                         "2819": {"name": "Aayush Sharma", "total_points": 2, "no_of_test_given": 1},
+                         "2925": {"name": "Abhijith Nair", "total_points": 2, "no_of_test_given": 1},
+                         "8084": {"name": "Abhik sahu", "total_points": 2, "no_of_test_given": 1},
+                         "2914": {"name": "Prem Narayan Vishwakarma", "total_points": 92, "no_of_test_given": 46},
+                         "2879": {"name": "Sandeep Makwana", "total_points": 114, "no_of_test_given": 57},
+                         "2874": {"name": "Suryam Jain", "total_points": 84, "no_of_test_given": 42},
+                         "2943": {"name": "Harsh Singhal", "total_points": 48, "no_of_test_given": 24},
+                         "2849": {"name": "Nitin Dwivedi", "total_points": 48, "no_of_test_given": 24},
+                         "2927": {"name": "Prakhar Patidar", "total_points": 42, "no_of_test_given": 21},
+                         "2797": {"name": "Dipraj Panwar", "total_points": 58, "no_of_test_given": 29},
+                         "2976": {"name": "Gaurav Rawat", "total_points": 30, "no_of_test_given": 15},
+                         "10019": {"name": "Sahil Kharche", "total_points": 80, "no_of_test_given": 40},
+                         "2851": {"name": "Mudit tiwari", "total_points": 18, "no_of_test_given": 9},
+                         "2854": {"name": "Piyush Joshi", "total_points": 10, "no_of_test_given": 5},
+                         "2909": {"name": "Prerna Chitransh", "total_points": 72, "no_of_test_given": 36},
+                         "2876": {"name": "Utkarsh Gupta", "total_points": 48, "no_of_test_given": 24},
+                         "2667": {"name": "Aman Kumar Singh", "total_points": 2, "no_of_test_given": 1},
+                         "2728": {"name": "Vijay Patidar", "total_points": 8, "no_of_test_given": 4},
+                         "2895": {"name": "Niraj Kumar Lathar", "total_points": 92, "no_of_test_given": 46},
+                         "2903": {"name": "Rajendra chourasiya", "total_points": 30, "no_of_test_given": 15},
+                         "2946": {"name": "Rishabh Raghuwanshi", "total_points": 52, "no_of_test_given": 26},
+                         "2944": {"name": "Sourabh Patidar", "total_points": 6, "no_of_test_given": 3},
+                         "2875": {"name": "Abhishek Bhandari", "total_points": 66, "no_of_test_given": 33},
+                         "2929": {"name": "Ayush Raj Keshri", "total_points": 46, "no_of_test_given": 23},
+                         "2890": {"name": "Gaurav Verma", "total_points": 54, "no_of_test_given": 27},
+                         "2727": {"name": "Ayush Bendwal", "total_points": 12, "no_of_test_given": 6},
+                         "2724": {"name": "Gyanendra Singh Chandrawat", "total_points": 24, "no_of_test_given": 12},
+                         "3087": {"name": "Sahil Namdeo", "total_points": 6, "no_of_test_given": 3},
+                         "2922": {"name": "Rutvik Kapade", "total_points": 70, "no_of_test_given": 35},
+                         "2881": {"name": "Shruti Itoria", "total_points": 40, "no_of_test_given": 20},
+                         "2864": {"name": "Jayesh rathore", "total_points": 72, "no_of_test_given": 36},
+                         "10005": {"name": "Yash Sule", "total_points": 34, "no_of_test_given": 17},
+                         "2930": {"name": "Akash Katuri", "total_points": 54, "no_of_test_given": 27},
+                         "2907": {"name": "Darshan hirekurubar", "total_points": 76, "no_of_test_given": 38},
+                         "2884": {"name": "Harsh mishra", "total_points": 72, "no_of_test_given": 36},
+                         "2761": {"name": "Priyam Kumar Singh", "total_points": 2, "no_of_test_given": 1},
+                         "3098": {"name": "Khushi Shrivastava", "total_points": 8, "no_of_test_given": 4},
+                         "3095": {"name": "Rashi Jaiswal", "total_points": 10, "no_of_test_given": 5},
+                         "10009": {"name": "Chinmay Raiker", "total_points": 2, "no_of_test_given": 1},
+                         "2731": {"name": "Mandeep Lamba", "total_points": 6, "no_of_test_given": 3},
+                         "3086": {"name": "Aarti Bhawsar", "total_points": 12, "no_of_test_given": 6},
+                         "3082": {"name": "Mansi Jaiswal", "total_points": 10, "no_of_test_given": 5},
+                         "10004": {"name": "Yash Thakur", "total_points": 12, "no_of_test_given": 6},
+                         "2924": {"name": "Aman Singh", "total_points": 6, "no_of_test_given": 3},
+                         "2915": {"name": "Anuj patidar", "total_points": 2, "no_of_test_given": 1},
+                         "2857": {"name": "Akshay saxena", "total_points": 2, "no_of_test_given": 1},
+                         "2877": {"name": "Adarsh kumar singh", "total_points": 8, "no_of_test_given": 4},
+                         "2923": {"name": "Anish kumar nirala", "total_points": 8, "no_of_test_given": 4},
+                         "2848": {"name": "Brijendra Kumar Yadav", "total_points": 4, "no_of_test_given": 2},
+                         "2865": {"name": "Manmohan sharma", "total_points": 4, "no_of_test_given": 2},
+                         "2846": {"name": "Vansh Verma", "total_points": 2, "no_of_test_given": 1},
+                         "2932": {"name": "Priyanka Prajapat", "total_points": 14, "no_of_test_given": 7},
+                         "2618": {"name": "Nishchay Zinzore", "total_points": 2, "no_of_test_given": 1},
+                         "2627": {"name": "Prashant Kumar", "total_points": 2, "no_of_test_given": 1},
+                         "10015": {"name": "Dev Sahu", "total_points": 6, "no_of_test_given": 3},
+                         "2637": {"name": "Snehal Dinkar Barge", "total_points": 2, "no_of_test_given": 1},
+                         "2732": {"name": "Mayank Singhal", "total_points": 2, "no_of_test_given": 1}}}},
             400: {'description': 'Bad Request'}
         }
     )(view_func)
