@@ -15,6 +15,7 @@ from rest_framework.authentication import TokenAuthentication
 from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
+from report.swagger import *
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
 from employee.serializers import UserSerializer
@@ -32,6 +33,7 @@ class ScrumMeetingReport(GenericViewSet):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @report_scrum_meeting
     @action(methods=['get'], detail=False, url_path='scrum_meeting')
     def scrum_meeting(self, request):
         scrum_meeting = ScrumMeeting.objects.filter(previous=True)
@@ -89,6 +91,7 @@ class ScrumMeetingReport(GenericViewSet):
             return Response({"message": "message sent"}, status=200)
         return Response({"message": "Previous meeting not found"}, status=400)
 
+    @report_set_meeting
     @transaction.atomic
     @action(methods=['get'], detail=False, url_path='set_meeting')
     def set_meeting(self, request):
@@ -321,6 +324,7 @@ command - {command}\n\n
 
         return text
 
+    @cmd_consultant
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
         try:
@@ -392,6 +396,7 @@ command - {command} {query}\n
             write_exception(error, request)
             return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
+    @cmd_marketer
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
@@ -440,6 +445,7 @@ command - {command} {query}\n
             write_exception(error, request)
             return Response({"text": "Bad Request", "error": str(error)}, status=200)
 
+    @cmd_team
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
@@ -591,6 +597,7 @@ class EngineeringReportViewSets(GenericViewSet, ListModelMixin):
         counts['independent'] = independent
         return counts
 
+    @list_support_report
     def list(self, request, *args, **kwargs):
         try:
             first, last = get_page_limits(request)
@@ -671,6 +678,7 @@ class MarketingReportViewSets(GenericViewSet):
     authentication_classes = (TokenAuthentication,)
     serializer_class = ProjectSupportDetailSerializer
 
+    @marketing_report_marketer
     @action(methods=['get'], detail=False, url_path='marketer')
     def marketer(self, request):
         try:
@@ -744,6 +752,7 @@ class MarketingReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @marketing_report_team
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
@@ -842,6 +851,7 @@ class MarketingReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @marketing_report_team_data
     @action(methods=['get'], detail=True, url_path='team_data')
     def team_data(self, request, pk):
         try:
@@ -888,6 +898,7 @@ class MarketingReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @marketing_report_consultant
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
         try:
@@ -950,6 +961,7 @@ class MarketingReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @marketing_report_supervisor
     @action(methods=['get'], detail=False, url_path='supervisor')
     def supervisor(self, request):
         try:
@@ -1002,6 +1014,7 @@ class MarketingReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @marketing_report_compare_supervisors
     @action(methods=['get'], detail=False, url_path='compare_supervisors')
     def compare_supervisors(self, request):
         try:
@@ -1053,6 +1066,7 @@ class EngineerReportXposedViewSets(GenericViewSet):
             return Response({"message": "Unauthorized"}, status=401)
         return True
 
+    @engineers_project_support
     @action(methods=['get'], detail=False, url_path='project/support')
     def get_info(self, request, *args, **kwargs):
         self.verify_api_key(request.GET.get('api_key'))
