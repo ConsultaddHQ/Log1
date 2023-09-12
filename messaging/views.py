@@ -17,6 +17,7 @@ from employee.models import Asset
 from api_key.permissions import APIKey
 from messaging.models import Message, Conversation
 from log1.utils import write_exception, ERROR_MSG, write_info
+from messaging.swagger import *
 from notification.utils import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
 
@@ -41,6 +42,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
+    @list_twilio
     def list(self, request, *args, **kwargs):
         try:
             asset_id = request.GET.get('user1', None)
@@ -68,6 +70,7 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': str(error)}, status=400)
 
+    @twilio_send
     @action(methods=['post'], detail=False, url_path='send')
     def send_sms(self, request):
         try:
@@ -97,6 +100,7 @@ class ReceiveSMSViewSet(GenericViewSet):
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
 
+    @twilio_receive_sms
     @action(methods=['get', 'post'], detail=False, url_path='sms')
     def receive_sms(self, request):
         try:
