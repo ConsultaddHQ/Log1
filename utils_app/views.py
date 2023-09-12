@@ -13,7 +13,6 @@ from log1.utils import write_exception, ERROR_MSG
 from utils_app.swagger import *
 
 
-
 class UtilSerializer(serializers.Serializer):
     name = serializers.CharField()
 

@@ -138,6 +138,7 @@ def utility_get_technology(view_func):
 
     return decorated_view
 
+
 def utility_add_technology(view_func):
     decorated_view = generate_swagger_auto_schema(
         body_params=[
