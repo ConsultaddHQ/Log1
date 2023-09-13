@@ -8,6 +8,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
+from ckiller.swagger import *
 from consultant.models import Consultant
 from log1.utils import write_exception, ERROR_MSG, write_info
 from ckiller.models import CkillerSubmission, CkillerVendorClient
@@ -49,6 +50,7 @@ class CkillerSubmissionViewSet(ModelViewSet):
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
 
+    @list_ckiller_data
     def list(self, request, *args, **kwargs):
         try:
             query = request.GET.get('query', None)
