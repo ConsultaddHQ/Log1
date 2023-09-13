@@ -100,7 +100,7 @@ class ReceiveSMSViewSet(GenericViewSet):
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
 
-    @twilio_receive_sms
+    # @twilio_receive_sms
     @action(methods=['get', 'post'], detail=False, url_path='sms')
     def receive_sms(self, request):
         try:
