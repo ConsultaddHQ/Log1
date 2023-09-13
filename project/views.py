@@ -17,6 +17,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from constance import config
+
+from project.swagger import *
 from utils_app.mailing import send_email
 from api_key.permissions import HasAPIKey
 from activity.views import create_activity
@@ -382,6 +384,7 @@ class ProjectViewSets(ModelViewSet):
             write_exception(message="Offer mail error for {}".format(marketer.email) + str(error))
             return error, "error"
 
+    @retrieve_project
     def retrieve(self, request, *args, **kwargs):
         try:
             permission = {"update": False}
@@ -394,6 +397,7 @@ class ProjectViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @list_project
     def list(self, request, *args, **kwargs):
         url = ""
         first, last = get_page_limits(request)
@@ -595,6 +599,7 @@ class ProjectViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @update_project
     def update(self, request, *args, **kwargs):
         project_id = kwargs.get('pk')
         try:
@@ -729,6 +734,7 @@ class ProjectViewSets(ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @project_mail_to_onboard
     @action(methods=['get'], detail=False, url_path="mail_to_onboard")
     def mail_to_onboard(self, request):
         try:
@@ -782,6 +788,7 @@ class ProjectViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @project_send_support_mail
     @action(methods=['get'], detail=True, url_path="send_support_mail")
     def send_support_and_offer_mail(self, request, pk):
         try:
@@ -796,6 +803,7 @@ class ProjectViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @project_fields
     @action(methods=['get'], detail=True, url_path='fields')
     def fields(self, request, pk):
         try:
@@ -813,6 +821,7 @@ class ProjectViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @project_remove_remote
     @action(methods=['get'], detail=True, url_path='remove_remote')
     def remove_remote(self, request, pk):
         try:
@@ -857,6 +866,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @create_project_support
     def create(self, request, *args, **kwargs):
         try:
             is_proxy_support = request.data.get('is_proxy_support', False)
@@ -930,6 +940,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @update_project_support
     def update(self, request, *args, **kwargs):
         try:
             support = get_object_or_404(ProjectSupport, id=kwargs.get('pk'))
@@ -946,6 +957,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @project_support_status
     @action(methods=['put'], detail=True, url_path="status")
     def status(self, request, project_id, pk):
         try:
@@ -968,6 +980,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @project_support_initiate
     @action(methods=['put'], detail=False, url_path="initiate")
     def initiate(self, request, project_id):
         try:
@@ -1016,6 +1029,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @project_support_remove
     @action(methods=['delete'], detail=True, url_path="remove")
     def remove_support(self, request, project_id, pk):
         try:
@@ -1030,6 +1044,7 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @project_support_update_details
     @action(methods=['put'], detail=True, url_path="update_details")
     def details(self, request, project_id, pk):
         try:
@@ -1151,6 +1166,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
     serializer_class = ProjectOrderSerializer
     authentication_classes = (TokenAuthentication,)
 
+    @list_project_order
     def list(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=request.GET.get('project_id'))
@@ -1160,6 +1176,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @create_project_order
     def create(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=request.data.get('project_id'))
@@ -1206,6 +1223,7 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @update_project_order
     def update(self, request, *args, **kwargs):
         try:
             order = get_object_or_404(ProjectOrder, id=kwargs.get('pk'))
@@ -1244,6 +1262,7 @@ class EngineeringProjectsViewSets(GenericViewSet, ListModelMixin):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
 
+    @list_eng_project
     def list(self, request, *args, **kwargs):
         try:
             end = request.GET.get("end", None)
@@ -1982,6 +2001,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @list_rate_revision
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
