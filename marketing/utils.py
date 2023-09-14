@@ -69,6 +69,8 @@ def get_users_and_attendees(request, interview):
         if email:
             attendees.append({"email": email})
 
+        if interview.consultant.id == "948":
+            attendees.append({"email": "jyothsna.consultadd@gmail.com"})
         return user_list, attendees
     except Exception as error:
         write_exception(error, request)
