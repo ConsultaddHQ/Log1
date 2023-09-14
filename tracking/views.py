@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from log1.utils import write_exception, ERROR_MSG, get_page_limits
 
+from tracking.swagger import *
 from employee.models import User
 from tracking.models import Devices, Location
 from tracking.serializers import TrackingSerializer
@@ -22,6 +23,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
 
+    @list_tracking
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
@@ -41,6 +43,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @tracking_set_location
     @action(methods=['post'], detail=False, url_path='set_location')
     def set_location(self, request):
         try:
@@ -87,6 +90,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(message=error)
             return Response({"message": "Unable to fetch location", "error": str(error)}, status=400)
 
+    @tracking_get_locations
     @action(methods=['GET'], detail=True, url_path='get_locations')
     def get_device_locations(self, request, *args, **kwargs):
         try:
@@ -105,6 +109,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @tracking_get_export_info
     @action(methods=['GET'], detail=True, url_path='get_export_info')
     def get_device_export(self, request, *args, **kwargs):
         try:
@@ -136,6 +141,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @tracking_device_list
     @action(methods=['GET'], detail=False, url_path='device_list')
     def get_device_list(self, request, *args, **kwargs):
         try:
@@ -146,6 +152,7 @@ class TrackingViewSets(GenericViewSet, RetrieveModelMixin):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @tracking_export_list
     @action(methods=['GET'], detail=True, url_path='export_list')
     def get_export_list(self, request, *args, **kwargs):
         try:
