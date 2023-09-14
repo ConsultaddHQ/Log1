@@ -1341,11 +1341,17 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer " \
                        f"changed to {request.data.get('value')} by {request.user.employee_name}"
 
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+
             elif request.data.get('field') == 'end_date':
                 effective_date = project.end_date
                 project.end_date = request.data.get('value')
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} extended to " \
                        f"{request.data.get('value')} by {request.user.employee_name}"
+
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             order = ProjectOrder.objects.create(
                 field=request.data.get('field'), value=request.data.get('value'),
