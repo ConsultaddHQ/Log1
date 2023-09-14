@@ -9,13 +9,29 @@ from timezonefinder import TimezoneFinder
 from utils_app.models import CronJob, CronError
 from log1.utils import write_exception, write_info
 from utils_app.mailing import send_email_without_template
+from tracking.models import ExportData, Devices
 
 TECHNOLOGIES = ['Python', 'Java', 'Nodejs', 'JavaScript', 'ReactJS', 'Angular', 'SQL', 'AWS', 'DevOps', 'BA', 'DA',
                 'Peoplesoft', 'Workday', 'Kronos', 'Lawson', 'Full Stack', 'Salesforce', 'Cyber Security', 'Other']
 
 
-def generate_s3_url(filename):
+def add_export_log(export_type, request):
     try:
+        cookie_value = request.META.get('HTTP_X_ID_TOKEN', None)
+        devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+        if devices_cookies:
+            ExportData.objects.create(
+                name=export_type,
+                device=devices_cookies
+            )
+    except Exception as error:
+        write_exception(message=error, request=request)
+
+
+def generate_s3_url(filename, request=None, export_type=None):
+    try:
+        if request:
+            add_export_log(export_type, request)
         file = open(f'{filename}', 'rb')
         session = boto3.Session()
         s3 = session.client(
@@ -72,7 +88,7 @@ def create_cron_error(job, description):
             'subject': f"{job.name} failed at {datetime.now().strftime('%d-%B-%Y::%H:%M:%S')}",
         }
         if os.environ.get('ENV', 'local') == 'prod':
-            send_email_without_template(mail_data, 'log1.consultadd@gmail.com')
+            send_email_without_template(mail_data, 'log1.consultadd@gmail.com', None, None)
     except Exception as error:
         write_exception(message=error)
 
@@ -100,7 +116,7 @@ def get_timezone(city_name):
         return None
 
 
-def export_to_csv(payload, columns, filename, request=None):
+def export_to_csv(payload, columns, filename, request=None, report_type=None):
     try:
         file = open(filename, 'w')
         writer = csv.writer(file)
@@ -119,7 +135,7 @@ def export_to_csv(payload, columns, filename, request=None):
                     row_elems.append(data[column_name[i]])
             writer.writerow(row_elems)
         file.close()
-        file_url = generate_s3_url(file.name)
+        file_url = generate_s3_url(file.name, request, report_type)
         return file_url
     except Exception as error:
         write_exception(error, request)

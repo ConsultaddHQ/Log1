@@ -17,6 +17,7 @@ from api_key.models import APIKey
 from employee.models import Team, User
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
+from utils_app.thred_mail import send_email
 from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
@@ -678,13 +679,22 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
+            user_status = request.GET.get('user_status', 'all')
             export = json.loads(request.GET.get('export', 'false'))
             filter_by_team = request.GET.get('filter_by_team', None)
 
             if query:
                 employees = User.objects.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             else:
-                employees = User.objects.filter(team__dept='Marketing', role__name='marketer', is_active=True)
+                employees = User.objects.filter(team__dept='Marketing', role__name='marketer')
+            if user_status == 'isActive':
+                employees = employees.filter(is_active=True, account_login=True)
+            elif user_status == 'inActive':
+                employees = employees.filter(
+                    Q(is_active=True, account_login=False) |
+                    Q(is_active=False, account_login=True) |
+                    Q(is_active=False, account_login=False)
+                )
             if filter_by_team:
                 employees = employees.filter(team__name=filter_by_team)
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
@@ -737,7 +747,8 @@ class MarketingReportViewSets(GenericViewSet):
                 ]
                 if export:
                     url = export_to_csv(
-                        data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                        data, col_name, f"marketer_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                        request, "Marketing Report"
                     )
             return Response({"data": data, "total": total, "file_url": url}, status=200)
         except Exception as error:
@@ -761,7 +772,8 @@ class MarketingReportViewSets(GenericViewSet):
                 end = date.today()
             end = end + timedelta(days=1) if type(end) is not str else datetime.strptime(end, '%Y-%m-%d').date() + timedelta(days=1)
             data, url = list(), ""
-            total_bench = total_submissions = total_interviews = total_joining = total_offers = total_termination = 0
+            total_bench = total_submissions = total_interviews = total_joining = total_offers \
+                = total_termination = total_completion = 0
             teams = Team.objects.filter(dept='Marketing')
             for team in teams:
                 team_id = team.id
@@ -786,11 +798,32 @@ class MarketingReportViewSets(GenericViewSet):
                     submission__marketing_team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
-                termination_count = Project.objects.filter(
-                    statuses__status__istartswith='terminated',
+                completion_count = Project.objects.filter(
+                    statuses__status='complete',
                     submission__marketing_team__id=team_id,
                     statuses__created__gte=start, statuses__created__lte=end,
                 ).order_by('id').distinct('id').count()
+
+                termination_type = request.GET.get("termination_type", None)
+                termination_mapping = {
+                    "Resigned": "terminated-resigned",
+                    "Fired": "terminated-fired",
+                }
+                is_start_with = termination_mapping.get(termination_type, "terminated")
+
+                if termination_type == "Other":
+                    termination_count = Project.objects.filter(
+                        statuses__status=is_start_with,
+                        submission__marketing_team__id=team_id,
+                        statuses__created__gte=start, statuses__created__lte=end,
+                    ).order_by('id').distinct('id').count()
+                else:
+                    termination_count = Project.objects.filter(
+                        statuses__status__istartswith=is_start_with,
+                        submission__marketing_team__id=team_id,
+                        statuses__created__gte=start, statuses__created__lte=end,
+                    ).order_by('id').distinct('id').count()
+
                 scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
                 scrum_master = None
                 if scrum_masters:
@@ -804,6 +837,7 @@ class MarketingReportViewSets(GenericViewSet):
                     "interview_count": interview_count,
                     "bench_consultant": bench_consultant,
                     "submission_count": submission_count,
+                    "completion_count": completion_count,
                     "termination_count": termination_count,
                 })
                 total_offers += offer_count
@@ -811,6 +845,7 @@ class MarketingReportViewSets(GenericViewSet):
                 total_bench += bench_consultant
                 total_interviews += interview_count
                 total_submissions += submission_count
+                total_completion += completion_count
                 total_termination += termination_count
             data.append({
                 "id": 0,
@@ -820,6 +855,7 @@ class MarketingReportViewSets(GenericViewSet):
                 "joined_count": total_joining,
                 "bench_consultant": total_bench,
                 "interview_count": total_interviews,
+                "completion_count": total_completion,
                 "submission_count": total_submissions,
                 "termination_count": total_termination,
             })
@@ -835,7 +871,8 @@ class MarketingReportViewSets(GenericViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    "Marketing Team Report"
                 )
             return Response({"data": data, "file_url": url}, status=200)
         except Exception as error:
@@ -943,7 +980,8 @@ class MarketingReportViewSets(GenericViewSet):
                 ]
                 if export:
                     url = export_to_csv(
-                        data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                        data, col_name, f"consultant_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                        "Marketing Consultant Report"
                     )
             return Response({'data': data, "total": total, "file_url": url}, status=200)
         except Exception as error:
@@ -956,6 +994,7 @@ class MarketingReportViewSets(GenericViewSet):
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             query = request.GET.get('query', None)
+            user_status = request.GET.get('user_status', 'all')
             export = json.loads(request.GET.get('export', 'false'))
 
             if start and end and datetime.strptime(start, '%Y-%m-%d').date() > datetime.strptime(end,
@@ -966,7 +1005,15 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today() + timedelta(days=1)
 
-            supervisors = User.objects.filter(is_active=True, role__name='interviewee')
+            supervisors = User.objects.filter(role__name='interviewee')
+            if user_status == 'isActive':
+                supervisors = supervisors.filter(is_active=True, account_login=True)
+            elif user_status == 'inActive':
+                supervisors = supervisors.filter(
+                    Q(is_active=True, account_login=False) |
+                    Q(is_active=False, account_login=True) |
+                    Q(is_active=False, account_login=False)
+                )
             if query:
                 supervisors = supervisors.filter(employee_name__istartswith=query.lstrip().replace(':amp:', '&'))
             data = []
@@ -995,7 +1042,8 @@ class MarketingReportViewSets(GenericViewSet):
             url = ""
             if export:
                 url = export_to_csv(
-                    data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    data, col_name, f"supervisor_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    "Marketing Supervisor Report"
                 )
             return Response({'data': data, "total": supervisors.count(), "file_url": url}, status=200)
         except Exception as error:
@@ -1156,6 +1204,42 @@ class EngineerReportXposedViewSets(GenericViewSet):
                 }
                 count += 1
             return Response({"emp_info": emp_info, "cycle_duration": cycle_duration, "data": resp}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['post'], detail=False, url_path='okr/send_mail')
+    def okr_send_mail(self, request, *args, **kwargs):
+        self.verify_api_key(request.data.get('api_key'))
+        try:
+            mail_data = {
+                'bcc': request.data.get('bcc', []),
+                'cc': request.data.get('cc', []),
+                'to': request.data.get('to', []),
+                'subject': request.data.get('subject', None),
+                'body': request.data.get('body', None),
+                'from': request.data.get('from', None),
+                'template': '../templates/okr_mail_template.html',
+                'context': {
+                    'employee_name': request.data.get('employee_name', None),
+                    'employee_id': request.data.get('employee_id', None),
+                    'password': request.data.get('password', None),
+                    'url': config.OKR_URL
+                },
+            }
+
+            required_keys = ['to', 'subject', 'body', 'from']
+
+            for key in required_keys:
+                if not mail_data[key]:
+                    return Response({"message": f"Key '{key}' is missing or empty."}, status=400)
+
+            try:
+                send_email(mail_data, request.data.get('from', 'product@consultadd.com'), None)
+            except Exception as e:
+                return Response({"message": ERROR_MSG, "error": str(e)}, status=400)
+
+            return Response({"message": "Mail sent successfully"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
