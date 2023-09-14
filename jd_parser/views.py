@@ -18,11 +18,11 @@ class LargeResultsSetPagination(PageNumberPagination):
 
 
 class MarketingMailListViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
-    queryset = MMailScrap.objects.all()
-    permission_classes = (AllowAny,)
+    queryset = MMailScrap.objects.all().order_by("-date")
+    permission_classes = (IsAuthenticated,)
     serializer_class = MarketingMailListSerializer
     pagination_class = LargeResultsSetPagination
-    # authentication_classes = (TokenAuthentication,)
+    authentication_classes = (TokenAuthentication,)
 
     def retrieve(self, request, *args, **kwargs):
         try:
