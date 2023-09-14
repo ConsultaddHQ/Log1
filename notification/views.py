@@ -358,7 +358,7 @@ class ConsultantNotificationViewSet(ListModelMixin, GenericViewSet):
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    # @con_notify_count
+    @con_notify_count
     @action(methods=['get'], detail=False, url_name='count')
     def count(self, request):
         try:

@@ -83,8 +83,8 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
                 "submission": Submission,
                 "consultant": Consultant,
             }
-            # if model not in models.keys():
-            #     return Response({"message": ERROR_MSG, "error": "Selected Model is not valid"}, status=400)
+            if model not in models.keys():
+                return Response({"message": ERROR_MSG, "error": "Selected Model is not valid"}, status=400)
 
             instance = get_object_or_404(models[model], id=object_id)
             comments = instance.comments.filter(parent_comment=None)

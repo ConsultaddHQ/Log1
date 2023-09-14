@@ -1077,7 +1077,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 return Response({"message": "Consultant is not in Marketing"})
             roles = request.user.roles
-            if True:
+            if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
+                                         in consultant_marketing.teams.all()):
                 marketer_ids = request.data.get('marketers', None)
                 marketers_name = []
                 for marketer_id in marketer_ids:
@@ -1148,7 +1149,8 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 return Response({"message": "Consultant is not in Marketing"})
             roles = request.user.roles
-            if True:
+            if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
+                                         in consultant_marketing.teams.all()):
                 marketers_name = []
                 marketer_ids = request.data.get('marketers', None)
                 for marketer_id in marketer_ids:
@@ -1182,7 +1184,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_marketing = queryset.first()
             else:
                 return Response({"message": "Consultant is not in Marketing"})
-            if True:
+            if 'superadmin' in request.user.roles:
                 team_ids = request.data.get('teams')
                 team_string = []
                 for team_id in team_ids:
@@ -2140,7 +2142,7 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             return Response({"data": data}, status=200)
         except Exception as error:
             write_exception(message=error)
-            return Response({"data": []}, status=400)
+            return Response({"data": []}, status=200)
 
     @log1_consultant_feedback
     @action(methods=['GET'], detail=False, url_path='feedback')
@@ -2154,4 +2156,4 @@ class ConsultantPerformanceViewSet(GenericViewSet):
             return Response({"data": serializer.data, "count": len(serializer.data)}, status=200)
         except Exception as error:
             write_exception(message=error)
-            return Response({"data": []}, status=400)
+            return Response({"data": []}, status=200)

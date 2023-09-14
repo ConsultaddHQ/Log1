@@ -809,7 +809,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @update_submission
+    @update_submission
     def update(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
@@ -1117,7 +1117,7 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @destroy_vendor_layer
+    @destroy_vendor_layer
     def destroy(self, request, *args, **kwargs):
         try:
             vendor_layer = get_object_or_404(VendorLayer, id=kwargs.get('pk'))
@@ -2704,7 +2704,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
     def create(self, request, *args, **kwargs):
         try:
             users = get_authenticated_users(request)
-            submission = get_object_or_404(Submission, id=request.data.get('submission'))
+            submission = get_object_or_404(Submission, id=request.data.get('submission'), created_by__in=users)
             if not submission:
                 return Response({"error": 'This is not your submission'}, status=400)
             if submission.test.filter(status__in=['new', 'assigned', 'feedback_due']):
@@ -3178,7 +3178,7 @@ class QuestionViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    # @question_parent
+    @question_parent
     @action(methods=['get'], detail=True, url_path='parent')
     def parent(self, request, pk):
         try:
@@ -3660,7 +3660,6 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
 
     def calculate_points(self, test_platform_name, test_type, test_current_status,
                          no_of_people_involved=0, no_mcq_q=0, no_coding_q=0):
-        breakpoint()
         points = 0
         if test_type.lower() == 'online':
             if no_mcq_q and no_coding_q:

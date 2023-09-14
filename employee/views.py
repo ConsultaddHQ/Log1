@@ -798,8 +798,8 @@ class ResetPasswordViewSets(GenericViewSet):
 class AssetsViewSets(ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
-    # permission_classes = (IsAuthenticated,)
-    # authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (TokenAuthentication,)
     field_list = ['id', 'email', 'number', 'username', 'password', 'provider', 'modified', 'tech',
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
 
@@ -1332,7 +1332,7 @@ class LoginViewSet(GenericViewSet, CreateModelMixin, DestroyModelMixin):
 
 
 # Route - /calendar_info/
-class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin):
+class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
     serializer_class = UserSerializer
     queryset = DefaultCalendar.objects.all()
     permission_classes = (IsAuthenticated,)
