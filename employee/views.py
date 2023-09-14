@@ -22,13 +22,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+from employee.swagger import *
 from api_key.models import APIKey
-from employee.swagger import register, login, get_all_employees, update_employee, account, associated, bulk_register, \
-    change_password, directory, projects, logout, me, profile, profile_activity, verify_project, role, shift_timings, \
-    team, technology, update_user, get_all_certificates, create_certificate, update_certificate, mark_certificate, \
-    get_all, create_default_calender, default, login_create_log1_user, login_create_bulk, login_delete_employee, \
-    login_delete_bulk, login_update_user, handover_create, handover_update, handover_delete, handover_patch, users_list, \
-    users_calendar_info, reset_password_token_request, reset_password_token_verify, reset_password_confirm_password
 from project.models import Project, ProjectSupport
 from consultant.models import Consultant
 from utils_app.calendar import GoogleCalendar
@@ -707,11 +702,12 @@ class ResetPasswordViewSets(GenericViewSet):
 class AssetsViewSets(ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
-    permission_classes = (IsAuthenticated,)
-    authentication_classes = (TokenAuthentication,)
+    # permission_classes = (IsAuthenticated,)
+    # authentication_classes = (TokenAuthentication,)
     field_list = ['id', 'email', 'number', 'username', 'password', 'provider', 'modified', 'tech',
                   'created', 'alter_email', 'alter_number', 'remarks', 'asset_type', 'owner__employee_name']
 
+    @retrieve_assets
     def retrieve(self, request, *args, **kwargs):
         try:
             asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
@@ -721,6 +717,7 @@ class AssetsViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @list_assets
     def list(self, request, *args, **kwargs):
         try:
             assets_of = request.GET.get('asset')
@@ -745,6 +742,7 @@ class AssetsViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @create_assets
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
@@ -764,6 +762,7 @@ class AssetsViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @update_assets
     def update(self, request, *args, **kwargs):
         try:
             asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
@@ -794,6 +793,7 @@ class AssetsViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @destroy_assets
     def destroy(self, request, *args, **kwargs):
         try:
             asset = get_object_or_404(Asset, id=kwargs.get('pk'), owner=request.user)
@@ -809,6 +809,7 @@ class AssetsViewSets(ModelViewSet):
     def partial_update(self, request, *args, **kwargs):
         return Response({"detail": "Method PATCH not allowed."}, status=405)
 
+    @assets_share
     @action(methods=['put'], detail=False, url_path='share')
     def share(self, request):
         users = request.data.get('users', [])
@@ -835,6 +836,7 @@ class AssetsViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @assets_un_share
     @action(methods=['put'], detail=True, url_path='un_share')
     def un_share(self, request, pk):
         try:
@@ -849,6 +851,7 @@ class AssetsViewSets(ModelViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @assets_bulk_upload
     @action(methods=['post'], detail=False, url_path='bulk_upload')
     def bulk_upload(self, request):
         try:

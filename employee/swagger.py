@@ -73,7 +73,7 @@ def get_all_employees(view_func):
             {'name': 'query', 'description': "Filter data based on employee name", 'type': openapi.TYPE_STRING},
             {'name': 'teams', 'description': 'Team names (comma separated)', 'type': openapi.TYPE_STRING},
             {'name': 'type', 'description': 'Role of employee', 'type': openapi.TYPE_STRING},
-            {'name': 'associate', 'description': 'Employee is associated to a team or not (default false)',
+            {'name': 'associate', 'description': 'Employee is associated to a team or not (default False)',
              'type': openapi.TYPE_BOOLEAN},
         ],
         responses={
@@ -792,6 +792,177 @@ def reset_password_confirm_password(view_func):
         ],
         responses={
             200: {'description': 'Success', 'response': {'message': 'Password changed successfully'}},
+            400: {'description': 'Bad Request', },
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def retrieve_assets(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            200: {'description': 'Success', 'response': {
+                "data": {"id": 754, "email": "na09ak@gmail.com", "number": "", "username": "Anky",
+                         "password": "MARKETING505", "owner_id": 180, "provider": "linkedin",
+                         "modified": "2023-05-17T18:43:52.942984Z", "tech": "Java",
+                         "created": "2019-11-20T21:36:05.711000Z", "alter_email": "", "alter_number": "",
+                         "remarks": "pass- MARKETING505", "asset_type": "social", "owner_name": "Arun Kumar",
+                         "shared_to": [{"id": 527, "employee_id": 2866, "email": "Sandeep.s@consultadd.com",
+                                        "employee_name": "Sandeep Saxena", "team": "OC10", "roles": ["marketer"],
+                                        "gender": "male", "phone": "918350852798", "avatar": None,
+                                        "is_superuser": False, "technology": None}]}}},
+            400: {'description': 'Bad Request'},
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def list_assets(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        query_params=[
+            {'name': 'asset', 'description': 'To filter assets which are shared', 'type': openapi.TYPE_STRING},
+        ],
+        responses={
+            200: {'description': 'Success',
+                  'response': {"data": {"email_asset": [
+                      {"id": 14, "email": "subh.js1012@gmail.com", "number": "702-200-4281", "username": "Deep J",
+                       "password": "dhananjay099", "provider": "dice", "modified": "2019-09-24T12:45:54.638000Z",
+                       "tech": "Java", "created": "2019-09-24T12:45:54.629000Z", "alter_email": "", "alter_number": "",
+                       "remarks": "", "asset_type": "job_board", "owner__employee_name": "Dhananjay Bakliwal"}]}}},
+            400: {'description': 'Bad Request'},
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def create_assets(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email ID'),
+                'username': openapi.Schema(type=openapi.TYPE_STRING, description='Username'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password'),
+                'number': openapi.Schema(type=openapi.TYPE_INTEGER, description='Phone Number'),
+                'tech': openapi.Schema(type=openapi.TYPE_STRING, description='Technology'),
+                'alter_email': openapi.Schema(type=openapi.TYPE_STRING, description='Alternate email id'),
+                'alter_number': openapi.Schema(type=openapi.TYPE_INTEGER, description='Alternate phone number'),
+                'remarks': openapi.Schema(type=openapi.TYPE_STRING, description='Remarks'),
+                'asset_type': openapi.Schema(type=openapi.TYPE_STRING, description='Type of asset'),
+            },
+            ['email', 'username', 'password']
+        ],
+        responses={
+            201: {'description': 'Success', 'response': {
+                "data": {"id": 1333, "email": "temp@test.com", "number": "8383899394", "username": "testusername",
+                         "password": "password", "owner_id": 1, "provider": "testusername",
+                         "modified": "2023-09-14T06:45:10.652426Z", "tech": "python",
+                         "created": "2023-09-14T06:45:10.645810Z", "alter_email": "a@test.com",
+                         "alter_number": "9493493949", "remarks": "remarks", "asset_type": "email",
+                         "owner_name": "Consultadd Admin", "shared_to": []}, "message": "Asset added"}},
+            400: {'description': 'Bad Request', },
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def update_assets(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password'),
+                'alter_number': openapi.Schema(type=openapi.TYPE_INTEGER, description='Alternate phone number')
+            },
+            []
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {
+                "data": {"id": 1333, "email": "temp@test.coms", "number": "838389939443", "username": "testusername3",
+                         "password": "passwords", "owner_id": 1, "provider": "testusername",
+                         "modified": "2023-09-14T06:56:43.712746Z", "tech": "pythons",
+                         "created": "2023-09-14T06:45:10.645810Z", "alter_email": "a@test.coms",
+                         "alter_number": "94934939492", "remarks": "remarkss", "asset_type": "email",
+                         "owner_name": "Consultadd Admin", "shared_to": []}, "message": "Asset updated"}},
+            400: {'description': 'Bad Request', },
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def destroy_assets(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        responses={
+            204: {'description': 'Success'},
+            400: {'description': 'Bad Request', },
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def assets_share(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'users': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_INTEGER),
+                                        description='IDS of users'),
+                'assets': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_INTEGER),
+                                         description='IDS of assets')
+            },
+            ['users', 'assets']
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {"message": "Asset shared"}},
+            400: {'description': 'Bad Request', },
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def assets_un_share(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'user': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID of user')
+            },
+            ['user']
+        ],
+        responses={
+            202: {'description': 'Success', 'response': {
+                "data": {"id": 1333, "email": "temp@test.coms", "number": "838389939443", "username": "testusername3",
+                         "password": "passwords", "owner_id": 1, "provider": "testusername",
+                         "modified": "2023-09-14T06:56:43.712746Z", "tech": "python",
+                         "created": "2023-09-14T06:45:10.645810Z", "alter_email": "a@test.coms",
+                         "alter_number": "94934939492", "remarks": "remarks", "asset_type": "email",
+                         "owner_name": "Consultadd Admin", "shared_to": []}}},
+            400: {'description': 'Bad Request', },
+        }
+    )(view_func)
+
+    return decorated_view
+
+
+def assets_bulk_upload(view_func):
+    decorated_view = generate_swagger_auto_schema(
+        body_params=[
+            {
+                'file': openapi.Schema(type=openapi.TYPE_FILE, description='File to upload')
+            },
+            ['file']
+        ],
+        responses={
+            201: {'description': 'Success', 'response': {"message": "Upload Complete",
+                                                         "count": {
+                                                             'user': 'Consultadd Admin',
+                                                             'created': 100,
+                                                             'updated': 2,
+                                                             'failed': 1,
+                                                         }, "mail": 'mail sent successfully'}},
             400: {'description': 'Bad Request', },
         }
     )(view_func)
