@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime, timedelta, date
 from django.core.management import BaseCommand
 
@@ -64,7 +65,11 @@ class Command(BaseCommand):
                 }
 
                 reply_to = [config.RELATIONS]
-                mail_id, mail_res, from_email = send_email(mail_data, "marketing@consultadd.com", reply_to)
+                try:
+                    send_email(mail_data, "marketing@consultadd.com", None)
+                    mail_res = True
+                except Exception as e:
+                    mail_res = False
 
                 submission_data.append({
                     "scrum_masters": cc,
@@ -92,4 +97,6 @@ class Command(BaseCommand):
             if submission_data:
                 send_email(mail_data, "marketing@consultadd.com")
         except Exception as error:
-            create_cron_error(job, error)
+            _, _, tb = sys.exc_info()
+            lineno = tb.tb_lineno
+            create_cron_error(job, f"{lineno} - {error}")

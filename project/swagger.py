@@ -105,13 +105,29 @@ def update_timesheet(view_func):
                     type=openapi.TYPE_BOOLEAN,
                     description='Do you want to set timesheet hours to zero.'
                 ),
+                'week_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description='ID of week.'
+                ),
+                'project_id': openapi.Schema(
+                    type=openapi.TYPE_INTEGER,
+                    description='ID of project.'
+                ),
+                'start_week': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='Start week of timesheet.'
+                ),
+                'end_week': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='End week of timesheet.'
+                ),
                 'hours': openapi.Schema(
                     type=openapi.TYPE_INTEGER,
                     description='Hours of timesheet.'
                 ),
                 'comment': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    description='Consultant comment of timesheet.'
+                    type=openapi.TYPE_INTEGER,
+                    description='Comment of consultant on timesheet.'
                 ),
                 'file1': openapi.Schema(
                     type=openapi.TYPE_FILE,
@@ -122,7 +138,7 @@ def update_timesheet(view_func):
                     description='Second attachment of timesheet.'
                 ),
             },
-            ['hours', 'file1']
+            ['hours', 'project_id', 'week_id', 'file1']
         ],
         responses={
             201: {'description': 'Success', 'response': {

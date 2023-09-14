@@ -20,12 +20,13 @@ class Command(BaseCommand):
             file = open(f'{filename}.csv', 'w')
             writer = csv.writer(file)
             writer.writerow(['Consultant', 'Marketer', 'Supervisor', 'Screening Type', 'Type',
-                             'Round', 'Client', 'Time', 'Job Title'])
+                             'Round', 'Client', 'Time', 'Job Title', 'Project Type'])
             for key in payload.keys():
                 for data in payload[key]:
                     writer.writerow([
                         data.get('consultant'), data.get('marketer'), data.get('ctb_name'), data.get('screening_type'),
-                        data.get('type'), data.get('round'), data.get('client'), data.get('start'), data.get('position')
+                        data.get('type'), data.get('round'), data.get('client'), data.get('start'), data.get('position'),
+                        data.get('project_type')
                     ])
             file.close()
             file_url = generate_s3_url(file.name)
@@ -86,6 +87,7 @@ class Command(BaseCommand):
                         {
                             "type": interview.get_interview_mode_display(),
                             "screening_type": interview.get_screening_type_display(),
+                            "project_type": interview.submission.get_work_type_display(),
                             "round": interview.round, "ctb_name": supervisor.employee_name,
                             "start": interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST'),
                             "marketer": interview.marketer.employee_name, "position": position,

@@ -1,5 +1,6 @@
 import os
 import json
+import copy
 from datetime import timedelta
 from dateutil.relativedelta import relativedelta
 
@@ -402,7 +403,7 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     @create_project_updates
     def create(self, request, *args, **kwargs):
         try:
-            data = request.data.copy()
+            data = copy.copy(request.data)
             data['update_by'] = request.user.id
             data['project'] = kwargs.get('project_id')
             serializer = self.serializer_class(data=data, partial=True)

@@ -1,11 +1,12 @@
+import os
 import csv
 import json
+
 from pytz import timezone
 
-from datetime import datetime
 from celery import shared_task
-from django.db.models import Q
 from django.http import HttpResponse
+from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
 
@@ -19,8 +20,8 @@ from marketing.models import Submission, Interview, Question, Answer
 
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
-from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
+from notification.utils import push_notification_consultant, create_notification
 
 
 def vendor_account_manager(vendor_company):
@@ -78,15 +79,18 @@ def date_filter(queryset, timestamp, field_str):
     filters = dict()
     if timestamp and type(timestamp) == dict:
         lte_date = timestamp.get('lte', None)
-        # if lte_date:
-        #     lte_date = (
-        #             datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        if lte_date:
+            lte_date = (
+                    datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
         lte = lte_date
         gte = timestamp.get('gte', None)
-        if lte:
-            filters[f"{field_str}__lte"] = lte
-        if gte:
-            filters[f"{field_str}__gte"] = gte
+        if lte and gte and lte == gte:  # Check if lte and gte are the same date
+            filters[f"{field_str}__date"] = lte  # Use "__date" for exact date matching
+        else:
+            if lte:
+                filters[f"{field_str}__lte"] = lte
+            if gte:
+                filters[f"{field_str}__gte"] = gte
     return queryset.filter(**filters)
 
 
@@ -111,22 +115,41 @@ def change_to_feedback_due():
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
+            data = {
+                "title": "interview feedback due",
+                "category": "alert",
+                "description": f"your {interview.submission.consultant_marketing.consultant.name} interview (I-{interview.id}) supervisor feedback is pending",
+                "parent_type": "submission",
+                "target_type": "interview",
+                "parent_id": interview.submission.id,
+                "target_id": interview.id,
+                "sender_id": interview.supervisor.id,
+                "recipient_user_type": "user",
+                "sender_user_type": "user",
+            }
+            create_notification([interview.supervisor], data)
 
         # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
-        delete_supervisor_notification.delay()
+        if os.environ.get('ENV') == 'prod':
+            delete_supervisor_notification.delay()
 
         # Creates push notifications for supervisors associated with screenings in 'feedback_due' status.
         interviews = Interview.objects.filter(
-            ~Q(supervisor_feedback__question__form_name='interview') &
-            Q(start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"))).exclude(
-            status__in=["cancelled", "next_round", "offer", "failed"]).order_by('id').distinct('id')
+            start_time__gte=datetime.strptime("2022-05-04", "%Y-%m-%d"),
+            end_time__lte=datetime.now(timezone('US/Eastern')).replace(tzinfo=timezone('UTC')) - timedelta(
+                hours=4)
+        ).exclude(
+            status__in=["cancelled", "next_round", "offer", "failed", "scheduled", "rescheduled"]
+        ).exclude(
+            supervisor_feedback__question__form_name='interview'
+        ).order_by('id').distinct('id')
 
         supervisor_ids = interviews.values_list('supervisor', flat=True).distinct()
         supervisor_list = User.objects.filter(id__in=supervisor_ids)
 
         for supervisor in supervisor_list:
             content_type = ContentType.objects.get(model='interview')
-            notification,created = UserNotification.objects.get_or_create(user=supervisor,content_type=content_type)
+            notification, created = UserNotification.objects.get_or_create(user=supervisor, content_type=content_type)
             if created:
                 notification.is_active=True
                 notification.save()

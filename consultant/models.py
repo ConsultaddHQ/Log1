@@ -70,6 +70,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
     skype = models.CharField(_('Skype Id'), max_length=100, null=True, blank=True)
     country = models.CharField(_('Country'), max_length=100, null=True, blank=True)
     timezone = models.CharField(_('Timezone'), max_length=20, blank=True, null=True)
+    approval_required = models.BooleanField(_('Leave Approval Required'), default=False)
     phone_no = models.CharField(_('Phone Number'), max_length=300, null=True, blank=True)
     current_city = models.CharField(_('Current City'), max_length=100, blank=True, null=True)
     consultant_comments = GenericRelation(ConsultantComment, verbose_name="consultant_comments")
@@ -149,7 +150,7 @@ class Consultant(AbstractBaseUser, TimeStampedModel):
 
     def send_mail(self, mail_data):
         try:
-            res, msg = send_email(mail_data, "admin@consultadd.com")
+            res, msg = send_email(mail_data, "product@consultadd.com")
             if not msg:
                 return res, "error"
             return res, "ok"

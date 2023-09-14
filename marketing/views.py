@@ -21,6 +21,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 import project.models
 from engineering.utils import assigned_test_points
 from marketing.swagger import *
+from constance import config
 from marketing.utils import *
 from marketing.serializers import *
 from utils_app.models import MapMail
@@ -42,6 +43,7 @@ from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
 from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
+from tracking.models import Devices, ExportData
 
 
 # Route - /vendor_company/
@@ -491,7 +493,8 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             data, visibility = list(), False
             submission = get_object_or_404(Submission, id=pk)
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
-            if (submission.created_by.id == user_id) or (user_id in supervisors) or ('engineer' in request.user.roles):
+            handover_ids = get_authenticated_users(request)
+            if (submission.created_by in handover_ids) or (user_id in supervisors) or ('engineer' in request.user.roles):
                 visibility = True
                 queryset = submission.attachments.all()
                 data = AttachmentSerializer(queryset, many=True).data
@@ -672,6 +675,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                             Q(consultant_marketing__status='open',
                               consultant_marketing__consultant__pocs__poc=request.user)
                         )
+                    elif filter_for == 'handover':
+                        pass
                     else:
                         queryset = queryset.filter(
                             Q(created_by=request.user) |
@@ -735,7 +740,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             url = ""
             if export:
                 url = export_to_csv(
-                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Submission Details List"
                 )
 
             if sub_data == "error":
@@ -873,7 +878,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in request.user.roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
-            pending_before = date.today() - timedelta(days=15)
+            pending_before = date.today() - timedelta(days=25)
             test_lst = Test.objects.filter(
                 status='feedback_due', submission__created_by=request.user, modified__gte="2022-01-01"
             ).exclude(modified__gte=pending_before)
@@ -1016,28 +1021,35 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     @action(methods=['get'], detail=False, url_path='similar_submission')
     def submission_check(self, request):
         try:
+            f_vendor = f_client = f_consultant = None
             filter_by = request.GET.get('filter_by', None)
             if request.GET.get('lead_id') == "0":
                 try:
                     obj = get_object_or_404(VendorCompany, id=request.GET.get('company_id'))
-                    vendor_company = obj.name
+                    vendor_company_id = obj.id
                 except VendorCompany.DoesNotExist:
-                    vendor_company = ""
+                    vendor_company_id = None
             else:
                 lead = get_object_or_404(Lead, id=request.GET.get('lead_id'))
-                vendor_company = lead.vendor_company.name
+                vendor_company_id = lead.vendor_company_id
 
-            f_vendor = Q(lead__vendor_company__name__icontains=vendor_company)
-            f_client = Q(client__icontains=request.GET.get('client'))
-            f_consultant = Q(consultant_marketing__consultant__id=request.GET.get('consultant_id'))
+            if vendor_company_id:
+                f_vendor = Q(lead__vendor_company_id=vendor_company_id)
+            if request.GET.get('client', None):
+                f_client = Q(client__istartswith=request.GET['client'])
+            if request.GET.get('consultant_id', None):
+                f_consultant = Q(consultant_marketing__consultant__id=request.GET['consultant_id'])
 
-            if filter_by == "client":
-                queryset = Submission.objects.filter(f_client, f_consultant)
-            elif filter_by == "vendor":
-                queryset = Submission.objects.filter(f_vendor, f_consultant)
+            if filter_by == "client" and f_client:
+                filter_qs = f_client & f_consultant
+            elif filter_by == "vendor" and f_vendor:
+                filter_qs = f_vendor & f_consultant
+            elif f_client and f_vendor and f_consultant:
+                filter_qs = f_client & f_vendor & f_consultant
             else:
-                queryset = Submission.objects.filter(f_vendor, f_consultant, f_client)
+                filter_qs = Q(consultant_marketing__consultant__id=request.GET['consultant_id'])
 
+            queryset = Submission.objects.filter(filter_qs)
             data = queryset.annotate(
                 marketer_name=F('created_by__employee_name'),
                 consultant_name=F('consultant_marketing__consultant__name'),
@@ -1268,6 +1280,9 @@ class InterviewViewSets(ModelViewSet):
                 if 'client' in filters and len(filters["client"]) > 0:
                     queryset = queryset.filter(submission__client__in=filters["client"])
 
+                if 'screening_type' in filters and len(filters["screening_type"]) > 0:
+                    queryset = queryset.filter(screening_type__in=filters["screening_type"])
+
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     queryset = queryset.filter(submission__created_by_id__in=filters["marketer"])
 
@@ -1348,6 +1363,13 @@ class InterviewViewSets(ModelViewSet):
             serializer = InterviewListSerializer(queryset, many=True)
             if serializer.data:
                 report = get_interview_report(serializer.data, request)
+                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
+                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
+                if devices_cookies:
+                    ExportData.objects.create(
+                    name="interview_list",
+                    device=devices_cookies
+                )
                 return report
             return Response({"message": "No Data to Extract"}, status=400)
         except Exception as error:
@@ -2656,18 +2678,21 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 writer = csv.writer(file)
                 writer.writerow(['Test Id', 'Consultant Name', 'Marketer Name', 'Client', 'Job Title', 'Company Name',
                                  'Link', 'Created At', 'Deadline', 'Skills', 'Submitted By', 'Status',
-                                 'Marketer Feedback', 'Engineer Associated'])
+                                 'Marketer Feedback', 'Engineer Associated', 'Test Type'])
                 for obj in queryset:
                     engineer_associated = [obj.employee_name for obj in obj.engineer.all()]
+                    test_type = obj.engineer_feedback.filter(question__title='Select type of test'
+                                                             ).values('answer').first()
                     writer.writerow([
                         obj.id, obj.submission.consultant.name, obj.submission.created_by.employee_name,
                         obj.submission.client, obj.submission.lead.job_title, obj.submission.lead.vendor_company.name,
                         obj.link, obj.created.date(), obj.deadline, obj.skills,
                         obj.submitted_by.employee_name if obj.submitted_by else None, obj.get_status_display(),
-                        obj.feedback, engineer_associated
+                        obj.feedback, engineer_associated,
+                        test_type.get('answer') if test_type else 'offline' if obj.is_offline else 'online',
                     ])
                 file.close()
-                url = generate_s3_url(file_name)
+                url = generate_s3_url(file_name, request, "Marketing List Data")
 
             data = TestListSerializer(queryset[first:last], many=True).data
             return Response({"counts": counts, "data": data, "url": url}, status=200)
@@ -3034,7 +3059,7 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'vendor': test.submission.vendor.name,
                 'consultant_name': test.submission.consultant.name,
                 'emoji': ':+1:' if test.get_status_display() == 'Passed' else ':-1:',
-                'test_url': f'https://app.log1.com/#/details/{test.submission.id}/test?id={test.id}',
+                'test_url': f'{config.APP_URL}#/details/{test.submission.id}/test?id={test.id}',
                 'marketer': f'<@{test.marketer.slack_id}>' if test.marketer.slack_id else test.marketer.employee_name,
                 'coders': [f'<@{eng.slack_id}>' if eng.slack_id else eng.employee_name for eng in
                            test.engineer.filter()],
@@ -3287,7 +3312,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             if query:
                 marketers = marketers.filter(employee_name__istartswith=query)
             marketers_data, counts = self.filter_marketers(marketers, filters, request)
-            return Response({"data": marketers_data[first: last], "count": counts, "total": len(marketers_data)}, status=200)
+            return Response({"data": marketers_data[first: last], "count": counts, "total": len(marketers_data)},
+                            status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
@@ -3415,7 +3441,8 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             for team in teams:
                 data = {
                     "id": team.id, "team_name": team.name,
-                    "employee": team.employees.filter(is_active=True).exclude(role__name='admin').values('id', 'employee_name'),
+                    "employee": team.employees.filter(is_active=True).exclude(role__name='admin'
+                                                                              ).values('id', 'employee_name'),
                     "scrum": team.employees.filter(
                         is_active=True, role__name='admin').values('id', 'employee_name')
                 }
@@ -3536,10 +3563,10 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 (set(submitted_tests.values_list('id', flat=True))))
             online_type_of_test = Question.objects.filter(title='Select type of test', form_name='online_test')
             offline_type_of_test = Question.objects.filter(title='Select type of test', form_name='offline_test')
-            online_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+            online_test_id = Answer.objects.filter(object_id__in=submitted_tests.filter().values_list('id', flat=True),
                                                    content_type__model='test',
                                                    question=online_type_of_test[0]).values_list('object_id', flat=True)
-            offline_test_id = Answer.objects.filter(object_id__in=tests.filter().values_list('id', flat=True),
+            offline_test_id = Answer.objects.filter(object_id__in=submitted_tests.filter().values_list('id', flat=True),
                                                     content_type__model='test',
                                                     question=offline_type_of_test[0]).values_list('object_id',
                                                                                                   flat=True)
@@ -3664,7 +3691,7 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         try:
             from api_key.models import APIKey
             employee_info = {}
-            tests = Test.objects.filter(created__lte='2023-06-30',created__gte='2023-01-01').distinct()
+            tests = Test.objects.filter(created__lte='2023-06-30', created__gte='2023-01-01').distinct()
             for test in tests:
                 platform_name = None
                 mcqs, coding_answers = 0, 0
@@ -3718,7 +3745,8 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
                 writer = csv.writer(file)
                 writer.writerow(['Employee Id', 'Employee Name', 'Total Test', 'Total Points'])
                 for emp_id in employee_info.keys():
-                    writer.writerow([emp_id, employee_info[emp_id]['name'], employee_info[emp_id]['no_of_test_given'], employee_info[emp_id]['total_points']])
+                    writer.writerow([emp_id, employee_info[emp_id]['name'], employee_info[emp_id]['no_of_test_given'],
+                                     employee_info[emp_id]['total_points']])
                 file.flush()
             return Response({"data": employee_info}, status=200)
         except Exception as error:

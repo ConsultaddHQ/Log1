@@ -21,20 +21,22 @@ class Command(BaseCommand):
             today = date.today()
             thirty_days_ago = today - timedelta(days=30)
             fourteen_days_ago = today - timedelta(days=14)
-            sixty_days_ago = today - timedelta(days=60)
 
             # Query to fetch the project support instances
-            active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago,) & Q(
-                project__start_date__lte=sixty_days_ago,
-                statuses__frequency__in=['active', 'less_active'],
-                statuses__is_current=True,
-                project__feedbacks__feedback_type__in=["independent", "2_week", "engineering_issue"])
+            active_projects = ~Q(project__feedbacks__created__gte=thirty_days_ago,
+                                 project__feedbacks__feedback_type__in=["independent", "2_week",
+                                                                        "engineering_issue"]) & Q(
+                project__start_date__lte=thirty_days_ago
+            )
 
-            initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago) & Q(
-                project__start_date__gte=thirty_days_ago)
+            initial_projects = ~Q(project__feedbacks__created__gte=fourteen_days_ago,
+                                  project__feedbacks__feedback_type__in=['independent', '2_week',
+                                                                         'engineering_issue']) & Q(
+                project__start_date__gte=thirty_days_ago, project__start_date__lte=fourteen_days_ago)
 
             project_support_persons = ProjectSupport.objects.filter(
-                Q(project__support_required=True, is_proxy_support=False) &
+                Q(end__isnull=True, project__support_required=True, is_proxy_support=False,
+                  statuses__is_current=True, statuses__frequency__in=['active', 'less_active'], ) &
                 (active_projects | initial_projects)).order_by('project__id').distinct('project__id')
 
             content_type = ContentType.objects.get(model='consultant')
@@ -47,13 +49,13 @@ class Command(BaseCommand):
                 data = {
                     "title": "consultant feedback due",
                     "category": "alert",
-                    "target_type": "user",
+                    "target_type": "feedback",
                     "sender_user_type": "user",
                     "recipient_user_type": "user",
                     "sender_id": support_person.support.id,
-                    "target_id": support_person.support.id,
+                    "target_id": support_person.project.consultant.id,
                     "description":
-                        f"your {support_person.project.consultant.name} feedback were not given form last 30 days"
+                        f"Your {support_person.project.consultant.name} feedback were not given form last 30 days"
                 }
 
                 create_notification([support_person.support], data)
@@ -70,7 +72,7 @@ class Command(BaseCommand):
                         'is_read': False,
                         'is_deleted': False,
                         'timestamp': str(timezone.now()),
-                        'target_id': support_person.support.id
+                        'target_id': support_person.project.consultant.id
                     },
                 }
                 push_notification([support_person.support.id], message_body)

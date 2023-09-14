@@ -35,6 +35,7 @@ from project.utils import fetch_scrum_masters
 from utils_app.utils import get_timezone
 from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
+from utils_app.utils import get_timezone, add_export_log
 from activity.serializers import Activity, ActivitySerializer
 from project.models import ProjectStatus, ConsultantFeedback, FEEDBACK_CHOICES
 from log1.utils import get_page_limits, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
@@ -194,7 +195,7 @@ class ConsultantV2ViewSets(ModelViewSet):
             response['Content-Disposition'] = "attachment; filename=Consultants.csv"
             for consultant in consultants:
                 writer.writerow([consultant.name, consultant.email, consultant.phone_no])
-
+            add_export_log("Consultant Info", request)
             return response
         except Exception as error:
             write_exception(error, request)
@@ -282,7 +283,7 @@ class ConsultantViewSets(ModelViewSet):
                 consultants = consultants.filter(marketing__status='open').exclude(
                     status='terminated')
 
-            consultants = consultants.order_by('id').distinct('id')[:100]
+            consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -969,14 +970,25 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_marketing.primary_marketer_id = primary_marketer
                 consultant_marketing.save()
 
-            teams = request.data.get('teams', [])
-            for team in teams:
-                consultant_marketing.teams.add(get_object_or_404(Team, name=team))
+            teams_marketer = request.data.get('teams_marketer', [])
+            for data in teams_marketer:
+                team_id = data.get('team')
+                marketers_value = data.get('marketers')
 
-            marketer_ids = request.data.get('marketers', [])
-            for marketer_id in marketer_ids:
-                marketer = get_object_or_404(User, id=marketer_id)
-                consultant_marketing.marketer.add(marketer)
+                team = get_object_or_404(Team, id=team_id)
+
+                if marketers_value == ["all"]:
+                    marketer_ids = User.objects.filter(
+                        (Q(team=team) | Q(associated_to=team)), is_active=True, account_login=True
+                    ).order_by('id').distinct('id').values_list('id', flat=True)
+                else:
+                    marketer_ids = marketers_value
+
+                consultant_marketing.teams.add(team)
+
+                for marketer_id in marketer_ids:
+                    marketer = get_object_or_404(User, id=marketer_id)
+                    consultant_marketing.marketer.add(marketer)
             start_marketing()
 
             # Activity
@@ -1107,6 +1119,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 for team_id in team_ids:
                     team = get_object_or_404(Team, id=team_id)
                     consultant_marketing.teams.add(team)
+
                 serializer = TeamSerializer(consultant_marketing.teams.all(), many=True)
                 teams_string = ", ".join(team.name for team in consultant_marketing.teams.all())
 
@@ -1188,6 +1201,188 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 return Response({"data": serializer.data, "message": "Team removed"}, status=202)
             else:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='assigned_marketers')
+    def assigned_marketers(self, request, pk):
+        try:
+            queryset = ConsultantMarketing.objects.filter(id=pk)
+            if queryset.exists():
+                marketer_data = {}
+
+                marketers = queryset.first().marketer.all()
+                teams = queryset.first().teams.all()
+
+                for team in teams:
+                    if team.name in marketer_data:
+                        continue
+                    else:
+                        team_info = {
+                            'team_id': team.id,
+                            'team_name': team.name,
+                            'marketers': []
+                        }
+                        marketer_data[team.name] = team_info
+
+                for marketer in marketers:
+
+                    if marketer.team:
+                        team = get_object_or_404(Team, id=marketer.team.id)
+
+                        marketer_info = {
+                            'id': marketer.id,
+                            'name': marketer.employee_name
+                        }
+                        if team in teams:
+                            marketer_data[team.name]['marketers'].append(marketer_info)
+
+                for team_info in marketer_data.values():
+                    team_marketer_ids = set(marketer['id'] for marketer in team_info['marketers'])
+
+                    all_marketers_info = User.objects.filter(
+                        (Q(team__name=team_info['team_name']) | Q(associated_to__name=team_info['team_name'])),
+                        is_active=True, account_login=True
+                    ).order_by('id').distinct('id').values('id', 'employee_name')
+
+                    team_info['is_all'] = set(marketer['id'] for marketer in all_marketers_info).issubset(
+                        team_marketer_ids)
+                    team_info['all_marketers'] = all_marketers_info
+
+                return Response({"data": list(marketer_data.values())}, status=200)
+            else:
+                return Response({"message": "Consultant is not in Marketing"}, status=404)
+            # if 'superadmin' in request.user.roles:
+            #     return Response({"data": serializer.data, "message": "Team removed"}, status=202)
+            # else:
+            #     return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='updated_marketers')
+    def updated_marketers(self, request, pk):
+        try:
+            queryset = ConsultantMarketing.objects.filter(id=pk)
+            if queryset:
+                consultant_marketing = queryset.first()
+            else:
+                return Response({"message": "Consultant is not in Marketing"})
+            if 'superadmin' or 'recruiter' in request.user.roles:
+                teams_marketer = request.data.get('teams_marketer', [])
+
+                updated_team_ids = {data['team'] for data in teams_marketer}
+                updated_marketer_ids = set()  # Initialize an empty set to store the updated marketer IDs
+
+                for data in teams_marketer:
+                    if "all" in data['marketers']:
+                        # If "all" is present, fetch all marketer IDs for the specified team and add them to updated_marketer_ids
+                        team = data['team']
+                        marketer_ids = User.objects.filter(
+                            (Q(team_id=team) | Q(associated_to__id=team)), is_active=True, account_login=True
+                        ).order_by('id').distinct('id').values_list('id', flat=True)
+                        updated_marketer_ids.update(marketer_ids)
+                    else:
+                        # Add individual marketer IDs to updated_marketer_ids
+                        updated_marketer_ids.update(data['marketers'])
+
+                existing_team_ids = set(consultant_marketing.teams.values_list('id', flat=True))
+                existing_marketer_ids = set(consultant_marketing.marketer.values_list('id', flat=True))
+
+                add_teams_ids = updated_team_ids - existing_team_ids
+                add_marketers_ids = updated_marketer_ids - existing_marketer_ids
+
+                removed_teams_ids = existing_team_ids - updated_team_ids
+                removed_marketers_ids = existing_marketer_ids-updated_marketer_ids
+
+                if add_teams_ids:
+                    teams = Team.objects.filter(id__in=add_teams_ids)
+                    consultant_marketing.teams.add(*teams)
+                    add_teams_names = Team.objects.filter(id__in=add_teams_ids).values_list('name', flat=True)
+
+                if add_marketers_ids:
+                    marketers = User.objects.filter(id__in=add_marketers_ids)
+                    consultant_marketing.marketer.add(*marketers)
+                    add_marketers_names = User.objects.filter(
+                        id__in=add_marketers_ids).values_list('employee_name', flat=True)
+
+                if removed_teams_ids:
+                    teams = Team.objects.filter(id__in=removed_teams_ids)
+                    consultant_marketing.teams.remove(*teams)
+                    remove_teams_names = Team.objects.filter(id__in=removed_teams_ids).values_list('name', flat=True)
+
+                if removed_marketers_ids:
+                    marketers = User.objects.filter(id__in=removed_marketers_ids)
+                    consultant_marketing.marketer.remove(*marketers)
+                    remove_marketers_names = User.objects.filter(id__in=removed_marketers_ids).values_list(
+                        'employee_name',
+                        flat=True)
+
+                consultant_marketing.save()
+
+                if len(add_marketers_ids) > 1:
+                    marketer_str = "marketers"
+                else:
+                    marketer_str = "marketer"
+
+                if len(add_teams_ids) > 1:
+                    team_str = "teams"
+                else:
+                    team_str = "team"
+
+
+                employee_name = request.user.employee_name
+
+                # Initialize a list to store activity descriptions
+                employee_description_parts = ""
+
+                if add_teams_ids:
+                    employee_description_parts += f"assigned {team_str} - {', '.join(add_teams_names)}. "
+
+                if add_marketers_ids:
+                    employee_description_parts += f"assigned {marketer_str} - {', '.join(add_marketers_names)}. "
+
+                if removed_marketers_ids:
+                    employee_description_parts += f"removed  {marketer_str} - {', '.join(remove_marketers_names)}. "
+
+                if removed_teams_ids:
+                    employee_description_parts += f"removed {team_str} - {', '.join(remove_teams_names)}. "
+
+                if employee_description_parts:
+                    # Combine employee-related activity descriptions into a single message
+                    employee_activity_description = f"{employee_name} - {employee_description_parts}"
+                    create_activity(
+                        consultant_marketing.consultant.id, 'consultant', request.user,
+                        employee_activity_description, 'updated'
+                    )
+                    send_notification_for_user(consultant_marketing.consultant, request.user, f"{employee_name} update the consultant marketing",
+                                               'consultantmarketing')
+
+                return Response({"message": "Successfully updated"}, status=202)
+            else:
+                return Response({"message": DONT_HAVE_ACCESS}, status=403)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['put'], detail=True, url_path='in_pool')
+    def in_pool(self, request, pk):
+        try:
+            try:
+                consultant_marketing = ConsultantMarketing.objects.get(id=pk, status="open")
+                in_pool = request.GET.get('in_pool',False)
+                consultant_marketing.in_pool = in_pool
+                consultant_marketing.save()
+            except ConsultantMarketing.DoesNotExist:
+                # Handle the case where the consultant is not found
+                return Response({"error": "Marketing cycle not found"}, status=404)
+
+            action = "added to pool" if in_pool else "removed from pool"
+            desc = f"{consultant_marketing.consultant.name} {action} by {request.user.employee_name}"
+            create_activity(consultant_marketing.consultant.id, 'consultant', request.user, desc, 'updated')
+            return Response({"message": "Updated in pool status"}, status=202)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

@@ -25,24 +25,17 @@ class Command(BaseCommand):
 
             # Query to fetch the project support person
             # user case send the notification to user on daily base if can not submit the feedback script run daily
-            active_projects = Q(
-                ~Q(project__updates__created__gte=seven_days_ago) &
-                Q(project__support_required=True, statuses__is_current=True,
-                  statuses__frequency__in=['is_active', 'less_active'], start__lte=seven_days_ago)
-            )
-            terminated_projects = Q(
-                ~Q(project__updates__created__gte=seven_days_ago) &
-                Q(statuses__is_current=True, statuses__created__lte=F('end') - timedelta(days=4),
-                  statuses__frequency__in=['terminate', 'handover', 'independent'])
-            )
-            training_projects = Q(
-                ~Q(project__updates__created__gte=one_day_ago),
-                Q(statuses__is_current=True, statuses__frequency='training')
-            )
+            active_projects = Q(~Q(project__updates__created__gte=seven_days_ago), start__lte=seven_days_ago,
+                                statuses__created__lte=seven_days_ago,
+                                statuses__frequency__in=['active', 'less_active'])
+
+            training_projects = Q(~Q(project__updates__created__gte=one_day_ago),
+                                  project__start_date__gte=date.today())
+
             project_support_persons = ProjectSupport.objects.filter(
-                Q(active_projects | terminated_projects| training_projects),
-                is_proxy_support=False
-            ).order_by('project__id').distinct('project__id')
+                Q(end__isnull=True,is_proxy_support=False, statuses__is_current=True,
+                  project__support_required=True) & (
+                        active_projects | training_projects)).order_by('project__id').distinct('project__id')
 
             content_type = ContentType.objects.get(model='project')
 
@@ -57,9 +50,9 @@ class Command(BaseCommand):
                 data = {
                     "title": "project update due",
                     "category": "alert",
-                    "description": f"your {support_person.project.consultant.name} updates were not given for last weeks",
-                    "target_type": "user",
-                    "target_id": support_person.support.id,
+                    "description": f"Your {support_person.project.submission.client} updates were not given for last weeks",
+                    "target_type": "projectupdate",
+                    "target_id": support_person.project.id,
                     "sender_id": support_person.support.id,
                     "recipient_user_type": "user",
                     "sender_user_type": "user",
@@ -77,7 +70,7 @@ class Command(BaseCommand):
                         'is_read': False,
                         'is_deleted': False,
                         'target': 'log1',
-                        'target_id':support_person.support.id,
+                        'target_id': support_person.project.id,
                         'timestamp': str(timezone.now()),
                     },
                 }

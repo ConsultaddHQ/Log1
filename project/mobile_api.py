@@ -18,8 +18,8 @@ from project.swagger import *
 from employee.models import User
 from attachment.models import Attachment
 from consultant.models import Consultant
-from utils_app.mailing import send_email
-from utils_app.aws_utils import get_s3_object
+from utils_app.thred_mail import send_email, send_email_attachment_multiple
+from utils_app.aws_utils import get_s3_object, download_s3_object
 from log1.utils import write_exception, ERROR_MSG
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
@@ -140,27 +140,26 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             project.timesheet_frequency = frequency
             project.save()
             prev_timesheet = TimeSheet.objects.filter(project=project).order_by('-created')
-            if prev_timesheet:
-                if prev_timesheet.exclude(status='draft').exists():
-                    last_filled_timesheet = prev_timesheet.exclude(status='draft').first()
-                    draft_timesheet = prev_timesheet.filter(status='draft', start__gte=last_filled_timesheet.end)
-                    timesheet_start_date = draft_timesheet.last().start if draft_timesheet else last_filled_timesheet.end + timedelta(days=1)
-                    draft_timesheet.delete()
-                    self.create_timesheet(project, timesheet_start_date, frequency)
-                else:
-                    timesheet_start_date = prev_timesheet.last().start
-                    prev_timesheet.delete()
-                    self.create_timesheet(project, timesheet_start_date, frequency)
-            else:
-                self.create_timesheet(project, frequency=frequency)
+            # if prev_timesheet:
+            #     if prev_timesheet.exclude(status='draft').exists():
+            #         last_filled_timesheet = prev_timesheet.exclude(status='draft').first()
+            #         draft_timesheet = prev_timesheet.filter(status='draft', start__gte=last_filled_timesheet.end)
+            #         timesheet_start_date = draft_timesheet.last().start if draft_timesheet else last_filled_timesheet.end + timedelta(days=1)
+            #         draft_timesheet.delete()
+            #         self.create_timesheet(project, timesheet_start_date, frequency)
+            #     else:
+            #         timesheet_start_date = prev_timesheet.last().start
+            #         prev_timesheet.delete()
+            #         self.create_timesheet(project, timesheet_start_date, frequency)
+            # else:
+            #     self.create_timesheet(project, frequency=frequency)
 
             return Response({"message": "Timesheet frequency updated successfully"}, status=201)
         except Exception as error:
             write_exception(error, request)
             return Response({"error": str(error)}, status=400)
 
-    @update_timesheet
-    def update(self, request, *args, **kwargs):
+    def create(self, request):
         try:
             screenshot = False
             perv_attachments = request.data.get('attachments', None)
@@ -168,13 +167,44 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                 perv_attachments = list(perv_attachments.split(","))
             else:
                 perv_attachments = []
+            week_id = request.data.get('week_id', None)
             zero_hours = request.GET.get('zero_hours', None)
-            timesheet = get_object_or_404(
-                TimeSheet, id=kwargs.get('pk', None),
-                project__consultant=request.user,
-                status__in=['draft', 'rejected', 'submitted'],
-                is_active=True,
-            )
+            project_id = request.data.get('project_id', None)
+            project = get_object_or_404(Project, id=project_id)
+
+            if project.submission.work_type != "c2c":
+                start = request.data['start_week']
+                start = datetime.strptime(start, "%Y-%m-%d").date()
+                end = request.data['end_week']
+                end = datetime.strptime(end, "%Y-%m-%d").date()
+                if week_id and week_id != '0':
+                    timesheet = TimeSheet.objects.filter(id=week_id,project=project,status__in=["submitted", "rejected"]).first()
+                    timesheet.start = start
+                    timesheet.end = end
+                else:
+                    query = Q(project=project, end__gte=start, start__lte=start) | Q(project=project,end__gte=end,start__lte=end)
+                    available_timesheet = TimeSheet.objects.filter(query).exclude(status="draft").order_by('-created')
+                    if available_timesheet:
+                        timesheet = available_timesheet.first()
+                        available_week = f"{timesheet.start} - {timesheet.end}"
+                        return Response({"error": f"PayStubs already exist {available_week}"}, status=400)
+
+                    timesheet = TimeSheet.objects.create(
+                        start=start, end=end, project=project, status='request',
+                    )
+                # update_timesheet = TimeSheet.objects.filter(project=project, start=start, end=end,
+                #                                           status__in=["submitted", "rejected"])
+
+            else:
+                timesheet = get_object_or_404(
+                    TimeSheet, id=request.data.get('week_id', None),
+                    project__consultant=request.user,
+                    status__in=['draft', 'rejected', 'submitted'],
+                    is_active=True,
+                )
+            if not timesheet:
+                return Response({"error": "SOMETHING WENT WRONG"}, status=400)
+
             timesheet_id = timesheet.id
             hours = float(request.data.get('hours'))
             timesheet.status = 'submitted' if timesheet.status != 'submitted' else 'updated'
@@ -194,7 +224,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     attachments = Attachment.objects.filter(object_id=timesheet.id, is_active=True,
                                                             attachment_type='timesheet')
                     for attachment in attachments:
-                        if attachment.id in perv_attachments:
+                        if str(attachment.id) in perv_attachments:
                             continue
                         attachment.is_active = False
                         attachment.save()
@@ -229,9 +259,10 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
 
             last_timesheet = TimeSheet.objects.filter(project=timesheet.project).aggregate(Max('end'))
             end_date = last_timesheet['end__max']
-            self.create_timesheet(
-                timesheet.project, end_date + timedelta(days=1), timesheet.project.timesheet_frequency, count=1
-            )
+            if project.submission.work_type == "c2c":
+                self.create_timesheet(
+                    timesheet.project, end_date + timedelta(days=1), timesheet.project.timesheet_frequency, count=1
+                )
             # new_ts, created = TimeSheet.objects.get_or_create(
             #     project=timesheet.project,
             #     start=end_date + timedelta(days=1),
@@ -402,7 +433,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
             timesheet = get_object_or_404(TimeSheet, id=pk, project__consultant=request.user)
             if timesheet.status == 'rejected':
                 timesheet = TimeSheet.objects.filter(
-                    project_id=timesheet.project.id, is_active=False,
+                    project_id=timesheet.project.id, is_active=True,
                     end=timesheet.end, start=timesheet.start, status='rejected'
                 )
                 attachments = timesheet.first().attachments.filter(is_active=True)
@@ -523,16 +554,18 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['POST'], detail=True, url_path='apply')
     def apply(self, request, pk, *args, **kwargs):
         try:
+            attachment = None
             data = request.data
+            consultant = request.user
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
             # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
             leave = Leave.objects.create(
                 leave_type=leave_type,
-                consultant=request.user,
+                consultant=consultant,
                 applied_on=date.today(),
                 to_date=data.get('to_date'),
                 from_date=data.get('from_date'),
-                description=data.get('description', None),
+                description=data.get('description', None)
             )
 
             if data['duration_type'] == 'hourly':
@@ -547,20 +580,44 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                 total_days = check_days(start, end, request)
                 leave.total_hours = total_days * 8
 
-            leave.status = 'applied'
+            leave.status = 'applied' if not consultant.approval_required else 'pending'
             leave.save()
             leave_type.balance = leave_type.balance - leave.total_hours
             leave_type.save()
 
             content_type = ContentType.objects.get(model='leave')
             if request.FILES.get('attachment', None):
-                Attachment.objects.create(
+                attachment = Attachment.objects.create(
                     creator_id=1,
                     object_id=leave.id,
                     content_type=content_type,
                     attachment_type='consultant_leave',
                     attachment_file=request.FILES.get('attachment'),
                 )
+
+            if consultant.approval_required:
+                path = []
+                if attachment:
+                    try:
+                        response, error = download_s3_object(attachment.attachment_file.name)
+                        path.append(response)
+                    except Exception as error:
+                        write_exception(error, request)
+
+                project_obj = consultant.projects.filter(statuses__status='joined', statuses__is_current=True).order_by('-id')
+                if not project_obj.first():
+                    project_obj = consultant.projects.filter(statuses__status='joined').order_by('-id')
+                mail_data = {
+                    "template": "../templates/leave_request.html", "attachments": path,
+                    "subject": f"Leave Requested from {consultant.name}",
+                    "to": ["siddharth.g@consultadd.com"], "cc": ["finance@consultadd.com"], "bcc": [],
+                    "context": {
+                        "end_date": leave.to_date, "start_date": leave.from_date,
+                        "consultant_name": consultant.name, "hours": leave.total_hours,
+                        "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}/{project_obj.first().id}/"
+                    }
+                }
+                send_email_attachment_multiple(mail_data, 'product@consultadd.com', request=request)
 
             return Response({"message": "leave applied successfully"}, status=201)
         except Exception as error:
