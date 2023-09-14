@@ -377,6 +377,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 user = get_object_or_404(User, id=user_id)
                 if account_login is not None:
                     user.account_login = account_login
+                    user.is_active = account_login
                     user.save()
                 else:
                     return Response({"message": "Parameter is not correct", "error": str(account_login)},

@@ -47,6 +47,7 @@ class MMailScrap(models.Model):
         blank=True,
         null=True,
     )
+    keywords = models.TextField(_("Keywords"), blank=True, null=True)
 
     def __str__(self):
         return self.sender_name + " " + self.sender_mail
