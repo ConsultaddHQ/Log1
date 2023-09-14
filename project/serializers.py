@@ -16,7 +16,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     client = serializers.SerializerMethodField()
     created = serializers.SerializerMethodField()
-    support = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
@@ -25,9 +24,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
-                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote', 'support', 'employer', 'work_type')
+        fields = ('id', 'status', 'created', 'submission', 'start_date', 'client', 'city', 'end_date', 'work_type',
+                  'consultant_name', 'marketer_name', 'company_name', 'is_remote', 'check_list', 'employer', 'rate')
 
     @staticmethod
     def get_created(obj):
@@ -40,10 +38,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_work_type(obj):
         return obj.submission.get_work_type_display()
-
-    @staticmethod
-    def get_check_list(obj):
-        return get_project_check_list(obj)
 
     @staticmethod
     def get_status(obj):
@@ -61,18 +55,20 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.submission.created_by.employee_name
 
     @staticmethod
+    def get_check_list(obj):
+        return get_project_check_list(obj)
+
+    @staticmethod
     def get_consultant_name(obj):
         if obj.consultant:
             if obj.is_remote:
-                firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Remote'
-                return f"{obj.submission.consultant.name} ({firstname})"
+                firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Not Assigned'
+                return {
+                    "remote": f"{firstname}", "name": f"{obj.submission.consultant.name}"
+                }
             else:
-                return obj.consultant.name
-        return None
-
-    @staticmethod
-    def get_support(obj):
-        return ProjectSupportSerializer(obj.support.all(), many=True).data
+                return {"name": obj.consultant.name}
+        return {"name": "Not Assigned"}
 
 
 class PayrollScheduleSerializer(serializers.ModelSerializer):
