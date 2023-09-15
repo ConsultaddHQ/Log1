@@ -1572,6 +1572,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_id = request.GET.get('consultant', None)
         project_type = request.GET.get('project_type', None)
         timesheet_status = request.GET.get('timesheet_status', None)
+        approval_required = json.loads(request.GET.get('approval_required', False))
 
         try:
             result = []
@@ -1612,6 +1613,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 .values_list('consultant_id', flat=True)
 
             consultants = Consultant.objects.filter(id__in=consultant_ids)
+
+            if approval_required:
+                consultants = consultants.filter(approval_required=approval_required)
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
