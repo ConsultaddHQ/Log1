@@ -34,13 +34,13 @@ from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
 from log1.utils import DONT_HAVE_ACCESS, ERROR_MSG, get_time_filter, get_page_limits, write_exception
 from project.models import ConsultantFeedback, Project, ProjectStatus, ProjectOrder, TimeSheet, ProjectSupport, \
-    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    SupportStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 from project.utils import ProjectUtil, create_remote_consultant, set_consultant_password, get_attachment_status, \
     fetch_project_status, create_checklist, diff_month_days, support_assignment_mail, send_employer_change_notification, \
-    mark_in_active, create_notification_and_send_push
+    mark_in_active, create_notification_and_send_push, get_country
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
 
 
 # Route - /project/
@@ -396,6 +396,7 @@ class ProjectViewSets(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         url = ""
+        status_count = {}
         first, last = get_page_limits(request)
         query = request.GET.get('query', None)
         sort_by = request.GET.get('sort_by', None)
@@ -404,7 +405,6 @@ class ProjectViewSets(ModelViewSet):
         export = json.loads(request.GET.get('export', 'false'))
         filter_by_time = request.GET.get('filter_by_time', None)
         filter_by_lead = request.GET.get('filter_by_lead', None)
-        filter_by_status = request.GET.get('filter_by_status', None)
 
         try:
             # search project by client and consultant
@@ -432,17 +432,15 @@ class ProjectViewSets(ModelViewSet):
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
-            if filter_json:
+            if filter_json and json.loads(filter_json):
                 filters = json.loads(filter_json)
 
-                if 'remote' in filters:
-                    projects = projects.filter(is_remote=filters['remote'])
+                created = filters.get('created', None)
+                if created:
+                    projects = date_filter(projects, created, 'created')
 
                 if 'client' in filters and len(filters["client"]) > 0:
                     projects = projects.filter(submission__client__in=filters['client'])
-
-                if 'work_type' in filters:
-                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'marketer' in filters and len(filters["marketer"]) > 0:
                     projects = projects.filter(submission__created_by_id__in=filters['marketer'])
@@ -452,25 +450,32 @@ class ProjectViewSets(ModelViewSet):
 
                 if 'consultant' in filters and len(filters["consultant"]) > 0:
                     projects = projects.filter(
-                        Q(submission__consultant_marketing__consultant__name__in=filters['consultant']) |
-                        Q(consultant__name__in=filters['consultant'])
+                        Q(consultant__name__in=filters['consultant']) |
+                        Q(submission__consultant_marketing__consultant__name__in=filters['consultant'])
                     )
 
-                created = filters.get('created', None)
-                projects = date_filter(projects, created, 'created')
+                if 'remote' in filters:
+                    projects = projects.filter(is_remote=filters['remote'])
 
-                projects = projects.order_by('id').distinct('id')
-                data = {
-                    "total": projects,
-                    "new": projects.filter(statuses__status='new', statuses__is_current=True),
-                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
-                    "received": projects.filter(statuses__status='received', statuses__is_current=True),
-                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
-                    "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                                  start_date__lt=date.today())
-                }
+                if 'work_type' in filters:
+                    projects = projects.filter(submission__work_type__in=filters['work_type'])
 
                 if 'status' in filters and len(filters["status"]) > 0:
+                    status_count = {
+                        "total": projects.count(),
+                        "new": projects.filter(statuses__status='new', statuses__is_current=True).count(),
+                        "joined": projects.filter(statuses__status='joined', statuses__is_current=True).count(),
+                        "received": projects.filter(statuses__status='received', statuses__is_current=True).count(),
+                        "complete": projects.filter(statuses__status='complete', statuses__is_current=True).count(),
+                        "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
+                        "cancelled": projects.filter(statuses__status__istartswith='cancelled',
+                                                     statuses__is_current=True).count(),
+                        "terminated": projects.filter(statuses__status__istartswith='terminated',
+                                                      statuses__is_current=True).count(),
+                        "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
+                                                      start_date__lt=date.today()).count()
+                    }
+
                     not_joined = Project.objects.none()
                     if 'not_joined' in filters["status"]:
                         not_joined = projects.filter(
@@ -478,68 +483,90 @@ class ProjectViewSets(ModelViewSet):
                         )
                     projects = projects.filter(statuses__status__in=filters['status'], statuses__is_current=True)
                     projects = (projects | not_joined).distinct('id')
-            else:
-                if filter_by_lead:
-                    projects = projects.filter(submission__work_type=filter_by_lead)
 
-                if filter_by_time:
-                    projects = get_time_filter(projects, filter_by_time)
+            if filter_by_lead:
+                projects = projects.filter(submission__work_type=filter_by_lead)
 
-                projects = projects.order_by('id').distinct('id')
-                data = {
-                    "total": projects,
-                    "new": projects.filter(statuses__status='new', statuses__is_current=True),
-                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True),
-                    "received": projects.filter(statuses__status='received', statuses__is_current=True),
-                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True),
-                    "not_joined": projects.filter(statuses__status='on_boarded', statuses__is_current=True,
-                                                  start_date__lt=date.today())
+            if filter_by_time:
+                projects = get_time_filter(projects, filter_by_time)
+
+            if not status_count:
+                status_count = {
+                    "total": projects.count(),
+                    "new": projects.filter(statuses__status='new', statuses__is_current=True).count(),
+                    "joined": projects.filter(statuses__status='joined', statuses__is_current=True).count(),
+                    "received": projects.filter(statuses__status='received', statuses__is_current=True).count(),
+                    "complete": projects.filter(statuses__status='complete', statuses__is_current=True).count(),
+                    "on_boarded": projects.filter(statuses__status='on_boarded', statuses__is_current=True).count(),
+                    "cancelled": projects.filter(
+                        statuses__status__istartswith='cancelled', statuses__is_current=True
+                    ).count(),
+                    "terminated": projects.filter(
+                        statuses__status__istartswith='terminated', statuses__is_current=True
+                    ).count(),
+                    "not_joined": projects.filter(
+                        statuses__status='on_boarded', statuses__is_current=True, start_date__lt=date.today()
+                    ).count()
                 }
 
-                if filter_by_status:
-                    projects = data[filter_by_status]
+            projects = projects.order_by('id').distinct('id')
 
             data_count = {
-                'new': data["new"].count(),
-                'total': data["total"].count(),
-                'joined': data["joined"].count(),
-                'received': data["received"].count(),
-                'on_boarded': data["on_boarded"].count(),
-                'not_joined': data["not_joined"].count(),
+                "status": {
+                    "new": status_count["new"],
+                    "total": status_count["total"],
+                    "joined": status_count["joined"],
+                    "received": status_count["received"],
+                    "complete": status_count["complete"],
+                    "cancelled": status_count["cancelled"],
+                    "terminated": status_count["terminated"],
+                    "not_joined": status_count["not_joined"],
+                    "on_boarded": status_count["on_boarded"]
+                },
+                "job_type": {
+                    "w2": projects.filter(submission__work_type='w2').count(),
+                    "c2c": projects.filter(submission__work_type='c2c').count(),
+                    "full_time": projects.filter(submission__work_type='full_time').count()
+                },
+                "project_type": {
+                    "in_house": projects.filter(is_remote=True).count(),
+                    "consultant": projects.filter(is_remote=False).count()
+                },
             }
 
-            if filter_json:
-                # count of project by status
-                if sort_by in ['created', 'modified']:
-                    order_by = f"-{sort_by}"
-                elif sort_by == 'consultant':
-                    order_by = '-submission__consultant_marketing__consultant__name'
-                else:
-                    order_by = '-modified'
+            if sort_by in ['created', 'modified']:
+                order_by = f"-{sort_by}"
+            elif sort_by == 'consultant':
+                order_by = '-submission__consultant_marketing__consultant__name'
+            else:
+                order_by = '-modified'
 
-                projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
+            projects = Project.objects.filter(id__in=projects.values('id')).order_by(order_by)
+
             if export:
-                first, last = 0, len(projects)
-            serializer = self.serializer_class(projects[first:last], many=True)
-            col_name = [
-                {"name": "consultant_name", "display_name": "Consultant Name"},
-                {"name": "marketer_name", "display_name": "Marketer Name"},
-                {"name": "client", "display_name": "Client Name"},
-                {"name": "employer", "display_name": "Employer Name"},
-                {"name": "company_name", "display_name": "Company Name"},
-                {"name": "start_date", "display_name": "Start Date"},
-                {"name": "end_date", "display_name": "End Date"},
-                {"name": "duration", "display_name": "Duration"},
-                {"name": "city", "display_name": "City"},
-                {"name": "is_remote", "display_name": "Remote"},
-                {"name": "status", "display_name": "Status"},
-                {"name": "rate", "display_name": "Rate"}
-            ]
-            if export:
+                col_name = [
+                    {"name": "consultant_name", "display_name": "Consultant Name"},
+                    {"name": "marketer_name", "display_name": "Marketer Name"},
+                    {"name": "client", "display_name": "Client Name"},
+                    {"name": "employer", "display_name": "Employer Name"},
+                    {"name": "company_name", "display_name": "Company Name"},
+                    {"name": "start_date", "display_name": "Start Date"},
+                    {"name": "end_date", "display_name": "End Date"},
+                    {"name": "duration", "display_name": "Duration"},
+                    {"name": "city", "display_name": "City"},
+                    {"name": "is_remote", "display_name": "Remote"},
+                    {"name": "status", "display_name": "Status"},
+                    {"name": "rate", "display_name": "Rate"}
+                ]
+                serializer = self.serializer_class(projects, many=True)
                 url = export_to_csv(
-                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                    serializer.data, col_name, f"po_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Project List"
                 )
-            return Response({"counts": data_count, "data": serializer.data, "file_url": url}, status=200)
+
+            serializer = self.serializer_class(projects[first: last], many=True)
+            return Response({
+                "counts": data_count, "data": serializer.data, "total": projects.count(), "file_url": url
+            }, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -611,6 +638,8 @@ class ProjectViewSets(ModelViewSet):
 
             project.city = request.data.get('city', project.city)
             project.rate = request.data.get('rate', project.rate)
+            if project.rate == "":
+                project.rate = 0
             project.duration = request.data.get('duration', project.duration)
             project.end_date = request.data.get('end_date', project.end_date)
             project.feedback = request.data.get('feedback', project.feedback)
@@ -628,8 +657,11 @@ class ProjectViewSets(ModelViewSet):
             project.is_remote = request.data.get('is_remote', False)
             project.save()
 
+            activity_created = False
+
             if prev_employer != project.employer and request.data['status'] not in ['new', 'received', 'on_boarded']:
                 data = {"prev_employer": prev_employer, "new_employer": project.employer}
+                activity_created = True
                 send_employer_change_notification(project, data, request)
 
             util = ProjectUtil(project, request)
@@ -654,12 +686,14 @@ class ProjectViewSets(ModelViewSet):
                     # Offer received message
                     desc = f"Purchase order status changed to Received"
                     util.send_receive_notification()
+                    activity_created = True
                     project.is_msg_sent = True
                     project.save()
 
                 # Project Joined
                 elif new_status == 'joined':
                     project.consultant.status = 'on_project'
+                    activity_created = True
                     project.consultant.save()
                     desc = f"PO status changed to Joined and Timesheet APP access mail is sent to consultant"
                     if marketing.status == 'open':
@@ -684,6 +718,7 @@ class ProjectViewSets(ModelViewSet):
                     marketing.status = 'open'
                     marketing.save()
                     project.support.update(end=datetime.now())
+                    activity_created = True
                     desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
                     po_status = project_status_obj.get_status_display()
@@ -694,6 +729,7 @@ class ProjectViewSets(ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
+                    activity_created = True
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
                     po_status = project_status_obj.get_status_display()
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
@@ -704,6 +740,7 @@ class ProjectViewSets(ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
+                    activity_created = True
                     desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
                     util.send_completion_notification()
@@ -712,12 +749,17 @@ class ProjectViewSets(ModelViewSet):
 
             # Activity
             if prev_rate != project.rate:
-                desc = f"Purchase order rate is updated"
+                activity_created = True
+                desc = f"Purchase order rate update form {prev_rate} to {prev_rate}"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif prev_start_date != str(project.start_date):
-                desc = f"Purchase order start_date is updated"
+
+            if str(prev_start_date) != str(project.start_date):
+                activity_created = True
+                desc = f"Purchase order start_date is updated form {prev_start_date} to {prev_start_date}"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
-            elif desc == f"Purchase order is updated" and prev_employer == project.employer:
+
+            if not activity_created:
+                desc = f"Purchase order is updated"
                 create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
             serializer = self.serializer_class(project)
 
@@ -827,6 +869,134 @@ class ProjectViewSets(ModelViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+
+class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, CreateModelMixin, RetrieveModelMixin):
+    permission_classes = (IsAuthenticated,)
+    queryset = ProjectPaymentTerm.objects.all()
+    serializer_class = ProjectPaymentTermSerializer
+    authentication_classes = (TokenAuthentication,)
+
+    def list(self, request, *args, **kwargs):
+        first, last = get_page_limits(request)
+        try:
+            query = request.GET.get('query')
+            queryset = ProjectPaymentTerm.objects.all()
+            project_type = request.GET.get('project_type')
+
+            if project_type:
+                queryset = queryset.filter(project__submission__work_type=project_type)
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                queryset = queryset.filter(
+                    project__submission__consultant_marketing__consultant__name__istartswith=query)
+
+            serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
+            return Response({"data": serializer.data, "count": len(serializer.data)}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            project = get_object_or_404(Project, id=kwargs.get('pk'))
+            data = {
+                'id': project.id,
+                'rate': project.rate,
+                'client_name': project.submission.client,
+                'remote_engineer': project.consultant.name,
+                'project_type': project.submission.work_type,
+                'country': get_country(project.submission.lead.city),
+                'consultant_name': project.submission.consultant.name,
+                'marketer_name': project.submission.created_by.employee_name,
+                'vendor_company': project.submission.lead.vendor_company.name,
+            }
+            return Response({"project_info": data}, status=status.HTTP_200_OK)
+
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not 'superadmin' in roles and not 'admin' in roles and not 'scrum master' in roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
+
+            project = get_object_or_404(Project, id=request.data.get("project_id"))
+
+            ProjectPaymentTerm.objects.create(
+                payment_term=request.data.get("payment_term", None),
+                payment_term_type=request.data.get("payment_term_type", None),
+                comment=request.data.get("comment", None),
+                created_by=request.user,
+                project=project
+            )
+            return Response({"message": "Payment Term Created Successfully"}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def update(self, request, *args, **kwargs):
+        try:
+            roles = request.user.roles
+            if not 'superadmin' in roles and not 'admin' in roles and not 'scrum master' in roles:
+                return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
+
+            payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
+            payment_term.payment_term = request.data.get("payment_term")
+            payment_term.payment_term_type = request.data.get("payment_term_type")
+            payment_term.comment = request.data.get("comment")
+            payment_term.save()
+
+            des = f"{request.user} has changed the project payment term details"
+            create_activity(payment_term.id, 'projectpaymentterm', request.user, des, 'updated')
+            return Response({"message": "Payment Term Updated Successfully"}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='payment_term_types')
+    def payment_term_types(self, request):
+        try:
+            return Response(ProjectPaymentTerm.PAYMENT_TERM_TYPE, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='project_list')
+    def project_list(self, request, ):
+        try:
+            ID_MAX_LENGTH = 4
+            project_list = []
+            query = request.GET.get('query', '').lower().replace("po-", "")
+            project_ids_with_payment_terms = ProjectPaymentTerm.objects.values_list('project_id', flat=True)
+
+            if len(query) == ID_MAX_LENGTH:
+                queryset = Project.objects.exclude(id__in=project_ids_with_payment_terms).filter(id=query)
+            else:
+                queryset = Project.objects.exclude(id__in=project_ids_with_payment_terms).exclude(
+                    submission__status='archive').filter(
+                    id__istartswith=query, statuses__status='joined', statuses__is_current=True
+                )
+            for project in queryset:
+                data = {
+                    "id": project.id,
+                    'rate': project.rate,
+                    'submission_id': project.submission.id,
+                    'client_name': project.submission.client,
+                    'remote_engineer': project.consultant.name,
+                    'project_type': project.submission.work_type,
+                    'country': get_country(project.submission.lead.city),
+                    'consultant_name': project.submission.consultant.name,
+                    'marketer_name': project.submission.created_by.employee_name,
+                    'vendor_company': project.submission.lead.vendor_company.name,
+                }
+                project_list.append(data)
+            return Response({"project_list": project_list}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /project/<project_id>/support/
@@ -1170,16 +1340,25 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} rate changed to " \
                        f"{request.data.get('value')} by {request.user.employee_name}"
 
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+
             elif request.data.get('field') == 'employer':
                 project.employer = request.data.get('value')
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer " \
                        f"changed to {request.data.get('value')} by {request.user.employee_name}"
+
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             elif request.data.get('field') == 'end_date':
                 effective_date = project.end_date
                 project.end_date = request.data.get('value')
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} extended to " \
                        f"{request.data.get('value')} by {request.user.employee_name}"
+
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             order = ProjectOrder.objects.create(
                 field=request.data.get('field'), value=request.data.get('value'),
@@ -1439,10 +1618,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 consultants = consultants.filter(name__istartswith=query)
 
             if leave_status:
-                if leave_status == 'pending':
-                    consultants = consultants.filter(leaves__status='applied')
-                elif leave_status == 'not_pending':
-                    consultants = consultants.exclude(leaves__status='applied')
+                consultants = consultants.filter(leaves__status=leave_status)
 
             project_qs = project_qs.filter(id__in=project_ids, consultant__in=consultants).order_by(
                 'consultant_id', 'id').distinct('consultant_id')
@@ -1455,7 +1631,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                     "id": consultant.id,
                     "name": consultant.name,
                     "email": consultant.email,
-                    "pending_leave": True if consultant.leaves.filter(status='applied').order_by('created') else False,
+                    "approval_required": consultant.approval_required,
+                    "pending_leave": True
+                    if consultant.leaves.filter(status__in=['applied', 'pending']).order_by('created') else False,
                     "pending_request": True
                     if TimesheetRequest.objects.filter(project__consultant=consultant, status='request') else False,
                     "ts_status": {
@@ -1516,7 +1694,8 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             for consultant_id in consultant_ids:
                 consultant = Consultant.objects.get(id=consultant_id)
                 timesheet_list = TimeSheet.objects.filter(
-                    status='draft', project__consultant__id=consultant_id, is_active=True,)
+                    status='draft', project__consultant__id=consultant_id, is_active=True
+                )
 
                 if start is not None:
                     timesheet_list = timesheet_list.filter(start__gte=start)
@@ -1654,6 +1833,30 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
+    @action(methods=["put"], detail=False, url_name="approval_required")
+    def approval_required(self, request, *args, **kwargs):
+        try:
+            # updated_consultants = ''
+            approval = request.data.get('action', True)
+            consultant_ids = request.data.get('consultant_ids', [])
+
+            for consultant_id in consultant_ids:
+                consultant = Consultant.objects.get(id=consultant_id)
+                if consultant.approval_required == approval:
+                    continue
+                consultant.approval_required = approval
+                consultant.save()
+
+                # updated_consultants = updated_consultants + consultant.name + ' '
+                required = '' if approval else 'not '
+                desc = f"{request.user.employee_name} marked {consultant.name} approval as {required}required"
+                create_activity(consultant.id, 'leave', request.user, desc, 'updated')
+
+            return Response({"message": "Consultant Approval Updated"}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Route - /finance/<consultant_id>/leave/
 class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
@@ -1676,8 +1879,8 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             queryset = self.queryset.filter(consultant=consultant).order_by('-created')
             # if year:
             #     queryset = queryset.filter(leave_type__year=year)
-            if status:
-                queryset = queryset.filter(status=status)
+            if status == 'applied':
+                queryset = queryset.filter(status__in=['pending', 'applied'])
             if end:
                 queryset = queryset.filter(to_date__lte=end)
             if start:
@@ -1695,31 +1898,44 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         consultant = get_object_or_404(Consultant, id=kwargs.get('consultant_id'))
 
         try:
-            status = request.data.get('status', None)
-            if not status:
+            leave_status = request.data.get('status', None)
+            if not leave_status:
                 return Response({"message": "No action selected"}, status=200)
             leave = get_object_or_404(Leave, id=kwargs.get('pk'), consultant=consultant)
+            prev_status = leave.get_status_display()
             leave.remarks = request.data.get('remarks', None)
             leave.save()
 
             consultant_leave = leave.leave_type
-            if not status or status == leave.status:
+            if not leave_status or leave_status == leave.status:
                 return Response({"message": "Status Not Updated"}, status=200)
 
-            if status.upper() == "REJECTED":
+            if leave_status.upper() == "REJECTED":
+                leave_status = "rejected_1st_level" if leave.status == 'pending' else "rejected"
                 consultant_leave.balance += leave.total_hours
                 consultant_leave.save()
 
-            elif status.upper() == "APPROVED" and leave.status.upper() == "REJECTED":
-                consultant_leave.balance -= leave.total_hours
-                consultant_leave.save()
+            elif leave_status.upper() == "APPROVED":
+                if "rejected" in leave.status:
+                    consultant_leave.balance -= leave.total_hours
+                    consultant_leave.save()
+                    leave_status = "approved" if leave.status == 'rejected' else "applied"
+                else:
+                    if leave.status == 'pending':
+                        leave_status = "applied"
+                    elif leave.status == 'applied':
+                        leave_status = "approved"
 
-            leave.status = status
+            leave.status = leave_status
             leave.save()
             sender_content_type = ContentType.objects.get(model='user')
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')
-            title = f"Leave {leave.status} for date {leave.from_date}"
+
+            if prev_status == 'pending' and request.data['status'] == 'approved':
+                title = f"Leave initial level approval granted from {request.user.employee_name}"
+            else:
+                title = f"Leave {leave.status} for date {leave.from_date}"
 
             Notification.objects.create(
                 category="info", recipient_content_type=recipient_content_type,
@@ -1937,7 +2153,8 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                 {"name": "feedback", "display_name": "Feedback"},
             ]
             file_url = export_to_csv(
-                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv", request
+                consultant_feedback, columns, f"event_feedback_{datetime.now().strftime('%d-%B-%Y')}.csv",
+                request, "Event Feedback"
             )
             return Response({"data": file_url}, status=200)
         except Exception as error:
@@ -2044,7 +2261,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
                 ]
                 file_url = export_to_csv(
                     data, columns, f"consultant_rate_revision_{datetime.now().strftime('%d-%B-%Y')}.csv",
-                    request=None
+                    None, "Consultant Rate Revision"
                 )
             return Response({"data": data[first: last], "url": file_url, "total": len(data)}, status=200)
         except Exception as error:

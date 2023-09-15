@@ -20,8 +20,8 @@ from marketing.models import Submission, Interview, Question, Answer
 
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
-from notification.utils import push_notification_consultant
 from utils_app.slack_notification import MessageCard as slack
+from notification.utils import push_notification_consultant, create_notification
 
 
 def vendor_account_manager(vendor_company):
@@ -69,6 +69,8 @@ def get_users_and_attendees(request, interview):
         if email:
             attendees.append({"email": email})
 
+        if interview.consultant.id == "948":
+            attendees.append({"email": "jyothsna.consultadd@gmail.com"})
         return user_list, attendees
     except Exception as error:
         write_exception(error, request)
@@ -79,9 +81,9 @@ def date_filter(queryset, timestamp, field_str):
     filters = dict()
     if timestamp and type(timestamp) == dict:
         lte_date = timestamp.get('lte', None)
-        # if lte_date:
-        #     lte_date = (
-        #             datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
+        if lte_date:
+            lte_date = (
+                    datetime.strptime(lte_date, '%Y-%m-%d').date() + timedelta(days=1)).strftime("%Y-%m-%d")
         lte = lte_date
         gte = timestamp.get('gte', None)
         if lte and gte and lte == gte:  # Check if lte and gte are the same date
@@ -115,6 +117,19 @@ def change_to_feedback_due():
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
+            data = {
+                "title": "interview feedback due",
+                "category": "alert",
+                "description": f"your {interview.submission.consultant_marketing.consultant.name} interview (I-{interview.id}) supervisor feedback is pending",
+                "parent_type": "submission",
+                "target_type": "interview",
+                "parent_id": interview.submission.id,
+                "target_id": interview.id,
+                "sender_id": interview.supervisor.id,
+                "recipient_user_type": "user",
+                "sender_user_type": "user",
+            }
+            create_notification([interview.supervisor], data)
 
         # Deletes push notifications for which there are no corresponding interviews with 'feedback_due' status.
         if os.environ.get('ENV') == 'prod':
@@ -136,7 +151,7 @@ def change_to_feedback_due():
 
         for supervisor in supervisor_list:
             content_type = ContentType.objects.get(model='interview')
-            notification,created = UserNotification.objects.get_or_create(user=supervisor,content_type=content_type)
+            notification, created = UserNotification.objects.get_or_create(user=supervisor, content_type=content_type)
             if created:
                 notification.is_active=True
                 notification.save()

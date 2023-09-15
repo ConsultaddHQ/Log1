@@ -59,6 +59,7 @@ PROJECT_APPS = [
     'messaging.apps.MessagingConfig',
     'engineering.apps.EngineeringConfig',
     'dashboard.apps.DashboardConfig',
+    'tracking.apps.TrackingConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -140,6 +141,7 @@ CORS_ALLOW_HEADERS = [
     'authorization',
     'accept-encoding',
     'x-requested-with',
+    'X-Id-Token',
 ]
 
 # Swagger
@@ -341,11 +343,12 @@ CONSTANCE_CONFIG = OrderedDict([
     ('slack_pre_joining_feedback_url', ('URL', 'Slack Pre Joining Feedback Channel')),
     ('slack_consultadd_compete_url', ('URL', 'Slack Consultadd Compete Channel')),
     ('slack_test_channel_url', ('URL', 'Slack Test Channel')),
+    ('OKR_URL', ('https://dlwngz4tmfcbh.cloudfront.net/login', 'OKR URL')),
 ])
 
 CONSTANCE_CONFIG_FIELDSETS = {
     'constants': (
-        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION'
+        'APP_URL', 'ANDROID_APP_LINK', 'IPHONE_APP_LINK', 'VERSION', 'APP_VERSION', 'OKR_URL'
     ),
     'Email Ids': (
         'APP_ADMIN', 'LEGAL', 'FINANCE', 'RELATIONS', 'RECRUITMENT', 'ENGINEERING', 'SUPERADMIN', 'BOOKING_ADMIN',

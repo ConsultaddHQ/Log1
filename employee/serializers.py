@@ -33,6 +33,7 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     project = serializers.SerializerMethodField()
     version = serializers.SerializerMethodField()
     handover = serializers.SerializerMethodField()
+    technology = serializers.SerializerMethodField()
     display_roles = serializers.SerializerMethodField()
 
     class Meta:
@@ -73,6 +74,16 @@ class UserDashboardSerializer(serializers.ModelSerializer):
     def get_handover(obj):
         if obj.handovers.all():
             return obj.handovers.all().values(name=F('user__employee_name'), employee_id=F('user__employee_id'))
+
+    @staticmethod
+    def get_technology(obj):
+        if obj.technology:
+            tech = obj.technology
+            if 'null' in tech:
+                tech.remove('null')
+            if None in tech:
+                tech.remove(None)
+            return tech
 
     @staticmethod
     def get_project(obj):
