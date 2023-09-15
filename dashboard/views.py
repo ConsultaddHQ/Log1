@@ -9,7 +9,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
-from dashboard.serializers import QuickActionsViewSetsSerializer
+from dashboard.serializers import QuickActionsSerializer
 from dashboard.swagger import list_dashboard_data, marketing_performance, dashboard_history, pending_status, \
     list_quick_actions_data, add_consultant
 from project.models import Project
@@ -412,7 +412,7 @@ class QuickActionsViewSets(GenericViewSet, ListModelMixin):
     queryset = QuickActions.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
-    serializer_class = QuickActionsViewSetsSerializer
+    serializer_class = QuickActionsSerializer
 
     @list_quick_actions_data
     def list(self, request, *args, **kwargs):

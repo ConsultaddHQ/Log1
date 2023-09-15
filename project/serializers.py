@@ -522,7 +522,7 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
         return obj.get_payment_term_type_display()
 
 
-class ConsultantRevisionViewSetSerializer(serializers.ModelSerializer):
+class ConsultantRateRevisionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ConsultantRateRevision
         fields = '__all__'
