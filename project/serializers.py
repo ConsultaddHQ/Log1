@@ -2,7 +2,7 @@ from django.db.models import Q
 from datetime import date, datetime
 from rest_framework import serializers
 
-from consultant.models import Consultant
+from consultant.models import Consultant, ConsultantRateRevision
 from utils_app.aws_utils import get_s3_object
 from employee.serializers import UserSerializer
 from marketing.serializers import SubmissionSerializer
@@ -520,3 +520,9 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_payment_term_type(obj):
         return obj.get_payment_term_type_display()
+
+
+class ConsultantRevisionViewSetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ConsultantRateRevision
+        fields = '__all__'

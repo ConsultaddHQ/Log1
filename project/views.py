@@ -42,7 +42,8 @@ from project.utils import ProjectUtil, create_remote_consultant, set_consultant_
     mark_in_active, create_notification_and_send_push, get_country
 from project.serializers import ProjectSerializer, ProjectGetSerializer, ProjectOrderSerializer, FinanceSerializer, \
     ProjectSupportSerializer, ConsultantTimeSheetSerializer, LeaveSerializer, ConsultantLeaveSerializer, \
-    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer
+    TimesheetRequestSerializer, TimetrackEventSerializer, ProjectPaymentTermSerializer, \
+    ConsultantRevisionViewSetSerializer
 
 
 # Route - /project/
@@ -2036,7 +2037,7 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
                             DestroyModelMixin):
     queryset = TimetrackEvent.objects.all()
     permission_classes = (IsAuthenticated,)
-    serializer_classes = TimetrackEventSerializer
+    serializer_class = TimetrackEventSerializer
     authentication_classes = (TokenAuthentication,)
 
     def list(self, request, *args, **kwargs):
@@ -2173,6 +2174,7 @@ class ConsultantRevisionViewSet(GenericViewSet, CreateModelMixin, ListModelMixin
     queryset = ConsultantRateRevision.objects.all()
     permission_classes = (IsAuthenticated,)
     authentication_classes = (TokenAuthentication,)
+    serializer_class = ConsultantRevisionViewSetSerializer
 
     @list_rate_revision
     def list(self, request, *args, **kwargs):
