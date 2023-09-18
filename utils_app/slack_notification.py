@@ -808,6 +808,18 @@ class MessageCard:
                         "fields": [
                             {
                                 "type": "mrkdwn",
+                                "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
+                            },
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
                                 "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
                             },
                         ]
