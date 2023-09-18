@@ -1572,6 +1572,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_id = request.GET.get('consultant', None)
         project_type = request.GET.get('project_type', None)
         timesheet_status = request.GET.get('timesheet_status', None)
+        approval_required = request.GET.get('approval_required', False)
 
         try:
             result = []
@@ -1612,6 +1613,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 .values_list('consultant_id', flat=True)
 
             consultants = Consultant.objects.filter(id__in=consultant_ids)
+
+            if approval_required == 'true':
+                consultants = consultants.filter(approval_required=True)
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -1932,10 +1936,16 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')
 
-            if prev_status == 'pending' and request.data['status'] == 'approved':
+            title = None
+            if prev_status in ['Pending 1st Level', 'Rejected 1st Level'] and request.data['status'] == 'approved':
                 title = f"Leave initial level approval granted from {request.user.employee_name}"
-            else:
-                title = f"Leave {leave.status} for date {leave.from_date}"
+            elif leave_status in ['rejected_1st_level', 'rejected']:
+                title = f"Leave rejected for date {leave.from_date}"
+            elif leave_status == 'approved':
+                title = f"Leave approved for date {leave.from_date}"
+
+            if not title:
+                return Response({"message": "Leave updated successfully"}, status=202)
 
             Notification.objects.create(
                 category="info", recipient_content_type=recipient_content_type,
