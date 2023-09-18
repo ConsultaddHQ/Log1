@@ -78,7 +78,8 @@ class MessageCard:
                                     f"{get_display_choice(obj.interview_mode, 'interview_mode', request)} :: "
                                     f"{obj.start_time.date().strftime('%m/%d/%Y')} :: "
                                     f"{obj.start_time.time().strftime('%H:%M')} EST :: {obj.submission.client} :: "
-                                    f"{marketer_name} ::  {obj.submission.marketing_team.name} :: {obj.submission.lead.position.display_name}"
+                                    f"{marketer_name} ::  {obj.submission.marketing_team.name} :: "
+                                    f"{obj.submission.lead.position.display_name}"
                         }
                     }
                 ]
@@ -795,6 +796,18 @@ class MessageCard:
                             },
                             {
                                 "type": "mrkdwn",
+                                "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
+                            },
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
                                 "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
                             },
                         ]
@@ -841,7 +854,7 @@ class MessageCard:
                                     "emoji": True,
                                     "text": "View in Log1"
                                 },
-                                "url": f"https://app.log1.com/#/details/{payload.get('submission_id')}/project?id={payload.get('project_id')}",
+                                "url": f"{config.APP_URL}#/details/{payload.get('submission_id')}/project?id={payload.get('project_id')}",
                                 "value": "click_me_123"
                             }
                         ]
