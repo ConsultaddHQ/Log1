@@ -17,8 +17,8 @@ from constance import config
 from employee.models import User
 from attachment.models import Attachment
 from consultant.models import Consultant
-from utils_app.mailing import send_email
-from utils_app.aws_utils import get_s3_object
+from utils_app.thred_mail import send_email, send_email_attachment_multiple
+from utils_app.aws_utils import get_s3_object, download_s3_object
 from log1.utils import write_exception, ERROR_MSG
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
@@ -177,7 +177,7 @@ class TimeSheetViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Updat
                     timesheet.end = end
                 else:
                     query = Q(project=project, end__gte=start, start__lte=start) | Q(project=project,end__gte=end,start__lte=end)
-                    available_timesheet = TimeSheet.objects.filter(query).exclude(status='draft').order_by('-created')
+                    available_timesheet = TimeSheet.objects.filter(query).exclude(status="draft").order_by('-created')
                     if available_timesheet:
                         timesheet = available_timesheet.first()
                         available_week = f"{timesheet.start} - {timesheet.end}"
@@ -541,16 +541,18 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     @action(methods=['POST'], detail=True, url_path='apply')
     def apply(self, request, pk, *args, **kwargs):
         try:
+            attachment = None
             data = request.data
+            consultant = request.user
             leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'), is_expired=False)
             # leave_type = get_object_or_404(ConsultantLeave, id=data.get('leave_type'))
             leave = Leave.objects.create(
                 leave_type=leave_type,
-                consultant=request.user,
+                consultant=consultant,
                 applied_on=date.today(),
                 to_date=data.get('to_date'),
                 from_date=data.get('from_date'),
-                description=data.get('description', None),
+                description=data.get('description', None)
             )
 
             if data['duration_type'] == 'hourly':
@@ -565,20 +567,44 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
                 total_days = check_days(start, end, request)
                 leave.total_hours = total_days * 8
 
-            leave.status = 'applied'
+            leave.status = 'applied' if not consultant.approval_required else 'pending'
             leave.save()
             leave_type.balance = leave_type.balance - leave.total_hours
             leave_type.save()
 
             content_type = ContentType.objects.get(model='leave')
             if request.FILES.get('attachment', None):
-                Attachment.objects.create(
+                attachment = Attachment.objects.create(
                     creator_id=1,
                     object_id=leave.id,
                     content_type=content_type,
                     attachment_type='consultant_leave',
                     attachment_file=request.FILES.get('attachment'),
                 )
+
+            if consultant.approval_required:
+                path = []
+                if attachment:
+                    try:
+                        response, error = download_s3_object(attachment.attachment_file.name)
+                        path.append(response)
+                    except Exception as error:
+                        write_exception(error, request)
+
+                project_obj = consultant.projects.filter(statuses__status='joined', statuses__is_current=True).order_by('-id')
+                if not project_obj.first():
+                    project_obj = consultant.projects.filter(statuses__status='joined').order_by('-id')
+                mail_data = {
+                    "template": "../templates/leave_request.html", "attachments": path,
+                    "subject": f"Leave Requested from {consultant.name}",
+                    "to": ["siddharth.g@consultadd.com"], "cc": ["finance@consultadd.com"], "bcc": [],
+                    "context": {
+                        "end_date": leave.to_date, "start_date": leave.from_date,
+                        "consultant_name": consultant.name, "hours": leave.total_hours,
+                        "url": f"{config.APP_URL}#/finance/leave_details/{consultant.id}/{project_obj.first().id}/"
+                    }
+                }
+                send_email_attachment_multiple(mail_data, 'product@consultadd.com', request=request)
 
             return Response({"message": "leave applied successfully"}, status=201)
         except Exception as error:

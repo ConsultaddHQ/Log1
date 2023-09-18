@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
-from utils_app.models import Choice
 from consultant.models import Consultant
+from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from utils_app.mailing import send_email as mail
@@ -118,8 +118,6 @@ def get_project_check_list(project):
     msa, work_order, offer_letter = 0, 0, 0
 
     if project.submission.get_work_type_display() != 'C2C':
-        if project.attachments.filter(attachment_type='offer_letter'):
-            offer_letter = 1
         result = get_attachment_status(project)
 
         return {
@@ -274,11 +272,12 @@ class ProjectUtil:
             ).count()
             w2_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one,
-                submission__work_type__in=["w2", "full_time"]
+                submission__work_type__in = ["w2","full_time"]
             ).count()
             c2c_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one,
                 submission__work_type="c2c"
+
             ).count()
             team_count = Project.objects.filter(
                 statuses__status=project_status,
@@ -643,3 +642,13 @@ def timesheet_submission_mail(obj, request=None):
     except Exception as error:
         write_exception(error, request)
         return None
+
+
+def get_country(city):
+    city_obj = None
+    if city:
+        split_city = city.split(",")
+        city_obj = City.objects.filter(
+            name=split_city[0], state=split_city[1]
+        )
+    return city_obj.first().country if city_obj else None

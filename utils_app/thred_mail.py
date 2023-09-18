@@ -195,7 +195,8 @@ def send_email(mail_data, from_email, request=None):
 @shared_task
 def send_email_without_template(mail_data, from_email, request=None, mail_id=None):
     try:
-        from_email = "product@consultadd.com"
+        if from_email:
+            from_email = "product@consultadd.com"
         service, from_mail_id = cred(from_email)
         if mail_id:
             email_data = service.users().messages().get(userId='me', id=mail_id).execute()  
@@ -218,7 +219,7 @@ def send_email_without_template(mail_data, from_email, request=None, mail_id=Non
                 
             else:
                 message['to'] = ','.join(
-                    ['suman.m@consultadd.com', 'shreyas.k@consultadd.com', 'shivam.k@consultadd.com', 'gufran.a@consultadd.com']
+                    ['piyush.y@consultadd.com', 'shreyas.k@consultadd.com', 'prashant.k@consultadd.com', 'gufran.a@consultadd.com']
                 )
                 message['cc'] = ''
                 message['bcc'] = ''
@@ -259,7 +260,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 
                 file_size = False
                 if len(mail_data["attachments"]) > 0:
-                    file_size = add_attachments(message,mail_data["attachments"])
+                    file_size = add_attachments(message, mail_data["attachments"])
                     
                 if file_size:
                     return str("Email size is more then 25 MB"), False, None
@@ -271,7 +272,7 @@ def send_email_attachment_multiple(mail_data, from_email, request=None, mail_id=
                 # b64_bytes = base64.urlsafe_b64encode(message.as_bytes())
                 # b64_string = b64_bytes.decode()
                 media = MediaIoBaseUpload(BytesIO(message.as_bytes()), mimetype='message/rfc822', resumable=True)
-                
+
             email_body = {'message': {'threadId': email_data['threadId']}}
             draft = service.users().drafts().create(userId='me', body=email_body, media_body=media).execute()
             message = service.users().drafts().send(userId='me', body={ 'id': draft['id'] }).execute()

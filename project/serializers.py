@@ -5,18 +5,17 @@ from rest_framework import serializers
 from consultant.models import Consultant
 from utils_app.aws_utils import get_s3_object
 from employee.serializers import UserSerializer
-from project.utils import get_project_check_list
 from marketing.serializers import SubmissionSerializer
+from project.utils import get_project_check_list, get_country
 from attachment.serializers import AttachmentSerializer, AttachmentURLSerializer
 from project.models import Project, ProjectOrder, ProjectSupport, SupportStatus, TimeSheet, PayrollSchedule, \
-    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent
+    ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, TimetrackEvent, ProjectPaymentTerm
 
 
 class ProjectSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     client = serializers.SerializerMethodField()
     created = serializers.SerializerMethodField()
-    support = serializers.SerializerMethodField()
     work_type = serializers.SerializerMethodField()
     check_list = serializers.SerializerMethodField()
     company_name = serializers.SerializerMethodField()
@@ -25,9 +24,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'status', 'feedback', 'created', 'duration', 'submission', 'start_date', 'client', 'rate',
-                  'city', 'end_date', 'consultant_name', 'city', 'check_list', 'marketer_name', 'company_name',
-                  'is_remote', 'support', 'employer', 'work_type')
+        fields = ('id', 'status', 'created', 'submission', 'start_date', 'client', 'city', 'end_date', 'work_type',
+                  'consultant_name', 'marketer_name', 'company_name', 'is_remote', 'check_list', 'employer', 'rate',
+                  'duration')
 
     @staticmethod
     def get_created(obj):
@@ -40,10 +39,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_work_type(obj):
         return obj.submission.get_work_type_display()
-
-    @staticmethod
-    def get_check_list(obj):
-        return get_project_check_list(obj)
 
     @staticmethod
     def get_status(obj):
@@ -61,18 +56,20 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.submission.created_by.employee_name
 
     @staticmethod
+    def get_check_list(obj):
+        return get_project_check_list(obj)
+
+    @staticmethod
     def get_consultant_name(obj):
         if obj.consultant:
             if obj.is_remote:
-                firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Remote'
-                return f"{obj.submission.consultant.name} ({firstname})"
+                firstname = obj.consultant.name.split(' ')[0] if obj.consultant else 'Not Assigned'
+                return {
+                    "remote": f"{firstname}", "name": f"{obj.submission.consultant.name}"
+                }
             else:
-                return obj.consultant.name
-        return None
-
-    @staticmethod
-    def get_support(obj):
-        return ProjectSupportSerializer(obj.support.all(), many=True).data
+                return {"name": obj.consultant.name}
+        return {"name": "Not Assigned"}
 
 
 class PayrollScheduleSerializer(serializers.ModelSerializer):
@@ -493,3 +490,34 @@ class TimetrackEventSerializer(serializers.ModelSerializer):
             "all": True if len(consultants) > 50 else False
         }
         return data
+
+
+class ProjectPaymentTermSerializer(serializers.ModelSerializer):
+    project = serializers.SerializerMethodField()
+    payment_term_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectPaymentTerm
+        fields = ('id', 'payment_term', 'payment_term_type', 'comment', 'project')
+
+    @staticmethod
+    def get_project(obj):
+        project = obj.project
+        if project:
+            return {
+                'rate': project.rate,
+                'project_id': project.id,
+                'submission_id':project.submission.id,
+                'client_name': project.submission.client,
+                'remote_engineer': project.consultant.name,
+                'project_type':project.submission.work_type,
+                'country': get_country(project.submission.lead.city),
+                'consultant_name': project.submission.consultant.name,
+                'marketer_name': project.submission.created_by.employee_name,
+                'vendor_company': project.submission.lead.vendor_company.name,
+            }
+        return None
+
+    @staticmethod
+    def get_payment_term_type(obj):
+        return obj.get_payment_term_type_display()
