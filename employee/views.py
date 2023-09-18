@@ -11,6 +11,7 @@ from django.db.models.functions import Lower
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from rest_framework.authtoken.models import Token
+from django.core.exceptions import ValidationError
 from django.db.models import Q, F, Value, CharField
 from django.contrib.auth.hashers import make_password
 from rest_framework.permissions import IsAuthenticated
