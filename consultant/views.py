@@ -263,7 +263,7 @@ class ConsultantViewSets(ModelViewSet):
                 consultants = consultants.filter(marketing__status='open').exclude(
                     status='terminated')
 
-            consultants = consultants.order_by('id').distinct('id')[:100]
+            consultants = consultants.order_by('id').distinct('id')
             serializer = ConsultantListSerializer(consultants, many=True)
             return Response({"data": serializer.data}, status=200)
         except Exception as error:
@@ -1223,7 +1223,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 consultant_marketing = queryset.first()
             else:
                 return Response({"message": "Consultant is not in Marketing"})
-            if  'superadmin' or 'recruiter' in request.user.roles:
+            if 'superadmin' or 'recruiter' in request.user.roles:
                 teams_marketer = request.data.get('teams_marketer', [])
 
                 updated_team_ids = {data['team'] for data in teams_marketer}
@@ -1235,7 +1235,7 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                         team = data['team']
                         marketer_ids = User.objects.filter(
                             (Q(team_id=team) | Q(associated_to__id=team)), is_active=True, account_login=True
-                        ).values_list('id', flat=True)
+                        ).order_by('id').distinct('id').values_list('id', flat=True)
                         updated_marketer_ids.update(marketer_ids)
                     else:
                         # Add individual marketer IDs to updated_marketer_ids
