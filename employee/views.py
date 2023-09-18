@@ -3,6 +3,8 @@ from itertools import chain
 from datetime import timedelta, datetime
 
 from dateutil import tz
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.mixins import *
 from rest_framework import exceptions
