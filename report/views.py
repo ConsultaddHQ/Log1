@@ -868,6 +868,8 @@ class MarketingReportViewSets(GenericViewSet):
                 {"name": "interview_count", "display_name": "Interview Count"},
                 {"name": "offer_count", "display_name": "Offer Count"},
                 {"name": "joined_count", "display_name": "Joined Count"},
+                {"name": "completion_count", "display_name": "completion Count"},
+                {"name": "termination_count", "display_name": "termination Count"},
             ]
             if export:
                 url = export_to_csv(

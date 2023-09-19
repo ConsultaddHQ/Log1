@@ -1572,10 +1572,15 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_id = request.GET.get('consultant', None)
         project_type = request.GET.get('project_type', None)
         timesheet_status = request.GET.get('timesheet_status', None)
+<<<<<<< Updated upstream
         approval_required = request.GET.get('approval_required', False)
+=======
+        approval_required = json.loads(request.GET.get('approval_required', 'False'))
+>>>>>>> Stashed changes
 
         try:
             result = []
+
             project_status = [
                 'terminated-fired_performance_issue', 'terminated-fired_security_issue',
                 'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
@@ -1614,8 +1619,13 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
             consultants = Consultant.objects.filter(id__in=consultant_ids)
 
+<<<<<<< Updated upstream
             if approval_required == 'true':
                 consultants = consultants.filter(approval_required=True)
+=======
+            if approval_required:
+                consultants = consultants.filter(approval_required=approval_required)
+>>>>>>> Stashed changes
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -1626,6 +1636,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
             project_qs = project_qs.filter(id__in=project_ids, consultant__in=consultants).order_by(
                 'consultant_id', 'id').distinct('consultant_id')
+
             for obj in project_qs[first: last]:
                 consultant = obj.consultant
                 ts_obj = timesheet_qs.filter(project=obj)
@@ -1862,7 +1873,6 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# Route - /finance/<consultant_id>/leave/
 class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Leave.objects.all()
     serializer_class = LeaveSerializer
