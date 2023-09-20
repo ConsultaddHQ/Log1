@@ -12,97 +12,31 @@ from rest_framework_swagger.views import get_swagger_view
 from activity.views import CommentViewSet
 from attachment.views import AttachmentGetView, AttachmentView
 from ckiller.views import CkillerSubmissionViewSet
-from consultant.mobile_api import (
-    ConsultantAppViewSet,
-    ConsultantAuthViewSet,
-    ConsultantResetPasswordViewSet,
-)
-from consultant.views import (
-    ConsultantBenchViewSets,
-    ConsultantExitViewSets,
-    ConsultantFeedbackViewSet,
-    ConsultantImportViewSet,
-    ConsultantMarketingViewSets,
-    ConsultantPerformanceViewSet,
-    ConsultantPetitionAuthViewSet,
-    ConsultantPOCViewSets,
-    ConsultantProfileViewSets,
-    ConsultantV2ViewSets,
-    ConsultantViewSets,
-    WorkAuthViewSets,
-)
 from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
-from employee.views import (
-    AllUsersViewSet,
-    AssetsViewSets,
-    CertificateViewSets,
-    DefaultCalendarViewSets,
-    EmployeeAuthViewSets,
-    EmployeeViewSets,
-    HandoverViewSets,
-    LoginViewSet,
-    ResetPasswordViewSets,
-)
-from engineering.views import (
-    EngineeringTeamViewSet,
-    EngineeringViewSet,
-    EngineerReportViewSet,
-    ProjectSummaryViewSet,
-    ProjectUpdateViewSet,
-    TrainingAgendaViewSet,
-    TrainingCheckListViewSet,
-)
 from impersonate.views import ImpersonateViewSets
 from jd_parser.views import MarketingMailListViewSet
-from legal.views import PetitionDocsViewSets, PetitionViewSets
-from marketing.views import (
-    InterviewViewSets,
-    LeadViewSets,
-    MarketingAPIViewSet,
-    MarketingTeamViewSet,
-    QuestionViewSets,
-    SubmissionV2ViewSets,
-    SubmissionViewSets,
-    TestViewSets,
-    VendorCompanyViewSets,
-    VendorContactViewSets,
-    VendorLayerViewSets,
-)
-from messaging.views import ReceiveSMSViewSet, SMSViewSet
-from notification.views import (
-    ConsultantNotificationViewSet,
-    EmployeeNotificationViewSet,
-    FCMDeviceViewSet,
-)
-from project.mobile_api import (
-    ConsultantLeaveViewSet,
-    PayrollScheduleViewSet,
-    TimeSheetViewSet,
-    TimetrackEventMobileViewSet,
-)
-from project.views import (
-    ConsultantRevisionViewSet,
-    EngineeringProjectsViewSets,
-    FinanceTimeSheetViewSets,
-    LeaveManagementViewSets,
-    ProjectOrderViewSet,
-    ProjectSupportViewSet,
-    ProjectViewSets,
-    TimetrackEventViewSet,
-)
-from report.views import (
-    EngineeringReportViewSets,
-    EngineerReportXposedViewSets,
-    MarketingReportViewSets,
-    ScrumMeetingReport,
-    SlashCommandViewSets,
-)
-from utils_app.views import (
-    ChoiceViewSet,
-    CityViewSet,
-    TeamsTargetViewSet,
-    UtilityViewSet,
-)
+from legal.views import PetitionViewSets, PetitionDocsViewSets
+from messaging.views import SMSViewSet, ReceiveSMSViewSet
+from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
+from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
+    TimetrackEventMobileViewSet
+from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
+from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
+from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
+    EngineerReportXposedViewSets
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
+    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
+    ConsultantRevisionViewSet
+from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
+    TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet
+from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
+    AllUsersViewSet, HandoverViewSets, LoginViewSet, DefaultCalendarViewSets, CertificateViewSets
+from marketing.views import VendorCompanyViewSets, VendorContactViewSets, LeadViewSets, SubmissionViewSets, \
+    InterviewViewSets, VendorLayerViewSets, TestViewSets, SubmissionV2ViewSets, QuestionViewSets, MarketingTeamViewSet, \
+    MarketingAPIViewSet
+from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, ConsultantProfileViewSets, WorkAuthViewSets, \
+    ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
+    ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
 
 router = DefaultRouter()
 schema_view = get_swagger_view(title="Log1")

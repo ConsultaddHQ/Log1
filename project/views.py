@@ -638,6 +638,8 @@ class ProjectViewSets(ModelViewSet):
 
             project.city = request.data.get('city', project.city)
             project.rate = request.data.get('rate', project.rate)
+            if project.rate == "":
+                project.rate = 0
             project.duration = request.data.get('duration', project.duration)
             project.end_date = request.data.get('end_date', project.end_date)
             project.feedback = request.data.get('feedback', project.feedback)
@@ -684,12 +686,14 @@ class ProjectViewSets(ModelViewSet):
                     # Offer received message
                     desc = f"Purchase order status changed to Received"
                     util.send_receive_notification()
+                    activity_created = True
                     project.is_msg_sent = True
                     project.save()
 
                 # Project Joined
                 elif new_status == 'joined':
                     project.consultant.status = 'on_project'
+                    activity_created = True
                     project.consultant.save()
                     desc = f"PO status changed to Joined and Timesheet APP access mail is sent to consultant"
                     if marketing.status == 'open':
@@ -714,6 +718,7 @@ class ProjectViewSets(ModelViewSet):
                     marketing.status = 'open'
                     marketing.save()
                     project.support.update(end=datetime.now())
+                    activity_created = True
                     desc = f"Purchase order status changed to Cancelled and cancellation mail is sent"
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Cancelled', request)
                     po_status = project_status_obj.get_status_display()
@@ -724,6 +729,7 @@ class ProjectViewSets(ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
+                    activity_created = True
                     desc = f"Purchase order status changed to Terminated and termination mail is sent"
                     po_status = project_status_obj.get_status_display()
                     resp, err = self.po_end_mail(project, scrum_masters, 'PO Terminated', request)
@@ -734,6 +740,7 @@ class ProjectViewSets(ModelViewSet):
                     project.consultant.status = 'on_bench'
                     project.consultant.save()
                     project.support.update(end=datetime.now())
+                    activity_created = True
                     desc = f"Purchase order status changed to Complete"
                     resp, err = self.po_end_mail(project, scrum_masters, 'project completed', request)
                     util.send_completion_notification()
@@ -742,14 +749,14 @@ class ProjectViewSets(ModelViewSet):
 
             # Activity
             if prev_rate != project.rate:
-                desc = f"Purchase order rate is updated"
-                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
                 activity_created = True
+                desc = f"Purchase order rate update form {prev_rate} to {prev_rate}"
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             if str(prev_start_date) != str(project.start_date):
-                desc = f"Purchase order start_date is updated"
-                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
                 activity_created = True
+                desc = f"Purchase order start_date is updated form {prev_start_date} to {prev_start_date}"
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             if not activity_created:
                 desc = f"Purchase order is updated"
@@ -1341,11 +1348,17 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} employer " \
                        f"changed to {request.data.get('value')} by {request.user.employee_name}"
 
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
+
             elif request.data.get('field') == 'end_date':
                 effective_date = project.end_date
                 project.end_date = request.data.get('value')
                 desc = f"Project {project.submission.consultant.name} :: {project.submission.client} extended to " \
                        f"{request.data.get('value')} by {request.user.employee_name}"
+
+                # Activity
+                create_activity(project.submission.id, 'submission', request.user, desc, 'updated')
 
             order = ProjectOrder.objects.create(
                 field=request.data.get('field'), value=request.data.get('value'),
@@ -1559,6 +1572,7 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
         consultant_id = request.GET.get('consultant', None)
         project_type = request.GET.get('project_type', None)
         timesheet_status = request.GET.get('timesheet_status', None)
+        approval_required = request.GET.get('approval_required', False)
 
         try:
             result = []
@@ -1599,6 +1613,9 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
                 .values_list('consultant_id', flat=True)
 
             consultants = Consultant.objects.filter(id__in=consultant_ids)
+
+            if approval_required == 'true':
+                consultants = consultants.filter(approval_required=True)
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -1919,10 +1936,16 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             target_content_type = ContentType.objects.get(model='leave')
             recipient_content_type = ContentType.objects.get(model='consultant')
 
-            if prev_status == 'pending' and request.data['status'] == 'approved':
+            title = None
+            if prev_status in ['Pending 1st Level', 'Rejected 1st Level'] and request.data['status'] == 'approved':
                 title = f"Leave initial level approval granted from {request.user.employee_name}"
-            else:
-                title = f"Leave {leave.status} for date {leave.from_date}"
+            elif leave_status in ['rejected_1st_level', 'rejected']:
+                title = f"Leave rejected for date {leave.from_date}"
+            elif leave_status == 'approved':
+                title = f"Leave approved for date {leave.from_date}"
+
+            if not title:
+                return Response({"message": "Leave updated successfully"}, status=202)
 
             Notification.objects.create(
                 category="info", recipient_content_type=recipient_content_type,
