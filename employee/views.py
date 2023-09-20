@@ -3,6 +3,8 @@ from itertools import chain
 from datetime import timedelta, datetime
 
 from dateutil import tz
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.mixins import *
 from rest_framework import exceptions
@@ -11,6 +13,7 @@ from django.db.models.functions import Lower
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from rest_framework.authtoken.models import Token
+from django.core.exceptions import ValidationError
 from django.db.models import Q, F, Value, CharField
 from django.contrib.auth.hashers import make_password
 from rest_framework.permissions import IsAuthenticated
@@ -377,6 +380,7 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
                 user = get_object_or_404(User, id=user_id)
                 if account_login is not None:
                     user.account_login = account_login
+                    user.is_active = account_login
                     user.save()
                 else:
                     return Response({"message": "Parameter is not correct", "error": str(account_login)},
