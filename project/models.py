@@ -13,7 +13,7 @@ from utils_app.models import TimeStampedModel, Choice
 
 FEEDBACK_CHOICES = (
     ('cfr', 'CFR'),
-    ("monthly","Monthly")
+    ("monthly", "Monthly"),
     ('green_card', 'Green Card'),
     ('independent', 'Independent'),
     ('pre_joining', 'Pre Joining'),
