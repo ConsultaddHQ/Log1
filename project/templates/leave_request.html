@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html
+   lang="en"
+   xmlns="http://www.w3.org/1999/xhtml"
+   xmlns:o="urn:schemas-microsoft-com:office:office"
+   >
+   <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+      <meta name="x-apple-disable-message-reformatting" />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+      <link
+         href="https://fonts.googleapis.com/css2?family=sans-serif:wght@100;200;300;400;500;600;700;800;900&display=swap"
+         rel="stylesheet"
+         />
+      <style>
+         * {
+         font-family: sans-serif, "sans-serif";
+         margin: 0;
+         padding: 0;
+         }
+         .boldSpan{
+         color: #384860;
+         /* Paragraph /  Medium / Semibold */
+         font-family: sans-serif;
+         font-size: 16px;
+         font-style: normal;
+         font-weight: 600;
+         line-height: 24px;
+         }
+         .footerStyle{
+         display: flex;
+         padding: 40px;
+         flex-direction: column;
+         align-items: center;
+         gap: 16px;
+         align-self: stretch;
+         }
+         .footerText{
+         font-family: sans-serif;
+         font-size: 14px;
+         font-style: normal;
+         font-weight: 500;
+         line-height: 20px; color:  #9A9CB0;
+         text-align: center; align-self: stretch;
+         }
+      </style>
+   </head>
+   <body style="margin: 0; padding: 0">
+      <table
+         role="presentation"
+         style="
+         border-collapse: collapse;
+         border-spacing: 0;
+         background-image: linear-gradient(#F1F3FA 50%, #fff 50%);
+         margin: auto;
+         width: 648px;
+         height: 304px;
+         "
+         >
+         <tr>
+            <td align="center" style="padding: 0 40px 100px 40px">
+               <table
+                  role="presentation"
+                  style="
+                  border-collapse: collapse;
+                  border-spacing: 0;
+                  width: fit-content;
+                  "
+                  >
+                  <!-- Insert logo here -->
+                  <tr>
+                     <td align="center" style="padding: 40px 0">
+                        <a href={{url}} target="_blank" style="text-decoration: none">
+                        <img
+                           height="32px"
+                           src="https://i.ibb.co/rp8xQvg/Group-1.png"
+                           />
+                        </a>
+                     </td>
+                  </tr>
+                  <!-- Card starts here -->
+                  <tr>
+                     <td>
+                        <table
+                           role="presentation"
+                           style="
+                           display: flex;
+padding: 40px;
+flex-direction: column;
+align-items: flex-start;
+gap: 64px;
+                           background: #fff;
+                           border-radius: 24px;
+border: 8px solid rgba(215, 221, 250, 0.20);
+                           "
+                           >
+                           <tr>
+                              <td>
+                                 <p
+                                    style="
+                                    font-size: 32px;
+                                    margin: 0;
+                                    font-weight: 700;
+                                    line-height: 44px;
+                                    color: #1b1c20;
+                                    "
+                                    >
+                                    Leave approval
+                                 </p><br>
+                              </td>
+                           </tr>
+                           <tr>
+                              <td>
+                                 <p style="font-family: sans-serif;
+                                    font-family: sans-serif;
+                                    font-size: 16px;
+                                    font-style: normal;
+                                    font-weight: 400;
+                                    line-height: 24px;
+                                    color: #384860;
+                                    ">
+                                    Greetings Siddharth,<br><br> We would like to inform you that Consultant <span class="boldSpan">{{consultant_name}}</span> has submitted a leave request for a duration of <span class="boldSpan">{{hours}} hours</span> from <span class="boldSpan">{{start_date}} to {{end_date}}</span>. To review it, please click the button below to be redirected to the LOG1 App. <br><br> Best Regards,<br>The Product Team
+                                 </p>
+                              </td>
+                           </tr>
+                           <tr>
+                              <td>
+                                 <table role="presentation" style="border-spacing: 0 8px; width: 100%;">
+                                     <tr style="display: flex;
+flex-direction: column;
+align-items: flex-start;
+gap: 64px;"><td></td></tr>
+                                    <tr>
+                                       <td>
+                                          <button style="display: flex;
+                                             padding: 12px 24px;
+                                             justify-content: center;
+                                             align-items: center;
+                                             gap: 8px;
+                                             border-radius: 8px;
+                                             background: #26305C;
+                                             border: none"><a style="cursor:default; color:#FFF;
+                                             /* Paragraph/Medium/Medium */
+                                             font-family: sans-serif;
+                                             font-size: 16px;
+                                             font-style: normal;
+                                             font-weight: 500;
+                                             line-height: 24px; /* 150% */ text-decoration: none" href={{url}} target="_blank">Go to Log1</a></button>
+                                       </td>
+                                    </tr>
+                                  <!--  <tr>
+                                       <td style="display: flex;
+                                          flex-direction: column;
+                                          align-items: flex-start;
+                                          gap: 32px;"></td>
+                                    </tr>
+                                    <tr style="display: flex;
+                                       flex-direction: column;
+                                       align-items: flex-start;
+                                       gap: 32px;"></tr>
+                                    <tr style="display: flex;
+                                       align-items: flex-start;
+                                       gap: 18px;">
+                                       <td>
+                                          <button id="approve" style="display: flex;
+                                             padding: 12px 24px;
+                                             justify-content: center;
+                                             align-items: center;
+                                             gap: 8px;
+                                             border-radius: 8px;
+                                             background: #14882F;
+                                             border: none"><a style="
+                                             cursor:default;
+                                             color: #FFF;
+                                             /* Paragraph/Medium/Medium */
+                                             font-family: sans-serif;
+                                             font-size: 16px;
+                                             font-style: normal;
+                                             font-weight: 500;
+                                             line-height: 24px; /* 150% */ text-decoration: none" href={{url}} target="_blank">Approve</a></button>
+                                       </td>
+                                       <td style="padding-left: 10px;">
+                                          <button style="display: flex;
+                                             padding: 12px 24px;
+                                             justify-content: center;
+                                             align-items: center;
+                                             gap: 8px;
+                                             border-radius: 8px;
+                                             border: 1px solid #EF4444;
+                                             background: #FFF;"><a style="
+                                             cursor:default;
+                                             color: #EF4444;
+                                             /* Paragraph/Medium/Medium */
+                                             font-family: sans-serif;
+                                             font-size: 16px;
+                                             font-style: normal;
+                                             font-weight: 500;
+                                             line-height: 24px; /* 150% */text-decoration: none" href={{url}} target="_blank">Reject</a></button>
+                                       </td>
+                                    </tr>
+                                    -->
+                                 </table>
+                              </td>
+                           </tr>
+                        </table>
+                     </td>
+                  </tr>
+                  <!-- Card ends here -->
+               </table>
+            </td>
+         </tr>
+         <!-- Footer starts here -->
+         <tr>
+            <td style="background: #F9FAFB; padding: 20px 0; width: 100%">
+               <table
+                  role="presentation"
+                  style="padding: 0 40px; border-spacing: 0 15px; width: 100%"
+                  >
+                  <tr style="text-align: center;">
+                     <!-- Insert logo here -->
+                     <td>
+                        <a href={{url}} target="_blank" style="text-decoration: none">
+                        <img
+                           height="32px"
+                           src="https://i.ibb.co/rp8xQvg/Group-1.png"
+                           alt="logo"
+                           />
+                        </a>
+                     </td>
+                  </tr>
+                  <tr style="width: 568px;
+                     height: 1px;background: #EAEBF2;">
+                     <td></td>
+                  </tr>
+                  <tr>
+                     <td>
+                        <!-- Insert icons here -->
+                        <p class="footerText">
+                           © 2019 Log1. All rights reserved.
+                        </p>
+                        <br>
+                        <p class="footerText">
+                           Consultadd Inc.<br>110 Wall Street., New York City,NY, 10005
+                        </p>
+                     </td>
+                  </tr>
+                  <!-- T & C container starts here -->
+                  </td>
+                  </tr>
+                  <!-- Footer ends here -->
+               </table>
+            </td>
+         </tr>
+      </table>
+   </body>
+</html>

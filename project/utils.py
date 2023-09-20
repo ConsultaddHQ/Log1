@@ -7,8 +7,8 @@ from django.shortcuts import get_object_or_404
 
 from constance import config
 from employee.models import User
-from utils_app.models import Choice
 from consultant.models import Consultant
+from utils_app.models import Choice, City
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from utils_app.mailing import send_email as mail
@@ -118,8 +118,6 @@ def get_project_check_list(project):
     msa, work_order, offer_letter = 0, 0, 0
 
     if project.submission.get_work_type_display() != 'C2C':
-        if project.attachments.filter(attachment_type='offer_letter'):
-            offer_letter = 1
         result = get_attachment_status(project)
 
         return {
@@ -208,11 +206,17 @@ def create_notification_and_send_push(timesheet, request, category):
     target_content_type = ContentType.objects.get(model='timesheet')
     recipient_content_type = ContentType.objects.get(model='consultant')
 
+    work_type = timesheet.project.submission.work_type
+    if work_type == "c2c":
+        action = "Timesheet"
+    else:
+        action = "Paystubs"
+
     if timesheet.remark or len(timesheet.remark) != 0:
-        title = f"Timesheet {category} for week end {str(timesheet.end)} for client " \
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
                 f"{timesheet.project.submission.client} \n Remark: {timesheet.remark}"
     else:
-        title = f"Timesheet {category} for week end {str(timesheet.end)} for client " \
+        title = f"{action} {category} for week end {str(timesheet.end)} for client " \
                 f"{timesheet.project.submission.client}"
 
     Notification.objects.create(
@@ -266,12 +270,21 @@ class ProjectUtil:
             total_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one
             ).count()
+            w2_count = Project.objects.filter(
+                statuses__status=project_status, statuses__created__gte=day_one,
+                submission__work_type__in = ["w2","full_time"]
+            ).count()
+            c2c_count = Project.objects.filter(
+                statuses__status=project_status, statuses__created__gte=day_one,
+                submission__work_type="c2c"
+
+            ).count()
             team_count = Project.objects.filter(
                 statuses__status=project_status,
                 statuses__created__gte=day_one,
                 submission__marketing_team=team,
             ).count()
-            return total_count, team_count, team.name
+            return total_count, team_count, team.name, w2_count, c2c_count
         except Exception as error:
             write_exception(message=error, request=self.request)
 
@@ -295,7 +308,7 @@ class ProjectUtil:
         try:
             recruiter_name = "NA"
             recruiter = self.consultant.recruiter
-            total, team_count, team = self.fetch_project_count("joined")
+            total, team_count, team, w2_count, c2c_count = self.fetch_project_count("joined")
             # team_name = self.project.submission.created_by.team.name
             if recruiter:
                 recruiter_name = self.consultant.recruiter.employee_name
@@ -329,8 +342,8 @@ class ProjectUtil:
             if recruiter:
                 recruiter_name = f"<@{recruiter.slack_id}>" if recruiter.slack_id else recruiter.employee_name
 
-            total, team_count, team = self.fetch_project_count("received")
-            interviews = self.project.submission.screening.exclude(status='cancelled')
+            total, team_count, team, w2_count, c2c_count = self.fetch_project_count("received")
+            interviews = self.project.submission.screening.exclude(status='cancelled').order_by('-created')
             supervisors = ", ".join([f"Round {interview.round} - <@{interview.supervisor.slack_id}>"
                                      if interview.supervisor.slack_id else interview.supervisor.employee_name
                                     if interview.supervisor.employee_id != 9999
@@ -343,7 +356,8 @@ class ProjectUtil:
                 "city": self.project.city, "supervisors": supervisors,  "project_id": self.project.id,
                 "activity_text": self.activity_text, "total": total, "employer": self.employer, "team": team,
                 "recruiter_name": recruiter_name, "project_start": self.project_start, "team_count": team_count,
-                "submission_id": self.project.submission.id, "job_title": self.project.submission.lead.job_title,
+                "project_type":self.project.submission.get_work_type_display(), "submission_id": self.project.submission.id,
+                "job_title": self.project.submission.lead.job_title,"w2_count":w2_count, "c2c_count":c2c_count
             }
             slack.po_receive_message_card(payload, self.request)
 
@@ -628,3 +642,13 @@ def timesheet_submission_mail(obj, request=None):
     except Exception as error:
         write_exception(error, request)
         return None
+
+
+def get_country(city):
+    city_obj = None
+    if city:
+        split_city = city.split(",")
+        city_obj = City.objects.filter(
+            name=split_city[0], state=split_city[1]
+        )
+    return city_obj.first().country if city_obj else None

@@ -50,9 +50,9 @@ class Command(BaseCommand):
                 data = {
                     "title": "project update due",
                     "category": "alert",
-                    "description": f"your {support_person.project.consultant.name} updates were not given for last weeks",
-                    "target_type": "user",
-                    "target_id": support_person.support.id,
+                    "description": f"Your {support_person.project.submission.client} updates were not given for last weeks",
+                    "target_type": "projectupdate",
+                    "target_id": support_person.project.id,
                     "sender_id": support_person.support.id,
                     "recipient_user_type": "user",
                     "sender_user_type": "user",
@@ -70,7 +70,7 @@ class Command(BaseCommand):
                         'is_read': False,
                         'is_deleted': False,
                         'target': 'log1',
-                        'target_id':support_person.support.id,
+                        'target_id': support_person.project.id,
                         'timestamp': str(timezone.now()),
                     },
                 }
