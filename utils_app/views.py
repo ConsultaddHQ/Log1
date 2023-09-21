@@ -67,7 +67,7 @@ class ChoiceViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
     def list(self, request, *args, **kwargs):
         try:
             field = request.GET.get('field', None)
-            model = request.GET.get('"na"', None)
+            model = request.GET.get('model', None)
             queryset = self.queryset.filter(field=field) if field else self.queryset
             if model:
                 content_type = ContentType.objects.get(model=model)
