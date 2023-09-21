@@ -292,6 +292,16 @@ class ConsultantViewSets(ModelViewSet):
         if not ('superadmin' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         data = request.data
+        mandatory_fields = {'name', 'email', 'country', 'current_city', 'recruiter', 'ssn', 'skills', 'gender',
+                            'phone_no', 'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'payroll_employer',
+                            'employer_start_date', 'marital_status'}
+        missing_fields =[]
+        for mandatory_field in mandatory_fields:
+            if not (mandatory_field in data and data[mandatory_field] not in [None, '']):
+                missing_fields.append(mandatory_field)
+        error_string = ', '.join(field for field in missing_fields)
+        if error_string:
+            return Response({'message': f'{error_string} {"is" if len(missing_fields)==1 else "are"} mandatory.'}, status=400)
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
             return Response({"message": "Consultant Already Exist"}, status=400)
@@ -310,7 +320,7 @@ class ConsultantViewSets(ModelViewSet):
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
-                marital_status=request.data.get('marital_status', None),
+                marital_status=data['marital_status'],
                 internal_employee=request.data.get('internal_employee', False)
             )
             if consultant.current_city:
