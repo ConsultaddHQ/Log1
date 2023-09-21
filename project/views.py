@@ -956,8 +956,8 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
             payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
-            payment_term.payment_term = request.data.get("company_payment_term"),
-            payment_term.consultant_payment_term = request.data.get("consultant_payment_term"),
+            payment_term.payment_term = request.data.get("company_payment_term")
+            payment_term.consultant_payment_term = request.data.get("consultant_payment_term")
             payment_term.payment_term_type = request.data.get("payment_term_type")
             payment_term.comment = request.data.get("comment")
             payment_term.save()
