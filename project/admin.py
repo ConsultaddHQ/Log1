@@ -113,4 +113,4 @@ class ProjectPaymentTermAdmin(ExportActionModelAdmin):
     actions = ["export_as_csv"]
     list_filter = ('payment_term_type',)
     search_fields = ('id', 'project__consultant__name', 'project__id')
-    list_display = ('id', 'payment_term', 'payment_term_type', 'comment', 'project')
+    list_display = ('id', 'consultant_payment_term', 'payment_term', 'payment_term_type', 'comment', 'project')
