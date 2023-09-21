@@ -160,13 +160,13 @@ SWAGGER_SETTINGS = {
         "apiKeyAuth": {
             "type": "apiKey",
             "in": "header",
-            "name": "Token Authentication"
+            "name": "Authorization"
         }
     },
 
     "api_key": '',
     "is_superuser": False,
-    'USE_SESSION_AUTH': True,
+    'USE_SESSION_AUTH': False,
     "is_authenticated": True,
 }
 
