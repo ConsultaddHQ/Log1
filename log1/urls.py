@@ -38,7 +38,7 @@ from consultant.views import ConsultantBenchViewSets, ConsultantViewSets, Consul
     ConsultantPOCViewSets, ConsultantMarketingViewSets, ConsultantPetitionAuthViewSet, ConsultantExitViewSets, \
     ConsultantImportViewSet, ConsultantV2ViewSets, ConsultantFeedbackViewSet, ConsultantPerformanceViewSet
 from .swagger import urlpatterns as swagger_urls
-from tracking.views import TrackingViewSets
+
 router = DefaultRouter()
 schema_view = get_swagger_view(title="Log1")
 
