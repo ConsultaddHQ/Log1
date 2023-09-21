@@ -1887,6 +1887,7 @@ class InterviewViewSets(ModelViewSet):
                         booking_res = 'booked'
                         interview.save()
                     except Exception as error:
+                        write_exception(str(error), request)
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
                 else:
                     try:
@@ -1900,8 +1901,10 @@ class InterviewViewSets(ModelViewSet):
                             booking_res = 'booked'
                             interview.save()
                         if msg == 'error':
+                            write_exception(res, request)
                             return Response({"message": "Calendar reschedule failed", "error": res}, status=400)
                     except Exception as error:
+                        write_exception(str(error), request)
                         return Response({"message": "Calendar reschedule failed", "error": str(error)}, status=400)
 
                 # Activity
