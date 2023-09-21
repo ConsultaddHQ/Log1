@@ -17,17 +17,19 @@ from constance import config
 from employee.models import User
 from attachment.models import Attachment
 from consultant.models import Consultant
+# from finance.models import TimeSheet, TimesheetRequest, ConsultantLeave, TimetrackEvent, TimetrackEventFeedback, Leave
+from finance.serializers import TimetrackEventSerializer, LeaveSerializer
 from utils_app.thred_mail import send_email, send_email_attachment_multiple
 from utils_app.aws_utils import get_s3_object, download_s3_object
 from log1.utils import write_exception, ERROR_MSG
 from consultant.permissions import ConsultantIsAuthenticated
 from consultant.authentication import ConsultantTokenAuthentication
 from notification.utils import create_notification, push_notification
-from project.utils import check_days, mark_in_active, timesheet_submission_mail
-from project.models import Project, TimeSheet, PayrollSchedule, ProjectStatus, ConsultantLeave, Leave, TimesheetRequest, \
-    TimetrackEvent, TimetrackEventFeedback
+from project.utils import check_days, mark_in_active
+from project.models import Project, TimeSheet, TimesheetRequest, ConsultantLeave, TimetrackEvent, \
+    TimetrackEventFeedback, Leave, PayrollSchedule
 from project.serializers import TimeSheetSerializer, PayrollScheduleSerializer, ProjectTimeSheetSerializer, \
-    ConsultantLeaveSerializer, LeaveSerializer, TimetrackEventSerializer
+    ConsultantLeaveSerializer
 
 
 # Route - /payroll/
@@ -649,6 +651,7 @@ class ConsultantLeaveViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
             return Response({"error": str(error)}, status=400)
 
 
+# Route - /event/
 class TimetrackEventMobileViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin):
     queryset = TimetrackEvent.objects.all()
     serializer_class = TimetrackEventSerializer

@@ -60,6 +60,7 @@ PROJECT_APPS = [
     'engineering.apps.EngineeringConfig',
     'dashboard.apps.DashboardConfig',
     'tracking.apps.TrackingConfig',
+    'finance.apps.FinanceConfig',
 ]
 
 INSTALLED_APPS = INSTALLED_APPS + THIRD_PARTY_APPS + PROJECT_APPS

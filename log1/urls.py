@@ -10,12 +10,10 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_swagger.views import get_swagger_view
 
 from activity.views import CommentViewSet
-<<<<<<< Updated upstream
-from attachment.views import AttachmentGetView, AttachmentView
-=======
-from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSet
+from attachment.views import AttachmentView, AttachmentGetView
+from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSets, \
+    TimetrackEventViewSet, ConsultantRevisionViewSet
 from impersonate.views import ImpersonateViewSets
->>>>>>> Stashed changes
 from ckiller.views import CkillerSubmissionViewSet
 from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from impersonate.views import ImpersonateViewSets
@@ -30,12 +28,7 @@ from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, C
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
     EngineerReportXposedViewSets
 from project.views import ProjectViewSets, EngineeringProjectsViewSets, \
-    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
-<<<<<<< Updated upstream
-    ConsultantRevisionViewSet
-=======
-    ConsultantRevisionViewSet, ProjectPaymentTermViewSet,FinanceTimeSheetViewSets
->>>>>>> Stashed changes
+    ProjectOrderViewSet, ProjectSupportViewSet, ProjectPaymentTermViewSet
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
     TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
@@ -88,10 +81,8 @@ router.register(r"vendor_company", VendorCompanyViewSets)
 router.register(r"vendor_contact", VendorContactViewSets)
 router.register(r"marketing_team", MarketingTeamViewSet)
 
-<<<<<<< Updated upstream
-=======
 router.register(r'project', ProjectViewSets)
-router.register(r'finance', FinanceTimeSheetViewSets)
+# router.register(r'finance', FinanceTimeSheetViewSets)
 router.register(r'project_order', ProjectOrderViewSet)
 router.register(r'eng_team', EngineeringTeamViewSet)
 router.register(r'engineer_report', EngineerReportViewSet)
@@ -106,27 +97,8 @@ router.register(r'project/(?P<project_id>[0-9]+)/training', TrainingAgendaViewSe
 router.register(r'project/(?P<project_id>[0-9]+)/checklist', TrainingCheckListViewSet)
 # router.register(r'finance/(?P<consultant_id>[0-9]+)/leave', LeaveManagementViewSets)
 router.register(r'engineer_detail', MarketingAPIViewSet)
->>>>>>> Stashed changes
 
 router.register(r"m_mail", MarketingMailListViewSet)
-
-
-router.register(r"project", ProjectViewSets)
-router.register(r"finance", FinanceTimeSheetViewSets)
-router.register(r"project_order", ProjectOrderViewSet)
-router.register(r"eng_team", EngineeringTeamViewSet)
-router.register(r"engineer_report", EngineerReportViewSet)
-router.register(r"timesheet_event", TimetrackEventViewSet)
-router.register(r"eng_project", EngineeringProjectsViewSets)
-router.register(r"rate_revision", ConsultantRevisionViewSet)
-router.register(r"project/(?P<project_id>[0-9]+)/updates", ProjectUpdateViewSet)
-router.register(r"project/(?P<project_id>[0-9]+)/support", ProjectSupportViewSet)
-router.register(r"project/(?P<project_id>[0-9]+)/summary", ProjectSummaryViewSet)
-router.register(r"project/(?P<project_id>[0-9]+)/training", TrainingAgendaViewSet)
-router.register(r"project/(?P<project_id>[0-9]+)/checklist", TrainingCheckListViewSet)
-router.register(r"finance/(?P<consultant_id>[0-9]+)/leave", LeaveManagementViewSets)
-router.register(r"engineer_detail", MarketingAPIViewSet)
-
 router.register(r"city", CityViewSet)
 router.register(r"choice", ChoiceViewSet)
 
@@ -172,7 +144,7 @@ router.register(r"consultant_petition", ConsultantPetitionAuthViewSet)
 # finance App routes
 router.register(r'finance_leave', FinanceLeaveViewSets)    #FinLeaveViewSets
 router.register(r'finance_payStubs', FinancePayStubsViewSets)    #FinStubsViewSets
-# router.register(r'finance_timesheet', FinanceTimeSheetViewSets)
+router.register(r'finance_timesheet', FinanceTimeSheetViewSets)
 
 # Twilio messaging app routes
 router.register(r"twilio", SMSViewSet)
