@@ -267,6 +267,7 @@ logging_conf = {
         }
     }
 }
+logging.config.dictConfig(logging_conf)
 
 # Celery settings
 CELERY_TASK_SERIALIZER = 'json'
