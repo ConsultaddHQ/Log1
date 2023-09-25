@@ -938,10 +938,10 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
 
             ProjectPaymentTerm.objects.create(
                 payment_term=100 if request.data.get("payment_term_type",
-                                                     None) == '100% To Company' else request.data.get(
+                                                     None) == '100%_to_company' else request.data.get(
                     "payment_term", None),
                 consultant_payment_term=100 if request.data.get("payment_term_type",
-                                                                None) == '100% To Consultant' else request.data.get(
+                                                                None) == '100%_to_consultant' else request.data.get(
                     "consultant_payment_term", None),
                 payment_term_type=request.data.get("payment_term_type", None),
                 comment=request.data.get("comment", None),
@@ -960,12 +960,15 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
             payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
-            payment_term.payment_term = 100 if request.data.get("payment_term_type",
-                                                   None) == '100% To Company' else request.data.get(
-                "payment_term", None),
-            payment_term.consultant_payment_term = 100 if request.data.get("payment_term_type",
-                                                              None) == '100% To Consultant' else request.data.get(
-                "consultant_payment_term", None),
+            if request.data.get("payment_term_type") == '100%_to_company':
+                payment_term.payment_term = 100
+                payment_term.consultant_payment_term = 0
+            elif request.data.get("payment_term_type") == '100%_to_consultant':
+                payment_term.consultant_payment_term = 100
+                payment_term.payment_term = 0
+            else:
+                payment_term.payment_term = request.data.get("payment_term")
+                payment_term.consultant_payment_term = request.data.get("consultant_payment_term")
             payment_term.payment_term_type = request.data.get("payment_term_type")
             payment_term.comment = request.data.get("comment")
             payment_term.save()
