@@ -11,6 +11,7 @@ from rest_framework_swagger.views import get_swagger_view
 
 from activity.views import CommentViewSet
 from attachment.views import AttachmentGetView, AttachmentView
+from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSet
 from ckiller.views import CkillerSubmissionViewSet
 from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from impersonate.views import ImpersonateViewSets
@@ -24,9 +25,9 @@ from notification.views import EmployeeNotificationViewSet, ConsultantNotificati
 from consultant.mobile_api import ConsultantAuthViewSet, ConsultantAppViewSet, ConsultantResetPasswordViewSet
 from report.views import ScrumMeetingReport, SlashCommandViewSets, EngineeringReportViewSets, MarketingReportViewSets, \
     EngineerReportXposedViewSets
-from project.views import ProjectViewSets, EngineeringProjectsViewSets, FinanceTimeSheetViewSets, \
-    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet, \
-    ConsultantRevisionViewSet, ProjectPaymentTermViewSet
+from project.views import ProjectViewSets, EngineeringProjectsViewSets, \
+    ProjectOrderViewSet, ProjectSupportViewSet, LeaveManagementViewSets, TimetrackEventViewSet,\
+    ConsultantRevisionViewSet, ProjectPaymentTermViewSet,FinanceTimeSheetViewSets
 from engineering.views import EngineeringViewSet, ProjectUpdateViewSet, ProjectSummaryViewSet, TrainingAgendaViewSet, \
     TrainingCheckListViewSet, EngineerReportViewSet, EngineeringTeamViewSet
 from employee.views import EmployeeAuthViewSets, EmployeeViewSets, AssetsViewSets, ResetPasswordViewSets, \
@@ -79,10 +80,7 @@ router.register(r"vendor_company", VendorCompanyViewSets)
 router.register(r"vendor_contact", VendorContactViewSets)
 router.register(r"marketing_team", MarketingTeamViewSet)
 
-
 router.register(r"m_mail", MarketingMailListViewSet)
-
-
 router.register(r"project", ProjectViewSets)
 router.register(r"finance", FinanceTimeSheetViewSets)
 router.register(r"project_order", ProjectOrderViewSet)
@@ -141,6 +139,11 @@ router.register(r"util", TeamsTargetViewSet)
 router.register(r"petition", PetitionViewSets)
 router.register(r"petition_docs", PetitionDocsViewSets)
 router.register(r"consultant_petition", ConsultantPetitionAuthViewSet)
+
+# finance App routes
+router.register(r'finance_leave', FinanceLeaveViewSets)    #FinLeaveViewSets
+router.register(r'finance_payStubs', FinancePayStubsViewSets)    #FinStubsViewSets
+router.register(r'finance_timesheet', FinanceTimeSheetViewSet)  #FintimeViewSet
 
 # Twilio messaging app routes
 router.register(r"twilio", SMSViewSet)
