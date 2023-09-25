@@ -143,7 +143,7 @@ router.register(r"consultant_petition", ConsultantPetitionAuthViewSet)
 # finance App routes
 router.register(r'finance_leave', FinanceLeaveViewSets)    #FinLeaveViewSets
 router.register(r'finance_payStubs', FinancePayStubsViewSets)    #FinStubsViewSets
-# router.register(r'finance_timesheet', FinanceTimeSheetViewSets)
+router.register(r'finance_timesheet', FinanceTimeSheetViewSet)  #FintimeViewSet
 
 # Twilio messaging app routes
 router.register(r"twilio", SMSViewSet)

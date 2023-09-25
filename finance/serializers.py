@@ -1,10 +1,7 @@
-
 from rest_framework import serializers
-
-# from finance.models import TimetrackEvent, TimeSheet, Leave, TimesheetRequest
 from utils_app.aws_utils import get_s3_object
-from project.models import Project, TimetrackEvent, TimeSheet, Leave, TimesheetRequest
 from attachment.serializers import AttachmentURLSerializer
+from project.models import Project, TimetrackEvent, TimeSheet, Leave, TimesheetRequest
 
 
 class FinanceSerializer(serializers.ModelSerializer):
