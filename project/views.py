@@ -903,7 +903,7 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                     project__submission__consultant_marketing__consultant__name__istartswith=query)
 
             serializer = ProjectPaymentTermSerializer(queryset[first:last], many=True)
-            return Response({"data": serializer.data, "count": len(serializer.data)}, status=status.HTTP_200_OK)
+            return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
