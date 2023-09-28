@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, date
 
 from django.utils import timezone
@@ -157,8 +158,8 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
             project_qs = project_qs.annotate(
                 custom_status=Case(
-                    When(statuses__status="pending", then=Value("1_pending")),
-                    When(statuses__status="updated", then=Value("2_updated")),
+                    When(statuses__status="updated", then=Value("1_pending")),
+                    When(statuses__status="pending", then=Value("2_updated")),
                     When(statuses__status="rejected", then=Value("3_rejected")),
                     When(statuses__status="approved", then=Value("4_approved")),
                     default=Value("5_other"),
@@ -224,8 +225,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 if 'pending' in timesheet_status:
                     timesheet_status.remove('pending')
                     timesheet_status.apppned(['submitted', 'updated'])
-                paystub_qs = timesheet_qs.filter(
-                    statuses__status__in=timesheet_status)
+                timesheet_qs = timesheet_qs.filter(status__in=timesheet_status)
             else:
                 timesheet_qs = timesheet_qs.exclude(status='draft')
 
@@ -245,15 +245,19 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             total = timesheet_qs.count()
             serializer = FinanceDetailSerializer(timesheet_qs[first:last], many=True)
 
-            project = Project.objects.get(id=project_id);
+            project = Project.objects.get(id=project_id)
 
             data = {
                 "project":{
                     'id': project.id,
                     'employer': project.employer,
+                    'consultant_name':project.consultant.name,
+                    'consultant_email':project.consultant.email,
+                    'timesheet_frequency':project.timesheet_frequency,
                     'status': "terminated" if project.statuses.filter(status__istartswith='terminated') else project.status,
                     'start_date': project.start_date,
                     'submission': {
+                        'consultant':project.submission.consultant.name,
                         'client': project.submission.client,
                         'vendor': project.submission.lead.vendor_company.name,
                         'work_type': project.submission.get_work_type_display(),
@@ -272,8 +276,8 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         try:
             query = request.GET.get('query', '')
             end_date = request.GET.get('end', '')
-            vendor = request.GET.get('vendor', '')
-            client = request.GET.get('client', '')
+            vendor = request.GET.get('vendor', [])
+            client = request.GET.get('client', [])
             start_date = request.GET.get('start', '')
             project_status = request.GET.get('project_status', [])
             timesheet_status = request.GET.get('timesheet_status', [])
@@ -290,22 +294,23 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             ).order_by('id').distinct('id')
 
             if client:
-                project_qs = project_qs.filter(submission__istartswith=client)
+                project_qs = project_qs.filter(submission__client__in=client)
 
             if vendor:
-                project_qs = project_qs.filter(submission__lead__vendor_company__name__istartsswith=vendor)
+                project_qs = project_qs.filter(submission__lead__vendor_company__in=vendor)
 
             if project_status:
                 if 'terminated' in project_status:
-                    project_status.apppned(terminated_status)
+                    project_status.append(terminated_status)
                 project_qs = project_qs.filter(
-                        statuses__status__in=terminated_status + ['joined', 'complete'] )
+                        statuses__status__in=project_status,statuses__is_current=True)
+
             if timesheet_status:
                 if 'pending' in timesheet_status:
                     timesheet_status.remove('pending')
-                    timesheet_status.apppned(['submitted','updated'])
+                    timesheet_status.append(['submitted','updated'])
                 project_qs = project_qs.filter(
-                    statuses__status__in=timesheet_status)
+                    timesheets__status__in=timesheet_status)
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
@@ -313,6 +318,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                     Q(consultant__name__istartswith=query) |
                     Q(employer__startswith=query) |
                     Q(submission__client__icontains=query) |
+                    Q(submission__consultant_marketing__consultant__name__icontains=query) |
                     Q(submission__lead__vendor_company__name__icontains=query)
                 ).order_by('id').distinct('id')
 
@@ -323,11 +329,12 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
             project_qs = project_qs.annotate(
                 custom_status=Case(
-                    When(statuses__status="pending", then=Value("1_pending")),
-                    When(statuses__status="updated", then=Value("2_updated")),
-                    When(statuses__status="rejected", then=Value("3_rejected")),
-                    When(statuses__status="approved", then=Value("4_approved")),
-                    default=Value("5_other"),
+                    When(statuses__status="updated", then=Value(1)),
+                    When(statuses__status="submitted", then=Value(2)),
+                    When(statuses__status="rejected", then=Value(3)),
+                    When(statuses__status="approved", then=Value(4)),
+                    When(statuses__status="draft", then=Value((5))),
+                    default=Value("6"),
                     output_field=CharField(),
                 )
             ).order_by("id", "custom_status").distinct("id")
@@ -423,9 +430,12 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 ).annotate(
                     client=F('submission__client'),
                     work_type=F('submission__work_type'),
+                    remote_engineer=F('consultant__name'),
+                    remote_engineer_email=F('consultant__email'),
                     vendor=F('submission__lead__vendor_company__name'),
-                ).values('id', 'client', 'vendor', 'work_type').order_by('-start_date')
-                return Response({'result': projects}, status=200)
+                    consultant_name=F('submission__consultant_marketing__consultant__name'),
+                ).values('id', 'client', 'vendor', 'work_type','remote_engineer','remote_engineer_email','consultant_name').order_by('-start_date')
+                return Response({'result': projects,'total':projects.count()}, status=200)
 
             else:
                 project = get_object_or_404(Project, id=project_id, consultant_id=kwargs.get('pk'))
@@ -433,9 +443,10 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                     "id": project.consultant.id, "project_id": project.id,
                     "vendor": project.submission.lead.vendor_company.name,
                     "work_type": project.submission.get_work_type_display(),
-                    "name": project.consultant.name, "email": project.consultant.email,
-                    "team": project.submission.marketing_team.name, "start_date": project.start_date,
-                    "client": project.submission.client, "marketer": project.submission.created_by.employee_name
+                    "remote_engineer": project.consultant.name, "remote_engineer_email": project.consultant.email,
+                    "consultant_name":project.submission.consultant.name,
+                    "start_date": project.start_date,"client": project.submission.client,
+                    "marketer": project.submission.created_by.employee_name
                 }
                 return Response({'result': data}, status=200)
         except Exception as error:
@@ -510,29 +521,6 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
-    @action(methods=["put"], detail=False, url_name="approval_required")
-    def approval_required(self, request, *args, **kwargs):
-        try:
-            # updated_consultants = ''
-            approval = request.data.get('action', True)
-            consultant_ids = request.data.get('consultant_ids', [])
-
-            for consultant_id in consultant_ids:
-                consultant = Consultant.objects.get(id=consultant_id)
-                if consultant.approval_required == approval:
-                    continue
-                consultant.approval_required = approval
-                consultant.save()
-
-                # updated_consultants = updated_consultants + consultant.name + ' '
-                required = '' if approval else 'not '
-                desc = f"{request.user.employee_name} marked {consultant.name} approval as {required}required"
-                create_activity(consultant.id, 'leave', request.user, desc, 'updated')
-
-            return Response({"message": "Consultant Approval Updated"}, status=status.HTTP_202_ACCEPTED)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Route - /finance_leave
@@ -544,56 +532,56 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
+        filter_json = request.GET.get('filter_json', None)
         query = request.GET.get('query', None)
         start_date = request.GET.get('start', None)
-        end_date = request.GET.get('start', None)
+        end_date = request.GET.get('end', None)
         leave_status = request.GET.get('leave_status', [])
         leave_type = request.GET.get('leave_type', [])
         approval_required = request.GET.get('approval_required', 'false')
 
         try:
-            project_status = [
-                'terminated-fired_performance_issue', 'terminated-fired_security_issue',
-                'terminated-resigned_full_time_offer', 'terminated-resigned_technology_issue',
-                'terminated-fired_budget_issue', 'terminated-resigned_location_issue', 'complete',
-                'joined', 'terminated', 'terminated-resigned', 'terminated-resigned_location_issue',
-            ]
 
-            consultant_ids = Project.objects.filter(
-                    statuses__status__in=project_status, statuses__is_current=True
-            ).values_list('consultant', flat=True)
+            consultants = Consultant.objects.all().exclude(status='terminated').order_by('id').distinct('id')
 
-            consultants = Consultant.objects.filter(id__in=list(consultant_ids),).order_by('id').distinct('id')
+            if filter_json:
+                filter_json = json.loads(filter_json)
+                if 'leave_status' in filter_json:
+                    consultants = consultants.filter(leaves__status__in=filter_json['leave_status'])
 
-            if leave_status:
-                consultants=consultants.filter(leaves__status__in=leave_status)
+                if 'leave_type' in filter_json:
+                    consultants = consultants.filter(leaves__leave_type__leave_type__name__in=filter_json['leave_type'])
 
-            if leave_type:
-                consultants = consultants.filter(leaves__leave_type__leave_type__in=leave_type)
+                if 'approval_required' in filter_json:
+                    consultants = consultants.filter(approval_required=True)
 
-            if approval_required == 'true':
-                consultants = consultants.filter(approval_required=True)
+                if 'start' in filter_json:
+                    consultants.filter(leaves__from_date__gte=filter_json['start'])
+                if 'end' in filter_json:
+                    consultants.filter(leaves__to_date__lte=filter_json['end'])
 
-            if query:
-                query = query.lstrip().replace(':amp:', '&')
-                consultants = Consultant.objects.filter(
-                    Q(name__istartswith=query) |
-                    Q(projects__employer__startswith=query) |
-                    Q(projects__submission__client__icontains=query) |
-                    Q(projects__submission__lead__vendor_company__name__icontains=query)
-                ).order_by('id').distinct('id')
+                if query:
+                    query = query.lstrip().replace(':amp:', '&')
+                    consultants = Consultant.objects.filter(
+                        Q(name__icontains=query) |
+                        Q(projects__employer__startswith=query) |
+                        Q(projects__submission__client__icontains=query) |
+                        Q(projects__submission__consultant_marketing__consultant__name__icontains=query) |
+                        Q(projects__submission__lead__vendor_company__name__icontains=query)
+                    ).order_by('id').distinct('id')
 
-            if start_date:
-                consultants.filter(leaves__from_date__gte=start_date)
-            if end_date:
-                consultants = consultants.filter(leaves__to_date__lte=end_date)
+            data = {
+                "pending_level_2": consultants.filter(leaves__status='applied').count(),
+                "pending_level_1": consultants.filter(leaves__status='pending', approval_required=True).count(),
+                "rejected_level_1": consultants.filter(leaves__status='rejected_1st_level',approval_required=True).count(),
+            }
 
             status_order = {
-                'approved': 1,
-                'rejected': 2,
-                'applied': 3,
-                'pending': 4,
-                'rejected_1st_level': 5,
+                'pending': 1,
+                'applied': 2,
+                'rejected_1st_level': 3,
+                'rejected': 4,
+                'approved': 5,
             }
 
             # Function to get sorting key for a consultant
@@ -604,26 +592,21 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             # Sort the consultants based on the custom key
             sorted_consultants = sorted(consultants, key=consultant_sort_key)
 
-            consultant_list=[]
+            consultant_list = []
 
-
-            for consultant in sorted_consultants:
+            for consultant in sorted_consultants[first:last]:
                 consultant = {
-                    "id":consultant.id,
-                    "name":consultant.name,
-                    "email":consultant.email,
-                    "employer":"Boto3",
-                    "approval_required":consultant.approval_required,
-                    "leave_status":consultant.leaves.latest().leave_type.leave_type.name if consultant.leaves.count() != 0 else "Not applied yet"
+                    "id": consultant.id,
+                    "name": consultant.name,
+                    "email": consultant.email,
+                    "approval_required": consultant.approval_required,
+                    "employer": "Boto3",
+                    "leave_status": consultant.leaves.latest().get_status_display() if consultant.leaves.count() != 0 else "Not applied yet",
+                    "leave_type": consultant.leaves.latest().leave_type.leave_type.name if consultant.leaves.count() != 0 else "Not applied yet",
                 }
                 consultant_list.append(consultant)
 
-            data = {
-                "total_pending":0,
-                "pending_level_1":0,
-                "pending_level_2":0,
-                "consultants":consultant_list
-            }
+            data["consultants"] = consultant_list
 
             total = consultants.count()
             # serializer = ConsultantTimeSheetSerializer(consultants[first:last], many=True)
@@ -637,21 +620,42 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
         try:
             end = request.GET.get('end')
             start = request.GET.get('start')
-            status = request.GET.get('status')
-            leave_type = request.GET.get('leave_type')
+            leave_type = request.GET.get('leave_type',[])
+            leave_status = request.GET.get('leave_status',[])
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk', None))
-            queryset = self.queryset.filter(consultant=consultant).order_by('-created')
-            if status == 'applied':
-                queryset = queryset.filter(status__in=['pending', 'applied'])
-            if end:
-                queryset = queryset.filter(to_date__lte=end)
-            if start:
-                queryset = queryset.filter(from_date__gte=start)
-            if leave_type:
-                queryset = queryset.filter(leave_type__leave_type__id=leave_type)
+            leave_qs = self.queryset.filter(consultant=consultant).order_by('-created')
 
-            serializer = LeaveSerializer(queryset, many=True)
-            return Response({"data": serializer.data[first: last], 'total': len(queryset)}, status=200)
+            if end:
+                leave_qs = leave_qs.filter(to_date__lte=end)
+            if start:
+                leave_qs = leave_qs.filter(from_date__gte=start)
+            if leave_status:
+                leave_qs = leave_qs.filter(status__in=leave_status)
+            if leave_type:
+                leave_qs = leave_qs.filter(leave_type__leave_type__name__in=leave_type)
+
+            custom_order = Case(
+                When(status='pending', then=Value(1)),
+                When(status='applied', then=Value(2)),
+                When(status='rejected_1st_level', then=Value(3)),
+                When(status='rejected', then=Value(4)),
+                When(status='approved', then=Value(5)),
+                default=Value(6),
+                output_field=CharField()
+            )
+
+            # Order the queryset based on custom_order and created date
+            leave_qs = leave_qs.annotate(custom_order=custom_order).order_by('custom_order', '-created')
+
+            data = {
+                "id":consultant.id,
+                "name":consultant.name,
+                "email":consultant.email,
+                "team": "Boto3",
+                "approval_required":consultant.approval_required,
+                "leaves":LeaveSerializer(leave_qs[first:last], many=True).data
+            }
+            return Response({"data": data, 'total': len(leave_qs)}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -727,12 +731,11 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
-    @action(methods=["get"], detail=False, url_name="balances")
+    @action(methods=["get"], detail=True, url_name="balances")
     def balances(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('consultant_id')
             year = request.GET.get('year', date.today().year)
-            queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id, year=year)
+            queryset = ConsultantLeave.objects.filter(consultant__id= kwargs.get('pk'), year=year)
             # queryset = ConsultantLeave.objects.filter(consultant_id=consultant_id)
             serializer = ConsultantLeaveSerializer(queryset, many=True)
             return Response({"data": serializer.data}, status=200)
@@ -743,7 +746,6 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
     @action(methods=["put"], detail=True, url_name="update_balances")
     def update_balances(self, request, *args, **kwargs):
         try:
-            consultant_id = kwargs.get('consultant_id')
             leave_type = get_object_or_404(ConsultantLeave, id=kwargs.get('pk'))
             updated_balance = request.data.get('granted_leaves')
             if updated_balance > leave_type.granted:
@@ -759,7 +761,7 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             title = f"{leave_type.leave_type.display_name} balance updated"
 
             Notification.objects.create(
-                title=title, recipient_object_id=consultant_id,
+                title=title, recipient_object_id=leave_type.consultant.id,
                 category="info", recipient_content_type=recipient_content_type,
                 sender_content_type=sender_content_type, target_content_type=target_content_type,
                 description=title, target_object_id=leave_type.id, sender_object_id=request.user.id,
@@ -785,3 +787,27 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["put"], detail=False, url_name="approval_required")
+    def approval_required(self, request, *args, **kwargs):
+        try:
+            # updated_consultants = ''
+            approval = request.data.get('action', True)
+            consultant_ids = request.data.get('consultant_ids', [])
+
+            for consultant_id in consultant_ids:
+                consultant = Consultant.objects.get(id=consultant_id)
+                if consultant.approval_required == approval:
+                    continue
+                consultant.approval_required = approval
+                consultant.save()
+
+                # updated_consultants = updated_consultants + consultant.name + ' '
+                required = '' if approval else 'not '
+                desc = f"{request.user.employee_name} marked {consultant.name} approval as {required}required"
+                create_activity(consultant.id, 'leave', request.user, desc, 'updated')
+
+            return Response({"message": "Consultant Approval Updated"}, status=status.HTTP_202_ACCEPTED)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

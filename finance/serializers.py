@@ -12,7 +12,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'employer', 'start_date','project_status','timesheet_status','consultant', 'submission')
+        fields = ('id', 'employer', 'start_date','project_status','timesheet_status','timesheet_frequency','consultant', 'submission',)
 
     @staticmethod
     def get_timesheet_status(obj):
