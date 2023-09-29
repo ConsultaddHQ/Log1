@@ -1463,6 +1463,7 @@ class InterviewViewSets(ModelViewSet):
                 start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
                 event = {
+                    "call_type": interview.call_type,
                     "end": end_time, "summary": title, "start": start_time,
                     "submission": submission, "consultant": interview.consultant,
                     "user": request.user, "attendees": attendees, "lead": submission.lead,
@@ -1505,7 +1506,7 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'screening_type', 'rank', 'submission_id',
+                ).values('id', 'round','call_type', 'status', 'start_time', 'end_time', 'screening_type', 'rank', 'submission_id',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name', 'job_title',
                          'interview_mode')
 
@@ -1575,6 +1576,7 @@ class InterviewViewSets(ModelViewSet):
                     start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                         "%Y-%m-%dT%H:%M:%S")
                     event = {
+                        "call_type": request.data["call_type"],
                         "user": request.user, "attendees": attendees,
                         "lead": submission.lead, "submission": submission,
                         "start": start_time, "consultant": submission.consultant,
@@ -1628,7 +1630,7 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
+                ).values('id', 'round', 'call_type' 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
                 notification_data = {
@@ -1761,7 +1763,7 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
+                ).values('id', 'round', 'call_type','status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
                 notification_data = {
@@ -1818,6 +1820,7 @@ class InterviewViewSets(ModelViewSet):
                 start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
                 event = {
+                    "call_type":  request.data["call_type"],
                     "lead": submission.lead, "submission": submission, "consultant": submission.consultant,
                     "call_details": request.data["call_details"], "user": request.user, "attendees": attendees,
                     "end": end_time, "description": request.data["description"], "start": start_time, "summary": title,
@@ -1894,7 +1897,7 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
+                ).values('id', 'round', 'call_type','status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
 
