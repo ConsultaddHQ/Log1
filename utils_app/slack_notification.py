@@ -1022,7 +1022,8 @@ class MessageCard:
                                 {
                                     "type": "mrkdwn",
                                     "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
-                                            f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
+                                            f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t "
+                                            f" *Call Type:* {data.get('call_type', None)}\n\t "
                                             f"   *Time:* {data.get('start', None).split('::')[1]}\n\t   "
                                             f"*Project Type:* {data.get('project_type')}"
                                 },
