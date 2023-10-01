@@ -17,6 +17,7 @@ from rest_framework.authentication import TokenAuthentication
 from constance import config
 from consultant.models import Consultant
 from activity.views import create_activity
+from legal.models import Petition
 from notification.models import Notification, FCMDevice
 from utils_app.thred_mail import send_email as send_email_
 from finance.serializers import FinanceDetailSerializer, FinanceSerializer, LeaveSerializer, \
@@ -40,9 +41,7 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         try:
             first, last = get_page_limits(request)
             query = request.GET.get('query')
-            start = request.GET.get('start')
-            paystub_status = request.GET.get('status', [])
-            end = request.GET.get('end', date.today().strftime('%Y-%m-%d'))
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
 
             paystub_qs = TimeSheet.objects.filter(project=kwargs.get('pk')).order_by('-created')
 
@@ -53,17 +52,18 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                     Q(submission__lead__vendor_company__name__istartswith=query)
                 )
 
-            if start:
-                if not end:
-                    end = date.today().strftime('%Y-%m-%d')
-                paystub_qs = paystub_qs.filter(start__gte=start, end__lte=end)
+            if filter_json:
+                if 'start' in filter_json:
+                    if not 'end' in filter_json:
+                        end = date.today().strftime('%Y-%m-%d')
+                    paystub_qs = paystub_qs.filter(start__gte=filter_json['start'], end__lte=filter_json['end'])
 
-            if paystub_status:
-                if 'pending' in paystub_status:
-                    paystub_status.remove('pending')
-                    paystub_status.apppned(['submitted', 'updated'])
-                paystub_qs = paystub_qs.filter(
-                    statuses__status__in=paystub_status)
+                if 'paystub_status' in filter_json:
+                    if 'pending' in filter_json['paystub_status']:
+                        filter_json['paystub_status'].remove('pending')
+                        filter_json['paystub_status'].apppned(['submitted', 'updated'])
+                    paystub_qs = paystub_qs.filter(
+                        statuses__status__in=filter_json['paystub_status'])
 
             custom_order = Case(
                 When(status='updated', then=Value(1)),
@@ -104,12 +104,7 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         first, last = get_page_limits(request)
         try:
             query = request.GET.get('query', '')
-            end_date = request.GET.get('end', '')
-            vendor = request.GET.get('vendor', '')
-            client = request.GET.get('client', '')
-            start_date = request.GET.get('start', '')
-            project_status = request.GET.get('project_status', [])
-            paystub_status = request.GET.get('paystub_status', [])
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
 
             terminated_status = [
                 'terminated-fired_performance_issue', 'terminated-fired_security_issue',
@@ -123,38 +118,41 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             ).order_by('id').distinct('id')
 
 
-            if client:
-                project_qs = project_qs.filter(submission__istartswith=client)
+            if 'client' in filter_json:
+                project_qs = project_qs.filter(submission__istartswith=filter_json['client'])
 
-            if vendor:
-                project_qs = project_qs.filter(submission__lead__vendor_company__name__istartsswith=vendor)
+            if 'vendor' in filter_json:
+                project_qs = project_qs.filter(submission__lead__vendor_company__name__istartsswith=filter_json['vendor'])
 
-            if project_status:
-                if 'terminated' in project_status:
-                    project_status.apppned(terminated_status)
+            if 'project_status' in filter_json:
+                if 'terminated' in filter_json['project_status']:
+                    filter_json['project_status'].apppned(terminated_status)
+                if 'active' in filter_json['project_status']:
+                    # filter_json['project_status'].remove('active')
+                    filter_json['project_status'].append('joined')
                 project_qs = project_qs.filter(
                     statuses__status__in=terminated_status + ['joined', 'complete'])
 
-            if paystub_status:
-                if 'pending' in paystub_status:
-                    paystub_status.remove('pending')
-                    paystub_status.apppned(['submitted', 'updated'])
+            if 'paystub_status' in filter_json:
+                if 'pending' in filter_json['paystub_status']:
+                    filter_json['paystub_status'].remove('pending')
+                    filter_json['paystub_status'].apppned(['submitted', 'updated'])
                 project_qs = project_qs.filter(
-                    statuses__status__in=paystub_status)
+                    statuses__status__in=filter_json['paystub_status'])
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 project_qs = project_qs.filter(
                     Q(consultant__name__istartswith=query) |
-                    Q(employer__startswith=query) |
+                    Q(employer__istartswith=query) |
                     Q(submission__client__icontains=query) |
                     Q(submission__lead__vendor_company__name__icontains=query)
                 ).order_by('id').distinct('id')
 
-            if start_date:
-                project_qs = project_qs.filter(timesheets__start__gte=start_date)
-            if end_date:
-                project_qs = project_qs.filter(timesheets__end__lte=end_date)
+            if 'start' in filter_json:
+                project_qs = project_qs.filter(timesheets__start__gte=filter_json['start'])
+            if 'end' in filter_json:
+                project_qs = project_qs.filter(timesheets__end__lte=filter_json['end'])
 
             project_qs = project_qs.annotate(
                 custom_status=Case(
@@ -208,26 +206,26 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
     def retrieve(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        start = request.GET.get('start', None)
-        end = request.GET.get('end', date.today().strftime('%Y-%m-%d'))
-        timesheet_status = request.GET.get('status', None)
-
         try:
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
             project_id = kwargs.get('pk', None)
             timesheet_qs = TimeSheet.objects.filter(project=project_id).order_by('-created')
 
-            if start:
-                if not end:
-                    end = date.today().strftime('%Y-%m-%d')
-                timesheet_qs = timesheet_qs.filter(start__gte=start, end__lte=end)
+            if filter_json:
+                filter_json= json.loads(filter_json)
+                if 'start' in filter_json['start']:
+                    if not filter_json['end']:
+                        filter_json['end'] = date.today().strftime('%Y-%m-%d')
+                    timesheet_qs = timesheet_qs.filter(start__gte=filter_json['start'], end__lte=filter_json['end'])
 
-            if timesheet_status:
-                if 'pending' in timesheet_status:
-                    timesheet_status.remove('pending')
-                    timesheet_status.apppned(['submitted', 'updated'])
-                timesheet_qs = timesheet_qs.filter(status__in=timesheet_status)
-            else:
-                timesheet_qs = timesheet_qs.exclude(status='draft')
+                if 'timesheet_status' in filter_json['timesheet_status']:
+                    if 'pending' in filter_json['timesheet_status']:
+                        filter_json['timesheet_status'].remove('pending')
+                        filter_json['timesheet_status'].apppned(['submitted', 'updated'])
+                    timesheet_qs = timesheet_qs.filter(status__in=filter_json['timesheet_status'])
+                else:
+                    timesheet_qs = timesheet_qs.exclude(status='draft')
+
 
             custom_order = Case(
                 When(status='updated', then=Value(1)),
@@ -275,12 +273,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
         first, last = get_page_limits(request)
         try:
             query = request.GET.get('query', '')
-            end_date = request.GET.get('end', '')
-            vendor = request.GET.get('vendor', [])
-            client = request.GET.get('client', [])
-            start_date = request.GET.get('start', '')
-            project_status = request.GET.get('project_status', [])
-            timesheet_status = request.GET.get('timesheet_status', [])
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
 
             terminated_status = [
                 'terminated-fired_performance_issue', 'terminated-fired_security_issue',
@@ -293,39 +286,44 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 submission__work_type="c2c", timesheets__isnull=False
             ).order_by('id').distinct('id')
 
-            if client:
-                project_qs = project_qs.filter(submission__client__in=client)
+            if filter_json:
+                if 'client' in filter_json:
+                    project_qs = project_qs.filter(submission__client__in=filter_json['client'])
 
-            if vendor:
-                project_qs = project_qs.filter(submission__lead__vendor_company__in=vendor)
+                if 'vendor' in filter_json:
+                    project_qs = project_qs.filter(submission__lead__vendor_company__in=filter_json['vendor'])
 
-            if project_status:
-                if 'terminated' in project_status:
-                    project_status.append(terminated_status)
-                project_qs = project_qs.filter(
-                        statuses__status__in=project_status,statuses__is_current=True)
+                if 'project_status' in filter_json:
+                    if 'terminated' in filter_json['project_status']:
+                        filter_json['project_status'].append(terminated_status)
+                    if 'active' in filter_json['project_status']:
+                        # filter_json['project_status'].remove('active')
+                        filter_json['project_status'].append('joined')
+                    project_qs = project_qs.filter(
+                        statuses__status__in=filter_json['project_status'], statuses__is_current=True)
 
-            if timesheet_status:
-                if 'pending' in timesheet_status:
-                    timesheet_status.remove('pending')
-                    timesheet_status.append(['submitted','updated'])
-                project_qs = project_qs.filter(
-                    timesheets__status__in=timesheet_status)
+                if 'timesheet_status' in filter_json:
+                    if 'pending' in filter_json['timesheet_status']:
+                        # filter_json['timesheet_status'].remove('pending')
+                        filter_json['timesheet_status'].append(['submitted', 'updated'])
+                    project_qs = project_qs.filter(
+                        timesheets__status__in=filter_json['timesheet_status'])
+
+                if 'start' in filter_json:
+                    project_qs = project_qs.filter(timesheets__start__gte=filter_json['start'])
+                if 'end' in filter_json:
+                    project_qs = project_qs.filter(timesheets__end__lte=filter_json['end'])
 
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 project_qs = project_qs.filter(
                     Q(consultant__name__istartswith=query) |
-                    Q(employer__startswith=query) |
+                    Q(employer__istartswith=query) |
                     Q(submission__client__icontains=query) |
                     Q(submission__consultant_marketing__consultant__name__icontains=query) |
                     Q(submission__lead__vendor_company__name__icontains=query)
                 ).order_by('id').distinct('id')
 
-            if start_date:
-                project_qs = project_qs.filter(timesheets__start__gte=start_date)
-            if end_date:
-                project_qs = project_qs.filter(timesheets__end__lte=end_date)
 
             project_qs = project_qs.annotate(
                 custom_status=Case(
@@ -521,8 +519,6 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             write_exception(error, request)
             return Response({'error': str(error)}, status=400)
 
-
-
 # Route - /finance_leave
 class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = Leave.objects.all()
@@ -532,20 +528,15 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
 
     def list(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
-        filter_json = request.GET.get('filter_json', None)
+        filter_json = json.loads(request.GET.get('filter_json', '{}'))
         query = request.GET.get('query', None)
-        start_date = request.GET.get('start', None)
-        end_date = request.GET.get('end', None)
-        leave_status = request.GET.get('leave_status', [])
-        leave_type = request.GET.get('leave_type', [])
-        approval_required = request.GET.get('approval_required', 'false')
 
         try:
-
             consultants = Consultant.objects.all().exclude(status='terminated').order_by('id').distinct('id')
 
             if filter_json:
                 filter_json = json.loads(filter_json)
+
                 if 'leave_status' in filter_json:
                     consultants = consultants.filter(leaves__status__in=filter_json['leave_status'])
 
@@ -553,27 +544,25 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
                     consultants = consultants.filter(leaves__leave_type__leave_type__name__in=filter_json['leave_type'])
 
                 if 'approval_required' in filter_json:
-                    consultants = consultants.filter(approval_required=True)
+                    consultants = consultants.filter(approval_required=filter_json['approval_required'])
 
                 if 'start' in filter_json:
-                    consultants.filter(leaves__from_date__gte=filter_json['start'])
+                    consultants = consultants.filter(leaves__from_date__gte=filter_json['start'])
                 if 'end' in filter_json:
-                    consultants.filter(leaves__to_date__lte=filter_json['end'])
+                    consultants = consultants.filter(leaves__to_date__lte=filter_json['end'])
 
-                if query:
-                    query = query.lstrip().replace(':amp:', '&')
-                    consultants = Consultant.objects.filter(
-                        Q(name__icontains=query) |
-                        Q(projects__employer__startswith=query) |
-                        Q(projects__submission__client__icontains=query) |
-                        Q(projects__submission__consultant_marketing__consultant__name__icontains=query) |
-                        Q(projects__submission__lead__vendor_company__name__icontains=query)
-                    ).order_by('id').distinct('id')
+            if query:
+                query = query.lstrip().replace(':amp:', '&')
+                consultants = consultants.filter(
+                    Q(name__icontains=query) |
+                    Q(projects__employer__istartswith=query) |
+                    Q(projects__submission__consultant_marketing__consultant__name__icontains=query)
+                ).order_by('id').distinct('id')
 
             data = {
                 "pending_level_2": consultants.filter(leaves__status='applied').count(),
-                "pending_level_1": consultants.filter(leaves__status='pending', approval_required=True).count(),
-                "rejected_level_1": consultants.filter(leaves__status='rejected_1st_level',approval_required=True).count(),
+                "pending_level_1": consultants.filter(leaves__status='pending').count(),
+                "rejected_level_1": consultants.filter(leaves__status='rejected_1st_level').count(),
             }
 
             status_order = {
@@ -595,14 +584,15 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             consultant_list = []
 
             for consultant in sorted_consultants[first:last]:
+                petition = Petition.objects.filter(beneficiary=consultant, is_active=True).first()
                 consultant = {
                     "id": consultant.id,
                     "name": consultant.name,
                     "email": consultant.email,
                     "approval_required": consultant.approval_required,
-                    "employer": "Boto3",
-                    "leave_status": consultant.leaves.latest().get_status_display() if consultant.leaves.count() != 0 else "Not applied yet",
-                    "leave_type": consultant.leaves.latest().leave_type.leave_type.name if consultant.leaves.count() != 0 else "Not applied yet",
+                    "employer": petition.employer if petition else None,
+                    "leave_status": consultant.leaves.latest().get_status_display() if consultant.leaves.count() != 0 else None,
+                    "leave_type": consultant.leaves.latest().leave_type.leave_type.name if consultant.leaves.count() != 0 else None,
                 }
                 consultant_list.append(consultant)
 
@@ -618,21 +608,19 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
     def retrieve(self, request, *args, **kwargs):
         first, last = get_page_limits(request)
         try:
-            end = request.GET.get('end')
-            start = request.GET.get('start')
-            leave_type = request.GET.get('leave_type',[])
-            leave_status = request.GET.get('leave_status',[])
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk', None))
             leave_qs = self.queryset.filter(consultant=consultant).order_by('-created')
 
-            if end:
-                leave_qs = leave_qs.filter(to_date__lte=end)
-            if start:
-                leave_qs = leave_qs.filter(from_date__gte=start)
-            if leave_status:
-                leave_qs = leave_qs.filter(status__in=leave_status)
-            if leave_type:
-                leave_qs = leave_qs.filter(leave_type__leave_type__name__in=leave_type)
+            if filter_json:
+                if 'end' in filter_json:
+                    leave_qs = leave_qs.filter(to_date__lte=filter_json['end'])
+                if 'start' in filter_json:
+                    leave_qs = leave_qs.filter(from_date__gte=filter_json['start'])
+                if 'leave_status' in filter_json:
+                    leave_qs = leave_qs.filter(status__in=filter_json['leave_status'])
+                if 'leave_type' in filter_json:
+                    leave_qs = leave_qs.filter(leave_type__leave_type__name__in=filter_json['leave_type'])
 
             custom_order = Case(
                 When(status='pending', then=Value(1)),
@@ -646,12 +634,12 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
 
             # Order the queryset based on custom_order and created date
             leave_qs = leave_qs.annotate(custom_order=custom_order).order_by('custom_order', '-created')
-
+            petition = Petition.objects.filter(beneficiary=consultant, is_active=True).first()
             data = {
                 "id":consultant.id,
                 "name":consultant.name,
                 "email":consultant.email,
-                "team": "Boto3",
+                "team": petition.employer if petition else None,
                 "approval_required":consultant.approval_required,
                 "leaves":LeaveSerializer(leave_qs[first:last], many=True).data
             }
