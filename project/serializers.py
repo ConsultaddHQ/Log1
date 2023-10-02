@@ -68,7 +68,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     "remote": f"{firstname}", "name": f"{obj.submission.consultant.name}"
                 }
             else:
-                return {"name": obj.consultant.name}
+                return {"name": obj.submission.consultant.name, "remote": obj.consultant.name.split(' ')[0]}
         return {"name": "Not Assigned"}
 
 
