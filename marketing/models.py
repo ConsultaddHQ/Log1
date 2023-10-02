@@ -433,6 +433,7 @@ class Interview(TimeStampedModel):
     screening_type = models.CharField(_('Screening Type'), max_length=20, choices=TYPE_CHOICES)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    call_type = models.ForeignKey(Choice, null=True, blank=True,on_delete=models.CASCADE, related_name='interview_type')
     if_previous_calendar = models.BooleanField(_('Previous Calendar'), default=True)
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
