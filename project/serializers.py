@@ -68,7 +68,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     "remote": f"{firstname}", "name": f"{obj.submission.consultant.name}"
                 }
             else:
-                return {"name": obj.consultant.name}
+                return {"name": obj.submission.consultant.name, "remote": obj.consultant.name.split(' ')[0]}
         return {"name": "Not Assigned"}
 
 
@@ -498,7 +498,7 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectPaymentTerm
-        fields = ('id', 'payment_term', 'payment_term_type', 'comment', 'project')
+        fields = ('id', 'consultant_payment_term', 'payment_term', 'payment_term_type', 'comment', 'project')
 
     @staticmethod
     def get_project(obj):

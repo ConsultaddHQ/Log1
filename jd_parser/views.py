@@ -86,13 +86,13 @@ class MarketingMailListViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixi
             ],
         }
         role = request.GET.get("role", None)
-        requirmentMail = request.GET.get("requirmentMail", None)
+        requirementMail = request.GET.get("requirementMail", None)
         try:
             queryset = self.filter_queryset(self.get_queryset())
             queryset = (
-                queryset.exclude(body_text__isnull=True)
+                queryset.filter(requirementMail=True if requirementMail == "1" else False).exclude(body_text__isnull=True)
                 .exclude(body_text__exact="")
-                .exclude(requirmentMail=requirmentMail)
+                
             )
             if role:
                 filters = Q()

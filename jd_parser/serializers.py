@@ -15,6 +15,7 @@ class MarketingMailListSerializer(serializers.ModelSerializer):
             "subject",
             "date",
             "keywords",
+            "requirementMail"
         ]
 
     def to_representation(self, instance):
