@@ -1630,7 +1630,7 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'call_type__name' 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
+                ).values('id', 'round', 'call_type__name', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
                 notification_data = {
