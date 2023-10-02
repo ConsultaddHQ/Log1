@@ -498,7 +498,7 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectPaymentTerm
-        fields = ('id', 'payment_term', 'payment_term_type', 'comment', 'project')
+        fields = ('id', 'consultant_payment_term', 'payment_term', 'payment_term_type', 'comment', 'project')
 
     @staticmethod
     def get_project(obj):
