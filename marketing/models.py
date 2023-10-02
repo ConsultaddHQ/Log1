@@ -390,7 +390,6 @@ class Interview(TimeStampedModel):
         ('video_call', 'Video Call'),
         ('voice_call', 'Voice Call'),
     )
-
     TYPE_CHOICES = (
         ('ip_screening', 'IP Tech Screening'),
         ('vendor_screening', 'Vendor Tech Screening'),

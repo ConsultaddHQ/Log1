@@ -66,7 +66,6 @@ class Command(BaseCommand):
             for screening_type in screening_types:
                 interviews_type = interviews.filter(screening_type=screening_type[0])
                 for index, interview in enumerate(interviews_type):
-                    breakpoint()
                     if index == 0:
                         slack_data[screening_type[1]] = []
                     position = interview.submission.lead.position.display_name \

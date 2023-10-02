@@ -1463,7 +1463,7 @@ class InterviewViewSets(ModelViewSet):
                 start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
                 event = {
-                    "call_type": interview.call_type,
+                    "call_type": interview.call_type.name,
                     "end": end_time, "summary": title, "start": start_time,
                     "submission": submission, "consultant": interview.consultant,
                     "user": request.user, "attendees": attendees, "lead": submission.lead,
