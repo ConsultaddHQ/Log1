@@ -19,6 +19,7 @@ from consultant.models import Consultant
 from activity.views import create_activity
 from legal.models import Petition
 from notification.models import Notification, FCMDevice
+from utils_app.models import Choice
 from utils_app.thred_mail import send_email as send_email_
 from finance.serializers import FinanceDetailSerializer, FinanceSerializer, LeaveSerializer, \
     TimesheetRequestSerializer
@@ -61,7 +62,7 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 if 'paystub_status' in filter_json:
                     if 'pending' in filter_json['paystub_status']:
                         filter_json['paystub_status'].remove('pending')
-                        filter_json['paystub_status'].apppned(['submitted', 'updated'])
+                        filter_json['paystub_status'].append(['submitted', 'updated'])
                     paystub_qs = paystub_qs.filter(
                         statuses__status__in=filter_json['paystub_status'])
 
@@ -117,29 +118,6 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 submission__work_type__in=['w2','full_time'], timesheets__isnull=False
             ).order_by('id').distinct('id')
 
-
-            if 'client' in filter_json:
-                project_qs = project_qs.filter(submission__istartswith=filter_json['client'])
-
-            if 'vendor' in filter_json:
-                project_qs = project_qs.filter(submission__lead__vendor_company__name__istartsswith=filter_json['vendor'])
-
-            if 'project_status' in filter_json:
-                if 'terminated' in filter_json['project_status']:
-                    filter_json['project_status'].apppned(terminated_status)
-                if 'active' in filter_json['project_status']:
-                    # filter_json['project_status'].remove('active')
-                    filter_json['project_status'].append('joined')
-                project_qs = project_qs.filter(
-                    statuses__status__in=terminated_status + ['joined', 'complete'])
-
-            if 'paystub_status' in filter_json:
-                if 'pending' in filter_json['paystub_status']:
-                    filter_json['paystub_status'].remove('pending')
-                    filter_json['paystub_status'].apppned(['submitted', 'updated'])
-                project_qs = project_qs.filter(
-                    statuses__status__in=filter_json['paystub_status'])
-
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 project_qs = project_qs.filter(
@@ -149,10 +127,35 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                     Q(submission__lead__vendor_company__name__icontains=query)
                 ).order_by('id').distinct('id')
 
-            if 'start' in filter_json:
-                project_qs = project_qs.filter(timesheets__start__gte=filter_json['start'])
-            if 'end' in filter_json:
-                project_qs = project_qs.filter(timesheets__end__lte=filter_json['end'])
+
+            if filter_json:
+               if 'client' in filter_json:
+                   project_qs = project_qs.filter(submission__istartswith=filter_json['client'])
+
+               if 'vendor' in filter_json:
+                   project_qs = project_qs.filter(
+                       submission__lead__vendor_company__name__istartsswith=filter_json['vendor'])
+
+               if 'project_status' in filter_json:
+                   if 'terminated' in filter_json['project_status']:
+                       filter_json['project_status'].append(terminated_status)
+                   if 'active' in filter_json['project_status']:
+                       # filter_json['project_status'].remove('active')
+                       filter_json['project_status'].append('joined')
+                   project_qs = project_qs.filter(
+                       statuses__status__in=terminated_status + ['joined', 'complete'])
+
+               if 'paystub_status' in filter_json:
+                   if 'pending' in filter_json['paystub_status']:
+                       filter_json['paystub_status'].remove('pending')
+                       filter_json['paystub_status'].append(['submitted', 'updated'])
+                   project_qs = project_qs.filter(
+                       statuses__status__in=filter_json['paystub_status'])
+
+               if 'start' in filter_json:
+                   project_qs = project_qs.filter(timesheets__start__gte=filter_json['start'])
+               if 'end' in filter_json:
+                   project_qs = project_qs.filter(timesheets__end__lte=filter_json['end'])
 
             project_qs = project_qs.annotate(
                 custom_status=Case(
@@ -212,16 +215,15 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             timesheet_qs = TimeSheet.objects.filter(project=project_id).order_by('-created')
 
             if filter_json:
-                filter_json= json.loads(filter_json)
-                if 'start' in filter_json['start']:
-                    if not filter_json['end']:
+                if 'start' in filter_json:
+                    if 'end' not in filter_json:
                         filter_json['end'] = date.today().strftime('%Y-%m-%d')
                     timesheet_qs = timesheet_qs.filter(start__gte=filter_json['start'], end__lte=filter_json['end'])
 
-                if 'timesheet_status' in filter_json['timesheet_status']:
+                if 'timesheet_status' in filter_json:
                     if 'pending' in filter_json['timesheet_status']:
                         filter_json['timesheet_status'].remove('pending')
-                        filter_json['timesheet_status'].apppned(['submitted', 'updated'])
+                        filter_json['timesheet_status'].append(['submitted', 'updated'])
                     timesheet_qs = timesheet_qs.filter(status__in=filter_json['timesheet_status'])
                 else:
                     timesheet_qs = timesheet_qs.exclude(status='draft')
@@ -535,8 +537,6 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             consultants = Consultant.objects.all().exclude(status='terminated').order_by('id').distinct('id')
 
             if filter_json:
-                filter_json = json.loads(filter_json)
-
                 if 'leave_status' in filter_json:
                     consultants = consultants.filter(leaves__status__in=filter_json['leave_status'])
 
@@ -555,6 +555,7 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
                 query = query.lstrip().replace(':amp:', '&')
                 consultants = consultants.filter(
                     Q(name__icontains=query) |
+                    Q(email__icontains=query) |
                     Q(projects__employer__istartswith=query) |
                     Q(projects__submission__consultant_marketing__consultant__name__icontains=query)
                 ).order_by('id').distinct('id')
@@ -772,6 +773,41 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             push_notification_consultant(registration_ids, message_body)
 
             return Response({"message": "Leave balance updated"}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=["post"], detail=True, url_name="request_balances")
+    def request_balances(self, request, *args, **kwargs):
+        try:
+            year = request.data.get('year', date.today().year)
+            leave_ids = request.data.get('leave_ids', [])
+            consultant_id = kwargs.get('pk')
+
+            if leave_ids:
+                leave_types = Choice.objects.filter(id__in=leave_ids)
+            else:
+                leave_types = Choice.objects.filter(field="leave")
+
+            for leave_type in leave_types:
+                existing_balance = ConsultantLeave.objects.filter(
+                    consultant_id=consultant_id, year=year, leave_type=leave_type
+                ).first()
+
+                if existing_balance:
+                    continue
+
+                new_balance = ConsultantLeave(
+                    year=year,
+                    balance=0.0,
+                    granted=0.0,
+                    is_expired=False,
+                    leave_type=leave_type,
+                    consultant_id=consultant_id
+                )
+                new_balance.save()
+
+            return Response({"message": "Leave balances added"}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

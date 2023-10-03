@@ -12,7 +12,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ('id', 'employer', 'start_date','project_status','timesheet_status','timesheet_frequency','consultant', 'submission',)
+        fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'timesheet_frequency', 'consultant', 'submission')
 
     @staticmethod
     def get_timesheet_status(obj):
@@ -107,6 +107,7 @@ class FinanceDetailSerializer(serializers.ModelSerializer):
 
 
 class LeaveSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
     leave_type = serializers.SerializerMethodField()
     attachment = serializers.SerializerMethodField()
     duration_type = serializers.SerializerMethodField()
@@ -115,10 +116,14 @@ class LeaveSerializer(serializers.ModelSerializer):
         model = Leave
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
                   'description', 'attachment', 'duration_type')
+    @staticmethod
+    def get_status(obj):
+        return obj.get_status_display()
 
     @staticmethod
     def get_leave_type(obj):
         return obj.leave_type.leave_type.display_name
+
 
     @staticmethod
     def get_attachment(obj):
