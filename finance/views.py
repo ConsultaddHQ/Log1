@@ -76,11 +76,12 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 output_field=CharField()
             )
 
-            # Order the queryset based on custom_order and created date
             paystub_qs = paystub_qs.annotate(custom_order=custom_order).order_by('custom_order', '-created')
+
             total = paystub_qs.count()
             project = get_object_or_404(Project,id=kwargs.get('pk'))
             submission = project.submission
+
             data = {
             'id': project.id,
             'status':project.status,
@@ -138,7 +139,7 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
                if 'project_status' in filter_json:
                    if 'terminated' in filter_json['project_status']:
-                       filter_json['project_status'].append(terminated_status)
+                       filter_json['project_status'].extend(terminated_status)
                    if 'active' in filter_json['project_status']:
                        # filter_json['project_status'].remove('active')
                        filter_json['project_status'].append('joined')
@@ -148,7 +149,7 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                if 'paystub_status' in filter_json:
                    if 'pending' in filter_json['paystub_status']:
                        filter_json['paystub_status'].remove('pending')
-                       filter_json['paystub_status'].append(['submitted', 'updated'])
+                       filter_json['paystub_status'].extend(['submitted', 'updated'])
                    project_qs = project_qs.filter(
                        statuses__status__in=filter_json['paystub_status'])
 
@@ -223,7 +224,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 if 'timesheet_status' in filter_json:
                     if 'pending' in filter_json['timesheet_status']:
                         filter_json['timesheet_status'].remove('pending')
-                        filter_json['timesheet_status'].append(['submitted', 'updated'])
+                        filter_json['timesheet_status'].extend(['submitted', 'updated'])
                     timesheet_qs = timesheet_qs.filter(status__in=filter_json['timesheet_status'])
                 else:
                     timesheet_qs = timesheet_qs.exclude(status='draft')
@@ -288,6 +289,8 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 submission__work_type="c2c", timesheets__isnull=False
             ).order_by('id').distinct('id')
 
+            context_data = {'timesheet_status': None}
+
             if filter_json:
                 if 'client' in filter_json:
                     project_qs = project_qs.filter(submission__client__in=filter_json['client'])
@@ -297,19 +300,21 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
                 if 'project_status' in filter_json:
                     if 'terminated' in filter_json['project_status']:
-                        filter_json['project_status'].append(terminated_status)
+                        filter_json['project_status'].extend(terminated_status)
                     if 'active' in filter_json['project_status']:
-                        # filter_json['project_status'].remove('active')
                         filter_json['project_status'].append('joined')
                     project_qs = project_qs.filter(
                         statuses__status__in=filter_json['project_status'], statuses__is_current=True)
 
                 if 'timesheet_status' in filter_json:
+                    context_data = {'timesheet_status': filter_json['timesheet_status']}
                     if 'pending' in filter_json['timesheet_status']:
-                        # filter_json['timesheet_status'].remove('pending')
-                        filter_json['timesheet_status'].append(['submitted', 'updated'])
+                        filter_json['timesheet_status'].extend(['submitted', 'updated'])
                     project_qs = project_qs.filter(
                         timesheets__status__in=filter_json['timesheet_status'])
+                    if 'pending' in filter_json['timesheet_status']:
+                        filter_json['timesheet_status'].remove('submitted')
+                        filter_json['timesheet_status'].remove('updated')
 
                 if 'start' in filter_json:
                     project_qs = project_qs.filter(timesheets__start__gte=filter_json['start'])
@@ -339,7 +344,7 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                 )
             ).order_by("id", "custom_status").distinct("id")
 
-            project_serializer = FinanceSerializer(project_qs[first:last], many=True)
+            project_serializer = FinanceSerializer(project_qs[first:last], many=True,context=context_data)
 
             data = {
                 "pending_timesheet": project_qs.filter(timesheets__status__in=["updated", "submitted"]).count(),
@@ -379,39 +384,65 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
     @action(methods=["post"], detail=False, url_name="send_reminder")
     def send_reminder(self, request, *args, **kwargs):
-        try:
-            consultant_ids = request.data.get('consultant_ids', [])
-            start = request.data.get('start', None)
-            end = request.data.get('end', None)
-            if not consultant_ids:
-                return Response({"message": "mail sent"}, status=400)
+        consultant_ids = request.data.get('consultant_ids', [])
+        timesheet_ids = request.data.get('timesheet_ids', [])
+        start = request.data.get('start', None)
+        end = request.data.get('end', None)
+
+        if not consultant_ids and not timesheet_ids:
+            return Response({"message": "Mail not sent"}, status=400)
+
+        cc = [config.FINANCE, 'yash.j@consultadd.com']
+        bcc = []
+
+        if consultant_ids:
+            timesheet_data = []
             for consultant_id in consultant_ids:
                 consultant = Consultant.objects.get(id=consultant_id)
-                timesheet_list = TimeSheet.objects.filter(
-                    status='draft', project__consultant__id=consultant_id, is_active=True
+                timesheets = TimeSheet.objects.filter(
+                    status='draft',
+                    project__consultant__id=consultant_id,
+                    is_active=True,
                 )
 
                 if start is not None:
-                    timesheet_list = timesheet_list.filter(start__gte=start)
+                    timesheets = timesheets.filter(start__gte=start)
 
                 if end is not None:
-                    timesheet_list = timesheet_list.filter(end__lte=end)
+                    timesheets = timesheets.filter(end__lte=end)
+
+                timesheet_data.append(timesheets)
+
                 mail_data = {
-                    'cc': [config.FINANCE, 'yash.j@consultadd.com'],
-                    'bcc': [],
+                    'cc': cc,
+                    'bcc': bcc,
                     'template': '../templates/reminder.html',
                     'to': [consultant.email],
                     'subject': "Timesheet reminder",
                     'context': {
                         'consultant': consultant.name,
-                        'timesheet_list': timesheet_list
+                        'timesheet_list': timesheet_data,
                     }
                 }
                 send_email_(mail_data, 'sakshi.shetty@consultadd.com', request=request)
-            return Response({"message": "mail sent"}, status=202)
-        except Exception as error:
-            write_exception(error, request)
-            return Response({'error': str(error)}, status=400)
+
+        else:
+            timesheets = TimeSheet.objects.filter(id__in=timesheet_ids)
+            consultant_email = timesheets[0].project.consultant.email
+            mail_data = {
+                'cc': cc,
+                'bcc': bcc,
+                'template': '../templates/reminder.html',
+                'to': [consultant_email],
+                'subject': "Timesheet reminder",
+                'context': {
+                    'consultant': timesheets[0].project.consultant.name,
+                    'timesheet_list': timesheets,
+                }
+            }
+            send_email_(mail_data, 'sakshi.shetty@consultadd.com', request=request)
+
+        return Response({"message": "Mail sent"}, status=202)
 
     @action(methods=["get"], detail=True, url_name="projects")
     def projects(self, request, *args, **kwargs):

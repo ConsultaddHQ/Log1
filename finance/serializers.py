@@ -14,11 +14,13 @@ class FinanceSerializer(serializers.ModelSerializer):
         model = Project
         fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'timesheet_frequency', 'consultant', 'submission')
 
-    @staticmethod
-    def get_timesheet_status(obj):
-        ts_obj = TimeSheet.objects.filter(project=obj, status__in=["updated", "submitted"])
+    def get_timesheet_status(self, obj):
+        status = self.context.get('timesheet_status')
+        if status:
+            return status[0]
+        ts_obj = TimeSheet.objects.filter(project=obj, status__in=["updated", "submitted"]).exclude(status='draft')
         try:
-            ts_status = ts_obj.latest().status if ts_obj else TimeSheet.objects.filter(
+            ts_status = "pending" if ts_obj else TimeSheet.objects.filter(
                 project=obj).latest().status
         except:
             ts_status = None
