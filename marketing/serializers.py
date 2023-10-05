@@ -449,8 +449,9 @@ class SubmissionConProfile(serializers.ModelSerializer):
 
 
 class InterviewV2Serializer(serializers.ModelSerializer):
-    supervisor = serializers.SerializerMethodField()
     guest = UserDetailSerializer(many=True)
+    call_type = serializers.SerializerMethodField()
+    supervisor = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
     guest_feedback = serializers.SerializerMethodField()
@@ -481,6 +482,13 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_marketer_name(obj):
         return obj.submission.created_by.employee_name
+
+    @staticmethod
+    def get_call_type(obj):
+        if obj.call_type:
+            return {"id": obj.call_type.id, "name": obj.call_type.display_name}
+        else:
+            return {}
 
     @staticmethod
     def get_allow_status_change(obj):
