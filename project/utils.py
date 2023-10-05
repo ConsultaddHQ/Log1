@@ -277,6 +277,7 @@ class ProjectUtil:
             c2c_count = Project.objects.filter(
                 statuses__status=project_status, statuses__created__gte=day_one,
                 submission__work_type="c2c"
+
             ).count()
             team_count = Project.objects.filter(
                 statuses__status=project_status,

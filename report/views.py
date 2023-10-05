@@ -862,12 +862,14 @@ class MarketingReportViewSets(GenericViewSet):
 
             col_name = [
                 {"name": "team", "display_name": "Team Name"},
-                {"name": "scrum_master", "display_name": "Scrum Master"},
-                {"name": "bench_consultant", "display_name": "Bench Consultant"},
-                {"name": "submission_count", "display_name": "Submission Count"},
-                {"name": "interview_count", "display_name": "Interview Count"},
                 {"name": "offer_count", "display_name": "Offer Count"},
                 {"name": "joined_count", "display_name": "Joined Count"},
+                {"name": "scrum_master", "display_name": "Scrum Master"},
+                {"name": "interview_count", "display_name": "Interview Count"},
+                {"name": "bench_consultant", "display_name": "Bench Consultant"},
+                {"name": "submission_count", "display_name": "Submission Count"},
+                {"name": "completion_count", "display_name": "completion Count"},
+                {"name": "termination_count", "display_name": "termination Count"},
             ]
             if export:
                 url = export_to_csv(

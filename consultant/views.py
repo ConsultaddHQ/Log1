@@ -1191,6 +1191,18 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                         if team in teams:
                             marketer_data[team.name]['marketers'].append(marketer_info)
 
+                    if marketer.associated_to.all():
+                        for team in marketer.associated_to.all():
+                            if team:
+                                team_obj = get_object_or_404(Team, id=team.id)
+
+                                marketer_info = {
+                                    'id': marketer.id,
+                                    'name': marketer.employee_name
+                                }
+                                if team_obj in teams:
+                                    marketer_data[team.name]['marketers'].append(marketer_info)
+
                 for team_info in marketer_data.values():
                     team_marketer_ids = set(marketer['id'] for marketer in team_info['marketers'])
 
@@ -1831,7 +1843,7 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
                 feedback_type=request.data.get('feedback_type'),
                 department=request.data.get('department', None),
             )
-            if feedback.feedback_type in ['engineering_issue', '2_week', 'independent']:
+            if feedback.feedback_type in ['engineering_issue', '2_week', 'independent', "monthly"]:
                 setattr(feedback, 'department', 'engineering')
                 feedback.save()
             #     if feedback.feedback_type == 'engineering_issue':

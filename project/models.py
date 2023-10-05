@@ -13,6 +13,7 @@ from utils_app.models import TimeStampedModel, Choice
 
 FEEDBACK_CHOICES = (
     ('cfr', 'CFR'),
+    ('monthly', 'Monthly'),
     ('green_card', 'Green Card'),
     ('independent', 'Independent'),
     ('pre_joining', 'Pre Joining'),
@@ -415,8 +416,8 @@ class ProjectPaymentTerm(TimeStampedModel):
     )
     comment = models.TextField(_("Comment"), null=True, blank=True)
     term_end = models.DateTimeField(_("Term_End"), null=True, blank=True)
-    consultant_payment_term = models.FloatField(_('Consultant Payment Term'), null=True, blank=True)
     payment_term = models.FloatField(_('Company Payment Term'), null=True, blank=True)
+    consultant_payment_term = models.FloatField(_('Consultant Payment Term'), null=True, blank=True)
     payment_term_type = models.CharField(_("Payment_Term_Type"), max_length=30, choices=PAYMENT_TERM_TYPE)
     project = models.ForeignKey(
         Project, on_delete=models.PROTECT,

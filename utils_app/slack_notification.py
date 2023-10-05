@@ -789,10 +789,23 @@ class MessageCard:
                                 "type": "mrkdwn",
                                 "text": f"*Role:* {payload.get('job_title', 'NA')}"
                             },
+
                             {
                                 "type": "mrkdwn",
                                 "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
                             },
+                            {
+                                "type": "mrkdwn",
+                                "text": f"*Job Type:* {payload.get('project_type', 'NA')}"
+                            },
+                        ]
+                    },
+                    {
+                        "type": "divider"
+                    },
+                    {
+                        "type": "section",
+                        "fields": [
                             {
                                 "type": "mrkdwn",
                                 "text": f"*Recruiter:* {payload.get('recruiter_name', 'NA')}"
@@ -1023,7 +1036,6 @@ class MessageCard:
                                     "type": "mrkdwn",
                                     "text": f"*`{sl}.`* *CTB:* {data.get('ctb', None)}\n\t   "
                                             f"*Round:* {data.get('round', 1)}\n\t   *Type:* {data.get('type', None)}\n\t"
-                                            f" *Call Type:* {data.get('call_type', None)}\n\t "
                                             f"   *Time:* {data.get('start', None).split('::')[1]}\n\t   "
                                             f"*Project Type:* {data.get('project_type')}"
                                 },
@@ -1031,6 +1043,7 @@ class MessageCard:
                                     "type": "mrkdwn",
                                     "text": f"`Consultant` {data.get('consultant')}\n `Client` {data.get('client', None)} "
                                             f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
+                                            f"\n `Call Type` {data.get('call_type')}"
                                 }
                             ]
                         },
