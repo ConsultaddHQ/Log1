@@ -140,3 +140,18 @@ def export_to_csv(payload, columns, filename, request=None, report_type=None):
     except Exception as error:
         write_exception(error, request)
         return ""
+
+
+def validate_data(mandatory_fields=[], data={}):
+    try:
+        missing_fields = []
+        for mandatory_field in mandatory_fields:
+            if not(mandatory_field in data and data[mandatory_field] not in [None, '']):
+                missing_fields.append(mandatory_field)
+        error_string = ', '.join(field for field in missing_fields)
+        if error_string:
+            return False, f'{error_string} {"is" if len(missing_fields) == 1 else "are"} mandatory.'
+        return True, ''
+    except Exception as error:
+        write_exception(message=error)
+        return str(error), False

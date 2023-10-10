@@ -8,6 +8,7 @@ from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from log1.utils import write_exception
 from employee.models import User, Handover
 from employee.serializers import Token, UserSerializerLogin, HandoverSerializer, HandoverUserSerializer
+from utils_app.utils import validate_data
 
 
 # Route - /impersonate/
@@ -19,6 +20,11 @@ class ImpersonateViewSets(GenericViewSet, ListModelMixin, CreateModelMixin):
 
     def create(self, request, *args, **kwargs):
         try:
+            mandatory_fields = ['id']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             user_id = request.data.get('id')
             if not User.objects.filter(id=user_id).exists():
                 return Response({"message": "User does not exist"}, status=404)

@@ -18,6 +18,7 @@ from marketing.models import Submission, Interview
 from consultant.utils import send_notification_for_user
 from notification.utils import create_notification, push_notification
 from activity.serializers import ActivitySerializer, CommentGetSerializer
+from utils_app.utils import validate_data
 
 
 def create_activity(object_id, model, user, desc, activity_type):
@@ -95,6 +96,11 @@ class CommentViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     def create(self, request, *args, **kwargs):
         model = request.data.get('model', None)
         try:
+            mandatory_fields = ['comment_text', 'id', 'model']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             content_type = ContentType.objects.get(model=model)
             comment = Comment.objects.create(
                 user=request.user,

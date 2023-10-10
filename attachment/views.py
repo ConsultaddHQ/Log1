@@ -14,6 +14,7 @@ from project.utils import get_project_check_list
 from log1.utils import write_exception, ERROR_MSG
 from utils_app.aws_utils import get_s3_object, presigned_post_url
 from attachment.serializers import Attachment, AttachmentSerializer
+from utils_app.utils import validate_data
 
 
 # Route - /attachment/
@@ -53,6 +54,11 @@ class AttachmentView(RetrieveModelMixin, CreateModelMixin, DestroyModelMixin, Ge
                 )
                 if resume:
                     return Response({"message": "You can't attach multiple resumes"}, status=400)
+
+            mandatory_fields = ['obj_type', 'object_id', 'file', 'attachment_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
 
             attachment = Attachment.objects.create(
                 object_id=object_id,

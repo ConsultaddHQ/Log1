@@ -16,7 +16,7 @@ from consultant.serializers import *
 from employee.models import tag_users
 from project.utils import fetch_scrum_masters
 
-from utils_app.utils import get_timezone
+from utils_app.utils import get_timezone, validate_data
 from utils_app.ms_account import MicrosoftAccount
 from attachment.serializers import AttachmentSerializer
 from utils_app.utils import get_timezone, add_export_log
@@ -292,19 +292,16 @@ class ConsultantViewSets(ModelViewSet):
         if not ('superadmin' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         data = request.data
-        mandatory_fields = {'name', 'email', 'country', 'current_city', 'recruiter', 'ssn', 'skills', 'gender',
-                            'phone_no', 'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'payroll_employer',
-                            'employer_start_date', 'marital_status'}
-        missing_fields =[]
-        for mandatory_field in mandatory_fields:
-            if not (mandatory_field in data and data[mandatory_field] not in [None, '']):
-                missing_fields.append(mandatory_field)
-        error_string = ', '.join(field for field in missing_fields)
-        if error_string:
-            return Response({'message': f'{error_string} {"is" if len(missing_fields)==1 else "are"} mandatory.'}, status=400)
+
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
             return Response({"message": "Consultant Already Exist"}, status=400)
+        mandatory_fields = ['name', 'email', 'country', 'current_city', 'recruiter', 'ssn', 'skills', 'gender',
+                            'phone_no', 'date_of_birth', 'visa_type', 'visa_start', 'visa_end', 'payroll_employer',
+                            'employer_start_date', 'marital_status']
+        is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=data)
+        if not is_valid:
+            return Response({'message': message}, status=400)
         try:
             consultant = Consultant.objects.create(
                 ssn=data['ssn'],
@@ -386,6 +383,11 @@ class ConsultantViewSets(ModelViewSet):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             consultant = get_object_or_404(Consultant, id=kwargs.get('pk'))
+            mandatory_fields = ['name', 'email', 'country', 'current_city', 'ssn', 'skills', 'gender','phone_no',
+                                'date_of_birth', 'marital_status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             serializer = ConsultantUpdateSerializer(consultant, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
 
@@ -485,6 +487,11 @@ class ConsultantViewSets(ModelViewSet):
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
+        mandatory_fields = ['major', 'city', 'org_name', 'end_date', 'edu_type']
+        is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+        if not is_valid:
+            return Response({'message': message}, status=400)
+
         if request.method == 'POST':
             try:
                 data = request.data
@@ -534,6 +541,11 @@ class ConsultantViewSets(ModelViewSet):
         roles = request.user.roles
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+        mandatory_fields = ['city', 'company', 'exp_type', 'end_date', 'start_date', 'title']
+        is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+        if not is_valid:
+            return Response({'message': message}, status=400)
 
         if request.method == 'POST':
             try:
@@ -620,6 +632,10 @@ class ConsultantViewSets(ModelViewSet):
             try:
                 employer = PayrollEmployer.objects.get(id=pk)
                 prev_start = employer.start
+                mandatory_fields = ['name', 'start']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 serializer = PayrollEmployerSerializer(employer, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save()
@@ -638,6 +654,10 @@ class ConsultantViewSets(ModelViewSet):
         else:
             try:
                 consultant = get_object_or_404(Consultant, id=pk)
+                mandatory_fields = ['name', 'start']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 serializer = PayrollEmployerSerializer(data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
                 serializer.save(consultant=consultant)
@@ -673,6 +693,11 @@ class ConsultantViewSets(ModelViewSet):
                     prev_rate = prev_rate_obj.rate
                     prev_rate_obj.end = datetime.today()
                     prev_rate_obj.save()
+
+                mandatory_fields = ['consultant', 'rate', 'start']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
 
                 rate_obj = ConsultantRateRevision.objects.create(
                     previous_rate=prev_rate,
@@ -900,6 +925,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
                 future_date = fut_marketing.first().start
                 return Response({"message": f"Marketing will start on {str(future_date)}"}, status=400)
 
+            mandatory_fields = ['consultant', 'in_pool', 'marketing_start', 'preferred_location', 'reset_days', 'rtg',
+                                'teams_marketer']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             if queryset:
                 latest_marketing_cycle = queryset.latest('end')
             else:
@@ -994,6 +1025,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
     def stop_marketing(self, request, pk):
         try:
             marketing = get_object_or_404(ConsultantMarketing, id=pk)
+
+            mandatory_fields = ['end']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             marketing.end = request.data.get('end')
             marketing.save()
             close_marketing()
@@ -1043,6 +1080,11 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             roles = request.user.roles
             if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
                                          in consultant_marketing.teams.all()):
+                mandatory_fields = ['marketers']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
+
                 marketer_ids = request.data.get('marketers', None)
                 marketers_name = []
                 for marketer_id in marketer_ids:
@@ -1079,6 +1121,11 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 return Response({"message": "Consultant is not in Marketing"})
             if 'superadmin' or 'recruiter' in request.user.roles:
+                mandatory_fields = ['teams']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
+
                 team_ids = request.data.get('teams')
                 for team_id in team_ids:
                     team = get_object_or_404(Team, id=team_id)
@@ -1114,6 +1161,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             if 'superadmin' in roles or (('admin' in roles or 'proxy' in roles) and request.user.team
                                          in consultant_marketing.teams.all()):
                 marketers_name = []
+
+                mandatory_fields = ['marketers']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
+
                 marketer_ids = request.data.get('marketers', None)
                 for marketer_id in marketer_ids:
                     marketer = get_object_or_404(User, id=marketer_id)
@@ -1146,6 +1199,12 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 return Response({"message": "Consultant is not in Marketing"})
             if 'superadmin' in request.user.roles:
+
+                mandatory_fields = ['teams']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
+
                 team_ids = request.data.get('teams')
                 team_string = []
                 for team_id in team_ids:
@@ -1234,6 +1293,10 @@ class ConsultantMarketingViewSets(CreateModelMixin, ListModelMixin, UpdateModelM
             else:
                 return Response({"message": "Consultant is not in Marketing"})
             if 'superadmin' or 'recruiter' in request.user.roles:
+                mandatory_fields = ['teams_marketer']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 teams_marketer = request.data.get('teams_marketer', [])
 
                 updated_team_ids = {data['team'] for data in teams_marketer}
@@ -1383,6 +1446,12 @@ class ConsultantProfileViewSets(ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
+
+            mandatory_fields = ['consultant', 'current_city', 'dob', 'visa_end', 'visa_start', 'visa_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             suffix = data['title'].strip()
             name = request.user.employee_name
             initials = name.split()[0][0] + name.split()[1][0] if len(name.split()) > 1 else ""
@@ -1418,6 +1487,12 @@ class ConsultantProfileViewSets(ModelViewSet):
     def update(self, request, *args, **kwargs):
         try:
             profile = get_object_or_404(ConsultantProfile, id=kwargs.get('pk'))
+
+            mandatory_fields = ['current_city', 'date_of_birth', 'visa_end', 'visa_start', 'visa_type', 'title']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             serializer = self.serializer_class(profile, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -1451,6 +1526,12 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
         if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
+
+            mandatory_fields = ['consultant', 'poc', 'poc_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             poc_type = request.data['poc_type']
             if poc_type == 'relation':
                 poc_type = 'retention'
@@ -1487,6 +1568,12 @@ class ConsultantPOCViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             instance = get_object_or_404(ConsultantPOC, id=kwargs.get('pk'))
+
+            mandatory_fields = ['consultant', 'poc', 'poc_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             serializer = self.serializer_class(instance, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -1526,6 +1613,12 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
                 previous_work_auth = instance.first()
                 previous_work_auth.is_current = False
                 previous_work_auth.save()
+
+            mandatory_fields = ['consultant', 'visa_end', 'visa_start', 'visa_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             work_auth = WorkAuth.objects.create(
                 is_current=True,
                 visa_type=request.data['visa_type'],
@@ -1561,6 +1654,12 @@ class WorkAuthViewSets(CreateModelMixin, UpdateModelMixin, GenericViewSet):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         try:
             work_auth = get_object_or_404(WorkAuth, id=kwargs.get('pk'))
+
+            mandatory_fields = ['consultant', 'visa_end', 'visa_start', 'visa_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             serializer = self.serializer_class(work_auth, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -1650,6 +1749,11 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
             if not ('superadmin' in roles or 'recruiter' in roles or 'retention' in roles or 'finance' in roles):
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
+            mandatory_fields = ['consultant', 'legal_action', 'rehire', 'type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             consultant = get_object_or_404(Consultant, id=request.data.get('consultant'))
             con_exit = ConsultantExit.objects.create(
                 status='in_process',
@@ -1704,6 +1808,11 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
 
             con_exit = get_object_or_404(ConsultantExit, id=kwargs.get('pk'))
 
+            mandatory_fields = ['legal_action', 'rehire', 'type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             #  Message for exit interview
             if request.data.get('exit_details', None) and not con_exit.exit_details:
                 send_exit_interview_detail(con_exit, request)
@@ -1736,6 +1845,11 @@ class ConsultantExitViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixi
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
             con_exit = get_object_or_404(ConsultantExit, id=pk)
+
+            mandatory_fields = ['cancel_reason']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
 
             if request.data.get('cancel_reason', None) and not con_exit.last_date or con_exit.last_date > date.today():
                 con_exit.status = 'cancelled'
@@ -1831,6 +1945,12 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
     def create(self, request, *args, **kwargs):
         try:
             user_list = []
+
+            mandatory_fields = ['description', 'feedback_type', 'rating']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             feedback = ConsultantFeedback.objects.create(
                 created_by=request.user,
                 project_id=request.data.get('project'),
@@ -1892,6 +2012,11 @@ class ConsultantFeedbackViewSet(GenericViewSet, CreateModelMixin, UpdateModelMix
             feedback = get_object_or_404(ConsultantFeedback, id=kwargs.get('pk'))
             if feedback.created_by != request.user:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            mandatory_fields = ['department', 'description', 'feedback_type', 'rating']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
 
             serializer = self.serializer_class(feedback, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
