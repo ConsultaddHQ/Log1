@@ -215,6 +215,7 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
 class InterviewListSerializer(serializers.ModelSerializer):
     guest = serializers.SerializerMethodField()
+    call_type = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
     supervisor_detail = serializers.SerializerMethodField()
@@ -243,6 +244,10 @@ class InterviewListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_consultant_name(obj):
         return obj.consultant.name
+
+    @staticmethod
+    def get_call_type(obj):
+        return obj.call_type.display_name if obj.call_type else "NA"
 
     @staticmethod
     def get_supervisor_detail(obj):

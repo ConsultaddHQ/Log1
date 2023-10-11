@@ -1368,10 +1368,11 @@ class InterviewViewSets(ModelViewSet):
 
         details = [
             obj.id, start_time, obj.marketer.employee_name, obj.consultant.name,
-            work_auth.get_visa_type_display() if work_auth else '', obj.supervisor.employee_name,
+            work_auth.get_visa_type_display() if work_auth else 'NA', obj.supervisor.employee_name,
             obj.submission.lead.job_title, obj.submission.client, obj.submission.vendor.name, obj.status,
             obj.feedback, obj.failure_reason, obj.coding_present, coders,
-            supervisor_remark.first().answer if supervisor_remark else '', obj.guest_remark, supervisor_feedback,
+            obj.call_type.display_name if obj.call_type else "NA",
+            supervisor_remark.first().answer if supervisor_remark else 'NA', obj.guest_remark, supervisor_feedback,
             guest_feedback
         ]
         return details
@@ -1395,8 +1396,8 @@ class InterviewViewSets(ModelViewSet):
             writer.writerow(
                 ['Interview Id', 'Interview Time', 'Marketer Name', 'Consultant Name', 'Work Auth', 'Supervisor',
                  'Job Title', 'Client', 'Vendor', 'Interview Status', 'Interview Feedback', 'Failure Reason',
-                 'Coding Present', 'Coders', 'Supervisor Remark', 'Coders Remark', 'Supervisor Feedback',
-                 'Coder Feedback']
+                 'Coding Present', 'Coders', 'Call Type', 'Supervisor Remark', 'Coders Remark',
+                 'Supervisor Feedback', 'Coder Feedback']
             )
             response['Content-Disposition'] = "attachment; filename=InterviewFeedbackReport.csv"
             for obj in queryset:
@@ -1408,6 +1409,9 @@ class InterviewViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
+        if 'call_type' not in request.data or not request.data['call_type']:
+            return Response({"message": "Call Type info is missing"}, status=400)
+
         try:
             # Change status of past Interview to feedback due
             change_to_feedback_due()

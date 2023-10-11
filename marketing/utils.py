@@ -480,16 +480,17 @@ def get_interview_report(payload, request):
         writer = csv.writer(response)
         writer.writerow([
             "Interview Id", "Consultant Name", "Marketer Name", "Supervisor Name", "Client Name", "Vendor Name",
-            "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack", "Status", "Failure Reason", "Passed Reason"
+            "Call Type", "Round", "Scheduled At", "Mode", "Screening Type", "Tech Stack", "Status", "Failure Reason",
+            "Passed Reason"
         ])
         for data in payload:
             writer.writerow([
                 data.get('id', None), data.get('consultant_name', None), data['submission'].get('marketer_name', None),
                 f"{data['supervisor_detail']['supervisor_name']}({data['supervisor_detail']['call_given_by']})",
-                data['submission'].get('client', None), data['submission'].get('vendor', None), data.get('round', None),
-                data.get('start_time', None), data.get('interview_mode', None), data.get('screening_type', None),
-                data.get('tech_stack', None), data.get('status', None), data.get('failure_reason', None),
-                data.get('passed_reason', None),
+                data['submission'].get('client', None), data['submission'].get('vendor', None),
+                data['call_type'], data.get('round', None), data.get('start_time', None),
+                data.get('interview_mode', None), data.get('screening_type', None), data.get('tech_stack', None),
+                data.get('status', None), data.get('failure_reason', None), data.get('passed_reason', None)
             ])
         return response
     except Exception as error:
