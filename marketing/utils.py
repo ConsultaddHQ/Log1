@@ -485,10 +485,12 @@ def get_interview_report(payload, request):
         ])
         for data in payload:
             writer.writerow([
-                data.get('id', None), data.get('consultant_name', None), data['submission'].get('marketer_name', None),
-                f"{data['supervisor_detail']['supervisor_name']}({data['supervisor_detail']['call_given_by']})",
-                data['submission'].get('client', None), data['submission'].get('vendor', None),
-                data['call_type'], data.get('round', None), data.get('start_time', None),
+                data.get('id', None), data.get('consultant_name', None),
+                data.get('submission').get('marketer_name', None),
+                f"{data.get('supervisor_detail').get('supervisor_name')}"
+                f"({data.get('supervisor_detail').get('call_given_by')})",
+                data.get('submission').get('client', None), data.get('submission').get('vendor', None),
+                data.get('call_type'), data.get('round', None), data.get('start_time', None),
                 data.get('interview_mode', None), data.get('screening_type', None), data.get('tech_stack', None),
                 data.get('status', None), data.get('failure_reason', None), data.get('passed_reason', None)
             ])

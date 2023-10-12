@@ -1409,7 +1409,7 @@ class InterviewViewSets(ModelViewSet):
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
     def create(self, request, *args, **kwargs):
-        if 'call_type' not in request.data or not request.data['call_type']:
+        if 'call_type' not in request.data or not request.data.get('call_type'):
             return Response({"message": "Call Type info is missing"}, status=400)
 
         try:
