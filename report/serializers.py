@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-CHECK_FOR_NAME = ['Submission', 'Interview', 'Project']
-CHECK_FOR_ID = ['Interview', 'Project']
+CHECK_FOR_NAME_FIELD = ['Submission', 'Interview', 'Project']
+CHECK_FOR_ID_FIELD = ['Interview', 'Project']
 
 
 class ReportSerializer(serializers.Serializer):
