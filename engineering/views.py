@@ -17,7 +17,7 @@ from employee.models import Team, Role
 from engineering.serializers import *
 from marketing.models import Interview
 from marketing.utils import date_filter
-from utils_app.utils import TECHNOLOGIES, export_to_csv
+from utils_app.utils import TECHNOLOGIES, export_to_csv, validate_data
 from activity.views import create_activity
 from employee.serializers import TeamSerializer
 from attachment.models import Attachment, create_attachment
@@ -341,6 +341,10 @@ class EngineeringViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
     def support(self, request, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('pk'))
+            mandatory_fields = ['is_required']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             project.support_required = request.data.get('is_required')
             project.save()
 
@@ -384,6 +388,10 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
             data = copy.copy(request.data)
             data['update_by'] = request.user.id
             data['project'] = kwargs.get('project_id')
+            mandatory_fields = ['update', 'start']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             serializer = self.serializer_class(data=data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -413,6 +421,10 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def update(self, request, *args, **kwargs):
         try:
             update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            mandatory_fields = ['update', 'start']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             serializer = self.serializer_class(update, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -453,6 +465,10 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def add_document(self, request, *args, **kwargs):
         try:
             update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            mandatory_fields = ['file']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             file_data = {
                 "object_id": update.id,
                 "creator": request.user,
@@ -474,6 +490,10 @@ class ProjectUpdateViewSet(GenericViewSet, ListModelMixin, CreateModelMixin, Upd
     def remove_document(self, request, *args, **kwargs):
         try:
             update = get_object_or_404(ProjectUpdate, id=kwargs.get('pk'))
+            mandatory_fields = ['attachment_id']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             attachment = get_object_or_404(Attachment, id=request.data.get('attachment_id'))
             if update.update_by.id == request.user.id or attachment.creator.id == request.user.id:
                 file_name = attachment.attachment_file.name
@@ -557,6 +577,10 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     def create(self, request, *args, **kwargs):
         try:
             project = get_object_or_404(Project, id=kwargs.get('project_id'))
+            mandatory_fields = ['technology', 'timezone']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             if hasattr(project, 'description'):
                 serializer = ProjectDescriptionSerializer(project.description, request.data, partial=True)
             else:
@@ -584,6 +608,10 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
     def update(self, request, *args, **kwargs):
         try:
             description = ProjectDescription.objects.get(id=kwargs.get('pk'))
+            mandatory_fields = ['technology', 'timezone']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             serializer = ProjectDescriptionSerializer(description, request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -636,6 +664,10 @@ class ProjectSummaryViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
         try:
             project = get_object_or_404(Project, id=project_id)
             if request.method == 'PUT':
+                mandatory_fields = ['file']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 description, _ = ProjectDescription.objects.get_or_create(project=project)
                 if request.FILES.get('file', None):
                     content_type = ContentType.objects.get(model='projectdescription')
@@ -687,7 +719,10 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             qs = TrainingAgenda.objects.filter(project_id=kwargs.get('project_id'))
             if qs:
                 old_position = qs.aggregate(Max('position'))['position__max']
-
+            mandatory_fields = ['description', 'duration']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             TrainingAgenda.objects.create(
                 created_by=request.user,
                 position=old_position + 1,
@@ -713,6 +748,10 @@ class TrainingAgendaViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Cr
             if not qs:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             agenda = qs.first()
+            mandatory_fields = ['duration']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             serializer = self.serializer_class(agenda, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -764,6 +803,10 @@ class TrainingCheckListViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin)
     def update(self, request, *args, **kwargs):
         try:
             checklist = get_object_or_404(TrainingCheckList, id=kwargs.get('pk'))
+            mandatory_fields = ['status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             checklist.status = request.data.get('status')
             checklist.remark = request.data.get('remark', None)
             checklist.save()
@@ -1437,7 +1480,10 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
         try:
             if 'superadmin' not in request.user.roles and 'scrum_master' not in request.user.roles:
                 return Response({"message": "You don't have access"}, status=400)
-
+            mandatory_fields = ['name', 'scrum_timing']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             data = request.data
             team = Team.objects.filter(name=data['name'])
             if team:
@@ -1452,6 +1498,10 @@ class EngineeringTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin,
     def update(self, request, *args, **kwargs):
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
+            mandatory_fields = ['name', 'scrum_timing']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             serializer = TeamSerializer(team, data=request.data, partial=True)
             serializer.is_valid()
             serializer.save()
