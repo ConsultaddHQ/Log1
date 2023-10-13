@@ -111,16 +111,15 @@ def change_to_feedback_due():
             """
         tz = timezone('US/Eastern')
         time_est = datetime.now(tz).replace(tzinfo=timezone('UTC'))
-        previous_interviews = Interview.objects.filter(
-            start_time__lte=time_est, status__in=['scheduled', 'rescheduled']
-        )
+        previous_interviews = Interview.objects.filter(end_time__lt=time_est, status__in=['scheduled', 'rescheduled'])
         for interview in previous_interviews:
             interview.status = 'feedback_due'
             interview.save()
             data = {
                 "title": "interview feedback due",
                 "category": "alert",
-                "description": f"your {interview.submission.consultant_marketing.consultant.name} interview (I-{interview.id}) supervisor feedback is pending",
+                "description": f"your {interview.submission.consultant_marketing.consultant.name} interview"
+                               f" (I-{interview.id}) supervisor feedback is pending",
                 "parent_type": "submission",
                 "target_type": "interview",
                 "parent_id": interview.submission.id,
