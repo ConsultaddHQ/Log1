@@ -14,6 +14,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.mixins import ListModelMixin, CreateModelMixin
 
 from marketing.models import Interview
+from utils_app.utils import validate_data
 from project.models import ProjectSupport
 from consultant.permissions import ConsultantIsAuthenticated
 from log1.utils import get_page_limits, write_exception, ERROR_MSG
@@ -137,6 +138,10 @@ class EmployeeNotificationViewSet(ListModelMixin, GenericViewSet):
             user_id = request.data.get("user_id", None)
             if not user_id:
                 return Response({"user not found"}, status=404)
+            mandatory_fields = ['types']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             if 'interview' in type_list:
                 content_type = ContentType.objects.get(model='interview')
                 notification = UserNotification.objects.filter(user=user_id, content_type=content_type).first()
