@@ -460,6 +460,12 @@ class ProjectViewSets(ModelViewSet):
                 if 'work_type' in filters:
                     projects = projects.filter(submission__work_type__in=filters['work_type'])
 
+                if 'teams' in filters and len(filters["teams"]) > 0:
+                    projects = projects.filter(submission__marketing_team__name__in=filters['teams'])
+
+                if 'department' in filters and len(filters["department"]) > 0:
+                    projects = projects.filter(submission__marketing_team__dept__in=filters['department'])
+
                 if 'status' in filters and len(filters["status"]) > 0:
                     status_count = {
                         "total": projects.count(),

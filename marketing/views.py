@@ -694,6 +694,9 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                         consultant_marketing__consultant__name__in=filters['consultant']
                     )
 
+                if 'department' in filters and len(filters["department"]) > 0:
+                    queryset = queryset.filter(marketing_team__dept__in=filters['department'])
+
                 created = filters.get('created', None)
                 queryset = date_filter(queryset, created, 'created')
 
@@ -1252,6 +1255,12 @@ class InterviewViewSets(ModelViewSet):
                     queryset = queryset.filter(
                         submission__consultant_marketing__consultant__name__in=filters["consultant"]
                     )
+
+                if 'teams' in filters and len(filters["teams"]) > 0:
+                    queryset = queryset.filter(submission__marketing_team__name__in=filters['teams'])
+
+                if 'department' in filters and len(filters["department"]) > 0:
+                    queryset = queryset.filter(submission__marketing_team__dept__in=filters['department'])
 
                 start_time = filters.get('start_time', None)
                 queryset = date_filter(queryset, start_time, "start_time")
