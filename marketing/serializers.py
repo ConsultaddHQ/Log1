@@ -11,6 +11,8 @@ from consultant.serializers import ConsultantSerializer
 from employee.serializers import UserSerializer, UserDetailSerializer
 from attachment.serializers import AttachmentSerializer, AttachmentGetSerializer
 
+CONSULTANT_EMPLOYEE_ID = 9999
+
 
 class VendorCompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -215,6 +217,7 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
 class InterviewListSerializer(serializers.ModelSerializer):
     guest = serializers.SerializerMethodField()
+    call_type = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
     supervisor_detail = serializers.SerializerMethodField()
@@ -242,11 +245,15 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant_name(obj):
-        return obj.consultant.name
+        return obj.consultant.get('name') if obj.consultant else None
+
+    @staticmethod
+    def get_call_type(obj):
+        return obj.call_type.display_name if obj.call_type else "NA"
 
     @staticmethod
     def get_supervisor_detail(obj):
-        if obj.supervisor.employee_id == 9999:
+        if obj.supervisor.employee_id == CONSULTANT_EMPLOYEE_ID:
             data = {
                 "call_given_by": "Consultant",
                 "supervisor_name": obj.submission.consultant.name
