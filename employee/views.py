@@ -25,6 +25,7 @@ from .utils import valid_password
 from activity.models import Activity
 from consultant.models import Consultant
 from notification.models import FCMDevice
+from utils_app.utils import validate_data
 from activity.views import create_activity
 from utils_app.thred_mail import send_email
 from tracking.models import Devices, Location
@@ -97,7 +98,10 @@ class EmployeeAuthViewSets(GenericViewSet):
                     return Response({"message": "This user not found"}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({"message": "Employee Id is Empty"}, status=status.HTTP_400_BAD_REQUEST)
-
+            mandatory_fields = ['employee_id', 'password']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             user = queryset.first()
             user = authenticate(employee_id=user.employee_id, password=request.data.get('password').strip())
             if user:
@@ -229,6 +233,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
     def update(self, request, *args, **kwargs):
         try:
             user = get_object_or_404(User, id=kwargs.get('pk'))
+            mandatory_fields = ['employee_name', 'shift', 'team']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             serializer = UserSerializer(user, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -248,7 +256,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             password = request.data.get('password').strip()
             employee_id = int(request.data.get('employee_id'))
             team = Team.objects.get(name=request.data.get('team'))
-
+            mandatory_fields = ['name', 'email', 'employee_id', 'gender', 'password', 'phone', 'role', 'team']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             user = User.objects.filter(employee_id__exact=employee_id)
             if user:
                 return Response({"message": "User already exist",
@@ -285,6 +296,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             import pandas as pd
             file = request.FILES.get('file')
+            mandatory_fields = ['file']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             file_extension = file.name.split(".")[-1]
             if file_extension == 'csv':
                 df = pd.read_csv(file, encoding="ISO-8859-1", skip_blank_lines=False)
@@ -340,6 +355,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
             user_id = request.data.get('user_id')
             role_ids = request.data.get('role_id', [])
             team_id = request.data.get('team_id', None)
+            mandatory_fields = ['role_id', 'team_id', 'user_id']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             if 'superadmin' in request.user.roles:
                 user = get_object_or_404(User, id=user_id)
                 desc = ""
@@ -374,6 +393,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             user_id = request.data.get('user_id')
             account_login = request.data.get('active', None)
+            mandatory_fields = ['active', 'user_id']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             if request.user.is_superuser:
                 user = get_object_or_404(User, id=user_id)
                 if account_login is not None:
@@ -462,6 +485,10 @@ class EmployeeViewSets(GenericViewSet, ListModelMixin, RetrieveModelMixin, Creat
         try:
             current_password = request.data.get('cur_password')
             new_password = request.data.get('new_password')
+            mandatory_fields = ['cur_password', 'new_password']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             if request.user.check_password(current_password):
                 is_valid = valid_password(new_password)
                 if is_valid:
@@ -602,6 +629,10 @@ class ResetPasswordViewSets(GenericViewSet):
 
     @action(methods=['post'], detail=False, url_path='token_request')
     def token_request(self, request):
+        mandatory_fields = ['email']
+        is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+        if not is_valid:
+            return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
@@ -731,6 +762,10 @@ class ResetPasswordViewSets(GenericViewSet):
                 Response: The response indicating the result of token verification.
         """
         try:
+            mandatory_fields = ['token']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
                 return Response({'message': 'OTP Verified'}, status=status.HTTP_200_OK)
@@ -758,6 +793,10 @@ class ResetPasswordViewSets(GenericViewSet):
         try:
             reset_password_token, password, valid = self.valid_token(request.data)
             if valid:
+                mandatory_fields = ['password']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
                 is_valid = valid_password(request.data.get('password'))
                 if is_valid:
                     reset_password_token.user.set_password(password)
@@ -818,6 +857,10 @@ class AssetsViewSets(ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             data = request.data
+            mandatory_fields = ['asset_type', 'email', 'number', 'password', 'provider', 'username']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             asset = Asset.objects.create(
                 owner=request.user,
                 email=data['email'],
@@ -884,6 +927,10 @@ class AssetsViewSets(ModelViewSet):
         users = request.data.get('users', [])
         assets = request.data.get('assets', [])
         try:
+            mandatory_fields = ['users', 'assets']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             if len(assets) < 1:
                 return Response({"message": "Please select Asset"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -909,6 +956,10 @@ class AssetsViewSets(ModelViewSet):
     def un_share(self, request, pk):
         try:
             asset = get_object_or_404(Asset, id=pk, owner=request.user)
+            mandatory_fields = ['user']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             user = User.objects.get(id=request.data.get('user'))
             asset.shared_to.remove(user)
             desc = f"{request.user.employee_name} Unshared {user.employee_name} from {asset.asset_type} asset"
@@ -924,6 +975,10 @@ class AssetsViewSets(ModelViewSet):
         try:
             import pandas as pd
             file = request.FILES.get('file')
+            mandatory_fields = ['file']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             file_extension = file.name.split(".")[-1]
             if file_extension == 'csv':
                 df = pd.read_csv(file, encoding="ISO-8859-1", skip_blank_lines=False)
@@ -1073,6 +1128,10 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
     def create(self, request, *args, **kwargs):
         try:
             if 'superadmin' in request.user.roles:
+                mandatory_fields = ['user_id', 'handover_to_id']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
                 user = get_object_or_404(User, id=request.data.get('user_id'))
                 handover_to = get_object_or_404(User, id=request.data.get('handover_to_id'))
                 handover, created = Handover.objects.get_or_create(user=user)
@@ -1093,6 +1152,10 @@ class HandoverViewSets(GenericViewSet, CreateModelMixin, UpdateModelMixin, Destr
             if 'superadmin' in request.user.roles:
                 user_id = kwargs.get('pk', None)
                 user = get_object_or_404(User, id=user_id)
+                mandatory_fields = ['user_id', 'handover_to_id']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
                 handover_to = get_object_or_404(User, id=request.data.get('handover_to_id'))
                 qs = Handover.objects.filter(user_id=user_id)
                 if qs:
@@ -1300,6 +1363,10 @@ class DefaultCalendarViewSets(GenericViewSet, CreateModelMixin, ListModelMixin):
 
     def create(self, request, *args, **kwargs):
         try:
+            mandatory_fields = ['emails']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             if type(request.data['emails']) is list:
                 obj, msg = DefaultCalendar.objects.get_or_create(user=request.user)
                 obj.emails = request.data['emails']
@@ -1354,6 +1421,10 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
 
     def create(self, request, *args, **kwargs):
         try:
+            mandatory_fields = ['certificate_name', 'has_expiry', 'issued_date', 'organization']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             certificate_name = request.data.get('certificate_name', None)
             organization = request.data.get('organization', None)
             certificate = Certificate.objects.filter(name=certificate_name, issued_by=organization).first()
@@ -1380,6 +1451,10 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
     def update(self, request, *args, **kwargs):
         try:
             certificate_info = get_object_or_404(CertificateInfo, id=kwargs.get('pk'))
+            mandatory_fields = ['certificate_name', 'has_expiry', 'issued_date', 'organization']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             serializer = self.serializer_class(certificate_info, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -1402,6 +1477,10 @@ class CertificateViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, Upda
     def mark_certificate(self, request, *args, **kwargs):
         try:
             user = get_object_or_404(User, id=request.user.id)
+            mandatory_fields = ['have_certificate']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             user.have_certificate = request.data.get('have_certificate')
             user.save()
             return Response({"data": "Data updated successfully"}, status=status.HTTP_202_ACCEPTED)
