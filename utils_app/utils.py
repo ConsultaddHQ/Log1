@@ -146,7 +146,7 @@ def validate_data(mandatory_fields=[], data={}):
     try:
         missing_fields = []
         for mandatory_field in mandatory_fields:
-            if not(mandatory_field in data and data[mandatory_field] not in [None, '']):
+            if not(mandatory_field in data and data[mandatory_field] not in [None, '', []]):
                 missing_fields.append(mandatory_field)
         error_string = ', '.join(field for field in missing_fields)
         if error_string:
