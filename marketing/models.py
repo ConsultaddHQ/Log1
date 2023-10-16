@@ -375,8 +375,8 @@ class Test(TimeStampedModel):
 class InterviewerProfile(TimeStampedModel):
     client = models.CharField(_('Client'), max_length=100)
     name = models.CharField(_('Interviewer Name'), max_length=80)
+    linkedin = models.TextField(_('Interviewer Linkedin'), blank=True, null=True)
     email = models.CharField(_('Interviewer Email'), max_length=100, blank=True, null=True)
-    linkedin = models.CharField(_('Interviewer Linkedin'), max_length=340, blank=True, null=True)
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT,
         related_name='interviewer_profile',
