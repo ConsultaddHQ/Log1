@@ -3689,12 +3689,3 @@ class MarketingAPIViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, Up
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, 'error': error}, status=400)
-
-
-class InterviewerViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, UpdateModelMixin, CreateModelMixin):
-    queryset = Interviewer.objects.all()
-    permission_classes = (IsAuthenticated,)
-    # serializer_class = TeamStructureSerializer
-    authentication_classes = (TokenAuthentication,)
-
-    # def create(self):
