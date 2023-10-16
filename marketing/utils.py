@@ -16,7 +16,7 @@ from utils_app.models import Choice
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from notification.models import FCMDevice, UserNotification
-from marketing.models import Submission, Interview, Question, Answer
+from marketing.models import Submission, Interview, Question, Answer, InterviewerProfile
 
 from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
@@ -529,3 +529,41 @@ def delete_supervisor_notification():
     except Exception as error:
         write_exception(error, None)
         return str(error), False
+
+
+def assign_interviewee(obj, request):
+    try:
+        interviewers_profiles = request.data.get('interviewer_profiles')
+        for interviewer in interviewers_profiles:
+            if interviewer.get('id', None):
+                interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
+                obj.interviewers.add(interviewer_obj)
+            else:
+                interviewer_obj = InterviewerProfile.objects.create(
+                    name=interviewer.get('name'), email=interviewer.get('email', None),
+                    submitted_by=request.user, linkedin=interviewer.get('linkedin', None), client=obj.submission.client
+                )
+            obj.interviewers.add(interviewer_obj)
+        return True
+    except Exception as error:
+        write_exception(error, request)
+        return str(error)
+
+
+# def update_interviewee(obj, request):
+#     try:
+#         interviewers_profiles = request.data.get('interviewer_profiles')
+#         for interviewer in interviewers_profiles:
+#             if interviewer.get('id', None):
+#                 interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
+#                 obj.interviewers.add(interviewer_obj)
+#             else:
+#                 interviewer_obj = InterviewerProfile.objects.create(
+#                     name=interviewer.get('name'), email=interviewer.get('email', None),
+#                     submitted_by=request.user, linkedin=interviewer.get('linkedin', None)
+#                 )
+#             obj.interviewers.add(interviewer_obj)
+#         return True
+#     except Exception as error:
+#         write_exception(error, request)
+#         return str(error)
