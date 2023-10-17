@@ -1027,6 +1027,33 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @action(methods=['get'], detail=False, url_path='report_list')
+    def report_list(self, request):
+        try:
+            first, last = get_page_limits(request)
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
+            queryset = Submission.objects.filter(marketing_team__dept='Marketing').exclude(status='draft')
+            if filter_json:
+                if 'teams' in filter_json and len(filter_json.get('teams')) > 0:
+                    queryset = queryset.filter(marketing_team__id__in=filter_json.get('teams'))
+                if 'created' in filter_json and len(filter_json.get('created')) > 0:
+                    queryset = queryset.filter(created__gte=filter_json.get('created', {}).get('gte'),
+                                               created__lte=filter_json.get('created', {}).get('lte'))
+            queryset = queryset.order_by('id').distinct('id')
+            data = queryset[first:last].annotate(
+                city=F('lead__city'),
+                marketer_id=F('created_by'),
+                company_name=F('lead__vendor_company__name'),
+                marketer_name=F('created_by__employee_name'),
+                consultant_name=F('consultant_marketing__consultant__name'),
+            ).values('id', 'client', 'employer', 'status', 'created', 'modified', 'rate', 'city', 'is_active',
+                     'company_name', 'marketer_name', 'marketer_id', 'consultant_name', 'project', 'vendor_contact',
+                     'is_complete', 'work_type')
+            return Response({'data': data}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
 
 # Route - /vendor_layer/
 class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin, DestroyModelMixin, GenericViewSet):
@@ -2346,6 +2373,26 @@ class InterviewViewSets(ModelViewSet):
                     {"passed_reasons": passed_reasons, "failure_reasons": tuple(failed_reasons_list)}, status=200
                 )
             return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='report_list')
+    def report_list(self, request):
+        try:
+            first, last = get_page_limits(request)
+            filter_json = json.loads(request.GET.get('filter_json', '{}'))
+            queryset = Interview.objects.filter(submission__marketing_team__dept='Marketing'
+                                                ).exclude(status='cancelled')
+            if filter_json:
+                if 'teams' in filter_json and len(filter_json.get('teams')) > 0:
+                    queryset = queryset.filter(submission__marketing_team__id__in=filter_json.get('teams'))
+                if 'start_time' in filter_json and len(filter_json.get('start_time')) > 0:
+                    queryset = queryset.filter(start_time__gte=filter_json.get('start_time', {}).get('gte'),
+                                               start_time__lte=filter_json.get('start_time', {}).get('lte'))
+            queryset = queryset.order_by('submission_id').distinct('submission_id')
+            serializer = InterviewListSerializer(queryset[first:last], many=True)
+            return Response({"data": serializer.data}, status=200)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

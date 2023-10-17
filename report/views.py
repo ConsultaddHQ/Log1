@@ -773,7 +773,7 @@ class MarketingReportViewSets(GenericViewSet):
                 created__gte=start, created__lte=end,
             ).exclude(status='draft').order_by('id').distinct('id')
             interview = Interview.objects.filter(
-                created__gte=start, created__lte=end,
+                start_time__gte=start, start_time__lte=end,
                 submission__marketing_team__in=team
             ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id')
             offer = Project.objects.filter(
