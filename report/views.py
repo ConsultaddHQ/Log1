@@ -831,8 +831,7 @@ class MarketingReportViewSets(GenericViewSet):
 
             team_data = {
                 'data': {
-                    "id": team_id,
-                    "team": team_name,
+                    "team": {"id": team_id, "name": team_name},
                     "offer": {'count': offer_count,
                               'data': ReportSerializer(offer[0:3], many=True, context={'model': 'Project'}).data},
                     "scrum_master": scrum_master,
