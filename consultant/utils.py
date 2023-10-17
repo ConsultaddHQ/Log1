@@ -745,11 +745,6 @@ def candidate_filter(request):
                         created__gte=filters['created'].get('gte', None)
                     )
 
-            if 'department' in filters and len(filters['department']) > 0:
-                consultants = consultants.filter(
-                    marketing__teams__dept__in=filters['department'], marketing__status='open'
-                )
-
         if query:
             query = query.lstrip().replace(':amp:', '&')
             consultants = consultants.filter(
