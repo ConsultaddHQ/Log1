@@ -451,13 +451,13 @@ class Interview(TimeStampedModel):
     call_details = models.TextField(_('Call Details'), null=True, blank=True)
     tech_stack = models.TextField(_('Technology required'), null=True, blank=True)
     attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
+    interviewer_link = models.TextField(_('Interviewer Link'), null=True, blank=True)
     if_previous_calendar = models.BooleanField(_('Previous Calendar'), default=True)
     technical_assistance = models.BooleanField(_('Technical Assistance'), default=False)
     calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
     screening_type = models.CharField(_('Screening Type'), max_length=20, choices=TYPE_CHOICES)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
-    call_type = models.ForeignKey(Choice, null=True, blank=True, on_delete=models.CASCADE, related_name='interview_type')
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
         max_length=80, choices=FAILURE_CHOICES),
@@ -466,6 +466,11 @@ class Interview(TimeStampedModel):
     passed_reason = ArrayField(models.CharField(
         _('Passed Reason'),
         max_length=50, choices=PASSED_CHOICES),
+        null=True, blank=True
+    )
+    call_type = models.ForeignKey(
+        Choice, on_delete=models.CASCADE,
+        related_name='interview_type',
         null=True, blank=True
     )
     supervisor = models.ForeignKey(

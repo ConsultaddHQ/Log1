@@ -245,7 +245,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant_name(obj):
-        return obj.consultant.get('name') if obj.consultant else None
+        return obj.consultant.name if obj.consultant else None
 
     @staticmethod
     def get_call_type(obj):
@@ -465,6 +465,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     attachment_link = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
     supervisor_feedback = serializers.SerializerMethodField()
+    interviewer_profile = serializers.SerializerMethodField()
 
     class Meta:
         model = Interview
@@ -518,6 +519,13 @@ class InterviewV2Serializer(serializers.ModelSerializer):
                 question__category='child').order_by("question__position")
             return QuestionAnswerSerializer(answers, many=True).data
         return None
+
+    @staticmethod
+    def get_interviewer_profile(obj):
+        interviewers = obj.interviewers.all()
+        if interviewers:
+            return interviewers.values('id', 'name', 'email', 'linkedin')
+        return []
 
     @staticmethod
     def get_supervisor(obj):
