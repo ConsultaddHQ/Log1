@@ -83,6 +83,7 @@ class Command(BaseCommand):
                                     <td style="padding:5px 8px 5px 8px;"> {position} </td>
                                 </tr>"""
                     supervisor = interview.supervisor
+                    call_type = interview.call_type.display_name if interview.call_type else "NA"
                     slack_data[screening_type[1]].append(
                         {
                             "type": interview.get_interview_mode_display(),
@@ -93,6 +94,7 @@ class Command(BaseCommand):
                             "marketer": interview.marketer.employee_name, "position": position,
                             "consultant": interview.consultant.name, "client": interview.submission.client,
                             "ctb": f'<@{supervisor.slack_id}>' if supervisor.slack_id else supervisor.employee_name,
+                            "call_type": "otter.ai" if call_type == "Otter Al" else call_type
                         }
                     )
             data = {

@@ -2,6 +2,7 @@ import os
 import json
 import os.path
 import requests
+from googleapiclient.errors import HttpError
 
 from rest_framework.response import Response
 
@@ -121,13 +122,16 @@ class GoogleCalendar:
             try:
                 updated_event = service.events().update(calendarId=calendar_id, eventId=event_id, body=event,
                                                         sendUpdates='all').execute()
+                return updated_event, 'ok'
             except RefreshError:
                 calendar = Calendar(request=request)
                 cal_res, msg = calendar.update_ms_calendar(event_id, calendar_id, data)
                 return cal_res, msg
-            return updated_event, 'ok'
+            except HttpError as error:
+                if error.resp.status == 404:
+                    return event, 'ok'
         except Exception as error:
-            write_info(message=error, function='update_calendar')
+            write_exception(message=error, request=request)
             return str(error), "error"
 
     def get_interviews(self, user_emails, start, end, calendar_id):

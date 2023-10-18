@@ -1462,7 +1462,9 @@ class InterviewViewSets(ModelViewSet):
                     "%Y-%m-%dT%H:%M:%S")
                 start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
+                call_type = interview.call_type.display_name if interview.call_type else None
                 event = {
+                    "call_type": call_type,
                     "end": end_time, "summary": title, "start": start_time,
                     "submission": submission, "consultant": interview.consultant,
                     "user": request.user, "attendees": attendees, "lead": submission.lead,
@@ -1505,9 +1507,9 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'screening_type', 'rank', 'submission_id',
-                         'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name', 'job_title',
-                         'interview_mode')
+                ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'screening_type',
+                         'rank', 'submission_id', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
+                         'company_name', 'job_title', 'interview_mode')
 
                 # Creating Notification
                 notification_data = {
@@ -1546,12 +1548,22 @@ class InterviewViewSets(ModelViewSet):
             interview = queryset.first()
             prev_status = interview.status
             pre_guest_type = interview.guest_type
+            is_consultant = request.data.get('is_consultant', False)
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+
                 if status_change == 'false' and prev_status == 'cancelled':
                     interview.status = 'scheduled'
                     interview.save()
+
+                if is_consultant:
+                    interview.call_type = get_object_or_404(Choice, name='consultant', content_type__model='interview')
+                    interview.supervisor = get_object_or_404(User, employee_id=9999)
+                else:
+                    call_type_id = request.data.get('call_type', None)
+                    interview.call_type = get_object_or_404(Choice, id=call_type_id) if call_type_id else None
+                interview.save()
 
                 # Setting Submission is_active value
                 submission = interview.submission
@@ -1574,7 +1586,9 @@ class InterviewViewSets(ModelViewSet):
                         "%Y-%m-%dT%H:%M:%S")
                     start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                         "%Y-%m-%dT%H:%M:%S")
+                    call_type = interview.call_type.display_name if interview.call_type else None
                     event = {
+                        "call_type": call_type,
                         "user": request.user, "attendees": attendees,
                         "lead": submission.lead, "submission": submission,
                         "start": start_time, "consultant": submission.consultant,
@@ -1628,9 +1642,9 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
-                         'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
-                         'screening_type', 'interview_mode')
+                ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'job_title',
+                         'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
+                         'company_name', 'screening_type', 'interview_mode')
                 notification_data = {
                     'category': 'info', 'description': title,
                     'target_id': interview.id, 'parent_id': submission.id,
@@ -1761,9 +1775,9 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
-                         'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
-                         'screening_type', 'interview_mode')
+                ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'job_title',
+                         'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
+                         'company_name', 'screening_type', 'interview_mode')
                 notification_data = {
                     'category': 'info', 'description': title,
                     'target_id': interview.id, 'parent_id': submission.id,
@@ -1808,6 +1822,7 @@ class InterviewViewSets(ModelViewSet):
             # Activity
             end = interview.end_time
             start = interview.start_time
+            call_type = interview.call_type.display_name if interview.call_type else None
             desc = f"Interview round {interview.round} is rescheduled from {start.date()} :: {start.time()} " \
                    f"to {end.date()} :: {end.time()}"
             create_activity(submission.id, 'submission', request.user, desc, 'updated')
@@ -1818,6 +1833,7 @@ class InterviewViewSets(ModelViewSet):
                 start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
                     "%Y-%m-%dT%H:%M:%S")
                 event = {
+                    "call_type": call_type,
                     "lead": submission.lead, "submission": submission, "consultant": submission.consultant,
                     "call_details": request.data["call_details"], "user": request.user, "attendees": attendees,
                     "end": end_time, "description": request.data["description"], "start": start_time, "summary": title,
@@ -1894,7 +1910,7 @@ class InterviewViewSets(ModelViewSet):
                     company_name=F('submission__lead__vendor_company__name'),
                     marketer_name=F('submission__created_by__employee_name'),
                     consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
+                ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'job_title', 'submission_id', 'project',
                          'supervisor_name', 'marketer_name', 'consultant_name', 'client', 'company_name',
                          'screening_type', 'interview_mode')
 
