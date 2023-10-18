@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionModelAdmin
 
 from marketing.models import VendorCompany, VendorContact, Lead, Submission, Interview, VendorLayer, \
-    Test, Answer, Question, ChildQuestion
+    Test, Answer, Question, ChildQuestion, InterviewerProfile
 
 
 @admin.register(VendorCompany)
@@ -134,3 +134,11 @@ class AnswerAdmin(ExportActionModelAdmin):
     list_filter = ('object_id', 'content_type')
     search_fields = ('id', 'question__title', 'submitted_by__employee_name')
     list_display = ('id', 'answer', 'submitted_by', 'question', 'object_id', 'content_type', 'parent_question')
+
+
+@admin.register(InterviewerProfile)
+class InterviewerProfileAdmin(ExportActionModelAdmin):
+    actions = ['export_as_csv']
+    search_fields = ('id', 'email')
+    list_display = ('id', 'name', 'email', 'linkedin', 'created_by')
+
