@@ -24,6 +24,7 @@ from activity.serializers import ConsultantComment, ConsultantCommentGetSerializ
 from legal.models import Types, Petition, Reason, Document, DocumentList, PETITION_TYPES, PETITION_STATUSES
 from legal.serializers import PetitionSerializer, PetitionGetSerializer, PetitionUpdateSerializer, DocumentSerializer, \
     PetitionTypeSerializer
+from utils_app.utils import validate_data
 
 TOKEN_GENERATOR_CLASS = get_token_generator()
 
@@ -130,6 +131,10 @@ class PetitionViewSets(ModelViewSet):
             petition = Petition.objects.filter(beneficiary_id=request.data['consultant'])
             if petition:
                 return Response({"error": "already exist"}, status=400)
+            mandatory_fields = ['assigned_to', 'beneficiary_type', 'consultant', 'petition_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             petition = Petition.objects.create(
                 status='assigned',
                 created_by=request.user,
@@ -213,6 +218,10 @@ class PetitionViewSets(ModelViewSet):
     @action(methods=['post'], detail=False, url_path='extension')
     def extension(self, request):
         try:
+            mandatory_fields = ['assigned_to', 'beneficiary_type', 'consultant', 'employer', 'petition_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             consultant = get_object_or_404(Consultant, id=request.data['consultant'])
             petition_id = consultant.petitions.first().id
             documents = Document.objects.filter(petition=petition_id).exclude(
@@ -289,6 +298,10 @@ class PetitionViewSets(ModelViewSet):
     @action(methods=['post'], detail=False, url_path='upload_doc')
     def upload_doc(self, request):
         try:
+            mandatory_fields = ['file_type', 'file']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             petition_id = request.GET.get('petition')
             file_type = request.data.get('file_type')
             for file in request.FILES.getlist('file'):
@@ -313,6 +326,10 @@ class PetitionViewSets(ModelViewSet):
             petition_id = request.data.get('petition')
             doc_type_id = request.data.get('file_type')
             verification_status = request.data.get('status')
+            mandatory_fields = ['remark', 'petition', 'file_type', 'status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             documents = Document.objects.filter(petition_id=petition_id, doc_type_id=doc_type_id)
             message = None
             if verification_status == 'accepted':
@@ -429,6 +446,10 @@ class PetitionViewSets(ModelViewSet):
             file = request.FILES.get('file')
             request_status = request.data.get('status')
             doc_type_id = request.data.get('doc_type')
+            mandatory_fields = ['status', 'doc_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             petition = get_object_or_404(Petition, id=pk)
 
             if file:
@@ -465,7 +486,10 @@ class PetitionViewSets(ModelViewSet):
             request_status = request.data.get('status')
             denied_doc = request.FILES.get('denied_doc')
             approved_doc = request.FILES.get('approved_doc')
-
+            mandatory_fields = ['status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             petition = get_object_or_404(Petition, id=pk)
             if petition.status == 'print' and request_status == 'shipped':
                 if fedex_no:
@@ -571,6 +595,10 @@ class PetitionViewSets(ModelViewSet):
             elif request.method == 'POST':
                 if not ('legal' in request.user.roles):
                     return Response({"result": DONT_HAVE_ACCESS}, status=403)
+                mandatory_fields = ['comment_text']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 content_type = ContentType.objects.get(model='petition')
                 created_by_content_type = ContentType.objects.get(model='user')
                 comment = ConsultantComment.objects.create(
