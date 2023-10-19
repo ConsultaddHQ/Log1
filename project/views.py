@@ -25,7 +25,7 @@ from attachment.models import create_attachment
 from utils_app.models import MapMail, ObjectGroup
 from utils_app.aws_utils import download_s3_object
 from notification.models import Notification, FCMDevice
-from utils_app.utils import delete_temp_file, export_to_csv
+from utils_app.utils import delete_temp_file, export_to_csv, validate_data
 from marketing.utils import date_filter, get_authenticated_users
 from consultant.models import ConsultantPOC, Consultant, ConsultantRateRevision
 from utils_app.thred_mail import send_email as send_email_, send_email_attachment_multiple, send_mail_in_thread
@@ -590,7 +590,10 @@ class ProjectViewSets(ModelViewSet):
             sub = get_object_or_404(Submission, id=sub_id, created_by__in=users)
             if hasattr(sub, 'project'):
                 return Response({"message": "Project already exist"}, status=406)
-
+            mandatory_fields = ['duration', 'end_date', 'start_date', 'submission', 'work_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             # Adding Remote consultant
             remote_consultant = create_remote_consultant(request)
             if remote_consultant:
@@ -935,7 +938,10 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
             project = get_object_or_404(Project, id=request.data.get("project_id"))
-
+            mandatory_fields = ['project_id', 'payment_term_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             ProjectPaymentTerm.objects.create(
                 payment_term=100 if request.data.get("payment_term_type",
                                                      None) == '100%_to_company' else request.data.get(
@@ -960,6 +966,10 @@ class ProjectPaymentTermViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin
                 return Response({"message": DONT_HAVE_ACCESS}, status=status.HTTP_403_FORBIDDEN)
 
             payment_term = get_object_or_404(ProjectPaymentTerm, id=kwargs.get('pk'))
+            mandatory_fields = ['payment_term_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=status.HTTP_400_BAD_REQUEST)
             if request.data.get("payment_term_type") == '100%_to_company':
                 payment_term.payment_term = 100
                 payment_term.consultant_payment_term = 0
@@ -1059,6 +1069,11 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             supports = project.support.filter(end=None, is_proxy_support=False)
             proxy_start_date = request.data.get('proxy_start_date', None)
             proxy_support_person = request.data.get('proxy_support_person', None)
+            mandatory_fields = ['change_date', 'project', 'proxy_start_date', 'proxy_support_person', 'start', 'status',
+                                'support']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             if proxy_support_person and proxy_start_date:
                 proxy_support_person = get_object_or_404(User, id=proxy_support_person)
                 if supports.filter(support=proxy_support_person, statuses__frequency="active",
@@ -1231,7 +1246,10 @@ class ProjectSupportViewSet(GenericViewSet, RetrieveModelMixin, ListModelMixin, 
             data = request.data
             support = get_object_or_404(ProjectSupport, id=pk, project_id=project_id)
             prev_support = support.statuses.filter(is_current=True).first()
-
+            mandatory_fields = ['change_date', 'start', 'status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             project = support.project
             proxy_start_date = request.data.get('proxy_start_date', None)
             proxy_support_person = request.data.get('proxy_support_person', None)
@@ -1356,6 +1374,10 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
 
     def create(self, request, *args, **kwargs):
         try:
+            mandatory_fields = ['project_id', 'field', 'value', 'effective_date']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             project = get_object_or_404(Project, id=request.data.get('project_id'))
             effective_date = request.data.get('effective_date')
             desc = ""
@@ -1413,6 +1435,10 @@ class ProjectOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, Crea
         try:
             order = get_object_or_404(ProjectOrder, id=kwargs.get('pk'))
             prev_value = order.value
+            mandatory_fields = ['field', 'value']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             serializer = ProjectOrderSerializer(order, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -1691,6 +1717,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             if 'finance' in request.user.roles:
                 timesheet_id = kwargs.get('pk')
                 timesheet = get_object_or_404(TimeSheet, id=timesheet_id)
+                mandatory_fields = ['status']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 timesheet.remark = request.data.get('remark', None)
                 timesheet.status = request.data.get('status')
                 timesheet.status_updated_at = datetime.now()
@@ -1717,6 +1747,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             consultant_ids = request.data.get('consultant_ids', [])
             start = request.data.get('start', None)
             end = request.data.get('end', None)
+            mandatory_fields = ['consultant_ids']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             if not consultant_ids:
                 return Response({"message": "mail sent"}, status=400)
             for consultant_id in consultant_ids:
@@ -1814,6 +1848,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
 
             elif request.method == 'PUT':
                 request_id = request.data['request_id']
+                mandatory_fields = ['request_id', 'reviewer_comment', 'status']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 timesheet = get_object_or_404(TimesheetRequest, id=request_id)
 
                 available_timesheet = TimeSheet.objects.filter(project=timesheet.project, end__gte=timesheet.start
@@ -1867,7 +1905,10 @@ class FinanceTimeSheetViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMi
             # updated_consultants = ''
             approval = request.data.get('action', True)
             consultant_ids = request.data.get('consultant_ids', [])
-
+            mandatory_fields = ['action', 'consultant_ids']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             for consultant_id in consultant_ids:
                 consultant = Consultant.objects.get(id=consultant_id)
                 if consultant.approval_required == approval:
@@ -1927,6 +1968,10 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
 
         try:
             leave_status = request.data.get('status', None)
+            mandatory_fields = ['status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             if not leave_status:
                 return Response({"message": "No action selected"}, status=200)
             leave = get_object_or_404(Leave, id=kwargs.get('pk'), consultant=consultant)
@@ -2018,6 +2063,10 @@ class LeaveManagementViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             consultant_id = kwargs.get('consultant_id')
             leave_type = get_object_or_404(ConsultantLeave, id=kwargs.get('pk'))
             updated_balance = request.data.get('granted_leaves')
+            mandatory_fields = ['granted_leaves']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             if updated_balance > leave_type.granted:
                 diff = updated_balance - leave_type.granted
                 leave_type.granted += diff
@@ -2095,7 +2144,10 @@ class TimetrackEventViewSet(GenericViewSet, CreateModelMixin, ListModelMixin, Re
         try:
             end_datatime = request.data.get('end')
             start_datetime = request.data.get('start', None)
-
+            mandatory_fields = ['image', 'title', 'description', 'feedback_type', 'end', 'start']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             if request.data.get('all', False):
                 distinct_by = 'submission__consultant_marketing__consultant_id'
                 consultants_ids = Project.objects.filter(
