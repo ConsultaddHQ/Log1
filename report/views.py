@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 
 from django.db.models import Q
 from django.db import transaction
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
@@ -24,7 +25,7 @@ from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
 from marketing.models import Submission, Interview
 from consultant.models import ConsultantMarketing, Consultant
-from project.serializers import ProjectSupportDetailSerializer
+from project.serializers import ProjectSupportDetailSerializer, TimesheetProjectSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
 
 
@@ -1290,3 +1291,33 @@ class EngineerReportXposedViewSets(GenericViewSet):
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=False, url_path='timesheet/project')
+    def timesheet_project(self, request, *args, **kwargs):
+        try:
+            self.verify_api_key(request.GET.get('api_key'))
+            project_type = request.GET.get('project_type', 'support')
+            employee_id = request.GET.get('employee_id', None)
+            if project_type == 'support':
+                project_support = ProjectSupport.objects.filter(statuses__frequency__in=['active', 'less_active'],
+                                                                statuses__is_current=True,
+                                                                support__employee_id=employee_id,
+                                                                )
+                project_support = project_support.order_by('project__id').distinct('project__id')
+                project_ids = set(project_support.values_list('project__id', flat=True))
+                project = Project.objects.filter(id__in=project_ids)
+            else:
+                project = Project.objects.filter(statuses__status__in=['joined', 'extended'], statuses__is_current=True)
+                if employee_id:
+                    try:
+                        user = get_object_or_404(User, employee_id=employee_id)
+                        consultant = get_object_or_404(Consultant, email=user.email)
+                    except Exception as error:
+                        return Response({"message": 'No Projects found'}, status=status.HTTP_400_BAD_REQUEST)
+                    project = project.filter(consultant=consultant)
+                project = project.order_by('id').distinct('id')
+            serializer = TimesheetProjectSerializer(project, many=True)
+            return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)

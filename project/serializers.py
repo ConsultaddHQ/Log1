@@ -521,3 +521,21 @@ class ProjectPaymentTermSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_payment_term_type(obj):
         return obj.get_payment_term_type_display()
+
+
+class TimesheetProjectSerializer(serializers.ModelSerializer):
+    companies = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = ('id', 'companies')
+
+    @staticmethod
+    def get_companies(obj):
+        submission = obj.submission
+        if submission:
+            return {
+                'client': submission.client,
+                'vendor': submission.lead.vendor_company.name
+            }
+        return None
