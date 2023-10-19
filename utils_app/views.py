@@ -10,6 +10,7 @@ from django.contrib.contenttypes.models import ContentType
 
 from utils_app.models import City, Choice
 from log1.utils import write_exception, ERROR_MSG
+from utils_app.utils import validate_data
 
 
 class UtilSerializer(serializers.Serializer):
@@ -134,6 +135,10 @@ class UtilityViewSet(CreateModelMixin, GenericViewSet):
     def add_technology(self, request):
         try:
             technologies = request.data['technology']
+            mandatory_fields = ['technology']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             content_type = ContentType.objects.get(model='user')
             for technology in technologies:
                 available_technology = Choice.objects.filter(
