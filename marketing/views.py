@@ -40,7 +40,7 @@ from consultant.models import Consultant, ConsultantMarketing
 from utils_app.thred_mail import send_email_attachment_multiple
 from notification.utils import create_notification, push_notification
 from utils_app.aws_utils import presigned_post_url, download_s3_object
-from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES
+from utils_app.utils import delete_temp_file, export_to_csv, generate_s3_url, TECHNOLOGIES, validate_data
 from log1.utils import get_page_limits, post_msg_using_webhook, write_exception, write_info, DONT_HAVE_ACCESS, ERROR_MSG
 from tracking.models import Devices, ExportData
 
@@ -123,6 +123,10 @@ class VendorContactViewSets(RetrieveModelMixin, ListModelMixin, CreateModelMixin
         company = request.data.get('company', None)
         if not company:
             return Response({"message": "Select company"}, status=400)
+        mandatory_fields = ['company', 'email', 'name', 'number']
+        is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+        if not is_valid:
+            return Response({'message': message}, status=400)
 
         vendor = VendorContact.objects.filter(email__iexact=email, created_by=request.user, company_id=company)
         if vendor:
@@ -256,6 +260,12 @@ class LeadViewSets(ModelViewSet):
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
 
+            mandatory_fields = ['city', 'job_desc', 'job_title', 'position', 'position_type', 'status',
+                                'vendor_company']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             serializer = LeadCreateSerializer(data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -281,6 +291,12 @@ class LeadViewSets(ModelViewSet):
                 lead = queryset.first()
                 if lead.owner != request.user:
                     return Response({"message": DONT_HAVE_ACCESS}, status=403)
+
+            mandatory_fields = ['city', 'job_desc', 'job_title', 'position', 'position_type', 'lead_id',
+                                'vendor_company']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
 
             serializer = LeadCreateSerializer(lead, data=request.data, partial=True)
             if serializer.is_valid():
@@ -731,6 +747,11 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             if 'marketer' not in roles:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             lead_id = request.data.get('lead', None)
+            mandatory_fields = ['file_resume', 'marketing_team_id', 'email', 'phone', 'vendor_contact','profile_id',
+                                'marketing_id', 'employer', 'position', 'work_type']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
 
             if not lead_id:
                 position_id = request.data.get('position', None)
@@ -749,6 +770,7 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
                 lead_id = lead.id
             else:
                 lead = get_object_or_404(Lead, id=lead_id)
+
 
             sub, msg = create_submission(request, lead_id)
 
@@ -887,6 +909,10 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
     def resume(self, request, pk):
         try:
             attachment = get_object_or_404(Attachment, id=pk)
+            mandatory_fields = ['file']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             attachment.attachment_file = request.FILES.get('file')
             attachment.save()
 
@@ -1045,6 +1071,10 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
         try:
             level = 0
             submission_id = request.data.get('submission')
+            mandatory_fields = ['submission', 'company']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             queryset = VendorLayer.objects.filter(submission=submission_id)
             if queryset:
                 level = queryset.aggregate(Max('level'))['level__max']
@@ -1068,6 +1098,10 @@ class VendorLayerViewSets(RetrieveModelMixin, CreateModelMixin, UpdateModelMixin
     def update(self, request, *args, **kwargs):
         try:
             data = request.data.get('data')
+            mandatory_fields = ['data']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             for index in range(len(data)):
                 vendor_layer = get_object_or_404(VendorLayer, id=data[index]['id'])
                 vendor_layer.level = index + 1
@@ -1418,6 +1452,12 @@ class InterviewViewSets(ModelViewSet):
             if not submissions:
                 return Response({"message": 'This is not your submission'}, status=400)
 
+            mandatory_fields = ['end_time', 'guest_type', 'interview_mode', 'screening_type', 'start_time',
+                                'submission', 'supervisor']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             # calculating Interview round
             round_count = 0
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(status='cancelled')
@@ -1549,6 +1589,13 @@ class InterviewViewSets(ModelViewSet):
             prev_status = interview.status
             pre_guest_type = interview.guest_type
             is_consultant = request.data.get('is_consultant', False)
+
+            mandatory_fields = ['end_time', 'guest_type', 'interview_mode', 'screening_type', 'start_time',
+                                'submission', 'supervisor']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -1734,6 +1781,11 @@ class InterviewViewSets(ModelViewSet):
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
 
+            mandatory_fields = ['feedback', 'screening_id', 'status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             interview = queryset.first()
             prev_status = interview.get_status_display()
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
@@ -1803,6 +1855,12 @@ class InterviewViewSets(ModelViewSet):
             queryset = Interview.objects.filter(id=pk, submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "This is not your Interview"}, status=404)
+
+            mandatory_fields = ['end_time', 'guest_type', 'interview_mode', 'is_consultant', 'screening_id',
+                                'screening_type', 'start_time', 'start_time', 'submission', 'supervisor']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
 
             interview = queryset.first()
             prev_guest_type = interview.guest_type
@@ -1946,6 +2004,11 @@ class InterviewViewSets(ModelViewSet):
             if marketer_condition:
                 return Response({"message": "You don't have access"}, status=404)
 
+            mandatory_fields = ['feedback']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             try:
                 if interview.calendar_id:
                     calendar_mail_id = interview.submission.created_by.email
@@ -2026,6 +2089,12 @@ class InterviewViewSets(ModelViewSet):
             )
             if queryset:
                 interview = queryset.first()
+
+                mandatory_fields = ['notes']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
+
                 interview.notes = request.data.get('notes')
                 interview.save()
 
@@ -2046,6 +2115,10 @@ class InterviewViewSets(ModelViewSet):
         try:
             if request.method == 'PUT':
                 file_name = request.data['file_name']
+                mandatory_fields = ['attachment_type', 'file_name', 'obj_type', 'object_id']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 object_name = f'media/attachments/recordings/{pk}/{file_name}'
                 interview = get_object_or_404(Interview, id=pk)
                 response, error = presigned_post_url(object_name=object_name)
@@ -2170,6 +2243,10 @@ class InterviewViewSets(ModelViewSet):
 
                 interview = queryset.first()
                 guest = request.data.get('guest', [])
+                mandatory_fields = ['guest']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 if guest:
                     interview.guest.clear()
                     interview.guest_type = 'assigned'
@@ -2249,6 +2326,10 @@ class InterviewViewSets(ModelViewSet):
             queryset = Interview.objects.filter(id=pk, guest__in=[request.user])
             if not queryset:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
+            mandatory_fields = ['coding_present', 'feedback']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             interview = queryset.first()
             interview.coding_present = True if request.data.get('coding_present') == 'true' else False
             interview.guest_remark = request.data.get('feedback', None)
@@ -2283,6 +2364,11 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['post', 'put'], detail=True, url_path='supervisor_feedback')
     def feedback(self, request, pk):
         try:
+            mandatory_fields = ['feedback_form']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             if request.method == 'POST':
                 interview = get_object_or_404(Interview, id=pk)
 
@@ -2668,6 +2754,12 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             is_video, is_offline, con_informed = False, False, False
 
+            mandatory_fields = ['deadline', 'is_offline', 'skills', 'submission', 'is_video', 'con_informed',
+                                'platform']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             if request.data.get('is_video', 'false') == "True":
                 is_video = True
             if request.data.get('is_offline', 'false') == "True":
@@ -2735,6 +2827,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             users = get_authenticated_users(request)
             test = get_object_or_404(Test, id=kwargs.get('pk'), submission__created_by__in=users)
+            mandatory_fields = ['platform']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             prev_platform = test.platform
             new_platform = request.data.get('platform', prev_platform)
             if prev_platform != new_platform:
@@ -2812,6 +2908,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             test = get_object_or_404(Test, id=pk)
             users = request.data.get('assign_to', [])
+            mandatory_fields = ['assign_to']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             test.assign_to.clear()
             user_list, user_names = [], []
             for user_id in users:
@@ -2891,6 +2991,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
                 'engineer': json.loads(request.data.get('engineer')),
                 'remarks': request.data.get('remarks', None),
             }
+            mandatory_fields = ['engineer']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             for engineer_id in data['engineer']:
                 engineer = get_object_or_404(User, id=engineer_id)
                 test.engineer.add(engineer)
@@ -2933,6 +3037,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
         try:
             users = get_authenticated_users(request)
             test = get_object_or_404(Test, id=pk, submission__created_by__in=users)
+            mandatory_fields = ['status']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             test.feedback = request.data.get('feedback')
             test.status = request.data.get('status')
             test.submitted_by = request.user
@@ -3023,6 +3131,10 @@ class TestViewSets(GenericViewSet, CreateModelMixin, ListModelMixin, UpdateModel
 
             test = get_object_or_404(Test, id=pk)
             engineers = json.loads(request.data.get('associates', '[]'))
+            mandatory_fields = ['feedback_form', 'associates', 'remarks', '5']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             for emp_id in engineers:
                 engineer = User.objects.get(employee_id=emp_id)
                 test.engineer.add(engineer)
@@ -3281,6 +3393,10 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
             team = Team.objects.filter(name__iexact=name)
             if team:
                 return Response({"message": "Team name already in use"}, status=400)
+            mandatory_fields = ['name', 'scrum_timing']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             Team.objects.create(name=data['name'], scrum_timing=data['scrum_timing'],
                                 dept='Marketing', email='engineering@consultadd.com')
             return Response({"message": "Team added to log1"}, status=201)
@@ -3292,6 +3408,10 @@ class MarketingTeamViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin, U
         try:
             team = get_object_or_404(Team, id=kwargs.get('pk'))
             name = request.data['name'].replace(' ', '')
+            mandatory_fields = ['name', 'scrum_timing']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
             existing_team = Team.objects.filter(name__iexact=name)
             if existing_team:
                 return Response({"message": "Team name already in use"}, status=400)
