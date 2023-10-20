@@ -292,7 +292,6 @@ class ConsultantViewSets(ModelViewSet):
         if not ('superadmin' in roles or 'finance' in roles):
             return Response({"message": DONT_HAVE_ACCESS}, status=403)
         data = request.data
-
         consultant = Consultant.objects.filter(email__iexact=data['email'])
         if consultant:
             return Response({"message": "Consultant Already Exist"}, status=400)
@@ -317,7 +316,7 @@ class ConsultantViewSets(ModelViewSet):
                 skype=request.data.get('skype', None),
                 links=request.data.get('links', None),
                 work_type=request.data.get('work_type', 'full_time'),
-                marital_status=data['marital_status'],
+                marital_status=request.data.get('marital_status', None),
                 internal_employee=request.data.get('internal_employee', False)
             )
             if consultant.current_city:

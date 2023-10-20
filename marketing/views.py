@@ -771,7 +771,6 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             else:
                 lead = get_object_or_404(Lead, id=lead_id)
 
-
             sub, msg = create_submission(request, lead_id)
 
             # Activity
