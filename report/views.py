@@ -16,16 +16,16 @@ from rest_framework.authentication import TokenAuthentication
 from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
-from report.serializers import ReportSerializer
+from report.serializers import ReportSerializer, TimesheetProjectSerializer, TimesheetTestSerializer
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
 from utils_app.thred_mail import send_email
 from employee.serializers import UserSerializer
 from log1.utils import write_exception, ERROR_MSG
 from project.models import Project, ProjectSupport
-from marketing.models import Submission, Interview
+from marketing.models import Submission, Interview, Test
 from consultant.models import ConsultantMarketing, Consultant
-from project.serializers import ProjectSupportDetailSerializer, TimesheetProjectSerializer
+from project.serializers import ProjectSupportDetailSerializer
 from log1.utils import post_msg_using_webhook, get_page_limits
 
 
@@ -1317,6 +1317,20 @@ class EngineerReportXposedViewSets(GenericViewSet):
                     project = project.filter(consultant=consultant)
                 project = project.order_by('id').distinct('id')
             serializer = TimesheetProjectSerializer(project, many=True)
+            return Response({'data': serializer.data}, status=status.HTTP_200_OK)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['get'], detail=False, url_path='timesheet/test')
+    def timesheet_test(self, request, *args, **kwargs):
+        try:
+            self.verify_api_key(request.GET.get('api_key'))
+            test = Test.objects.filter(engineer__employee_id=request.GET.get('employee_id'),
+                                       submit_date__date=request.GET.get('date'),
+                                       status='feedback_due')
+            serializer = TimesheetTestSerializer(test, many=True)
+            # print(serializer.data)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
