@@ -19,6 +19,7 @@ from messaging.models import Message, Conversation
 from log1.utils import write_exception, ERROR_MSG, write_info
 from notification.utils import create_notification, push_notification
 from messaging.serializers import MessageSerializer, ConversationSerializer
+from utils_app.utils import validate_data
 
 
 # Route - /twilio/
@@ -77,6 +78,11 @@ class SMSViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
             account_sid = os.environ.get('ACCOUNT_SID')
             auth_token = os.environ.get('AUTH_TOKEN')
 
+            mandatory_fields = ['to', 'user1', 'message']
+            is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+            if not is_valid:
+                return Response({'message': message}, status=400)
+
             from_ = get_object_or_404(Asset, id=request.data['user1']).number
             client = Client(account_sid, auth_token)
             twilio_message = client.messages.create(body=body, from_=from_, to=to)
@@ -105,6 +111,10 @@ class ReceiveSMSViewSet(GenericViewSet):
                 to = request.data.get('To')
                 body = request.data.get('Body')
                 from_ = request.data.get('From')
+                mandatory_fields = ['To', 'Body', 'From', 'api_key']
+                is_valid, message = validate_data(mandatory_fields=mandatory_fields, data=request.data)
+                if not is_valid:
+                    return Response({'message': message}, status=400)
                 user1 = Asset.objects.filter(number=to)
                 if user1:
                     user1 = user1.first()
