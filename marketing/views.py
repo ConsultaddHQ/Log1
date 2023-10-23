@@ -1413,9 +1413,6 @@ class InterviewViewSets(ModelViewSet):
         try:
             # Change status of past Interview to feedback due
             change_to_feedback_due()
-            if request.data.get('screening_type', None) == 'interview' and \
-                    ('interviewers' not in request.data or request.data.get('interviewers', []) is None):
-                return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
             users = get_authenticated_users(request)
             submission_id = request.data.get('submission', None)
             submissions = Submission.objects.filter(id=submission_id, created_by__in=users)
@@ -1445,7 +1442,7 @@ class InterviewViewSets(ModelViewSet):
 
             resp = assign_interviewee(interview, request)
             if resp is not True:
-                return Response({"message": ERROR_MSG}, status=status.HTTP_200_OK)
+                return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
             # Get Interview Guest Type Required
             guest_type = get_guest_type(request)
@@ -1755,10 +1752,15 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
+
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
+
+            if queryset.first().get_screening_type_display() == 'Interview' and \
+                    ('interviewers' not in request.data or request.data.get('interviewers', []) is None):
+                return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
 
             interview = queryset.first()
             prev_status = interview.get_status_display()

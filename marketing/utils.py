@@ -539,7 +539,7 @@ def delete_supervisor_notification():
 
 def assign_interviewee(obj, request):
     try:
-        interviewers_profiles = request.data.get('interviewer_profiles')
+        interviewers_profiles = request.data.get('interviewer_profiles', [])
         for interviewer in interviewers_profiles:
             if interviewer.get('id', None):
                 interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
@@ -559,6 +559,7 @@ def assign_interviewee(obj, request):
 def update_interviewee(obj, request):
     try:
         updated_interviewers = set()
+        client = obj.submission.client
         interviewers_profiles = request.data.get('interviewer_profiles')
         existing_interviewers = set(obj.interviewers.all())
         for interviewer in interviewers_profiles:
@@ -575,12 +576,13 @@ def update_interviewee(obj, request):
             else:
                 interviewer_obj = InterviewerProfile.objects.create(
                     name=interviewer.get('name'), email=interviewer.get('email', None),
-                    submitted_by=request.user, linkedin=interviewer.get('linkedin', None)
+                    submitted_by=request.user, linkedin=interviewer.get('linkedin', None), client=client
                 )
                 obj.interviewers.add(interviewer_obj)
         existing_interviewers.difference_update(updated_interviewers)
         if existing_interviewers:
-            obj.interviewers.remove(obj for obj in existing_interviewers)
+            removed_interviewers = [elm for elm in existing_interviewers]
+            obj.interviewers.remove(*removed_interviewers)
             obj.save()
         return True
     except Exception as error:
@@ -605,16 +607,16 @@ def get_guest_type(request):
 def add_update_guest(obj, request):
     resp = 'Not Assigned'
     existing_guest = obj.guests.all()
-    guests = request.data.get('guest', [])
+    guests = request.data.get('guest_info', [])
     for guest in guests:
-        if guests.get('user_id', None) is None:
+        if guest.get('user_id', None) is None:
             continue
         guest_obj = GuestInfo.objects.filter(user_id=guest.get('user_id'), type=guest.get('type', None)).first()
         if not guest_obj:
             guest_obj = GuestInfo.objects.create(user_id=guest.get('user_id'), type=guest.get('type', None))
         if guest_obj in existing_guest:
             continue
-        elif guest_obj.user_id in existing_guest.values('user_id'):
+        elif guest_obj.user_id in existing_guest.values_list('user_id', flat=True):
             obj.guests.remove(existing_guest.filter(user_id=guest_obj.user_id).first())
         obj.guests.add(guest_obj)
         obj.save()
