@@ -1,10 +1,11 @@
 import json
 from datetime import datetime, date, timedelta
 
+from constance import config
+from activity.views import create_activity
+
 from django.utils import timezone
-from django.db.models import F, Q, Count
-from collections import OrderedDict
-from django.db.models import OuterRef, Subquery
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from django.db.models import Case, When, Value, CharField
 from django.contrib.contenttypes.models import ContentType
@@ -16,22 +17,21 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
-from constance import config
-from consultant.models import Consultant
-from activity.views import create_activity
-from finance.utils import check_access, make_unique_preserve_order, return_leave_status
 from legal.models import Petition
+from consultant.models import Consultant
 from notification.models import Notification, FCMDevice
-from utils_app.models import Choice
-from utils_app.thred_mail import send_email as send_email_
+from project.models import Project, Leave, TimeSheet, TimesheetRequest, ConsultantLeave
+
+
+from project.serializers import ConsultantLeaveSerializer
 from finance.serializers import FinanceDetailSerializer, FinanceSerializer, LeaveSerializer, \
     TimesheetRequestSerializer
 
-from project.serializers import ConsultantLeaveSerializer
+from utils_app.thred_mail import send_email as send_email_
 from notification.utils import push_notification_consultant
 from project.utils import create_notification_and_send_push
 from log1.utils import ERROR_MSG, get_page_limits, write_exception
-from project.models import Project, Leave, TimeSheet, TimesheetRequest, ConsultantLeave
+from finance.utils import check_access, make_unique_preserve_order, return_leave_status
 
 
 # Route - /finance_payStubs

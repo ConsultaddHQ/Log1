@@ -60,7 +60,6 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant(obj):
-        # consultant = obj.submission.consultant_marketing.consultant
         consultant=obj.consultant
         return {
             'id': consultant.id,
@@ -111,20 +110,6 @@ class FinanceDetailSerializer(serializers.ModelSerializer):
         if obj.status=="submitted":
             return "pending"
         return obj.status
-
-    # @staticmethod
-    # def get_project(obj):
-    #     submission = obj.project.submission
-    #     return {
-    #         'id': obj.project.id,
-    #         'employer': obj.project.employer,
-    #         'start_date': obj.project.start_date,
-    #         'submission' : {
-    #             'client': submission.client,
-    #             'vendor': submission.lead.vendor_company.name,
-    #             'work_type': submission.get_work_type_display(),
-    #         }
-    #     }
 
 
 class LeaveSerializer(serializers.ModelSerializer):
