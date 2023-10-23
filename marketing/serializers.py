@@ -577,11 +577,13 @@ class InterviewV2Serializer(serializers.ModelSerializer):
         if obj.supervisor.employee_id == 9999:
             data = {
                 "call_given_by": "Consultant",
+                "supervisor_id": obj.supervisor_id,
                 "supervisor_name": obj.submission.consultant.name
             }
         else:
             data = {
                 "call_given_by": "Interviewee",
+                "supervisor_id": obj.supervisor_id,
                 "supervisor_name": obj.supervisor.employee_name
             }
         return data

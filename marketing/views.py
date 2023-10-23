@@ -2281,6 +2281,7 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             interview = queryset.first()
             interview.coding_present = True if request.data.get('coding_present') == 'true' else False
+            interview.assistance_required = True if request.data.get('assistance_required') == 'true' else False
             interview.guest_remark = request.data.get('feedback', None)
             interview.save()
 

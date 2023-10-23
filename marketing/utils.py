@@ -593,7 +593,7 @@ def update_interviewee(obj, request):
 def get_guest_type(request):
     guest_type = "Not Required"
     coding_required = request.data.get('coding')
-    assistance_required = request.data.get('assistance_required')
+    assistance_required = request.data.get('assistance')
 
     if coding_required and not assistance_required:
         guest_type = "Coder"
