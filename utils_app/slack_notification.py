@@ -1043,6 +1043,7 @@ class MessageCard:
                                     "type": "mrkdwn",
                                     "text": f"`Consultant` {data.get('consultant')}\n `Client` {data.get('client', None)} "
                                             f"\n `Marketer` {data.get('marketer')}\n `Job` {data.get('position')}"
+                                            f"\n `Call Type` {data.get('call_type')}"
                                 }
                             ]
                         },
