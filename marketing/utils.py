@@ -550,6 +550,7 @@ def assign_interviewee(obj, request):
                     submitted_by=request.user, linkedin=interviewer.get('linkedin', None), client=obj.submission.client
                 )
             obj.interviewers.add(interviewer_obj)
+            obj.save()
         return True
     except Exception as error:
         write_exception(error, request)
@@ -579,6 +580,7 @@ def update_interviewee(obj, request):
                     submitted_by=request.user, linkedin=interviewer.get('linkedin', None), client=client
                 )
                 obj.interviewers.add(interviewer_obj)
+                obj.save()
         existing_interviewers.difference_update(updated_interviewers)
         if existing_interviewers:
             removed_interviewers = [elm for elm in existing_interviewers]

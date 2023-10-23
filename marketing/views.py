@@ -1203,7 +1203,7 @@ class InterviewViewSets(ModelViewSet):
             if filter_for == 'my':
                 if 'engineer' in request.user.roles:
                     queryset = queryset.filter(
-                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guest__id=user_id)
+                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guests__id=user_id)
                     )
                 else:
                     queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
@@ -1222,15 +1222,15 @@ class InterviewViewSets(ModelViewSet):
 
                 if 'assignment' in filters:
                     if filters["assignment"] == 'assigned':
-                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
+                        queryset = queryset.filter(guest_type__icontains='assigned').exclude(status='cancelled')
                     if filters["assignment"] == 'unassigned':
-                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
+                        queryset = queryset.exclude(guest_type__icontains='coder').exclude(status='cancelled')
 
                 if 'coding_interview' in filters:
                     if filters["coding_interview"] == 'yes':
-                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                        queryset = queryset.filter(guest_type__in=['Coder', 'Assigned Coder']).exclude(status='cancelled')
                     elif filters["coding_interview"] == 'no':
-                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                        queryset = queryset.exclude(guest_type__in=['Coder', 'Assigned Coder']).exclude(status='cancelled')
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1340,7 +1340,7 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='interview').order_by('question__position')
         coding_answer_qs = Answer.objects.filter(
             object_id=obj.id, question__form_name='coding').order_by('question__position')
-        coder_names = obj.guest.all()
+        coder_names = obj.guests.filter(type__in=['Coder', 'Assistant'])
         coders = ''
         n = 0
         for name in coder_names:
@@ -1650,7 +1650,8 @@ class InterviewViewSets(ModelViewSet):
 
                 add_update_guest(interview, request)
 
-                if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
+                if (pre_guest_type in ['Coder', 'Assistance'] or 'Assigned' in pre_guest_type) and \
+                        interview.guest_type == 'Not Required':
                     # coder_request_notification(interview, "Coding not required for this Interview", request)
                     interview.guest.clear()
 
@@ -1845,7 +1846,7 @@ class InterviewViewSets(ModelViewSet):
                 serializer.save()
 
             interview.status = 'rescheduled'
-            if interview.guest_type in ['coder', 'assistance', 'assigned']:
+            if interview.guest_type in ['Coder', 'Assistance'] or 'Assigned' in interview.guest_type:
                 interview.guest.clear()
             interview.save()
 
@@ -1920,7 +1921,8 @@ class InterviewViewSets(ModelViewSet):
                     # data = MessageCard.get_simple_card(payload)
                     # post_msg_using_webhook(config.slack_announcement_url, data)
 
-                if prev_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
+                if (prev_guest_type in ['Coder', 'Assistance'] or 'Assigned' in prev_guest_type) and \
+                        interview.guest_type == 'Not Required':
                     est = pytz.timezone('US/Eastern')
                     today = datetime.now().astimezone(est)
 
@@ -1932,7 +1934,8 @@ class InterviewViewSets(ModelViewSet):
                         title = "Coding request, Interview Rescheduled"
                     #     coder_request_notification(interview, title, request)
 
-                    if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
+                    if (interview.guest_type in ['Coder', 'Assistance'] or 'Assigned' in interview.guest_type) and \
+                            prev_guest_type == 'Not Required':
                         title = "Coding request"
                     #     coder_request_notification(interview, title, request)
 
