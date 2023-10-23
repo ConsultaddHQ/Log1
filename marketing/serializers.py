@@ -275,7 +275,7 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if (obj.guest_type in ['Coder', 'Assistance'] or ('Assigned' or 'assigned') in obj.guest_type) and \
+        if (obj.guest_type in ['Coder', 'Assistance'] or obj.guest_type in ['Assigned', 'assigned']) and \
                 obj.coding_present is None:
             return False
         return True
@@ -292,11 +292,10 @@ class InterviewListSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_guests(obj):
         guests = []
-        qs = obj.guests.all()
-        for obj in qs:
+        for guest_obj in obj.guests.all():
             guests.append({
-                "employee": {"id": obj.user_id, "name": obj.employee_name},
-                "guest_id": obj.id, "type": obj.type, "email": obj.user.email
+                "employee": {"id": guest_obj.user_id, "name": guest_obj.user.employee_name},
+                "guest_id": guest_obj.id, "type": guest_obj.type, "email": guest_obj.user.email
             })
         return guests
 
@@ -515,7 +514,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if (obj.guest_type in ['Coder', 'Assistance'] or ('Assigned' or 'assigned') in obj.guest_type) and \
+        if (obj.guest_type in ['Coder', 'Assistance'] or obj.guest_type in ['Assigned', 'assigned']) and \
                 obj.coding_present is None:
             return False
         return True
@@ -543,10 +542,10 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     def get_guests(obj):
         guests = []
         qs = obj.guests.all()
-        for obj in qs:
+        for guest_obj in qs:
             guests.append({
-                "guest_id": obj.id, "type": obj.type,
-                "employee": {"id": obj.user_id, "name": obj.employee_name}
+                "employee": {"id": guest_obj.user_id, "name": guest_obj.user.employee_name},
+                "guest_id": guest_obj.id, "type": guest_obj.type, "email": guest_obj.user.email
             })
         return guests
 
