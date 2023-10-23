@@ -91,10 +91,10 @@ class Command(BaseCommand):
                             "project_type": interview.submission.get_work_type_display(),
                             "round": interview.round, "ctb_name": supervisor.employee_name,
                             "start": interview.start_time.strftime('%m/%d/%Y::%I:%M %p EST'),
+                            "call_type": "otter.ai" if call_type == "Otter Al" else call_type,
                             "marketer": interview.marketer.employee_name, "position": position,
                             "consultant": interview.consultant.name, "client": interview.submission.client,
-                            "ctb": f'<@{supervisor.slack_id}>' if supervisor.slack_id else supervisor.employee_name,
-                            "call_type": "otter.ai" if call_type == "Otter Al" else call_type
+                            "ctb": f'<@{supervisor.slack_id}>' if supervisor.slack_id else supervisor.employee_name
                         }
                     )
             data = {

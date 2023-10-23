@@ -56,7 +56,9 @@ class Command(BaseCommand):
                 path = "{}/media/Scrum Report {} {}.csv".format(settings.BASE_DIR, team.name, str(today))
                 df.to_csv(path, sep=',')
                 scrum_masters = list(
-                    User.objects.filter(team=team, role__name__in=['admin', 'proxy']).values_list('email', flat=True)
+                    User.objects.filter(
+                        team=team, role__name__in=['admin', 'proxy'], is_active=True, account_login=True
+                    ).values_list('email', flat=True)
                 )
                 offers = Project.objects.filter(created__gte=today.replace(day=1), submission__marketing_team=team)
                 yesterday = today - timedelta(days=1)

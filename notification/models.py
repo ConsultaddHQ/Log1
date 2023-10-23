@@ -7,6 +7,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from employee.models import User
 from utils_app.models import TimeStampedModel
 
+
 class NotificationQuerySet(models.query.QuerySet):
     """ Notification QuerySet """
 
@@ -140,6 +141,7 @@ class Notification(models.Model):
         if self.deleted:
             self.deleted = False
             self.save()
+
 
 class UserNotification(TimeStampedModel):
     is_active = models.BooleanField(default=False)
