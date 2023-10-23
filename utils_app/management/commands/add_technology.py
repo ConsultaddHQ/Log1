@@ -1,20 +1,31 @@
-import csv
 from django.core.management import BaseCommand
 
-from consultant.models import Consultant
-from employee.models import Certificate
-from utils_app.utils import create_cron_error, create_cron_object, get_timezone
-from utils_app.models import Choice, ContentType
+from marketing.models import Interview, GuestInfo
+
+
+type_mapper = {
+    "coder": "Coder",
+    "assigned": "Assigned",
+    "not_required": "Not Required"
+}
 
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        job = create_cron_object(name='add_platform')
         try:
-            content_type = ContentType.objects.get(model='test')
-            platforms = ['CoderByte', 'Codility', 'Coderpad', 'CodeSignal', 'Amcat', 'Glider', 'FilteredAI', 'Kenexa',
-                         'Hackerrank', 'Interview Mocha', 'Hirevue', 'Ikm', 'Mettl', 'PluralSight', 'LeetCode']
-            for item in platforms:
-                Choice.objects.create(name=item, display_name=item, content_type=content_type, field='platform')
+            int_qs = Interview.objects.all()
+            for obj in int_qs:
+                obj.guest_type = type_mapper.get(obj.guest_type)
+                obj.save()
+                guest_qs = obj.guest.filter(role__name='engineer')
+                guests = obj.guests.all()
+                for guest_obj in guest_qs:
+                    info_obj = GuestInfo.objects.filter(user=guest_obj, type='Coder').first()
+                    if not info_obj:
+                        info_obj = GuestInfo.objects.create(user=guest_obj, type="Coder")
+                    if info_obj not in guests:
+                        obj.guests.add(info_obj)
+                        obj.save()
+                    obj.guest.clear()
         except Exception as error:
             print(error)
