@@ -473,13 +473,13 @@ class Interview(TimeStampedModel):
     if_previous_calendar = models.BooleanField(_('Previous Calendar'), default=True)
     attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
     interviewer_link = models.TextField(_('Interviewer Link'), null=True, blank=True)
-    calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
-    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=TYPE_CHOICES)
-    assistance_tech = models.TextField(_('Assistance Technology'), null=True, blank=True)
-    interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
     assistance_remarks = models.TextField(_('Assistance Remarks'), null=True, blank=True)
-    status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    assistance_tech = models.TextField(_('Assistance Technology'), null=True, blank=True)
+    calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
     assistance_required = models.BooleanField(_('Assistance Required'), null=True, blank=True)
+    screening_type = models.CharField(_('Screening Type'), max_length=20, choices=TYPE_CHOICES)
+    interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
+    status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
         max_length=80, choices=FAILURE_CHOICES),

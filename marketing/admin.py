@@ -149,4 +149,3 @@ class GuestInfoAdmin(ExportActionModelAdmin):
     search_fields = ('user__employee_name',)
     list_filter = ('type',)
     list_display = ('id', 'user', 'type')
-
