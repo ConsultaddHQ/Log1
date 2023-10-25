@@ -56,7 +56,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
         try:
             query = request.GET.get("query", "").lstrip().replace(':amp:', '&')
             first, last = get_page_limits(request) if query else (0, 20)
-            queryset = VendorCompany.objects.filter(name__icontains=query).order_by(Lower('name'))
+            queryset = VendorCompany.objects.filter(name__icontains=query).order_by('id', Lower('name')).distinct('id')
             total = queryset.count()
             data = queryset[first:last].values('id', 'name', 'created_by')
             return Response({"data": data, "total": total}, status=200)
