@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 
 from legal.models import Petition
+from utils_app.models import Choice
 from consultant.models import Consultant
 from notification.models import Notification, FCMDevice
 from project.models import Project, Leave, TimeSheet, TimesheetRequest, ConsultantLeave
@@ -26,7 +27,6 @@ from project.models import Project, Leave, TimeSheet, TimesheetRequest, Consulta
 from project.serializers import ConsultantLeaveSerializer
 from finance.serializers import FinanceDetailSerializer, FinanceSerializer, LeaveSerializer, \
     TimesheetRequestSerializer
-from utils_app.models import Choice
 
 from utils_app.thred_mail import send_email as send_email_
 from notification.utils import push_notification_consultant

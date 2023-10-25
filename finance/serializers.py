@@ -159,12 +159,12 @@ class LeaveSerializer(serializers.ModelSerializer):
 
 
 class TimesheetRequestSerializer(serializers.ModelSerializer):
-    submitted_at = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
     reviewed_by = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField()
-    start = serializers.SerializerMethodField()
-    end = serializers.SerializerMethodField()
+    submitted_at = serializers.SerializerMethodField()
 
     class Meta:
         model = TimesheetRequest

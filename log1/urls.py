@@ -11,7 +11,6 @@ from rest_framework_swagger.views import get_swagger_view
 
 from activity.views import CommentViewSet
 from attachment.views import AttachmentGetView, AttachmentView
-from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSet, LeaveBalanceViewSets
 from ckiller.views import CkillerSubmissionViewSet
 from dashboard.views import MarketingDashboardViewSet, QuickActionsViewSets
 from impersonate.views import ImpersonateViewSets
@@ -19,6 +18,8 @@ from jd_parser.views import MarketingMailListViewSet
 from legal.views import PetitionViewSets, PetitionDocsViewSets
 from messaging.views import SMSViewSet, ReceiveSMSViewSet
 from utils_app.views import CityViewSet, ChoiceViewSet, TeamsTargetViewSet, UtilityViewSet
+from finance.views import FinanceLeaveViewSets, FinancePayStubsViewSets, FinanceTimeSheetViewSet,\
+    LeaveBalanceViewSets
 from project.mobile_api import PayrollScheduleViewSet, TimeSheetViewSet, ConsultantLeaveViewSet, \
     TimetrackEventMobileViewSet
 from notification.views import EmployeeNotificationViewSet, ConsultantNotificationViewSet, FCMDeviceViewSet
