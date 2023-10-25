@@ -217,6 +217,7 @@ class InterviewGetSerializer(serializers.ModelSerializer):
 
 class InterviewListSerializer(serializers.ModelSerializer):
     guest = serializers.SerializerMethodField()
+    guests = serializers.SerializerMethodField()
     call_type = serializers.SerializerMethodField()
     submission = serializers.SerializerMethodField()
     consultant_name = serializers.SerializerMethodField()
@@ -274,7 +275,8 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
+        if (obj.guest_type in ['Coder', 'Assistance'] or obj.guest_type in ['Assigned', 'assigned']) and \
+                obj.coding_present is None:
             return False
         return True
 
@@ -286,6 +288,16 @@ class InterviewListSerializer(serializers.ModelSerializer):
         elif obj.supervisor_feedback.filter(question__form_name='interview') or obj.supervisor.employee_id == 9999:
             return True
         return False
+
+    @staticmethod
+    def get_guests(obj):
+        guests = []
+        for guest_obj in obj.guests.all():
+            guests.append({
+                "employee": {"id": guest_obj.user_id, "name": guest_obj.user.employee_name},
+                "guest_id": guest_obj.id, "type": guest_obj.type, "email": guest_obj.user.email
+            })
+        return guests
 
 
 class TestListSerializer(serializers.ModelSerializer):
@@ -457,10 +469,12 @@ class SubmissionConProfile(serializers.ModelSerializer):
 
 class InterviewV2Serializer(serializers.ModelSerializer):
     guest = UserDetailSerializer(many=True)
+    guests = serializers.SerializerMethodField()
     call_type = serializers.SerializerMethodField()
     supervisor = serializers.SerializerMethodField()
     permission = serializers.SerializerMethodField()
     marketer_name = serializers.SerializerMethodField()
+    interview_type = serializers.SerializerMethodField()
     guest_feedback = serializers.SerializerMethodField()
     attachment_link = serializers.SerializerMethodField()
     allow_status_change = serializers.SerializerMethodField()
@@ -500,9 +514,40 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
+        if (obj.guest_type in ['Coder', 'Assistance'] or obj.guest_type in ['Assigned', 'assigned']) and \
+                obj.coding_present is None:
             return False
         return True
+
+    @staticmethod
+    def get_interview_type(obj):
+        if obj.coding_present is None:
+            assistance = False
+            coding_required = False
+            if obj.guest_type in ['Coder', 'Assigned Coder']:
+                coding_required = True
+            elif obj.guest_type in ['Assistance', 'Assigned Assistance']:
+                assistance = True
+            elif obj.guest_type in ['Coder & Assistance', 'Assigned Coder & Assistance']:
+                assistance = True
+                coding_required = True
+        else:
+            assistance = obj.technical_assistance
+            coding_required = obj.coding_present
+        return {
+            "coding_required": coding_required, "assistance": assistance
+        }
+
+    @staticmethod
+    def get_guests(obj):
+        guests = []
+        qs = obj.guests.all()
+        for guest_obj in qs:
+            guests.append({
+                "employee": {"id": guest_obj.user_id, "name": guest_obj.user.employee_name},
+                "guest_id": guest_obj.id, "type": guest_obj.type, "email": guest_obj.user.email
+            })
+        return guests
 
     @staticmethod
     def get_supervisor_feedback(obj):
@@ -785,3 +830,10 @@ class TeamStructureSerializer(serializers.ModelSerializer):
             }
             return data
         return []
+
+
+class InterviewerProfileSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = InterviewerProfile
+        fields = '__all__'

@@ -473,7 +473,8 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             submission = get_object_or_404(Submission, id=pk)
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
             handover_ids = get_authenticated_users(request)
-            if (submission.created_by in handover_ids) or (user_id in supervisors) or ('engineer' in request.user.roles):
+            if (submission.created_by in handover_ids) or (user_id in supervisors) or (
+                    'engineer' in request.user.roles):
                 visibility = True
                 queryset = submission.attachments.all()
                 data = AttachmentSerializer(queryset, many=True).data
@@ -713,7 +714,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             url = ""
             if export:
                 url = export_to_csv(
-                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Submission Details List"
+                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    "Submission Details List"
                 )
 
             if sub_data == "error":
@@ -1199,9 +1201,12 @@ class InterviewViewSets(ModelViewSet):
                     )
 
             if filter_for == 'my':
-                queryset = queryset.filter(
-                    Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guest__id=user_id)
-                )
+                if 'engineer' in request.user.roles:
+                    queryset = queryset.filter(
+                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guest__id=user_id)
+                    )
+                else:
+                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
 
             elif filter_for == 'team':
                 queryset = queryset.filter(Q(submission__marketing_team=team) |
@@ -1319,13 +1324,6 @@ class InterviewViewSets(ModelViewSet):
             serializer = InterviewListSerializer(queryset, many=True)
             if serializer.data:
                 report = get_interview_report(serializer.data, request)
-                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
-                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
-                if devices_cookies:
-                    ExportData.objects.create(
-                    name="interview_list",
-                    device=devices_cookies
-                )
                 return report
             return Response({"message": "No Data to Extract"}, status=400)
         except Exception as error:
@@ -1415,9 +1413,6 @@ class InterviewViewSets(ModelViewSet):
         try:
             # Change status of past Interview to feedback due
             change_to_feedback_due()
-            if request.data.get('screening_type', None) == 'interview' and \
-                    ('interviewers' not in request.data or request.data.get('interviewers', []) is None):
-                return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
             users = get_authenticated_users(request)
             submission_id = request.data.get('submission', None)
             submissions = Submission.objects.filter(id=submission_id, created_by__in=users)
@@ -1428,7 +1423,8 @@ class InterviewViewSets(ModelViewSet):
             round_count = 0
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(status='cancelled')
             if prev_interview and prev_interview.first().status != 'next_round':
-                return Response({"message": "Update status of previous interview first"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"message": "Update status of previous interview first"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
             if prev_interview:
                 round_count = prev_interview.aggregate(Max('round'))['round__max']
@@ -1446,7 +1442,15 @@ class InterviewViewSets(ModelViewSet):
 
             resp = assign_interviewee(interview, request)
             if resp is not True:
-                return Response({"message": ERROR_MSG}, status=status.HTTP_200_OK)
+                return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get Interview Guest Type Required
+            guest_type = get_guest_type(request)
+            interview.guest_type = guest_type
+            interview.save()
+
+            # Assign Guest
+            add_update_guest(interview, request)
 
             # Activity
             end = interview.end_time.strftime("%Y-%m-%d %H-%M")
@@ -1491,7 +1495,7 @@ class InterviewViewSets(ModelViewSet):
                 if msg == 'error':
                     return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
-                interview.calendar_id = cal_res['id']
+                interview.calendar_id = cal_res.get('id')
                 interview.if_previous_calendar = False
                 booking_res = 'booked'
                 interview.save()
@@ -1575,6 +1579,11 @@ class InterviewViewSets(ModelViewSet):
                 else:
                     call_type_id = request.data.get('call_type', None)
                     interview.call_type = get_object_or_404(Choice, id=call_type_id) if call_type_id else None
+
+                updated = update_interviewee(interview, request)
+                if not updated:
+                    return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
+
                 interview.save()
 
                 # Setting Submission is_active value
@@ -1638,6 +1647,8 @@ class InterviewViewSets(ModelViewSet):
                 # if interview.guest_type in ['coder', 'assistance'] and (
                 #         pre_guest_type == 'not_required' or pre_guest_type is None):
                 #     coder_request_notification(interview, "Coding request", request)
+
+                add_update_guest(interview, request)
 
                 if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
                     # coder_request_notification(interview, "Coding not required for this Interview", request)
@@ -1741,67 +1752,78 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
+
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
 
+            if queryset.first().get_screening_type_display() == 'Interview' and \
+                    ('interviewers' not in request.data or request.data.get('interviewers', []) is None):
+                return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
+
             interview = queryset.first()
             prev_status = interview.get_status_display()
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
+            if not serializer.is_valid():
+                return Response({"message": ERROR_MSG, "error": str(serializer.errors)}, status=400)
+            serializer.save()
 
-                # Setting Submission is_active value
-                submission = interview.submission
-                if interview.status in ['next_round']:
-                    submission.is_active = True
-                if interview.status in ['offer']:
-                    submission.is_active = False
-                    submission.status = 'in_offer'
-                submission.save()
+            # Update Interviewer Info
+            updated = update_interviewee(interview, request)
+            if not updated:
+                return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
-                title = get_interview_title(interview)
-                booking_res = 'Interview Status Updated'
-                user_list, _ = get_users_and_attendees(request, interview)
-                desc = f"Round {interview.round} status is changed from {prev_status} to "
-                if interview.status not in ['cancelled']:
-                    if interview.status == 'next_round':
-                        desc += "Next round"
-                    elif interview.status == 'offer':
-                        desc = "Offer"
-                    else:
-                        desc = "Failed"
+            # Setting Submission is_active value
+            submission = interview.submission
+            if interview.status in ['next_round']:
+                submission.is_active = True
+            if interview.status in ['offer']:
+                submission.is_active = False
+                submission.status = 'in_offer'
+            submission.save()
 
-                    slack_card_json = interview_feedback_card(interview, request)
-                    post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
+            title = get_interview_title(interview)
+            booking_res = 'Interview Status Updated'
+            user_list, _ = get_users_and_attendees(request, interview)
+            desc = f"Round {interview.round} status is changed from {prev_status} to "
+            if interview.status not in ['cancelled']:
+                if interview.status == 'next_round':
+                    desc += "Next round"
+                elif interview.status == 'offer':
+                    desc = "Offer"
+                else:
+                    desc = "Failed"
 
-                # Activity
-                create_activity(submission.id, 'submission', request.user, desc, 'updated')
+                slack_card_json = interview_feedback_card(interview, request)
+                post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
 
-                data = queryset.annotate(
-                    client=F('submission__client'),
-                    project=F('submission__project'),
-                    job_title=F('submission__lead__job_title'),
-                    supervisor_name=F('supervisor__employee_name'),
-                    company_name=F('submission__lead__vendor_company__name'),
-                    marketer_name=F('submission__created_by__employee_name'),
-                    consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'job_title',
-                         'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
-                         'company_name', 'screening_type', 'interview_mode')
-                notification_data = {
-                    'category': 'info', 'description': title,
-                    'target_id': interview.id, 'parent_id': submission.id,
-                    'target_type': 'interview', 'parent_type': 'submission',
-                    'sender_user_type': 'user', 'title': 'Interview Updated',
-                    'sender_id': request.user.id, 'recipient_user_type': 'user',
-                }
-                create_notification(user_list, notification_data)
-                return Response(
-                    {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
-                )
-            return Response({"message": ERROR_MSG, "error": str(serializer.errors)}, status=400)
+            # Activity
+            create_activity(submission.id, 'submission', request.user, desc, 'updated')
+
+            data = queryset.annotate(
+                client=F('submission__client'),
+                project=F('submission__project'),
+                job_title=F('submission__lead__job_title'),
+                supervisor_name=F('supervisor__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'job_title',
+                     'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
+                     'company_name', 'screening_type', 'interview_mode')
+            notification_data = {
+                'category': 'info', 'description': title,
+                'target_id': interview.id, 'parent_id': submission.id,
+                'target_type': 'interview', 'parent_type': 'submission',
+                'sender_user_type': 'user', 'title': 'Interview Updated',
+                'sender_id': request.user.id, 'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+            return Response(
+                {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
+            )
+
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1988,7 +2010,7 @@ class InterviewViewSets(ModelViewSet):
 
             # if interview.guest_type in ['coder', 'assistance']:
             #     title = "Interview cancelled, coding is not required"
-                # coder_request_notification(interview, title, request)
+            # coder_request_notification(interview, title, request)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
@@ -2181,14 +2203,10 @@ class InterviewViewSets(ModelViewSet):
                     return Response({"message": "Interview not found"}, status=404)
 
                 interview = queryset.first()
-                guest = request.data.get('guest', [])
-                if guest:
-                    interview.guest.clear()
-                    interview.guest_type = 'assigned'
+                resp = add_update_guest(interview, request)
+                if resp == 'assigned' and ('Assigned' or 'assigned') not in interview.guest_type:
+                    interview.guest_type = 'Assigned ' + interview.guest_type
                     interview.save()
-
-                for user_id in guest:
-                    interview.guest.add(user_id)
 
                 est = pytz.timezone('US/Eastern')
                 today = datetime.now().astimezone(est)
@@ -2270,6 +2288,8 @@ class InterviewViewSets(ModelViewSet):
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
 
+            add_update_guest(interview, request)
+
             # Activity
             desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"
             create_activity(interview.submission.id, 'submission', request.user, desc, 'updated')
@@ -2349,6 +2369,16 @@ class InterviewViewSets(ModelViewSet):
                     {"passed_reasons": passed_reasons, "failure_reasons": tuple(failed_reasons_list)}, status=200
                 )
             return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='assigned_interviewers')
+    def assigned_interviewers(self, request, pk):
+        try:
+            interview_obj = get_object_or_404(Interview, id=pk)
+            interviewers_data = interview_obj.interviewers.all().values('id', 'name', 'email', 'linkedin')
+            return Response({"data": interviewers_data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
