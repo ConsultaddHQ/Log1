@@ -7,17 +7,9 @@ def check_access(request):
         return Response({"message": "You don't have access"}, status=status.HTTP_400_BAD_REQUEST)
     return None
 
-
 def make_unique_preserve_order(ids):
-    unique_ids = []
-    seen = set()
+    return list(dict.fromkeys(ids))
 
-    for id in ids:
-        if id not in seen:
-            unique_ids.append(id)
-            seen.add(id)
-
-    return unique_ids
 
 def return_leave_status(status):
     if status == "applied":
@@ -30,3 +22,4 @@ def return_leave_status(status):
         return "Rejected"
     elif status == "approved":
         return  "Approved"
+    return None
