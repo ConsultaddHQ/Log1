@@ -568,9 +568,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
     @staticmethod
     def get_interviewer_profile(obj):
         interviewers = obj.interviewers.all()
-        if interviewers:
-            return interviewers.values('id', 'name', 'email', 'linkedin')
-        return []
+        return interviewers.values('id', 'name', 'email', 'linkedin')
 
     @staticmethod
     def get_supervisor(obj):

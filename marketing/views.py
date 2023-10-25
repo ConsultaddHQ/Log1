@@ -1442,7 +1442,7 @@ class InterviewViewSets(ModelViewSet):
             interview.round = round_count + 1
             interview.save()
 
-            resp = assign_interviewee(interview, request)
+            resp = add_interviewer_profiles(interview, request)
             if resp is not True:
                 return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1452,7 +1452,7 @@ class InterviewViewSets(ModelViewSet):
             interview.save()
 
             # Assign Guest
-            assigned = add_update_guest(interview, request)
+            assigned = add_or_update_guest(interview, request)
             if not assigned:
                 return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1584,7 +1584,7 @@ class InterviewViewSets(ModelViewSet):
                     call_type_id = request.data.get('call_type', None)
                     interview.call_type = get_object_or_404(Choice, id=call_type_id) if call_type_id else None
 
-                updated = update_interviewee(interview, request)
+                updated = update_interviewer_profiles(interview, request)
                 if not updated:
                     return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1652,7 +1652,7 @@ class InterviewViewSets(ModelViewSet):
                 #         pre_guest_type == 'not_required' or pre_guest_type is None):
                 #     coder_request_notification(interview, "Coding request", request)
 
-                add_update_guest(interview, request)
+                add_or_update_guest(interview, request)
 
                 if (pre_guest_type in ['Coder', 'Assistance'] or 'Assigned' in pre_guest_type) and \
                         interview.guest_type == 'Not Required':
@@ -1775,7 +1775,7 @@ class InterviewViewSets(ModelViewSet):
             serializer.save()
 
             # Update Interviewer Info
-            updated = update_interviewee(interview, request)
+            updated = update_interviewer_profiles(interview, request)
             if not updated:
                 return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1795,10 +1795,8 @@ class InterviewViewSets(ModelViewSet):
             if interview.status not in ['cancelled']:
                 if interview.status == 'next_round':
                     desc += "Next round"
-                elif interview.status == 'offer':
-                    desc = "Offer"
                 else:
-                    desc = "Failed"
+                    desc = f"{interview.get_status_display()}"
 
                 slack_card_json = interview_feedback_card(interview, request)
                 post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
@@ -2210,7 +2208,7 @@ class InterviewViewSets(ModelViewSet):
                     return Response({"message": "Interview not found"}, status=404)
 
                 interview = queryset.first()
-                resp = add_update_guest(interview, request)
+                resp = add_or_update_guest(interview, request)
                 if resp == 'assigned' and ('Assigned' or 'assigned') not in interview.guest_type:
                     interview.guest_type = 'Assigned ' + interview.guest_type
                     interview.save()
@@ -2296,7 +2294,7 @@ class InterviewViewSets(ModelViewSet):
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
 
-            add_update_guest(interview, request)
+            add_or_update_guest(interview, request)
 
             # Activity
             desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"

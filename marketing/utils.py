@@ -537,7 +537,7 @@ def delete_supervisor_notification():
         return str(error), False
 
 
-def assign_interviewee(obj, request):
+def add_interviewer_profiles(obj, request):
     try:
         interviewers_profiles = request.data.get('interviewer_profiles', [])
         for interviewer in interviewers_profiles:
@@ -557,7 +557,7 @@ def assign_interviewee(obj, request):
         return str(error)
 
 
-def update_interviewee(obj, request):
+def update_interviewer_profiles(obj, request):
     try:
         updated_interviewers = set()
         client = obj.submission.client
@@ -606,7 +606,7 @@ def get_guest_type(request):
     return guest_type
 
 
-def add_update_guest(obj, request):
+def add_or_update_guest(obj, request):
     try:
         resp = 'Not Assigned'
         existing_guest = obj.guests.all()
