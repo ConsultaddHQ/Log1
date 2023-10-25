@@ -8,8 +8,9 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse
-from django.db.models.functions import Lower
 from django.db.models import F, Max, Count
+from django.db.models.functions import Lower
+from  django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
@@ -473,7 +474,8 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             submission = get_object_or_404(Submission, id=pk)
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
             handover_ids = get_authenticated_users(request)
-            if (submission.created_by in handover_ids) or (user_id in supervisors) or ('engineer' in request.user.roles):
+            if (submission.created_by in handover_ids) or (user_id in supervisors) or (
+                    'engineer' in request.user.roles):
                 visibility = True
                 queryset = submission.attachments.all()
                 data = AttachmentSerializer(queryset, many=True).data
@@ -713,7 +715,8 @@ class SubmissionViewSets(GenericViewSet, ListModelMixin, CreateModelMixin, Updat
             url = ""
             if export:
                 url = export_to_csv(
-                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request, "Submission Details List"
+                    data, col_name, f"submission_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    "Submission Details List"
                 )
 
             if sub_data == "error":
@@ -1199,9 +1202,12 @@ class InterviewViewSets(ModelViewSet):
                     )
 
             if filter_for == 'my':
-                queryset = queryset.filter(
-                    Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guest__id=user_id)
-                )
+                if 'engineer' in request.user.roles:
+                    queryset = queryset.filter(
+                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guests__id=user_id)
+                    )
+                else:
+                    queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
 
             elif filter_for == 'team':
                 queryset = queryset.filter(Q(submission__marketing_team=team) |
@@ -1217,15 +1223,15 @@ class InterviewViewSets(ModelViewSet):
 
                 if 'assignment' in filters:
                     if filters["assignment"] == 'assigned':
-                        queryset = queryset.filter(guest_type='assigned').exclude(status='cancelled')
+                        queryset = queryset.filter(guest_type__icontains='assigned').exclude(status='cancelled')
                     if filters["assignment"] == 'unassigned':
-                        queryset = queryset.filter(guest_type='coder').exclude(status='cancelled')
+                        queryset = queryset.exclude(guest_type__icontains='coder').exclude(status='cancelled')
 
                 if 'coding_interview' in filters:
                     if filters["coding_interview"] == 'yes':
-                        queryset = queryset.filter(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                        queryset = queryset.filter(guest_type__in=['Coder', 'Assigned Coder']).exclude(status='cancelled')
                     elif filters["coding_interview"] == 'no':
-                        queryset = queryset.exclude(guest_type__in=['coder', 'assigned']).exclude(status='cancelled')
+                        queryset = queryset.exclude(guest_type__in=['Coder', 'Assigned Coder']).exclude(status='cancelled')
 
                 if 'status' in filters and len(filters["status"]) > 0:
                     filter_by_status = filters["status"]
@@ -1319,13 +1325,6 @@ class InterviewViewSets(ModelViewSet):
             serializer = InterviewListSerializer(queryset, many=True)
             if serializer.data:
                 report = get_interview_report(serializer.data, request)
-                cookie_value = request.META.get('HTTP_X_ID_TOKEN', None) 
-                devices_cookies = Devices.objects.filter(cookies_value=cookie_value).first()
-                if devices_cookies:
-                    ExportData.objects.create(
-                    name="interview_list",
-                    device=devices_cookies
-                )
                 return report
             return Response({"message": "No Data to Extract"}, status=400)
         except Exception as error:
@@ -1342,7 +1341,7 @@ class InterviewViewSets(ModelViewSet):
             object_id=obj.id, question__form_name='interview').order_by('question__position')
         coding_answer_qs = Answer.objects.filter(
             object_id=obj.id, question__form_name='coding').order_by('question__position')
-        coder_names = obj.guest.all()
+        coder_names = obj.guests.filter(type__in=['Coder', 'Assistant'])
         coders = ''
         n = 0
         for name in coder_names:
@@ -1415,122 +1414,139 @@ class InterviewViewSets(ModelViewSet):
         try:
             # Change status of past Interview to feedback due
             change_to_feedback_due()
-
             users = get_authenticated_users(request)
             submission_id = request.data.get('submission', None)
-            submissions = Submission.objects.filter(id=submission_id, created_by__in=users)
-            if not submissions:
-                return Response({"message": 'This is not your submission'}, status=400)
+            try:
+                get_object_or_404(Submission, id=submission_id, created_by__in=users)
+            except ObjectDoesNotExist:
+                return Response({"message": 'This is not your submission'}, status=status.HTTP_404_NOT_FOUND)
 
             # calculating Interview round
             round_count = 0
             prev_interview = Interview.objects.filter(submission_id=submission_id).exclude(status='cancelled')
             if prev_interview and prev_interview.first().status != 'next_round':
-                return Response({"message": "Update status of previous interview first"}, status=400)
+                return Response({"message": "Update status of previous interview first"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
             if prev_interview:
                 round_count = prev_interview.aggregate(Max('round'))['round__max']
 
             # Saving Interview
             serializer = InterviewCreateSerializer(data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
+            if not serializer.is_valid():
+                return Response({"message": ERROR_MSG, "error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+            serializer.save()
 
-                queryset = Interview.objects.filter(id=serializer.data['id'])
-                interview = queryset.first()
-                interview.round = round_count + 1
+            queryset = Interview.objects.filter(id=serializer.data['id'])
+            interview = queryset.first()
+            interview.round = round_count + 1
+            interview.save()
+
+            resp = add_interviewer_profiles(interview, request)
+            if resp is not True:
+                return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get Interview Guest Type Required
+            guest_type = get_guest_type(request)
+            interview.guest_type = guest_type
+            interview.save()
+
+            # Assign Guest
+            assigned = add_or_update_guest(interview, request)
+            if not assigned:
+                return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Activity
+            end = interview.end_time.strftime("%Y-%m-%d %H-%M")
+            start = interview.start_time.strftime("%Y-%m-%d %H-%M")
+            desc = f"Interview round {interview.round} is scheduled for " \
+                   f"{start.split(' ')[0]}-{start.split(' ')[1]} to {end.split(' ')[0]}-{end.split(' ')[1]}"
+            create_activity(submission_id, 'submission', request.user, desc, 'created')
+
+            # Closing Submission for scheduling Interview
+            submission = interview.submission
+            submission.status = 'interview'
+            submission.is_active = False
+            submission.save()
+
+            # Ranking Interview
+            if interview.round == 1:
+                interview = self.rank_interviews(interview, 'create')
+
+            # Calendar attendees and User for sending notification
+            title = get_interview_title(interview)
+            # interview.submission.created_by.email
+            user_list, attendees = get_users_and_attendees(request, interview)
+            end_time = datetime.strptime(str(interview.end_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
+                "%Y-%m-%dT%H:%M:%S")
+            start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
+                "%Y-%m-%dT%H:%M:%S")
+            call_type = interview.call_type.display_name if interview.call_type else None
+            event = {
+                "call_type": call_type,
+                "end": end_time, "summary": title, "start": start_time,
+                "submission": submission, "consultant": interview.consultant,
+                "user": request.user, "attendees": attendees, "lead": submission.lead,
+                "description": interview.description, "call_details": interview.call_details,
+            }
+
+            # Booking Calendar
+            try:
+                # Booking Google calendar
+                calendar = GoogleCalendar()
+                cal_res, msg = calendar.book_calendar(event, submission.created_by.email, request)
+
+                if msg == 'error':
+                    return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
+
+                interview.calendar_id = cal_res.get('id')
+                interview.if_previous_calendar = False
+                booking_res = 'booked'
                 interview.save()
+            except Exception as error:
+                return Response(
+                    {"message": "Calendar booking failed", "error": str(error)}, status=status.HTTP_400_BAD_REQUEST
+                )
 
-                # Activity
-                end = interview.end_time.strftime("%Y-%m-%d %H-%M")
-                start = interview.start_time.strftime("%Y-%m-%d %H-%M")
-                desc = f"Interview round {interview.round} is scheduled for " \
-                       f"{start.split(' ')[0]}-{start.split(' ')[1]} to {end.split(' ')[0]}-{end.split(' ')[1]}"
-                create_activity(submission_id, 'submission', request.user, desc, 'created')
+            # Slack message for Interview
+            # if date.today() == interview.start_time.date():
+            #     payload = {
+            #         "title": ":scroll: New Interview Scheduled",
+            #         "body": title
+            #     }
+                # data = MessageCard.get_simple_card(payload)
+                # post_msg_using_webhook(config.slack_announcement_url, data)
 
-                # Closing Submission for scheduling Interview
-                submission = submissions.first()
-                submission.status = 'interview'
-                submission.is_active = False
-                submission.save()
+            # if interview.guest_type in ['coder', 'assistance']:
+            # coder_request_notification(interview, "Coding request", request)
 
-                # Ranking Interview
-                if interview.round == 1:
-                    interview = self.rank_interviews(interview, 'create')
+            data = queryset.annotate(
+                rank=F('submission__rank'),
+                client=F('submission__client'),
+                job_title=F('submission__lead__job_title'),
+                supervisor_name=F('supervisor__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'screening_type',
+                     'rank', 'submission_id', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
+                     'company_name', 'job_title', 'interview_mode')
 
-                # Calendar attendees and User for sending notification
-                title = get_interview_title(interview)
-                # interview.submission.created_by.email
-                user_list, attendees = get_users_and_attendees(request, interview)
-                end_time = datetime.strptime(str(interview.end_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
-                    "%Y-%m-%dT%H:%M:%S")
-                start_time = datetime.strptime(str(interview.start_time), "%Y-%m-%d %H:%M:%S+00:00").strftime(
-                    "%Y-%m-%dT%H:%M:%S")
-                call_type = interview.call_type.display_name if interview.call_type else None
-                event = {
-                    "call_type": call_type,
-                    "end": end_time, "summary": title, "start": start_time,
-                    "submission": submission, "consultant": interview.consultant,
-                    "user": request.user, "attendees": attendees, "lead": submission.lead,
-                    "description": interview.description, "call_details": interview.call_details,
-                }
-
-                # Booking Calendar
-                try:
-                    # Booking Google calendar
-                    calendar = GoogleCalendar()
-                    cal_res, msg = calendar.book_calendar(event, interview.submission.created_by.email, request)
-
-                    if msg == 'error':
-                        return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
-
-                    interview.calendar_id = cal_res['id']
-                    interview.if_previous_calendar = False
-                    booking_res = 'booked'
-                    interview.save()
-                except Exception as error:
-                    return Response({"message": "Calendar booking failed", "error": str(error)}, status=400)
-
-                # Slack message for Interview
-                if date.today() == interview.start_time.date():
-                    payload = {
-                        "title": ":scroll: New Interview Scheduled",
-                        "body": title
-                    }
-                    # data = MessageCard.get_simple_card(payload)
-                    # post_msg_using_webhook(config.slack_announcement_url, data)
-
-                # if interview.guest_type in ['coder', 'assistance']:
-                    # coder_request_notification(interview, "Coding request", request)
-
-                data = queryset.annotate(
-                    rank=F('submission__rank'),
-                    client=F('submission__client'),
-                    job_title=F('submission__lead__job_title'),
-                    supervisor_name=F('supervisor__employee_name'),
-                    company_name=F('submission__lead__vendor_company__name'),
-                    marketer_name=F('submission__created_by__employee_name'),
-                    consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'screening_type',
-                         'rank', 'submission_id', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
-                         'company_name', 'job_title', 'interview_mode')
-
-                # Creating Notification
-                notification_data = {
-                    'recipient_user_type': 'user', 'description': title,
-                    'category': 'info', 'title': 'New Interview Created',
-                    'target_id': interview.id, 'parent_id': submission.id,
-                    'target_type': 'interview', 'parent_type': 'submission',
-                    'sender_id': request.user.id, 'sender_user_type': 'user',
-                }
-                create_notification(user_list, notification_data)
-                return Response({
-                    "data": data[0], 'booking_response': booking_res, "message": "Interview created"
-                }, status=201)
-            return Response({"message": ERROR_MSG, "error": serializer.errors}, status=400)
+            # Creating Notification
+            notification_data = {
+                'recipient_user_type': 'user', 'description': title,
+                'category': 'info', 'title': 'New Interview Created',
+                'target_id': interview.id, 'parent_id': submission.id,
+                'target_type': 'interview', 'parent_type': 'submission',
+                'sender_id': request.user.id, 'sender_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+            return Response({
+                "data": data[0], 'booking_response': booking_res, "message": "Interview created"
+            }, status=status.HTTP_201_CREATED)
         except Exception as error:
             write_exception(error, request)
-            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         # Change status of past Screening to feedback due
@@ -1567,6 +1583,11 @@ class InterviewViewSets(ModelViewSet):
                 else:
                     call_type_id = request.data.get('call_type', None)
                     interview.call_type = get_object_or_404(Choice, id=call_type_id) if call_type_id else None
+
+                updated = update_interviewer_profiles(interview, request)
+                if not updated:
+                    return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
+
                 interview.save()
 
                 # Setting Submission is_active value
@@ -1631,7 +1652,10 @@ class InterviewViewSets(ModelViewSet):
                 #         pre_guest_type == 'not_required' or pre_guest_type is None):
                 #     coder_request_notification(interview, "Coding request", request)
 
-                if pre_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
+                add_or_update_guest(interview, request)
+
+                if (pre_guest_type in ['Coder', 'Assistance'] or 'Assigned' in pre_guest_type) and \
+                        interview.guest_type == 'Not Required':
                     # coder_request_notification(interview, "Coding not required for this Interview", request)
                     interview.guest.clear()
 
@@ -1733,67 +1757,76 @@ class InterviewViewSets(ModelViewSet):
 
             if interview_status == 'cancelled':
                 return Response({"message": "Interview can't be cancelled"}, status=400)
+
             users = get_authenticated_users(request)
             queryset = Interview.objects.filter(id=kwargs.get('pk'), submission__created_by__in=users)
             if not queryset:
                 return Response({"message": "Interview not found"}, status=404)
 
+            if queryset.first().get_screening_type_display() == 'Interview' and \
+                    ('interviewers' not in request.data or request.data.get('interviewers', []) is None):
+                return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
+
             interview = queryset.first()
             prev_status = interview.get_status_display()
             serializer = InterviewCreateSerializer(interview, data=request.data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
+            if not serializer.is_valid():
+                return Response({"message": ERROR_MSG, "error": str(serializer.errors)}, status=400)
+            serializer.save()
 
-                # Setting Submission is_active value
-                submission = interview.submission
-                if interview.status in ['next_round']:
-                    submission.is_active = True
-                if interview.status in ['offer']:
-                    submission.is_active = False
-                    submission.status = 'in_offer'
-                submission.save()
+            # Update Interviewer Info
+            updated = update_interviewer_profiles(interview, request)
+            if not updated:
+                return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
-                title = get_interview_title(interview)
-                booking_res = 'Interview Status Updated'
-                user_list, _ = get_users_and_attendees(request, interview)
-                desc = f"Round {interview.round} status is changed from {prev_status} to "
-                if interview.status not in ['cancelled']:
-                    if interview.status == 'next_round':
-                        desc += "Next round"
-                    elif interview.status == 'offer':
-                        desc = "Offer"
-                    else:
-                        desc = "Failed"
+            # Setting Submission is_active value
+            submission = interview.submission
+            if interview.status in ['next_round']:
+                submission.is_active = True
+            if interview.status in ['offer']:
+                submission.is_active = False
+                submission.status = 'in_offer'
+            submission.save()
 
-                    slack_card_json = interview_feedback_card(interview, request)
-                    post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
+            title = get_interview_title(interview)
+            booking_res = 'Interview Status Updated'
+            user_list, _ = get_users_and_attendees(request, interview)
+            desc = f"Round {interview.round} status is changed from {prev_status} to "
+            if interview.status not in ['cancelled']:
+                if interview.status == 'next_round':
+                    desc += "Next round"
+                else:
+                    desc = f"{interview.get_status_display()}"
 
-                # Activity
-                create_activity(submission.id, 'submission', request.user, desc, 'updated')
+                slack_card_json = interview_feedback_card(interview, request)
+                post_msg_using_webhook(config.slack_interview_feedback_url, slack_card_json)
 
-                data = queryset.annotate(
-                    client=F('submission__client'),
-                    project=F('submission__project'),
-                    job_title=F('submission__lead__job_title'),
-                    supervisor_name=F('supervisor__employee_name'),
-                    company_name=F('submission__lead__vendor_company__name'),
-                    marketer_name=F('submission__created_by__employee_name'),
-                    consultant_name=F('submission__consultant_marketing__consultant__name'),
-                ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'job_title',
-                         'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
-                         'company_name', 'screening_type', 'interview_mode')
-                notification_data = {
-                    'category': 'info', 'description': title,
-                    'target_id': interview.id, 'parent_id': submission.id,
-                    'target_type': 'interview', 'parent_type': 'submission',
-                    'sender_user_type': 'user', 'title': 'Interview Updated',
-                    'sender_id': request.user.id, 'recipient_user_type': 'user',
-                }
-                create_notification(user_list, notification_data)
-                return Response(
-                    {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
-                )
-            return Response({"message": ERROR_MSG, "error": str(serializer.errors)}, status=400)
+            # Activity
+            create_activity(submission.id, 'submission', request.user, desc, 'updated')
+
+            data = queryset.annotate(
+                client=F('submission__client'),
+                project=F('submission__project'),
+                job_title=F('submission__lead__job_title'),
+                supervisor_name=F('supervisor__employee_name'),
+                company_name=F('submission__lead__vendor_company__name'),
+                marketer_name=F('submission__created_by__employee_name'),
+                consultant_name=F('submission__consultant_marketing__consultant__name'),
+            ).values('id', 'round', 'call_type__display_name', 'status', 'start_time', 'end_time', 'job_title',
+                     'submission_id', 'project', 'supervisor_name', 'marketer_name', 'consultant_name', 'client',
+                     'company_name', 'screening_type', 'interview_mode')
+            notification_data = {
+                'category': 'info', 'description': title,
+                'target_id': interview.id, 'parent_id': submission.id,
+                'target_type': 'interview', 'parent_type': 'submission',
+                'sender_user_type': 'user', 'title': 'Interview Updated',
+                'sender_id': request.user.id, 'recipient_user_type': 'user',
+            }
+            create_notification(user_list, notification_data)
+            return Response(
+                {"data": data[0], "booking_response": booking_res, "message": "Interview updated"}, status=202
+            )
+
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
@@ -1815,7 +1848,7 @@ class InterviewViewSets(ModelViewSet):
                 serializer.save()
 
             interview.status = 'rescheduled'
-            if interview.guest_type in ['coder', 'assistance', 'assigned']:
+            if interview.guest_type in ['Coder', 'Assistance'] or 'Assigned' in interview.guest_type:
                 interview.guest.clear()
             interview.save()
 
@@ -1852,7 +1885,7 @@ class InterviewViewSets(ModelViewSet):
                         if msg == "error":
                             return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
-                        interview.calendar_id = cal_res['id']
+                        interview.calendar_id = cal_res.get('id')
                         interview.if_previous_calendar = False
                         booking_res = 'booked'
                         interview.save()
@@ -1890,7 +1923,8 @@ class InterviewViewSets(ModelViewSet):
                     # data = MessageCard.get_simple_card(payload)
                     # post_msg_using_webhook(config.slack_announcement_url, data)
 
-                if prev_guest_type in ['coder', 'assistance', 'assigned'] and interview.guest_type == 'not_required':
+                if (prev_guest_type in ['Coder', 'Assistance'] or 'Assigned' in prev_guest_type) and \
+                        interview.guest_type == 'Not Required':
                     est = pytz.timezone('US/Eastern')
                     today = datetime.now().astimezone(est)
 
@@ -1902,7 +1936,8 @@ class InterviewViewSets(ModelViewSet):
                         title = "Coding request, Interview Rescheduled"
                     #     coder_request_notification(interview, title, request)
 
-                    if interview.guest_type in ['coder', 'assistance'] and prev_guest_type == 'not_required':
+                    if (interview.guest_type in ['Coder', 'Assistance'] or 'Assigned' in interview.guest_type) and \
+                            prev_guest_type == 'Not Required':
                         title = "Coding request"
                     #     coder_request_notification(interview, title, request)
 
@@ -1980,7 +2015,7 @@ class InterviewViewSets(ModelViewSet):
 
             # if interview.guest_type in ['coder', 'assistance']:
             #     title = "Interview cancelled, coding is not required"
-                # coder_request_notification(interview, title, request)
+            # coder_request_notification(interview, title, request)
 
             title = f"""CTB:{interview.supervisor.employee_name} :: {interview.round}R ::
                                     {interview.get_screening_type_display()} :: 
@@ -2173,14 +2208,10 @@ class InterviewViewSets(ModelViewSet):
                     return Response({"message": "Interview not found"}, status=404)
 
                 interview = queryset.first()
-                guest = request.data.get('guest', [])
-                if guest:
-                    interview.guest.clear()
-                    interview.guest_type = 'assigned'
+                resp = add_or_update_guest(interview, request)
+                if resp == 'assigned' and ('Assigned' or 'assigned') not in interview.guest_type:
+                    interview.guest_type = 'Assigned ' + interview.guest_type
                     interview.save()
-
-                for user_id in guest:
-                    interview.guest.add(user_id)
 
                 est = pytz.timezone('US/Eastern')
                 today = datetime.now().astimezone(est)
@@ -2255,12 +2286,15 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             interview = queryset.first()
             interview.coding_present = True if request.data.get('coding_present') == 'true' else False
+            interview.assistance_required = True if request.data.get('assistance_required') == 'true' else False
             interview.guest_remark = request.data.get('feedback', None)
             interview.save()
 
             ques_answers = create_answer(request, interview, 'interview')
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
+
+            add_or_update_guest(interview, request)
 
             # Activity
             desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"
@@ -2341,6 +2375,16 @@ class InterviewViewSets(ModelViewSet):
                     {"passed_reasons": passed_reasons, "failure_reasons": tuple(failed_reasons_list)}, status=200
                 )
             return Response({"passed_reasons": passed_reasons, "failure_reasons": failed_reasons}, status=200)
+        except Exception as error:
+            write_exception(error, request)
+            return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
+
+    @action(methods=['get'], detail=True, url_path='assigned_interviewers')
+    def assigned_interviewers(self, request, pk):
+        try:
+            interview_obj = get_object_or_404(Interview, id=pk)
+            interviewers_data = interview_obj.interviewers.all().values('id', 'name', 'email', 'linkedin')
+            return Response({"data": interviewers_data}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)

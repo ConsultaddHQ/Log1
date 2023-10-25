@@ -7,6 +7,9 @@ from pytz import timezone
 from celery import shared_task
 from django.http import HttpResponse
 from datetime import datetime, timedelta
+
+from rest_framework import status
+from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
 
@@ -16,9 +19,9 @@ from utils_app.models import Choice
 from consultant.models import ConsultantProfile
 from attachment.models import create_attachment
 from notification.models import FCMDevice, UserNotification
-from marketing.models import Submission, Interview, Question, Answer
+from marketing.serializers import InterviewerProfileSerializer
+from marketing.models import Submission, Interview, Question, Answer, InterviewerProfile, GuestInfo
 
-from engineering.utils import get_shift
 from log1.utils import write_info, write_exception
 from utils_app.slack_notification import MessageCard as slack
 from notification.utils import push_notification_consultant, create_notification
@@ -532,3 +535,96 @@ def delete_supervisor_notification():
     except Exception as error:
         write_exception(error, None)
         return str(error), False
+
+
+def add_interviewer_profiles(obj, request):
+    try:
+        interviewers_profiles = request.data.get('interviewer_profiles', [])
+        for interviewer in interviewers_profiles:
+            if interviewer.get('id', None):
+                interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
+                obj.interviewers.add(interviewer_obj)
+            else:
+                interviewer_obj = InterviewerProfile.objects.create(
+                    name=interviewer.get('name'), email=interviewer.get('email', None),
+                    created_by=request.user, linkedin=interviewer.get('linkedin', None), client=obj.submission.client
+                )
+            obj.interviewers.add(interviewer_obj)
+            obj.save()
+        return True
+    except Exception as error:
+        write_exception(error, request)
+        return str(error)
+
+
+def update_interviewer_profiles(obj, request):
+    try:
+        updated_interviewers = set()
+        client = obj.submission.client
+        interviewers_profiles = request.data.get('interviewer_profiles')
+        existing_interviewers = set(obj.interviewers.all())
+        for interviewer in interviewers_profiles:
+            if interviewer.get('id', None):
+                interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
+                serializer = InterviewerProfileSerializer(interviewer_obj, data=interviewer, partial=True)
+                if not serializer.is_valid():
+                    return Response(
+                        {"message": "Interviewers details are incorrect", "error": str(serializer.errors)},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                serializer.save()
+                updated_interviewers.add(interviewer_obj)
+            else:
+                interviewer_obj = InterviewerProfile.objects.create(
+                    name=interviewer.get('name'), email=interviewer.get('email', None),
+                    created_by=request.user, linkedin=interviewer.get('linkedin', None), client=client
+                )
+                obj.interviewers.add(interviewer_obj)
+                obj.save()
+        existing_interviewers.difference_update(updated_interviewers)
+        if existing_interviewers:
+            removed_interviewers = [elm for elm in existing_interviewers]
+            obj.interviewers.remove(*removed_interviewers)
+            obj.save()
+        return True
+    except Exception as error:
+        write_exception(error, request)
+        return False
+
+
+def get_guest_type(request):
+    guest_type = "Not Required"
+    coding_required = request.data.get('coding')
+    assistance_required = request.data.get('assistance')
+
+    if coding_required and not assistance_required:
+        guest_type = "Coder"
+    elif not coding_required and assistance_required:
+        guest_type = "Assistance"
+    elif coding_required and assistance_required:
+        guest_type = "Coder & Assistance"
+    return guest_type
+
+
+def add_or_update_guest(obj, request):
+    try:
+        resp = 'Not Assigned'
+        existing_guest = obj.guests.all()
+        guests = request.data.get('guest_info', [])
+        for guest in guests:
+            if guest.get('user_id', None) is None:
+                continue
+            guest_obj = GuestInfo.objects.filter(user_id=guest.get('user_id'), type=guest.get('type', None)).first()
+            if not guest_obj:
+                guest_obj = GuestInfo.objects.create(user_id=guest.get('user_id'), type=guest.get('type', None))
+            if guest_obj in existing_guest:
+                continue
+            elif guest_obj.user_id in existing_guest.values_list('user_id', flat=True):
+                obj.guests.remove(existing_guest.filter(user_id=guest_obj.user_id).first())
+            obj.guests.add(guest_obj)
+            obj.save()
+            resp = 'assigned'
+        return resp
+    except Exception as error:
+        write_exception(error, request)
+        return False
