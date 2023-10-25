@@ -1885,7 +1885,7 @@ class InterviewViewSets(ModelViewSet):
                         if msg == "error":
                             return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
 
-                        interview.calendar_id = cal_res['id']
+                        interview.calendar_id = cal_res.get('id')
                         interview.if_previous_calendar = False
                         booking_res = 'booked'
                         interview.save()
