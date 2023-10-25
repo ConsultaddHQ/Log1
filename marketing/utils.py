@@ -547,7 +547,7 @@ def assign_interviewee(obj, request):
             else:
                 interviewer_obj = InterviewerProfile.objects.create(
                     name=interviewer.get('name'), email=interviewer.get('email', None),
-                    submitted_by=request.user, linkedin=interviewer.get('linkedin', None), client=obj.submission.client
+                    created_by=request.user, linkedin=interviewer.get('linkedin', None), client=obj.submission.client
                 )
             obj.interviewers.add(interviewer_obj)
             obj.save()
@@ -577,7 +577,7 @@ def update_interviewee(obj, request):
             else:
                 interviewer_obj = InterviewerProfile.objects.create(
                     name=interviewer.get('name'), email=interviewer.get('email', None),
-                    submitted_by=request.user, linkedin=interviewer.get('linkedin', None), client=client
+                    created_by=request.user, linkedin=interviewer.get('linkedin', None), client=client
                 )
                 obj.interviewers.add(interviewer_obj)
                 obj.save()
@@ -607,20 +607,24 @@ def get_guest_type(request):
 
 
 def add_update_guest(obj, request):
-    resp = 'Not Assigned'
-    existing_guest = obj.guests.all()
-    guests = request.data.get('guest_info', [])
-    for guest in guests:
-        if guest.get('user_id', None) is None:
-            continue
-        guest_obj = GuestInfo.objects.filter(user_id=guest.get('user_id'), type=guest.get('type', None)).first()
-        if not guest_obj:
-            guest_obj = GuestInfo.objects.create(user_id=guest.get('user_id'), type=guest.get('type', None))
-        if guest_obj in existing_guest:
-            continue
-        elif guest_obj.user_id in existing_guest.values_list('user_id', flat=True):
-            obj.guests.remove(existing_guest.filter(user_id=guest_obj.user_id).first())
-        obj.guests.add(guest_obj)
-        obj.save()
-        resp = 'assigned'
-    return resp
+    try:
+        resp = 'Not Assigned'
+        existing_guest = obj.guests.all()
+        guests = request.data.get('guest_info', [])
+        for guest in guests:
+            if guest.get('user_id', None) is None:
+                continue
+            guest_obj = GuestInfo.objects.filter(user_id=guest.get('user_id'), type=guest.get('type', None)).first()
+            if not guest_obj:
+                guest_obj = GuestInfo.objects.create(user_id=guest.get('user_id'), type=guest.get('type', None))
+            if guest_obj in existing_guest:
+                continue
+            elif guest_obj.user_id in existing_guest.values_list('user_id', flat=True):
+                obj.guests.remove(existing_guest.filter(user_id=guest_obj.user_id).first())
+            obj.guests.add(guest_obj)
+            obj.save()
+            resp = 'assigned'
+        return resp
+    except Exception as error:
+        write_exception(error, request)
+        return False

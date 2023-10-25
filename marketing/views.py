@@ -8,8 +8,9 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.db import transaction
 from django.http import HttpResponse
-from django.db.models.functions import Lower
 from django.db.models import F, Max, Count
+from django.db.models.functions import Lower
+from  django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
@@ -1415,9 +1416,10 @@ class InterviewViewSets(ModelViewSet):
             change_to_feedback_due()
             users = get_authenticated_users(request)
             submission_id = request.data.get('submission', None)
-            submissions = Submission.objects.filter(id=submission_id, created_by__in=users)
-            if not submissions:
-                return Response({"message": 'This is not your submission'}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                get_object_or_404(Submission, id=submission_id, created_by__in=users)
+            except ObjectDoesNotExist:
+                return Response({"message": 'This is not your submission'}, status=status.HTTP_404_NOT_FOUND)
 
             # calculating Interview round
             round_count = 0
@@ -1450,7 +1452,9 @@ class InterviewViewSets(ModelViewSet):
             interview.save()
 
             # Assign Guest
-            add_update_guest(interview, request)
+            assigned = add_update_guest(interview, request)
+            if not assigned:
+                return Response({"message": ERROR_MSG}, status=status.HTTP_400_BAD_REQUEST)
 
             # Activity
             end = interview.end_time.strftime("%Y-%m-%d %H-%M")
@@ -1460,7 +1464,7 @@ class InterviewViewSets(ModelViewSet):
             create_activity(submission_id, 'submission', request.user, desc, 'created')
 
             # Closing Submission for scheduling Interview
-            submission = submissions.first()
+            submission = interview.submission
             submission.status = 'interview'
             submission.is_active = False
             submission.save()
@@ -1490,7 +1494,7 @@ class InterviewViewSets(ModelViewSet):
             try:
                 # Booking Google calendar
                 calendar = GoogleCalendar()
-                cal_res, msg = calendar.book_calendar(event, interview.submission.created_by.email, request)
+                cal_res, msg = calendar.book_calendar(event, submission.created_by.email, request)
 
                 if msg == 'error':
                     return Response({"message": "Calendar booking failed", "error": cal_res}, status=400)
@@ -1505,11 +1509,11 @@ class InterviewViewSets(ModelViewSet):
                 )
 
             # Slack message for Interview
-            if date.today() == interview.start_time.date():
-                payload = {
-                    "title": ":scroll: New Interview Scheduled",
-                    "body": title
-                }
+            # if date.today() == interview.start_time.date():
+            #     payload = {
+            #         "title": ":scroll: New Interview Scheduled",
+            #         "body": title
+            #     }
                 # data = MessageCard.get_simple_card(payload)
                 # post_msg_using_webhook(config.slack_announcement_url, data)
 
