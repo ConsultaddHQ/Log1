@@ -372,6 +372,48 @@ class Test(TimeStampedModel):
         return self.submission.created_by
 
 
+class InterviewerProfile(TimeStampedModel):
+    client = models.CharField(_('Client'), max_length=100)
+    name = models.CharField(_('Interviewer Name'), max_length=80)
+    linkedin = models.TextField(_('Interviewer Linkedin'), blank=True, null=True)
+    email = models.CharField(_('Interviewer Email'), max_length=100, blank=True, null=True)
+    created_by = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='interviewer_profile',
+        verbose_name='Interviewer Profile Created By'
+    )
+
+    def save(self, *args, **kwargs):
+
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(InterviewerProfile, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name}-{self.client}"
+
+    class Meta:
+        verbose_name = _("Interviewer Profile")
+
+
+class GuestInfo(TimeStampedModel):
+    type = models.CharField(_('Guest Type'), max_length=80, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='interview_guest', null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(GuestInfo, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user.employee_name}-{self.type}"
+
+    class Meta:
+        verbose_name = _("Guest Info")
+
+
 class Interview(TimeStampedModel):
     STATUS_CHOICES = (
         ('offer', 'offer'),
@@ -427,14 +469,17 @@ class Interview(TimeStampedModel):
     guest_type = models.CharField(_('Guest Type'), max_length=50, null=True)
     start_time = models.DateTimeField(_('Start Date'), null=True, blank=True)
     call_details = models.TextField(_('Call Details'), null=True, blank=True)
-    tech_stack = models.TextField(_('Technology required'), null=True, blank=True)
-    attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
+    tech_stack = models.TextField(_('Coding Tech Stack'), null=True, blank=True)
     if_previous_calendar = models.BooleanField(_('Previous Calendar'), default=True)
+    attachment_link = models.TextField(_('Attachment Links'), null=True, blank=True)
+    interviewer_link = models.TextField(_('Interviewer Link'), null=True, blank=True)
+    assistance_remarks = models.TextField(_('Assistance Remarks'), null=True, blank=True)
+    assistance_tech = models.TextField(_('Assistance Technology'), null=True, blank=True)
     calendar_id = models.CharField(_('Calendar ID'), max_length=300, null=True, blank=True)
+    assistance_required = models.BooleanField(_('Assistance Required'), null=True, blank=True)
     screening_type = models.CharField(_('Screening Type'), max_length=20, choices=TYPE_CHOICES)
     interview_mode = models.CharField(_('Interview Mode'), max_length=20, choices=INTERVIEW_MODE)
     status = models.CharField(_('Status'), max_length=20, choices=STATUS_CHOICES, default='scheduled')
-    call_type = models.ForeignKey(Choice, null=True, blank=True, on_delete=models.CASCADE, related_name='interview_type')
     failure_reason = ArrayField(models.CharField(
         _('Failure Reason'),
         max_length=80, choices=FAILURE_CHOICES),
@@ -443,6 +488,11 @@ class Interview(TimeStampedModel):
     passed_reason = ArrayField(models.CharField(
         _('Passed Reason'),
         max_length=50, choices=PASSED_CHOICES),
+        null=True, blank=True
+    )
+    call_type = models.ForeignKey(
+        Choice, on_delete=models.CASCADE,
+        related_name='interview_type',
         null=True, blank=True
     )
     supervisor = models.ForeignKey(
@@ -459,6 +509,15 @@ class Interview(TimeStampedModel):
     guest = models.ManyToManyField(
         User, related_name='screenings',
         verbose_name='Guest',
+        blank=True
+    )
+    guests = models.ManyToManyField(
+        GuestInfo, verbose_name='Guests',
+        blank=True
+    )
+    interviewers = models.ManyToManyField(
+        InterviewerProfile, related_name='interview',
+        verbose_name='Interviewer',
         blank=True
     )
 
