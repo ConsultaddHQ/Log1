@@ -15,6 +15,7 @@ from rest_framework.authentication import TokenAuthentication
 from constance import config
 from api_key.models import APIKey
 from employee.models import Team, User
+from report.serializers import ReportSerializer
 from utils_app.models import ScrumMeeting
 from utils_app.utils import export_to_csv
 from utils_app.thred_mail import send_email
@@ -755,6 +756,122 @@ class MarketingReportViewSets(GenericViewSet):
             write_exception(error, request)
             return Response({"message": ERROR_MSG, "error": str(error)}, status=400)
 
+    @staticmethod
+    def get_marketing_team_report_data(team, **kwargs):
+        try:
+            start = kwargs.get('start')
+            end = kwargs.get('end')
+            team_data = kwargs.get('team_data')
+            request = kwargs.get('request')
+
+            bench_consultant = Consultant.objects.filter(
+                marketing__teams__in=team,
+                marketing__status='open'
+            ).order_by('id').distinct('id')
+            submission = Submission.objects.filter(
+                marketing_team__in=team,
+                created__gte=start, created__lte=end,
+            ).exclude(status='draft').order_by('id').distinct('id')
+            interview = Interview.objects.filter(
+                created__gte=start, created__lte=end,
+                submission__marketing_team__in=team
+            ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id')
+            offer = Project.objects.filter(
+                submission__marketing_team__in=team,
+                created__gte=start, created__lte=end,
+            ).order_by('id').distinct('id')
+            joining = Project.objects.filter(
+                statuses__status='joined',
+                submission__marketing_team__in=team,
+                statuses__created__gte=start, statuses__created__lte=end,
+            ).order_by('id').distinct('id')
+            completion = Project.objects.filter(
+                statuses__status='complete',
+                submission__marketing_team__in=team,
+                statuses__created__gte=start, statuses__created__lte=end,
+            ).order_by('id').distinct('id')
+
+            termination_type = request.GET.get("termination_type", None)
+            termination_mapping = {
+                "Resigned": "terminated-resigned",
+                "Fired": "terminated-fired",
+            }
+            is_start_with = termination_mapping.get(termination_type, "terminated")
+
+            if termination_type == "Other":
+                termination = Project.objects.filter(
+                    statuses__status=is_start_with,
+                    submission__marketing_team__in=team,
+                    statuses__created__gte=start, statuses__created__lte=end,
+                ).order_by('id').distinct('id')
+            else:
+                termination = Project.objects.filter(
+                    statuses__status__istartswith=is_start_with,
+                    submission__marketing_team__in=team,
+                    statuses__created__gte=start, statuses__created__lte=end,
+                ).order_by('id').distinct('id')
+
+            scrum_master = ''
+            if team_data:
+                scrum_masters = User.objects.filter(team__name__iexact=team[0].name, role__name='admin', is_active=True)
+                scrum_master = None
+                if scrum_masters:
+                    scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
+
+            team_id = team[0].id if team_data else 0
+            team_name = team[0].name.title() if team_data else 'Total'
+            scrum_master = scrum_master
+            offer_count = offer.count()
+            joining_count = joining.count()
+            interview_count = interview.count()
+            bench_consultant_count = bench_consultant.count()
+            submission_count = submission.count()
+            completion_count = completion.count()
+            termination_count = termination.count()
+
+            team_data = {
+                'data': {
+                    "id": team_id,
+                    "team": team_name,
+                    "offer": {'count': offer_count,
+                              'data': ReportSerializer(offer[0:3], many=True, context={'model': 'Project'}).data},
+                    "scrum_master": scrum_master,
+                    "joined": {'count': joining_count,
+                               'data': ReportSerializer(joining[0:3], many=True, context={'model': 'Project'}).data},
+                    "interview": {'count': interview_count,
+                                  'data': ReportSerializer(interview[0:3], many=True,
+                                                           context={'model': 'Interview'}).data},
+                    "bench_consultant": {'count': bench_consultant_count,
+                                         'data': ReportSerializer(bench_consultant[0:3], many=True,
+                                                                  context={'model': 'Consultant'}).data},
+                    "submission": {'count': submission_count,
+                                   'data': ReportSerializer(submission[0:3], many=True,
+                                                            context={'model': 'Submission'}).data},
+                    "completion": {'count': completion_count,
+                                   'data': ReportSerializer(completion[0:3], many=True,
+                                                            context={'model': 'Project'}).data},
+                    "termination": {'count': termination_count,
+                                    'data': ReportSerializer(termination[0:3], many=True,
+                                                             context={'model': 'Project'}).data},
+                },
+                'count': {
+                    "id": team_id,
+                    "team": team_name,
+                    "scrum_master": scrum_master,
+                    "offer_count": offer_count,
+                    "joined_count": joining_count,
+                    "bench_consultant": bench_consultant_count,
+                    "interview_count": interview_count,
+                    "completion_count": completion_count,
+                    "submission_count": submission_count,
+                    "termination_count": termination_count,
+                }
+            }
+            return team_data
+        except Exception as error:
+            write_exception(error, request)
+            return {}
+
     @action(methods=['get'], detail=False, url_path='team')
     def team(self, request):
         try:
@@ -770,95 +887,22 @@ class MarketingReportViewSets(GenericViewSet):
                 start = date.today() - timedelta(days=30)
             if not end:
                 end = date.today()
-            end = end + timedelta(days=1) if type(end) is not str else datetime.strptime(end, '%Y-%m-%d').date() + timedelta(days=1)
+            end = end + timedelta(days=1) if type(end) is not str else \
+                datetime.strptime(end, '%Y-%m-%d').date() + timedelta(days=1)
             data, url = list(), ""
-            total_bench = total_submissions = total_interviews = total_joining = total_offers \
-                = total_termination = total_completion = 0
             teams = Team.objects.filter(dept='Marketing')
+            data = []
+            export_data = []
             for team in teams:
-                team_id = team.id
-                bench_consultant = Consultant.objects.filter(
-                    marketing__teams__id=team_id,
-                    marketing__status='open'
-                ).order_by('id').distinct('id').count()
-                submission_count = Submission.objects.filter(
-                    marketing_team__id=team_id,
-                    created__gte=start, created__lte=end,
-                ).exclude(status='draft').order_by('id').distinct('id').count()
-                interview_count = Interview.objects.filter(
-                    created__gte=start, created__lte=end,
-                    submission__marketing_team__id=team_id
-                ).exclude(status='cancelled').order_by('submission_id').distinct('submission_id').count()
-                offer_count = Project.objects.filter(
-                    submission__marketing_team__id=team_id,
-                    created__gte=start, created__lte=end,
-                ).order_by('id').distinct('id').count()
-                joining_count = Project.objects.filter(
-                    statuses__status='joined',
-                    submission__marketing_team__id=team_id,
-                    statuses__created__gte=start, statuses__created__lte=end,
-                ).order_by('id').distinct('id').count()
-                completion_count = Project.objects.filter(
-                    statuses__status='complete',
-                    submission__marketing_team__id=team_id,
-                    statuses__created__gte=start, statuses__created__lte=end,
-                ).order_by('id').distinct('id').count()
+                team_data = self.get_marketing_team_report_data(team=[team], start=start, end=end, request=request,
+                                                                team_data=True)
+                data.append(team_data.get('data'))
+                export_data.append(team_data.get('count'))
 
-                termination_type = request.GET.get("termination_type", None)
-                termination_mapping = {
-                    "Resigned": "terminated-resigned",
-                    "Fired": "terminated-fired",
-                }
-                is_start_with = termination_mapping.get(termination_type, "terminated")
-
-                if termination_type == "Other":
-                    termination_count = Project.objects.filter(
-                        statuses__status=is_start_with,
-                        submission__marketing_team__id=team_id,
-                        statuses__created__gte=start, statuses__created__lte=end,
-                    ).order_by('id').distinct('id').count()
-                else:
-                    termination_count = Project.objects.filter(
-                        statuses__status__istartswith=is_start_with,
-                        submission__marketing_team__id=team_id,
-                        statuses__created__gte=start, statuses__created__lte=end,
-                    ).order_by('id').distinct('id').count()
-
-                scrum_masters = User.objects.filter(team__name__iexact=team.name, role__name='admin', is_active=True)
-                scrum_master = None
-                if scrum_masters:
-                    scrum_master = ", ".join(list(scrum_masters.values_list('employee_name', flat=True)))
-                data.append({
-                    "id": team.id,
-                    "team": team.name.title(),
-                    "offer_count": offer_count,
-                    "scrum_master": scrum_master,
-                    "joined_count": joining_count,
-                    "interview_count": interview_count,
-                    "bench_consultant": bench_consultant,
-                    "submission_count": submission_count,
-                    "completion_count": completion_count,
-                    "termination_count": termination_count,
-                })
-                total_offers += offer_count
-                total_joining += joining_count
-                total_bench += bench_consultant
-                total_interviews += interview_count
-                total_submissions += submission_count
-                total_completion += completion_count
-                total_termination += termination_count
-            data.append({
-                "id": 0,
-                "team": "Total",
-                "scrum_master": "",
-                "offer_count": total_offers,
-                "joined_count": total_joining,
-                "bench_consultant": total_bench,
-                "interview_count": total_interviews,
-                "completion_count": total_completion,
-                "submission_count": total_submissions,
-                "termination_count": total_termination,
-            })
+            team_data = self.get_marketing_team_report_data(team=teams, start=start, end=end, request=request,
+                                                            team_data=False)
+            data.append(team_data.get('data'))
+            export_data.append(team_data.get('count'))
 
             col_name = [
                 {"name": "team", "display_name": "Team Name"},
@@ -873,7 +917,7 @@ class MarketingReportViewSets(GenericViewSet):
             ]
             if export:
                 url = export_to_csv(
-                    data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
+                    export_data, col_name, f"team_report_{datetime.now().strftime('%d-%B-%Y')}.csv", request,
                     "Marketing Team Report"
                 )
             return Response({"data": data, "file_url": url}, status=200)
@@ -1068,7 +1112,8 @@ class MarketingReportViewSets(GenericViewSet):
             if not end:
                 end = date.today() + timedelta(days=1)
 
-            interviews = Interview.objects.filter(supervisor_id__in=supervisors, start_time__gte=start, start_time__lte=end)\
+            interviews = Interview.objects.filter(supervisor_id__in=supervisors, start_time__gte=start,
+                                                  start_time__lte=end) \
                 .exclude(status__in=['cancelled', 'scheduled', 'rescheduled', 'feedback_due']).order_by('-round')
             max_rounds = interviews.first().round if interviews else 0
             for sup_id in supervisors:
@@ -1078,12 +1123,12 @@ class MarketingReportViewSets(GenericViewSet):
                 sup_data = {
                     "id": supervisor.id, "name": supervisor.employee_name, "rounds": []
                 }
-                for round_number in range(1, sup_max_rounds+1):
+                for round_number in range(1, sup_max_rounds + 1):
                     pass_interviews = queryset.filter(round=round_number, status__in=['next_round', 'offer']).count()
                     fail_interviews = queryset.filter(round=round_number, status='failed').count()
                     sup_data['rounds'].append({
-                            "pass": pass_interviews, "fail": fail_interviews
-                        })
+                        "pass": pass_interviews, "fail": fail_interviews
+                    })
                 data.append(sup_data)
 
             return Response({'max_rounds': max_rounds, 'data': data}, status=200)

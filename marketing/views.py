@@ -57,7 +57,7 @@ class VendorCompanyViewSets(ListModelMixin, CreateModelMixin, GenericViewSet):
         try:
             query = request.GET.get("query", "").lstrip().replace(':amp:', '&')
             first, last = get_page_limits(request) if query else (0, 20)
-            queryset = VendorCompany.objects.filter(name__icontains=query).order_by(Lower('name'))
+            queryset = VendorCompany.objects.filter(name__icontains=query).order_by('id', Lower('name')).distinct('id')
             total = queryset.count()
             data = queryset[first:last].values('id', 'name', 'created_by')
             return Response({"data": data, "total": total}, status=200)
@@ -474,8 +474,7 @@ class SubmissionV2ViewSets(GenericViewSet, RetrieveModelMixin):
             submission = get_object_or_404(Submission, id=pk)
             supervisors = list(submission.screening.all().values_list('supervisor_id', flat=True))
             handover_ids = get_authenticated_users(request)
-            if (submission.created_by in handover_ids) or (user_id in supervisors) or (
-                    'engineer' in request.user.roles):
+            if (submission.created_by in handover_ids) or (user_id in supervisors) or ('engineer' in request.user.roles):
                 visibility = True
                 queryset = submission.attachments.all()
                 data = AttachmentSerializer(queryset, many=True).data
@@ -1225,7 +1224,9 @@ class InterviewViewSets(ModelViewSet):
                     if filters["assignment"] == 'assigned':
                         queryset = queryset.filter(guest_type__icontains='assigned').exclude(status='cancelled')
                     if filters["assignment"] == 'unassigned':
-                        queryset = queryset.exclude(guest_type__icontains='coder').exclude(status='cancelled')
+                        queryset = queryset.exclude(
+                            guest_type__in=['coder', 'Coder', 'Assistance', 'assistance', 'Coder & Assistance']
+                        ).exclude(status='cancelled')
 
                 if 'coding_interview' in filters:
                     if filters["coding_interview"] == 'yes':
@@ -1764,7 +1765,7 @@ class InterviewViewSets(ModelViewSet):
                 return Response({"message": "Interview not found"}, status=404)
 
             if queryset.first().get_screening_type_display() == 'Interview' and \
-                    ('interviewers' not in request.data or request.data.get('interviewers', []) is None):
+                    ('interviewer_profiles' not in request.data or request.data.get('interviewer_profiles', []) is None):
                 return Response({"message": "Please add interviewer info"}, status=status.HTTP_400_BAD_REQUEST)
 
             interview = queryset.first()
