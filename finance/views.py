@@ -19,8 +19,8 @@ from rest_framework.authentication import TokenAuthentication
 
 from legal.models import Petition
 from utils_app.models import Choice
-from consultant.models import Consultant
 from notification.models import Notification, FCMDevice
+from consultant.models import Consultant, PayrollEmployer
 from project.models import Project, Leave, TimeSheet, TimesheetRequest, ConsultantLeave
 
 
@@ -132,11 +132,11 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 project_qs = project_qs.filter(
-                    Q(consultant__name__icontains=query) |
-                    Q(employer__icontains=query) |
-                    Q(submission__client__icontains=query) |
-                    Q(submission__consultant_marketing__consultant__name__icontains=query) |
-                    Q(submission__lead__vendor_company__name__icontains=query)
+                    Q(employer__istartswith=query) |
+                    Q(consultant__name__istartswith=query) |
+                    Q(submission__client__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query)|
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
 
             if filter_json:
@@ -153,8 +153,7 @@ class FinancePayStubsViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMix
                    if 'active' in filter_json.get('project_status'):
                        project_status.append('joined')
 
-                   project_qs = project_qs.filter(
-                       statuses__status__in=project_status, statuses__is_current=True)
+                   project_qs = project_qs.filter(statuses__status__in=project_status, statuses__is_current=True)
 
                if 'paystub_status' in filter_json:
                    paystub_status = filter_json['paystub_status'].split(',')
@@ -376,13 +375,12 @@ class FinanceTimeSheetViewSet(RetrieveModelMixin, ListModelMixin, UpdateModelMix
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 project_qs = project_qs.filter(
-                    Q(consultant__name__icontains=query) |
-                    Q(employer__icontains=query) |
-                    Q(submission__client__icontains=query) |
-                    Q(submission__consultant_marketing__consultant__name__icontains=query) |
-                    Q(submission__lead__vendor_company__name__icontains=query)
+                    Q(employer__istartswith=query) |
+                    Q(consultant__name__istartswith=query) |
+                    Q(submission__client__istartswith=query) |
+                    Q(submission__lead__vendor_company__name__istartswith=query)|
+                    Q(submission__consultant_marketing__consultant__name__istartswith=query)
                 )
-
 
             project_qs = project_qs.annotate(
                 timesheet_status=Case(
@@ -693,10 +691,10 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             if query:
                 query = query.lstrip().replace(':amp:', '&')
                 consultants = consultants.filter(
-                    Q(name__icontains=query) |
-                    Q(email__icontains=query) |
+                    Q(name__istartswith=query) |
+                    Q(email__istartswith=query) |
                     Q(projects__employer__istartswith=query) |
-                    Q(projects__submission__consultant_marketing__consultant__name__icontains=query)
+                    Q(projects__submission__consultant_marketing__consultant__name__istartswith=query)
                 ).order_by('id').distinct('id')
 
             data = {
@@ -724,13 +722,13 @@ class FinanceLeaveViewSets(RetrieveModelMixin, ListModelMixin, UpdateModelMixin,
             consultant_list = []
 
             for consultant in sorted_consultants[first:last]:
-                petition = Petition.objects.filter(beneficiary=consultant, is_active=True).first()
+                employers = PayrollEmployer.objects.filter(consultant=consultant).order_by('-created')
                 consultant = {
                     "id": consultant.id,
                     "name": consultant.name,
                     "email": consultant.email,
                     "approval_required": consultant.approval_required,
-                    "employer": petition.employer if petition else None,
+                    "employer": employers.first().name if employers.first() else None,
                     "leave_status": return_leave_status(filter_json['leave_status']) if 'leave_status' in filter_json
                     else consultant.leaves.latest().get_status_display() if consultant.leaves.exists() else None,
                     "leave_type": consultant.leaves.latest().leave_type.leave_type.name if consultant.leaves.count() != 0 else None,
