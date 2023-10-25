@@ -566,7 +566,7 @@ def update_interviewee(obj, request):
         for interviewer in interviewers_profiles:
             if interviewer.get('id', None):
                 interviewer_obj = get_object_or_404(InterviewerProfile, id=interviewer.get('id'))
-                serializer = InterviewerProfileSerializer(interviewer_obj, partial=True)
+                serializer = InterviewerProfileSerializer(interviewer_obj, data=interviewer, partial=True)
                 if not serializer.is_valid():
                     return Response(
                         {"message": "Interviewers details are incorrect", "error": str(serializer.errors)},
