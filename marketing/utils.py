@@ -622,7 +622,7 @@ def add_or_update_guest(obj, request, guests=[]):
                 try:
                     user_guest = get_object_or_404(User, id=guest.get('user_id'))
                 except ObjectDoesNotExist:
-                    return Response({"message": ""})
+                    return Response({"message": "Guest does not exist"}, status=status.HTTP_400_BAD_REQUEST)
                 guest_obj = GuestInfo.objects.create(user=user_guest, type=guest.get('type', None))
             if guest_obj not in existing_guest:
                 obj.guests.add(guest_obj)
