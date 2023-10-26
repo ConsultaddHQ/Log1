@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 
 from constance import config
 from employee.models import User
@@ -606,18 +607,23 @@ def get_guest_type(request):
     return guest_type
 
 
-def add_or_update_guest(obj, request):
+def add_or_update_guest(obj, request, guests=[]):
     try:
         resp = 'Not Assigned'
         updated_guests = set()
         existing_guest = set(obj.guests.all())
-        guests = request.data.get('guest_info', [])
+        if not guests:
+            guests = request.data.get('guest_info', [])
         for guest in guests:
             if guest.get('user_id', None) is None:
                 continue
             guest_obj = GuestInfo.objects.filter(user_id=guest.get('user_id'), type=guest.get('type', None)).first()
             if not guest_obj:
-                guest_obj = GuestInfo.objects.create(user_id=guest.get('user_id'), type=guest.get('type', None))
+                try:
+                    user_guest = get_object_or_404(User, id=guest.get('user_id'))
+                except ObjectDoesNotExist:
+                    return Response({"message": ""})
+                guest_obj = GuestInfo.objects.create(user=user_guest, type=guest.get('type', None))
             if guest_obj not in existing_guest:
                 obj.guests.add(guest_obj)
                 obj.save()

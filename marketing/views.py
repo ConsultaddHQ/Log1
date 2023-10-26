@@ -10,7 +10,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.db.models import F, Max, Count
 from django.db.models.functions import Lower
-from  django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import ContentType
 
 from rest_framework.mixins import *
@@ -1203,7 +1203,7 @@ class InterviewViewSets(ModelViewSet):
             if filter_for == 'my':
                 if 'engineer' in request.user.roles:
                     queryset = queryset.filter(
-                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guests__id=user_id)
+                        Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id) | Q(guests__user_id=user_id)
                     )
                 else:
                     queryset = queryset.filter(Q(submission__created_by_id=user_id) | Q(supervisor_id=user_id))
@@ -2304,9 +2304,7 @@ class InterviewViewSets(ModelViewSet):
     @action(methods=['put'], detail=True, url_path='guest_feedback')
     def guest_feedback(self, request, pk):
         try:
-            queryset = Interview.objects.filter(id=pk, guests__in=[request.user]).filter(
-                Q(guests__type__icontains='Coder') | Q(guests__type__icontains='Assistance')
-            )
+            queryset = Interview.objects.filter(id=pk, guests__user_id__in=[request.user.id])
             if not queryset:
                 return Response({"message": DONT_HAVE_ACCESS}, status=403)
             interview = queryset.first()
@@ -2319,7 +2317,7 @@ class InterviewViewSets(ModelViewSet):
             if not ques_answers:
                 return Response({"message": "No feedback given"}, status=400)
 
-            add_or_update_guest(interview, request)
+            add_or_update_guest(interview, request, json.loads(request.data.get('guest_info', '[]')))
 
             # Activity
             desc = f"{request.user.employee_name} provided coding feedback for Interview I-{interview.id}"
@@ -2418,7 +2416,8 @@ class InterviewViewSets(ModelViewSet):
     def get_guests(self, request, pk):
         try:
             interview_obj = get_object_or_404(Interview, id=pk)
-            return Response({"data": interview_obj.guests.values("id", "name", "type")}, status=status.HTTP_200_OK)
+            interviewers = interview_obj.guests.values("id", "user_id", "type").annotate(name=F('user__employee_name'))
+            return Response({"data": interviewers}, status=status.HTTP_200_OK)
         except ObjectDoesNotExist:
             return Response({"message": "Interview ID does not exist"}, status=400)
 

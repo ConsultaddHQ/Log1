@@ -516,8 +516,8 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or \
-                (('Assigned' or 'assigned') in obj.guest_type) and obj.coding_present is None:
+        if obj.guest_type and ((obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or
+                               (('Assigned' or 'assigned') in obj.guest_type)) and obj.coding_present is None:
             return False
         return True
 
@@ -534,7 +534,7 @@ class InterviewV2Serializer(serializers.ModelSerializer):
                 assistance = True
                 coding_required = True
         else:
-            assistance = obj.technical_assistance
+            assistance = obj.assistance_required
             coding_required = obj.coding_present
         return {
             "coding_required": coding_required, "assistance": assistance
