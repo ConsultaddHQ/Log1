@@ -2,8 +2,8 @@ from datetime import datetime
 from rest_framework import serializers
 
 from marketing.models import *
-from consultant.models import Consultant
 from django.db.models import Q
+from consultant.models import Consultant
 from project.utils import get_project_check_list
 from project.models import Project, ProjectSupport
 from activity.serializers import CommentGetSerializer
@@ -188,7 +188,8 @@ class InterviewDetailSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if obj.guest_type in ['coder', 'assistance', 'assigned'] and obj.coding_present is None:
+        if (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or \
+                (('Assigned' or 'assigned') in obj.guest_type) and obj.coding_present is None:
             return False
         return True
 
@@ -275,8 +276,9 @@ class InterviewListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if (obj.guest_type in ['Coder', 'Assistance'] or obj.guest_type in ['Assigned', 'assigned']) and \
-                obj.coding_present is None:
+        if obj.guest_type and obj.coding_present is None and (
+                (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or (
+                ('Assigned' or 'assigned') in obj.guest_type)):
             return False
         return True
 
@@ -514,8 +516,8 @@ class InterviewV2Serializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allow_status_change(obj):
-        if (obj.guest_type in ['Coder', 'Assistance'] or obj.guest_type in ['Assigned', 'assigned']) and \
-                obj.coding_present is None:
+        if (obj.guest_type in ['Coder', 'Assistance', 'Coder & Assistance']) or \
+                (('Assigned' or 'assigned') in obj.guest_type) and obj.coding_present is None:
             return False
         return True
 

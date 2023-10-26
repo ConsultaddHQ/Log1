@@ -609,7 +609,8 @@ def get_guest_type(request):
 def add_or_update_guest(obj, request):
     try:
         resp = 'Not Assigned'
-        existing_guest = obj.guests.all()
+        updated_guests = set()
+        existing_guest = set(obj.guests.all())
         guests = request.data.get('guest_info', [])
         for guest in guests:
             if guest.get('user_id', None) is None:
@@ -617,13 +618,17 @@ def add_or_update_guest(obj, request):
             guest_obj = GuestInfo.objects.filter(user_id=guest.get('user_id'), type=guest.get('type', None)).first()
             if not guest_obj:
                 guest_obj = GuestInfo.objects.create(user_id=guest.get('user_id'), type=guest.get('type', None))
-            if guest_obj in existing_guest:
-                continue
-            elif guest_obj.user_id in existing_guest.values_list('user_id', flat=True):
-                obj.guests.remove(existing_guest.filter(user_id=guest_obj.user_id).first())
-            obj.guests.add(guest_obj)
+            if guest_obj not in existing_guest:
+                obj.guests.add(guest_obj)
+                obj.save()
+                resp = 'assigned'
+            updated_guests.add(guest_obj)
+
+        existing_guest.difference_update(updated_guests)
+        if existing_guest:
+            remove_guests = [elm for elm in existing_guest]
+            obj.guests.remove(*remove_guests)
             obj.save()
-            resp = 'assigned'
         return resp
     except Exception as error:
         write_exception(error, request)
