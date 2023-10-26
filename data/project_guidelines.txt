@@ -1,0 +1,101 @@
+CASE 2: Interaction does not take place on the day of project assignment:
+
+With respect to points mentioned above draft an email with below points:
+
+Greet the consultant for the offer
+
+Introduce yourself in brief
+
+Put details of what you expect from consultant in 1st session next day, specifically Ask them to complete point “4” and “5” from “CASE 1”.
+
+Share a Tentative agenda for point 6-b from case 1 based on JD and recording. Put it in a template which defines which topics will have how long sessions and on which days before joining. Make sure you cover all important topics from JD and recording.
+
+
+
+
+First Day Preparation Check List:
+
+Introduction needs to be prepared about 30-40 sec based on resume.
+
+VPN, VDI should be explained.
+
+Do’s and don’ts at client side needs to be discussed.
+
+
+
+
+What happens on first day at client side:
+
+
+
+ID check at reception
+
+He / She will ask for reporting person.
+
+There can be introductory meeting for new consultant where he/she will use already prepared introduction based on marketing resume.
+
+Try to gather information about the project.
+
+Manager/Someone from the team will KT session.
+
+If anyone does not get any KT he/she needs to ask for any project related documentation which can help in understanding project.
+
+Identify what tools, client is using and ask access for required things.
+
+To take support:
+
+If laptop provided, one needs to check for VPN so he/she can access stuff outside office and take support through screenshare.
+
+If desktop provided one needs to identify that how he/she can access stuff from home. Needs to get VPN, VDI in his/her personal laptop/Desktop
+
+
+
+
+Day to Day Support:
+
+
+Daily share some assignments to the consultant which he/she should work as a learning in parallel with the project, (start this exercise once project is stable in 2-3 weeks)
+
+
+
+Start the support call with asking about assignments completed or any road blocks faced in them.
+
+
+
+Request consultant about all the inputs and explanations, or any screenshots, audio, etc. of the tasks to be done in email at the end of his/her working hours. Task details etc. that needs to be delivered on that day before your support call starts. On call you can discuss the same things with the consultant.
+
+
+
+Try not to take access of machine and directly start working on the code instead guide/instruct the consultant on how to complete the task, you can just verbally share what needs to be done, be on call walk him/her through everything, share code snippets in the chat.
+
+
+
+If the deliverables are time critical or more tasks are there for the day then take the access and work on consultant’s machine but at the same time the consultant needs to be present on call and should make note of all the explanations given by you.
+
+
+
+Do not ask the consultant to send any code or any project on email to you, also do not open any accounts shared by the client on your machine, like AWS account, or any other cloud platform, if it is needed then discuss with any senior person or your Team Lead if that is needed.
+
+
+
+Any repeated task should be completed by the consultant only, if any changes are needed drop an email explaining the modifications in the required areas.
+
+
+
+At the end of the daily support call ask the consultant to drop you the email containing all today's tasks completed, all the notes he/she made, also the pending work to be done.
+
+
+
+Reply the email if you feel any correction are needed in the notes or in the tasks completed for the day.
+
+
+
+Any questions/missing-requirements which we need consultant to discuss with the client should be shared on email and it should also be explained verbally to the consultant along with other cross questions which could be asked to him/her.
+
+
+
+Also, for any urgent issues in absence of a support person, the consultant can reach for help on an official engineering email with task details. Anyone available will be assigned to help deliver the tasks.
+
+
+
+Any concern related to punctuality or dedication, knowledge, behavior, understanding which can lead to project failure should be reported to the concerned department on the same day, prepare the post and get it reviewed with Team Leads and post it tagging concerned people [ CANDIDATE FEEDBACK CHANNEL].

@@ -1,0 +1,164 @@
+from django.db import models
+from django.utils import timezone
+from django.utils.translation import ugettext_lazy as _
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
+
+from employee.models import User
+from utils_app.models import TimeStampedModel
+
+
+class NotificationQuerySet(models.query.QuerySet):
+    """ Notification QuerySet """
+
+    def unread(self, user, user_type):
+        """Return only unread items in the current queryset"""
+        return self.filter(
+            unread=True, deleted=False,
+            recipient_object_id=user.id,
+            recipient_content_type__model=user_type,
+        ).order_by('timestamp')
+
+    def mark_all_as_read(self, recipient, user_type):
+        """Mark as read any unread messages in the current queryset.
+        Optionally, filter these by recipient first.
+        """
+        qset = self.unread(recipient, user_type)
+        return qset.update(unread=False)
+
+    def active(self, recipient, user_type):
+        """Return only active(un-deleted) items in the current queryset"""
+        queryset = self.filter(
+            deleted=False,
+            recipient_object_id=recipient.id,
+            recipient_content_type__model=user_type,
+        )
+        return queryset
+
+    def mark_all_as_deleted(self, recipient, user_type):
+        """Mark current queryset as deleted.
+        Optionally, filter by recipient first.
+        """
+        qset = self.active(recipient, user_type)
+        return qset.update(deleted=True)
+
+
+class FCMDevice(models.Model):
+    DEVICE_TYPES = (
+        (u'ios', u'ios'),
+        (u'web', u'web'),
+        (u'android', u'android'),
+    )
+    active = models.BooleanField(_("Is active"), default=True)
+    type = models.CharField(choices=DEVICE_TYPES, max_length=10, blank=True, null=True)
+    name = models.CharField(_("Name of Device"), max_length=255, blank=True, null=True)
+    date_created = models.DateTimeField(_("Creation date"), auto_now_add=True, null=True)
+    device_id = models.CharField(_("Device ID"), primary_key=True, db_index=True, max_length=300)
+
+    object_id = models.CharField(_('Object Id'), max_length=40)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    class Meta:
+        verbose_name = _("FCM device")
+        verbose_name_plural = _("FCM devices")
+
+
+class Notification(models.Model):
+    CATEGORY_CHOICES = (
+        ('info', 'Info'),
+        ('alert', 'Alert'),
+        ('pending', 'Pending'),
+        ('rejected', 'Rejected'),
+    )
+    description = models.TextField(blank=True, null=True)
+    deleted = models.BooleanField(default=False, db_index=True)
+    emailed = models.BooleanField(default=False, db_index=True)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    timestamp = models.DateTimeField(default=timezone.now, db_index=True)
+    unread = models.BooleanField(default=True, blank=False, db_index=True)
+    category = models.CharField(choices=CATEGORY_CHOICES, default='alert', max_length=20)
+
+    recipient_object_id = models.PositiveIntegerField()
+    recipient_content_type = models.ForeignKey(
+        ContentType, null=True,
+        on_delete=models.SET_NULL,
+        related_name='recipient_notification'
+    )
+    recipient_content_object = GenericForeignKey('recipient_content_type', 'recipient_object_id')
+
+    sender_object_id = models.PositiveIntegerField()
+    sender_content_type = models.ForeignKey(
+        ContentType, null=True,
+        on_delete=models.SET_NULL,
+        related_name='sender_notification'
+    )
+    sender_content_object = GenericForeignKey('sender_content_type', 'sender_object_id')
+
+    target_object_id = models.PositiveIntegerField()
+    target_content_type = models.ForeignKey(
+        ContentType, null=True,
+        related_name='target_notification',
+        blank=True, on_delete=models.SET_NULL,
+    )
+    target_content_object = GenericForeignKey('target_content_type', 'target_object_id')
+
+    parent_object_id = models.PositiveIntegerField(null=True, blank=True)
+    parent_content_type = models.ForeignKey(
+        ContentType, null=True,
+        related_name='parent_notification',
+        blank=True, on_delete=models.SET_NULL,
+    )
+    parent_content_object = GenericForeignKey('parent_content_type', 'parent_object_id')
+
+    objects = NotificationQuerySet.as_manager()
+
+    class Meta:
+        ordering = ('-timestamp',)
+
+    def __str__(self):
+        ctx = {
+            'title': self.title,
+            'timesince': self.timesince()
+        }
+        return u'%(title)s %(timesince)s ago' % ctx
+
+    def timesince(self, now=None):
+        from django.utils.timesince import timesince as timesince_
+        return timesince_(self.timestamp, now)
+
+    def mark_as_read(self):
+        if self.unread:
+            self.unread = False
+            self.save()
+
+    def mark_as_deleted(self):
+        if not self.deleted:
+            self.deleted = True
+            self.save()
+
+    def mark_not_deleted(self):
+        if self.deleted:
+            self.deleted = False
+            self.save()
+
+
+class UserNotification(TimeStampedModel):
+    is_active = models.BooleanField(default=False)
+    count = models.IntegerField(_('count'), default=1)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE , null=True, blank=True)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='pushnotification',
+        verbose_name='User'
+    )
+
+    def save(self, *args, **kwargs):
+
+        if not self.id:
+            self.created = timezone.now()
+        self.modified = timezone.now()
+        return super(UserNotification, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.id}:{self.user.employee_name} '
