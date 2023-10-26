@@ -6,7 +6,7 @@ from marketing.models import Interview, GuestInfo
 
 type_mapper = {
     "coder": "Coder",
-    "assigned": "Assigned",
+    "assigned": "Assigned Coder",
     "not_required": "Not Required"
 }
 
