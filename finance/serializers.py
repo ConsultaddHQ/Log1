@@ -9,28 +9,17 @@ class FinanceSerializer(serializers.ModelSerializer):
     submission = serializers.SerializerMethodField()
     project_status = serializers.SerializerMethodField()
     timesheet_status = serializers.SerializerMethodField()
-    request_timesheet = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = ('id', 'employer', 'start_date', 'project_status', 'timesheet_status', 'request_timesheet', 'timesheet_frequency', 'consultant', 'submission')
+        fields = ('id', 'employer', 'start_date','project_status','timesheet_status','consultant', 'submission')
 
-    def get_timesheet_status(self, obj):
-        status = self.context.get('timesheet_status')
-        if status:
-            return status[0]
-        ts_obj = TimeSheet.objects.filter(project=obj)
+    @staticmethod
+    def get_timesheet_status(obj):
+        ts_obj = TimeSheet.objects.filter(project=obj, status__in=["updated", "submitted"])
         try:
-            if ts_obj.filter(status__in=["updated", "submitted"]):
-                return "pending"
-            elif ts_obj.filter(status="rejected"):
-                return "rejected"
-            elif ts_obj.filter(status="approved"):
-                return "approved"
-            elif ts_obj.filter(status="draft") & self.context.get('timesheet'):
-                return "draft"
-            else:
-                return None
+            ts_status = ts_obj.latest().status if ts_obj else TimeSheet.objects.filter(
+                project=obj).latest().status
         except:
             ts_status = None
         return ts_status
@@ -40,10 +29,6 @@ class FinanceSerializer(serializers.ModelSerializer):
         if obj.statuses.filter(status__istartswith='terminated').first():
             return "terminated"
         return obj.status
-
-    @staticmethod
-    def get_request_timesheet(obj):
-        return True if TimesheetRequest.objects.filter(project=obj, status="request") else False
 
     @staticmethod
     def get_submission(obj):
@@ -60,6 +45,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_consultant(obj):
+        # consultant = obj.submission.consultant_marketing.consultant
         consultant=obj.consultant
         return {
             'id': consultant.id,
@@ -71,7 +57,7 @@ class FinanceSerializer(serializers.ModelSerializer):
 class FinanceDetailSerializer(serializers.ModelSerializer):
     end = serializers.SerializerMethodField()
     start = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField()
+    # project = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
     submitted_at = serializers.SerializerMethodField()
     list_page_status = serializers.SerializerMethodField()
@@ -105,15 +91,22 @@ class FinanceDetailSerializer(serializers.ModelSerializer):
             return "pending"
         return obj.status
 
-    @staticmethod
-    def get_status(obj):
-        if obj.status=="submitted":
-            return "pending"
-        return obj.status
+    # @staticmethod
+    # def get_project(obj):
+    #     submission = obj.project.submission
+    #     return {
+    #         'id': obj.project.id,
+    #         'employer': obj.project.employer,
+    #         'start_date': obj.project.start_date,
+    #         'submission' : {
+    #             'client': submission.client,
+    #             'vendor': submission.lead.vendor_company.name,
+    #             'work_type': submission.get_work_type_display(),
+    #         }
+    #     }
 
 
 class LeaveSerializer(serializers.ModelSerializer):
-    status = serializers.SerializerMethodField()
     leave_type = serializers.SerializerMethodField()
     attachment = serializers.SerializerMethodField()
     duration_type = serializers.SerializerMethodField()
@@ -122,14 +115,10 @@ class LeaveSerializer(serializers.ModelSerializer):
         model = Leave
         fields = ('id', 'leave_type', 'to_date', 'from_date', 'total_hours', 'applied_on', 'status',
                   'description', 'attachment', 'duration_type')
-    @staticmethod
-    def get_status(obj):
-        return obj.get_status_display()
 
     @staticmethod
     def get_leave_type(obj):
         return obj.leave_type.leave_type.display_name
-
 
     @staticmethod
     def get_attachment(obj):
@@ -159,16 +148,17 @@ class LeaveSerializer(serializers.ModelSerializer):
 
 
 class TimesheetRequestSerializer(serializers.ModelSerializer):
-    end = serializers.SerializerMethodField()
-    start = serializers.SerializerMethodField()
-    status = serializers.SerializerMethodField()
+    submitted_at = serializers.SerializerMethodField()
     reviewed_by = serializers.SerializerMethodField()
     attachments = serializers.SerializerMethodField()
-    submitted_at = serializers.SerializerMethodField()
+    project = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    start = serializers.SerializerMethodField()
+    end = serializers.SerializerMethodField()
 
     class Meta:
         model = TimesheetRequest
-        fields = ('id', 'start', 'end', 'status', 'submitted_at', 'attachments', 'reviewer_comment',
+        fields = ('id', 'start', 'end', 'status', 'submitted_at', 'attachments', 'project', 'reviewer_comment',
                   'consultant_comment', 'reviewed_by')
 
     @staticmethod
@@ -193,18 +183,21 @@ class TimesheetRequestSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_status(obj):
-        if obj.status == "request":
-            return "pending"
-        elif obj.status == "reject":
-            return "rejected"
-        elif obj.status == "accepted":
-            return "approved"
-        else:
-            return None
+        return obj.get_status_display()
 
     @staticmethod
     def get_attachments(obj):
         return AttachmentURLSerializer(obj.attachments.filter(is_active=True), many=True).data
+
+    @staticmethod
+    def get_project(obj):
+        return {
+            'id': obj.project.id,
+            'employer': obj.project.employer,
+            'start_date': obj.project.start_date,
+            'client': obj.project.submission.client,
+            'vendor': obj.project.submission.lead.vendor_company.name,
+        }
 
 
 class TimetrackEventSerializer(serializers.ModelSerializer):

@@ -7,7 +7,6 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from employee.models import User
 from utils_app.models import TimeStampedModel
 
-
 class NotificationQuerySet(models.query.QuerySet):
     """ Notification QuerySet """
 
