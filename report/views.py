@@ -1150,6 +1150,7 @@ class DetailedReportViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='consultant')
     def consultant(self, request):
         try:
+            first, last = get_page_limits(request)
             end = request.GET.get('end', None)
             start = request.GET.get('start', None)
             team = request.GET.get('team', None)
@@ -1166,7 +1167,7 @@ class DetailedReportViewSets(GenericViewSet):
             else:
                 queryset = queryset.filter(marketing__status='open').order_by('id').distinct('id')
 
-            serializer = ConsultantInfoSerializer(queryset, many=True)
+            serializer = ConsultantInfoSerializer(queryset[first: last], many=True)
             return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
@@ -1201,6 +1202,7 @@ class DetailedReportViewSets(GenericViewSet):
     @action(methods=['get'], detail=False, url_path='interview')
     def interview(self, request):
         try:
+            first, last = get_page_limits(request)
             end = request.GET.get('end', None)
             team = request.GET.get('team', None)
             start = request.GET.get('start', None)
@@ -1218,7 +1220,7 @@ class DetailedReportViewSets(GenericViewSet):
             else:
                 queryset = queryset.order_by('submission_id').distinct('submission_id')
 
-            serializer = InterviewInfoSerializer(queryset, many=True)
+            serializer = InterviewInfoSerializer(queryset[first: last], many=True)
             return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
         except Exception as error:
             write_exception(error, request)
@@ -1232,6 +1234,7 @@ class DetailedReportViewSets(GenericViewSet):
             tab = request.GET.get('tab', None)
             team = request.GET.get('team', None)
             start = request.GET.get('start', None)
+            termination_type = request.GET.get('type', None)
 
             if not start and not end:
                 return Response({"message": ERR_DURATION}, status=status.HTTP_400_BAD_REQUEST)
@@ -1258,9 +1261,25 @@ class DetailedReportViewSets(GenericViewSet):
                 ).order_by('id').distinct('id')
 
             elif tab == "Terminated":
-                queryset = queryset.filter(
-                    statuses__status__istartswith='terminated', statuses__created__gte=start, statuses__created__lte=end
-                ).order_by('id').distinct('id')
+                termination_mapping = {
+                    'Resigned': 'terminated-resigned',
+                    'Fired': 'terminated-fired',
+                }
+                is_start_with = termination_mapping.get(termination_type, 'terminated')
+                if termination_type == "Other":
+                    queryset = queryset.filter(
+                        statuses__status=is_start_with, statuses__created__gte=start, statuses__created__lte=end
+                    ).order_by('id').distinct('id')
+                elif termination_type:
+                    queryset = queryset.filter(
+                        statuses__status__istartswith=is_start_with,
+                        statuses__created__gte=start, statuses__created__lte=end
+                    ).order_by('id').distinct('id')
+                else:
+                    queryset = queryset.filter(
+                        statuses__status__istartswith='terminated',
+                        statuses__created__gte=start, statuses__created__lte=end
+                    ).order_by('id').distinct('id')
 
             serializer = ProjectInfoSerializer(queryset[first: last], many=True)
             return Response({"data": serializer.data, "count": queryset.count()}, status=status.HTTP_200_OK)
